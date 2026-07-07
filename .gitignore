@@ -1,0 +1,38 @@
+# Windows
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Editor and IDE local state
+.idea/
+.vscode/
+*.iml
+
+# Android / Gradle
+.gradle/
+build/
+**/build/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Generated packages and binaries
+*.apk
+*.aab
+*.zip
+*.rar
+*.7z
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+
+# Local agent/runtime files
+.agents/
+.git-backups/
+task_plan.md
+findings.md
+progress.md

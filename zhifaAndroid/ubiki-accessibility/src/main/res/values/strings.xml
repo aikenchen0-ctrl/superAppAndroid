@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ubiki_accessibility_service_label">ubikiTouch Edge Bars</string>
+    <string name="ubiki_accessibility_service_description">Detects user gestures from transparent screen edge bars and runs configured navigation actions.</string>
+    <string name="ubiki_accessibility_service_summary">Shows touchable edge zones while the accessibility service is enabled.</string>
+    <string name="ubiki_launch_app_failed">Target app could not be launched.</string>
+    <string name="ubiki_persistent_channel_name">Gesture persistence</string>
+    <string name="ubiki_persistent_notification_title">ICON gestures are active</string>
+    <string name="ubiki_persistent_notification_text">Keeps edge gestures alive while accessibility is enabled.</string>
+    <string name="ubiki_recovery_notification_title">Enable ICON gesture persistence</string>
+    <string name="ubiki_recovery_notification_text">If gestures did not return after boot or cleanup, reopen accessibility and battery settings.</string>
+    <string name="ubiki_recovery_notification_action_accessibility">Accessibility settings</string>
+    <string name="ubiki_recovery_notification_action_app_settings">App settings</string>
+</resources>

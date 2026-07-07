@@ -1,0 +1,1047 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>悬浮聊天 APP 功能落实对照表</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --panel-soft: #eef3f8;
+      --text: #17202a;
+      --muted: #617182;
+      --line: #d7e0ea;
+      --ok: #138a55;
+      --ok-bg: #e5f6ee;
+      --part: #b56400;
+      --part-bg: #fff0d8;
+      --none: #b42318;
+      --none-bg: #fde8e7;
+      --removed: #6f3cc3;
+      --removed-bg: #efe7ff;
+      --unknown: #536171;
+      --unknown-bg: #e9eef4;
+      --accent: #2c6fbb;
+      --shadow: 0 18px 50px rgba(31, 53, 76, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+      background:
+        radial-gradient(circle at 16% 12%, rgba(44, 111, 187, 0.12), transparent 28%),
+        linear-gradient(180deg, #f7faff 0%, var(--bg) 52%, #edf3f8 100%);
+      color: var(--text);
+    }
+
+    .page {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 28px 28px 48px;
+    }
+
+    header {
+      display: grid;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      max-width: 980px;
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 14px;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin: 18px 0 16px;
+    }
+
+    .meta-card {
+      min-height: 92px;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid rgba(215, 224, 234, 0.9);
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(31, 53, 76, 0.08);
+    }
+
+    .meta-card strong {
+      display: block;
+      font-size: 28px;
+      line-height: 1;
+      margin-bottom: 10px;
+    }
+
+    .meta-card span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .panel {
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(215, 224, 234, 0.92);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 4;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      padding: 14px;
+      background: rgba(255, 255, 255, 0.96);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(12px);
+    }
+
+    .filter-btn {
+      appearance: none;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .filter-btn.active {
+      border-color: var(--accent);
+      background: #e7f1ff;
+      color: #174f8d;
+      font-weight: 700;
+    }
+
+    .search {
+      margin-left: auto;
+      width: min(360px, 100%);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 9px 13px;
+      font-size: 13px;
+      outline: none;
+      background: #fff;
+    }
+
+    .note {
+      margin: 0 0 18px;
+      padding: 14px 16px;
+      border: 1px solid #cad8e7;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.76);
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 13px;
+    }
+
+    .note b {
+      color: var(--text);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 13px;
+    }
+
+    thead th {
+      position: sticky;
+      top: 61px;
+      z-index: 3;
+      padding: 12px 10px;
+      text-align: left;
+      color: #2d3b49;
+      background: var(--panel-soft);
+      border-bottom: 1px solid var(--line);
+      white-space: nowrap;
+    }
+
+    tbody td {
+      vertical-align: top;
+      padding: 12px 10px;
+      border-bottom: 1px solid #e6edf4;
+      line-height: 1.6;
+    }
+
+    tbody tr:hover {
+      background: #f8fbff;
+    }
+
+    .module {
+      width: 132px;
+      color: #263747;
+      font-weight: 700;
+    }
+
+    .feature {
+      width: 180px;
+      font-weight: 700;
+    }
+
+    .request {
+      min-width: 260px;
+      color: #344250;
+    }
+
+    .evidence {
+      min-width: 270px;
+      color: #435363;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+    }
+
+    .gap {
+      min-width: 260px;
+      color: #596879;
+    }
+
+    .priority {
+      width: 86px;
+      white-space: nowrap;
+      color: #405164;
+      font-weight: 700;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 74px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .ok {
+      color: var(--ok);
+      background: var(--ok-bg);
+    }
+
+    .part {
+      color: var(--part);
+      background: var(--part-bg);
+    }
+
+    .none {
+      color: var(--none);
+      background: var(--none-bg);
+    }
+
+    .removed {
+      color: var(--removed);
+      background: var(--removed-bg);
+    }
+
+    .unknown {
+      color: var(--unknown);
+      background: var(--unknown-bg);
+    }
+
+    .section-title {
+      margin: 28px 0 12px;
+      font-size: 18px;
+    }
+
+    .summary-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .summary-box {
+      padding: 15px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      line-height: 1.7;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .summary-box b {
+      color: var(--text);
+    }
+
+    .source {
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.7;
+    }
+
+    @media (max-width: 980px) {
+      .page {
+        padding: 18px 12px 32px;
+      }
+
+      .meta-grid,
+      .summary-list {
+        grid-template-columns: 1fr;
+      }
+
+      .panel {
+        overflow-x: auto;
+      }
+
+      .search {
+        margin-left: 0;
+      }
+
+      thead th {
+        top: 118px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <h1>悬浮聊天 APP 功能落实对照表</h1>
+      <p class="subtitle">
+        对照来源为 Google 文档《aispect 传感大模型》导出文本，以及本机项目
+        <code>D:\xuanfu_APP\zhifaAndroid</code> 的 Android 源码扫描结果。状态判断按“当前代码是否有可见入口、UI、数据模型、持久化或业务闭环”归类。
+      </p>
+      <div class="meta-grid">
+        <div class="meta-card"><strong id="count-all">0</strong><span>细分功能项</span></div>
+        <div class="meta-card"><strong id="count-ok">0</strong><span>已落实：有明确代码链路</span></div>
+        <div class="meta-card"><strong id="count-part">0</strong><span>部分落实：模型/入口/UI 已有但不完整</span></div>
+        <div class="meta-card"><strong id="count-none">0</strong><span>未落实/已移除：未看到完整模块</span></div>
+      </div>
+    </header>
+
+    <p class="note">
+      <b>状态口径：</b>
+      “已落实”表示源码中能看到入口、UI 和核心逻辑或数据承载；“部分落实”表示有模型、按钮、模拟数据或局部页面，但缺少真实业务闭环；
+      “未落实”表示当前项目未找到对应独立模块；“已移除”表示文档提过但当前版本按后续需求删除或关闭。
+      本表是源码级审计，不等同于真机完整验收。
+    </p>
+
+    <section class="panel">
+      <div class="toolbar">
+        <button class="filter-btn active" data-filter="all">全部</button>
+        <button class="filter-btn" data-filter="已落实">已落实</button>
+        <button class="filter-btn" data-filter="部分落实">部分落实</button>
+        <button class="filter-btn" data-filter="未落实">未落实</button>
+        <button class="filter-btn" data-filter="已移除">已移除</button>
+        <input class="search" id="search" placeholder="搜索模块、功能、证据或缺口" />
+      </div>
+
+      <table id="feature-table">
+        <thead>
+          <tr>
+            <th>一级模块</th>
+            <th>细分功能</th>
+            <th>文档/需求描述</th>
+            <th>落实状态</th>
+            <th>源码证据</th>
+            <th>缺口/备注</th>
+            <th>优先级</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr data-status="已落实">
+            <td class="module">IM 悬浮页</td>
+            <td class="feature">单聊会话页</td>
+            <td class="request">点击左侧用户后只展示该用户聊天记录，类似微信私聊。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">FloatingChatPrototype.kt：privateMessagesFor；FloatingChatThreadSelectionTest.kt</td>
+            <td class="gap">按 threadContactId / connectionTarget 过滤私聊消息。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">IM 悬浮页</td>
+            <td class="feature">群聊会话页</td>
+            <td class="request">群聊切换后展示群成员头像、成员消息气泡和连接线。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">groupMessagesFor；groupChatMemberAvatarScrollsWithMessageBubble；groupChatConnectorUsesMessageScopedMemberAvatar</td>
+            <td class="gap">已支持成员头像随消息气泡移动和群头像/成员头像连接关系。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">IM 悬浮页</td>
+            <td class="feature">未回消息主页</td>
+            <td class="request">主页显示全部账号的未读消息，点击气泡跳转账号与会话，并清除未读绿点。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">homeUnreadOverviewShowsAllAccounts；homeUnreadBubbleSwitchesToOwningAccount；defaultAllAccountHomeUnreadThreadIds</td>
+            <td class="gap">有全部账号聚合、连接线、跳转和清除状态。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">双侧悬浮中台</td>
+            <td class="feature">左侧联系人栏</td>
+            <td class="request">左侧联系人/群聊头像列表支持滚动，滚动时显示名称、最新消息和时间。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">leftRailUsesScrollableLazyColumn；leftRailScrollShowsFollowTextOverlay；leftRailFollowTextIncludesNameLastMessageAndTime</td>
+            <td class="gap">有短内容可滑、双向滑动、松手隐藏文字。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="部分落实">
+            <td class="module">双侧悬浮中台</td>
+            <td class="feature">右侧账号/工具区展开</td>
+            <td class="request">右侧账号头像和工具按钮根据拖动区域调整空间，工具按钮支持排序。</td>
+            <td><span class="badge part">部分落实</span></td>
+            <td class="evidence">rightRailUsesAreaBasedExpansion=true；rightRailUsesContinuousDragExpansion=false；rightRailToolReorderPersistsOnDragEnd</td>
+            <td class="gap">区域式扩展和长按拖动排序已做；契约显示不是连续无级拖动，体验仍需真机调优。</td>
+            <td class="priority">P1</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">双侧悬浮中台</td>
+            <td class="feature">账号切换</td>
+            <td class="request">点击右侧账号头像切换账号，账号拥有独立好友和群聊。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">rightRailAccountAvatarClickSwitchesActiveAccountWorkspace；accountScopedFriendsAndGroupsAreIndependent</td>
+            <td class="gap">会切换 activeAccountId，并重置到该账号默认会话。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">双侧悬浮中台</td>
+            <td class="feature">账号资料编辑</td>
+            <td class="request">长按账号头像编辑头像、名字、电话、签名、性别等，并联动推名片。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">FloatingChatAccountProfile；accountProfileEditorSupportsImageAvatarUpload；cardToolSendsEditedAccountProfileCard</td>
+            <td class="gap">支持图片头像上传，颜色板块已隐藏，推名片使用账号资料。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">双侧悬浮中台</td>
+            <td class="feature">联系人/群资料编辑</td>
+            <td class="request">长按好友或群聊头像弹出微信风格编辑面板，支持备注、标签、群设置并持久化。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">LocalContactProfile；LocalGroupProfile；contactEditPanelUsesWechatFriendProfileLayout；groupEditPanelPersistsChangesInSqlite</td>
+            <td class="gap">联系人资料、群资料有 SQLite 表和 upsert 接口。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">连接线</td>
+            <td class="feature">私聊/群聊连接线</td>
+            <td class="request">使用单线逻辑，圆角大括号式连接线，连接头像与消息气泡。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">imModuleConnectionLineUsesNativeCanvasShadow；imModuleConnectionLineUsesRoundedElbows；imModuleConnectionLineUsesBraceHooks</td>
+            <td class="gap">源码契约标记已使用阴影、圆角肘线和 brace hook；仍建议真机复核实际视觉。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">连接线</td>
+            <td class="feature">离屏连接提示</td>
+            <td class="request">消息气泡或账号头像移出屏幕后仍保留连接线，提示屏幕外存在对应信息。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">connectorLayerUsesPrecomputedOffscreenTargets；createOffscreenConnectorBranch；homeUnreadOverviewUsesFallbackConnectorSourceWhenRailAvatarIsOffscreen</td>
+            <td class="gap">有预计算离屏目标；历史上多次反馈方向问题，实际方向需要回归测试。</td>
+            <td class="priority">P1</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">气泡样式</td>
+            <td class="feature">文本气泡</td>
+            <td class="request">复用 demo 气泡样式，对方和我方颜色/透明度不同，字体白色阴影。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">imModuleBubbleUsesDemoGlassEffect；cardMessageTextUsesImModuleShadow；OverlayTokens</td>
+            <td class="gap">文本气泡与卡片文字阴影都有契约函数。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">气泡样式</td>
+            <td class="feature">非文字卡片气泡</td>
+            <td class="request">非文字消息使用浅色纯色卡片，不同消息类型不同颜色。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">cardBackgroundFor；specialCardBorderColorFor；LocationMessageContent；ContactLinkCardContent；FilePreviewContent</td>
+            <td class="gap">位置、名片、小程序、文件、红包/转账有不同卡片样式。</td>
+            <td class="priority">P0</td>
+          </tr>
+
+          <tr data-status="已落实">
+            <td class="module">消息类型</td>
+            <td class="feature">文本消息</td>
+            <td class="request">普通文本消息，不显示“文本消息”等类型描述。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">FloatingChatMessageType.Text；SimpleTextMessageContent；messageBubbleShowsAccessChips=false</td>
+            <td class="gap">输入框可发送模拟文本，类型标题已不展示。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">消息类型</td>
+            <td class="feature">文本夹杂消息</td>
+            <td class="request">支持拍点链接、文件链接、网址、@人、AI 金字、图片名等 token。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">FloatingChatInlineTokenType：PaidianLink/FileLink/Url/Mention/Ai/ImageName；MixedTextMessageContent</td>
+            <td class="gap">渲染层按 token 设置蓝色链接和 AI 金色文字。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">消息类型</td>
+            <td class="feature">引用消息</td>
+            <td class="request">长按消息可引用，发送时带引用预览。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">FloatingChatMessageType.Quote；outgoingTextMessageWithOptionalQuote；messageLongPressQuoteShowsComposerPreview</td>
+            <td class="gap">引用逻辑和输入框预览已存在。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">消息类型</td>
+            <td class="feature">位置消息</td>
+            <td class="request">位置气泡可看到地图位置，发送真实设备位置。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">locationToolUsesRealDeviceLocation；locationMessageUsesMapPreview；locationMessageIncludesCoordinatesInResourceUrl</td>
+            <td class="gap">有权限请求、定位刷新、地图预览；不是接入真实地图 SDK 瓦片。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="部分落实">
+            <td class="module">消息类型</td>
+            <td class="feature">名片链接消息</td>
+            <td class="request">企微名片、个人名片、公众号名片、小程序名片、视频号名片。</td>
+            <td><span class="badge part">部分落实</span></td>
+            <td class="evidence">FloatingChatContactCardKind：WeCom/Personal/OfficialAccount/MiniProgram/Channel；ContactLinkCardContent</td>
+            <td class="gap">模型支持全部名片种类；真实外部名片体系、企微/公众号/视频号数据源未接入。</td>
+            <td class="priority">P1</td>
+          </tr>
+          <tr data-status="部分落实">
+            <td class="module">消息类型</td>
+            <td class="feature">小程序链接消息</td>
+            <td class="request">小程序链接卡片消息。</td>
+            <td><span class="badge part">部分落实</span></td>
+            <td class="evidence">FloatingChatMessageType.MiniProgramLink；MiniProgramLinkContent；simulatedToolFeatureMessage</td>
+            <td class="gap">卡片 UI 和模拟链接存在；未看到真实小程序运行容器或跳转协议。</td>
+            <td class="priority">P2</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">消息类型</td>
+            <td class="feature">图片消息</td>
+            <td class="request">相册选择真实图片，聊天页裸图展示，点击全屏查看、缩放、滑动切换。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">FloatingChatMediaPickerActivity；ImageThumbnail；MediaStandalone；mediaPreviewSupportsZoom；mediaPreviewSupportsSwipeBetweenThreadMedia</td>
+            <td class="gap">支持真实缩略图、黑色全屏、拖动收起、返回关闭。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">消息类型</td>
+            <td class="feature">视频消息</td>
+            <td class="request">相册选择真实视频，聊天页裸视频预览，不自动播放，全屏原比例播放。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">VideoPreview；MediaPlayer；mediaPreviewVideoAutoPlays=false；mediaPreviewVideoShowsProgressBar；chatListVideoAutoPlays=false</td>
+            <td class="gap">有播放按钮、进度条、时间码、原比例 frame；仍需真机验证不同编码兼容性。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">消息类型</td>
+            <td class="feature">语音消息</td>
+            <td class="request">语音输入可录制、发送并回放。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">RealVoiceInputPanel；MediaRecorder；voiceInputRecordsAudioMessage；voiceMessageSupportsPlayback</td>
+            <td class="gap">需要 RECORD_AUDIO 权限，消息使用 audio/mp4。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">消息类型</td>
+            <td class="feature">文件消息</td>
+            <td class="request">文件气泡直接预览内容，支持 txt、md、word、pdf 等格式，点击全屏查看。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">FloatingChatDocumentPickerActivity；FloatingChatDocumentReader；filePreviewOpensFullscreenViewer；PdfRenderer/docx/xlsx/zip</td>
+            <td class="gap">内置阅读支持 PDF、文本、DOCX 文本抽取、表格、ZIP 目录；外部打开保留为 fallback。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="部分落实">
+            <td class="module">消息类型</td>
+            <td class="feature">文件格式枚举</td>
+            <td class="request">文件格式图标按 txt、md、word、pdf、zip、rar 等变化。</td>
+            <td><span class="badge part">部分落实</span></td>
+            <td class="evidence">FloatingChatFileFormat：Txt/Markdown/Word/Pdf；documentReaderKindFor 支持 zip/xlsx/csv</td>
+            <td class="gap">UI 枚举只有四种核心格式；ZIP 读者支持，但 RAR 未看到内置支持。</td>
+            <td class="priority">P2</td>
+          </tr>
+          <tr data-status="已移除">
+            <td class="module">消息类型</td>
+            <td class="feature">可见范围/申请查看</td>
+            <td class="request">公开、仅好友粉丝、仅好友、仅收件者；申请查看、同意后查看。</td>
+            <td><span class="badge removed">已移除</span></td>
+            <td class="evidence">FloatingChatVisibilityScope 模型仍在；messageBubbleShowsAccessChips=false；standaloneMediaListShowsAccessChips=false</td>
+            <td class="gap">模型残留，但聊天气泡中的可见度按钮按后续要求删除，未形成申请审批闭环。</td>
+            <td class="priority">P3</td>
+          </tr>
+          <tr data-status="未落实">
+            <td class="module">消息类型</td>
+            <td class="feature">图片识图/找物按钮</td>
+            <td class="request">文本夹杂缩略图左侧提供识图、找物交互按钮。</td>
+            <td><span class="badge none">未落实</span></td>
+            <td class="evidence">mediaPreview action 仅 Share/Save/Favorite/More；未检索到识图/找物动作</td>
+            <td class="gap">有媒体操作按钮，但没有图像识别或找物业务入口。</td>
+            <td class="priority">P2</td>
+          </tr>
+
+          <tr data-status="已落实">
+            <td class="module">输入栏</td>
+            <td class="feature">底部输入栏</td>
+            <td class="request">微信式底部悬浮输入栏，输入多行自适应，跟随键盘上移。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">bottomInputUsesCustomBasicTextField；bottomInputBarUsesKeyboardInsets；messageListAutoScrollsOnInputFocus</td>
+            <td class="gap">输入聚焦、IME inset 变化会带动消息列表滚动。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">输入栏</td>
+            <td class="feature">主页/表情切换</td>
+            <td class="request">默认显示主页按钮，点击输入框后切换成表情按钮。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">bottomHomeButtonShowsUnreadOverview；bottomHomeButtonSwapsToEmojiWhenInputFocused；EmojiPickerView</td>
+            <td class="gap">表情面板使用 AndroidX Emoji Picker。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">输入栏</td>
+            <td class="feature">机器人预测回复</td>
+            <td class="request">点击机器人直接在聊天页展示预测回复，气泡为绿色虚线/AI 状态。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">FloatingChatToolAction.Assistant；FloatingChatMessageKind.AiDraft；bottomInputAssistantActionSendsPredictedMessage</td>
+            <td class="gap">当前是本地模拟预测文本，不是接入真实大模型。</td>
+            <td class="priority">P1</td>
+          </tr>
+
+          <tr data-status="已落实">
+            <td class="module">工具栏</td>
+            <td class="feature">相册</td>
+            <td class="request">图片按钮合并图片和视频选择，发送真实手机图片/视频。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">galleryToolPicksImageAndVideo；FloatingChatMediaPickerActivity；decodeImagePreview/decodeVideoPreview</td>
+            <td class="gap">选择后保持悬浮页状态，媒体处理在后台线程。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">工具栏</td>
+            <td class="feature">摄影</td>
+            <td class="request">点击摄影进入相机，单击拍照，长按录像，最多 15 秒，预览后发送。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">FloatingChatCameraActivity；CameraVideoMaxDurationMs=15_000；cameraToolTapCapturesPhoto；cameraToolLongPressRecordsVideo</td>
+            <td class="gap">有快门进度圈、预览、重拍、发送和视频播放预览。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">工具栏</td>
+            <td class="feature">文档</td>
+            <td class="request">点击文档弹出系统文件选择器，真实发送文档，点击全屏内置查看。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">documentToolRequestsSystemFilePicker；FloatingChatDocumentPickerActivity；DocumentPreviewOverlay；FloatingChatDocumentReader</td>
+            <td class="gap">内置阅读器不默认跳第三方，外部打开是 fallback。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">工具栏</td>
+            <td class="feature">收藏</td>
+            <td class="request">收藏页展示收藏的消息、链接、图片、视频；点击查看，长按转发/删除/多选。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">FavoriteCollectionPanel；favoriteCollectionClickOpensContentPreview；favoriteCollectionPersistsSavedItems</td>
+            <td class="gap">收藏持久化使用本地存储，媒体收藏复用全屏预览。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">工具栏</td>
+            <td class="feature">快捷语</td>
+            <td class="request">展示最近快捷语，可新增、修改、删除和发送。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">QuickPhrasePanel；quickPhrasePanelSupportsCrud；quickPhrasePanelCanSendSelectedPhrase</td>
+            <td class="gap">最大默认 8 条，保存在本地偏好。</td>
+            <td class="priority">P1</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">工具栏</td>
+            <td class="feature">推名片</td>
+            <td class="request">点击推名片先展示全部账号，选择后发送真实账号名片卡片。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">cardToolOpensAccountPickerInsteadOfDirectSend；cardToolAccountPickerShowsAllAccounts；contactLinkMessageReusesAccountCardPreview</td>
+            <td class="gap">名片卡片复用账号编辑页预览样式。</td>
+            <td class="priority">P1</td>
+          </tr>
+          <tr data-status="部分落实">
+            <td class="module">工具栏</td>
+            <td class="feature">搜索/钉住/翻译/截图/提醒/指令/分享</td>
+            <td class="request">右侧意图按钮列表中的扩展工具。</td>
+            <td><span class="badge part">部分落实</span></td>
+            <td class="evidence">FloatingChatToolAction：Search/Pin/Translate/Screenshot/Reminder/Command/Share；tool label/icon 映射</td>
+            <td class="gap">按钮枚举和 UI 存在，但未看到独立业务面板或真实执行闭环。</td>
+            <td class="priority">P2</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">工具栏</td>
+            <td class="feature">长按拖动排序</td>
+            <td class="request">类似手机桌面图标，长按进入排序，拖动任意按钮换位置，保存顺序。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">rightRailToolButtonsSupportDragReorder；rightRailToolReorderModeLetsAnyButtonDragImmediately；rightRailToolReorderPersistsOnDragEnd</td>
+            <td class="gap">有移动阈值取消误触点击，拖动中心跨槽位换位。</td>
+            <td class="priority">P1</td>
+          </tr>
+
+          <tr data-status="已落实">
+            <td class="module">朋友圈</td>
+            <td class="feature">朋友圈动态页</td>
+            <td class="request">悬浮窗内复刻微信朋友圈，支持发表、图片/视频、点赞、评论、更多菜单。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">MomentsTimelinePanel；MomentLikeCommentPopup；momentsTimelineSupportsLikeAndComment；momentsComposerSupportsImageAndVideo</td>
+            <td class="gap">当前为 App 内朋友圈，不跳转微信；媒体查看复用聊天全屏预览。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">朋友圈</td>
+            <td class="feature">朋友圈持久化</td>
+            <td class="request">发表后退出再进入仍保留内容。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">moment_posts 表；upsertMomentPost；momentPosts；momentsComposedPostsPersistInSqlite</td>
+            <td class="gap">图片/视频元数据也写入 moment_posts。</td>
+            <td class="priority">P0</td>
+          </tr>
+
+          <tr data-status="部分落实">
+            <td class="module">红包转账</td>
+            <td class="feature">红包</td>
+            <td class="request">红包气泡仿微信，点击查看金额，群聊自己发的红包也可领取，有领取动画。</td>
+            <td><span class="badge part">部分落实</span></td>
+            <td class="evidence">paymentCardUsesWechatStyleLayout；redPacketCardClickOpensAmountViewer；redPacketClaimUsesAnimatedState</td>
+            <td class="gap">UI 和状态动画已做；没有真实支付、余额、风控或服务端资金流。</td>
+            <td class="priority">P1</td>
+          </tr>
+          <tr data-status="部分落实">
+            <td class="module">红包转账</td>
+            <td class="feature">转账</td>
+            <td class="request">转账气泡仿微信，群聊可转给指定用户，点击查看。</td>
+            <td><span class="badge part">部分落实</span></td>
+            <td class="evidence">transferPanelSupportsGroupRecipientSelection；transferCardClickOpensAmountViewer；PaymentComposerPanel</td>
+            <td class="gap">应用内模拟转账已完成；没有真实支付账户或支付通道。</td>
+            <td class="priority">P1</td>
+          </tr>
+
+          <tr data-status="已落实">
+            <td class="module">媒体预览</td>
+            <td class="feature">微信式全屏预览</td>
+            <td class="request">点击图片/视频全屏展示，黑色背景，缩放，拖动收起，返回手势收起，左右切换上下文。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">MediaPreviewOverlay；mediaPreviewUsesBlackBackdrop；mediaPreviewSupportsDragToDismiss；mediaPreviewBackNavigationCloses</td>
+            <td class="gap">源码契约显示覆盖系统栏和沉浸式控制，仍需真机检查 ROM 行为。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">媒体预览</td>
+            <td class="feature">媒体操作按钮</td>
+            <td class="request">全屏查看时显示分享、保存、收藏、更多等按钮。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">MediaActionsBar；MediaAction：Share/Save/Favorite/More；handleMediaAction</td>
+            <td class="gap">当前多为 App 内 Toast/状态反馈，系统分享和保存行为需继续接真实实现。</td>
+            <td class="priority">P2</td>
+          </tr>
+
+          <tr data-status="已落实">
+            <td class="module">数据模型</td>
+            <td class="feature">聚合 IM 数据模型</td>
+            <td class="request">多维关系链、群聊/组织架构、双账号、消息类型、机器人、音视频、文件。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">FloatingChatConversation；FloatingChatContact；FloatingChatMessage；accountContacts/groupContacts/messages/toolActions</td>
+            <td class="gap">Android 原型模型覆盖当前 IM 需求；组织架构深层关系仍较弱。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">数据模型</td>
+            <td class="feature">SQLite 消息数据库</td>
+            <td class="request">手机端本地消息数据库，消息、文件索引、转发只新增索引不复制文件。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">FloatingChatDatabaseContract：chat_threads/chat_messages/chat_files/chat_message_files；forwardMessageWithFiles；FloatingChatFileIndex</td>
+            <td class="gap">数据库版本 4，支持消息、文件、朋友圈、联系人、群资料。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="已落实">
+            <td class="module">性能</td>
+            <td class="feature">聊天懒加载</td>
+            <td class="request">聊天页面只加载可视范围消息，提高滑动流畅度。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">messagePaneUsesLazyColumn；messagePaneOnlyComposesVisibleMessages；messagePaneUsesStableMessageKeys；mediaThumbnailsDecodeOffMainThread</td>
+            <td class="gap">LazyColumn 和可见项连接线已做；真机卡顿还可能来自无障碍 overlay 和图片解码。</td>
+            <td class="priority">P1</td>
+          </tr>
+          <tr data-status="部分落实">
+            <td class="module">悬浮持久性</td>
+            <td class="feature">相册/相机/文件期间页面持久</td>
+            <td class="request">像正常 App 一样，打开相册/相机后返回仍停留当前悬浮聊天页，不闪退重启。</td>
+            <td><span class="badge part">部分落实</span></td>
+            <td class="evidence">mediaPickerKeepsFloatingChatWindowPersistent；mediaPickerRestoresOverlayBeforeDeliveringPickedMedia；cameraToolKeepsFloatingChatWindowPersistent</td>
+            <td class="gap">源码契约有持久处理；用户历史多次反馈仍有闪烁，需按真机录像继续定位。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="部分落实">
+            <td class="module">手势系统</td>
+            <td class="feature">边缘返回/动作手势</td>
+            <td class="request">从屏幕边缘内拉触发，短距离/长距离动作，自定义距离，曲线 UI 对齐系统返回。</td>
+            <td><span class="badge part">部分落实</span></td>
+            <td class="evidence">BackGestureProgress；BackWaveOverlayController；floatingChatInternalEdgeGesture；shortPullThresholdDp/longPullThresholdDp</td>
+            <td class="gap">短/长距离、自定义阈值、曲线 UI 已有；是否真正替代系统返回受 Android/厂商系统限制，仍需设备级验证。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="部分落实">
+            <td class="module">手势系统</td>
+            <td class="feature">后台/重启持久生效</td>
+            <td class="request">后台清理后不失效，关机重启后自启动生效。</td>
+            <td><span class="badge part">部分落实</span></td>
+            <td class="evidence">GesturePersistenceReceiver；UbikiGestureKeepAliveService；RECEIVE_BOOT_COMPLETED；FOREGROUND_SERVICE_SPECIAL_USE</td>
+            <td class="gap">有启动接收器、前台保活和 watchdog；部分 ROM 后台限制、电池优化仍可能杀服务。</td>
+            <td class="priority">P0</td>
+          </tr>
+          <tr data-status="部分落实">
+            <td class="module">手势系统</td>
+            <td class="feature">轻触/重触交互体系</td>
+            <td class="request">基于 major radius 区分轻触、重触，绑定任意事件。</td>
+            <td><span class="badge part">部分落实</span></td>
+            <td class="evidence">EdgeGestureDetector；GestureType；GestureActionCatalog；MainActivity edge zone 设置</td>
+            <td class="gap">已有边缘手势配置和动作映射；Android 未看到 pressure/major radius 级别的通用重触体系。</td>
+            <td class="priority">P2</td>
+          </tr>
+
+          <tr data-status="已落实">
+            <td class="module">眨眼</td>
+            <td class="feature">眨眼测试入口</td>
+            <td class="request">右侧工具增加眨眼按钮，接入眨眼项目，悬浮窗口实时显示状态和识别日志。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">FloatingChatToolAction.Blink；FloatingChatBlinkVoiceActivity；BlinkDetector；BlinkVoiceFloatingCaptureContent</td>
+            <td class="gap">当前作为识别测试页，不自动关闭，识别结果可写回聊天。</td>
+            <td class="priority">P1</td>
+          </tr>
+          <tr data-status="部分落实">
+            <td class="module">眨眼</td>
+            <td class="feature">闭眼触发 AI</td>
+            <td class="request">闭眼触发 AI 重新生成、语音转文字、文本框生成草稿等。</td>
+            <td><span class="badge part">部分落实</span></td>
+            <td class="evidence">blinkVoiceResultMessageText；addOutgoingTextMessage(blink result)</td>
+            <td class="gap">能识别并记录事件；未接入“任意页面闭眼唤醒 AI/生成草稿”的系统级动作。</td>
+            <td class="priority">P2</td>
+          </tr>
+
+          <tr data-status="已落实">
+            <td class="module">外观设置</td>
+            <td class="feature">悬浮页毛玻璃背景</td>
+            <td class="request">悬浮聊天页面增加背景毛玻璃，可设置透明度、模糊和颜色，并预览。</td>
+            <td><span class="badge ok">已落实</span></td>
+            <td class="evidence">floatingChatOverlayUsesFrostedBackground；floatingChatOverlaySupportsRuntimeBackgroundColor；FloatingChatAppearancePreview</td>
+            <td class="gap">设置页中有外观预览和运行时刷新。</td>
+            <td class="priority">P1</td>
+          </tr>
+
+          <tr data-status="未落实">
+            <td class="module">视频页</td>
+            <td class="feature">独立视频页</td>
+            <td class="request">文档列出“视频页”和多维视频模型。</td>
+            <td><span class="badge none">未落实</span></td>
+            <td class="evidence">rg 未检索到 VideoPage/多维视频独立模块；仅有聊天媒体预览和相机/视频消息</td>
+            <td class="gap">当前视频能力服务于聊天媒体，不是独立视频产品页。</td>
+            <td class="priority">P3</td>
+          </tr>
+          <tr data-status="未落实">
+            <td class="module">商城页</td>
+            <td class="feature">商城</td>
+            <td class="request">文档列出商城页。</td>
+            <td><span class="badge none">未落实</span></td>
+            <td class="evidence">rg 未检索到 Mall/Shop/商城相关模块</td>
+            <td class="gap">没有商品、订单、支付、购物车等代码。</td>
+            <td class="priority">P3</td>
+          </tr>
+          <tr data-status="未落实">
+            <td class="module">浏览器</td>
+            <td class="feature">AI 浏览器 Web</td>
+            <td class="request">浏览器可后台执行任务。</td>
+            <td><span class="badge none">未落实</span></td>
+            <td class="evidence">rg 未检索到 WebView/Browser/AI browser 模块</td>
+            <td class="gap">没有 WebView 容器、浏览器任务队列或后台网页执行。</td>
+            <td class="priority">P3</td>
+          </tr>
+          <tr data-status="未落实">
+            <td class="module">知识库</td>
+            <td class="feature">知识库页</td>
+            <td class="request">文档列出知识库和拖入知识库。</td>
+            <td><span class="badge none">未落实</span></td>
+            <td class="evidence">rg 未检索到 Knowledge/KnowledgeBase/知识库模块</td>
+            <td class="gap">收藏功能已实现，但不是知识库、向量库或知识管理系统。</td>
+            <td class="priority">P3</td>
+          </tr>
+          <tr data-status="未落实">
+            <td class="module">AIfx</td>
+            <td class="feature">模板编排页</td>
+            <td class="request">AIfx 模板编排、AI 流编排。</td>
+            <td><span class="badge none">未落实</span></td>
+            <td class="evidence">rg 未检索到 AIfx/Template/编排相关模块</td>
+            <td class="gap">没有流程画布、节点、模板执行器或编排数据模型。</td>
+            <td class="priority">P3</td>
+          </tr>
+          <tr data-status="未落实">
+            <td class="module">AI 云盘</td>
+            <td class="feature">AI 文件整理系统</td>
+            <td class="request">AI 云盘/AI 文件整理系统。</td>
+            <td><span class="badge none">未落实</span></td>
+            <td class="evidence">rg 未检索到 Drive/Cloud/云盘模块</td>
+            <td class="gap">只有聊天文件索引，不是云盘同步、目录整理或 AI 文件管理。</td>
+            <td class="priority">P3</td>
+          </tr>
+          <tr data-status="未落实">
+            <td class="module">文本框 AI</td>
+            <td class="feature">AI 编辑友好文本框</td>
+            <td class="request">任意输入框开启 AI 续写、重写、润色、分词句选中、转语音等。</td>
+            <td><span class="badge none">未落实</span></td>
+            <td class="evidence">rg 未检索到通用 AI editor/textbox 编排；当前仅聊天输入框和预测消息</td>
+            <td class="gap">没有系统级输入框劫持、富文本分词背景、光标浮标或批量改写。</td>
+            <td class="priority">P2</td>
+          </tr>
+          <tr data-status="未落实">
+            <td class="module">Todo</td>
+            <td class="feature">意图识别与计划执行</td>
+            <td class="request">推断目的、建立计划、执行计划、连接 iOS 日历。</td>
+            <td><span class="badge none">未落实</span></td>
+            <td class="evidence">rg 未检索到 Todo/Calendar 业务模块</td>
+            <td class="gap">没有任务模型、日历同步或计划执行 agent。</td>
+            <td class="priority">P3</td>
+          </tr>
+          <tr data-status="未落实">
+            <td class="module">灵动岛/PIP</td>
+            <td class="feature">灵动岛和画中画模块</td>
+            <td class="request">模块 2 灵动岛、模块 3 PIP 画中画悬浮窗。</td>
+            <td><span class="badge none">未落实</span></td>
+            <td class="evidence">rg 未检索到 DynamicIsland/PictureInPicture/PIP 业务模块</td>
+            <td class="gap">当前是无障碍悬浮窗，不是系统 Live Activity 或 Android PIP 模块。</td>
+            <td class="priority">P3</td>
+          </tr>
+          <tr data-status="未落实">
+            <td class="module">通用 UI 套件</td>
+            <td class="feature">表单/图表/选择器/滑块/刻度尺/拖放区</td>
+            <td class="request">在气泡流里支持 AI 自动生成 UI 格式，提供一套 UI 操作组件。</td>
+            <td><span class="badge none">未落实</span></td>
+            <td class="evidence">当前有 Compose 表单和面板组件，但未看到 AI 生成 UI schema/renderer</td>
+            <td class="gap">缺少可由 AI 输出描述驱动的表单、图表、滑块、拖放等通用渲染器。</td>
+            <td class="priority">P2</td>
+          </tr>
+          <tr data-status="未落实">
+            <td class="module">视觉处理</td>
+            <td class="feature">默认抠图/图片叠加</td>
+            <td class="request">默认抠图去背景，文本与图片叠加两行，气泡出框 3D 效果。</td>
+            <td><span class="badge none">未落实</span></td>
+            <td class="evidence">rg 未检索到抠图/分割模型；媒体预览仅加载缩略图和播放</td>
+            <td class="gap">没有图像分割、背景移除或自动视觉合成能力。</td>
+            <td class="priority">P3</td>
+          </tr>
+          <tr data-status="未落实">
+            <td class="module">摇杆/套索</td>
+            <td class="feature">摇杆选取、旋钮、套索</td>
+            <td class="request">重触长按出现摇杆选择、旋钮选择、划动画圈套索。</td>
+            <td><span class="badge none">未落实</span></td>
+            <td class="evidence">未检索到 joystick/lasso/rotary selector 组件；仅有按钮拖拽排序和边缘手势</td>
+            <td class="gap">缺少跨界面的对象选取系统和套索选择器。</td>
+            <td class="priority">P2</td>
+          </tr>
+          <tr data-status="未落实">
+            <td class="module">状态调度器</td>
+            <td class="feature">状态指令中转器</td>
+            <td class="request">文本框、输入框、重触事件相关状态统一调度。</td>
+            <td><span class="badge none">未落实</span></td>
+            <td class="evidence">未检索到独立 StateDispatcher/CommandRouter；当前状态分散在 Compose remember 和 service 中</td>
+            <td class="gap">需要抽象统一事件总线/状态机，当前不是独立模块。</td>
+            <td class="priority">P2</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <h2 class="section-title">当前结论</h2>
+    <div class="summary-list">
+      <div class="summary-box">
+        <b>已经比较完整的部分：</b>
+        悬浮 IM 主体、单聊/群聊/主页未读、双侧头像与工具栏、消息类型渲染、图片视频预览、文件内置阅读、语音、位置、朋友圈、收藏、红包转账模拟、账号/联系人/群资料、SQLite 持久化。
+      </div>
+      <div class="summary-box">
+        <b>完全没有独立落地的部分：</b>
+        商城页、浏览器/AI 浏览器、知识库、AIfx 模板编排、AI 云盘、独立视频页、多维视频模型、灵动岛/PIP、通用 AI UI schema 渲染、抠图/图像理解、摇杆/套索选取、Todo/日历执行。
+      </div>
+      <div class="summary-box">
+        <b>最需要真机复核的部分：</b>
+        边缘手势是否被系统返回抢走、后台清理后的保活、媒体/相机/文件选择时悬浮页是否闪烁、连接线在头像离屏和切换会话后的方向与锚点。
+      </div>
+      <div class="summary-box">
+        <b>下一步建议：</b>
+        先把“源码已实现但用户历史反馈不稳定”的 P0 项做真机验收表，再决定是否进入商城/浏览器/知识库/AIfx 等大模块开发；这些大模块不适合混在悬浮 IM 文件里继续堆。
+      </div>
+    </div>
+
+    <p class="source">
+      生成时间：2026-07-07。文档来源：
+      https://docs.google.com/document/d/1atpm9ELWVrdXMDekRWjHZ1N8LxxPMjIN3fU2hln7eVg/edit?tab=t.0 。
+      本地扫描路径：D:\xuanfu_APP\zhifaAndroid 。
+    </p>
+  </main>
+
+  <script>
+    const rows = Array.from(document.querySelectorAll("#feature-table tbody tr"));
+    const buttons = Array.from(document.querySelectorAll(".filter-btn"));
+    const search = document.querySelector("#search");
+
+    function badgeClass(status) {
+      if (status === "已落实") return "ok";
+      if (status === "部分落实") return "part";
+      if (status === "已移除") return "removed";
+      if (status === "未确认") return "unknown";
+      return "none";
+    }
+
+    function updateCounts() {
+      const all = rows.length;
+      const ok = rows.filter(row => row.dataset.status === "已落实").length;
+      const part = rows.filter(row => row.dataset.status === "部分落实").length;
+      const none = rows.filter(row => row.dataset.status === "未落实" || row.dataset.status === "已移除").length;
+      document.querySelector("#count-all").textContent = all;
+      document.querySelector("#count-ok").textContent = ok;
+      document.querySelector("#count-part").textContent = part;
+      document.querySelector("#count-none").textContent = none;
+    }
+
+    function activeFilter() {
+      return buttons.find(button => button.classList.contains("active"))?.dataset.filter || "all";
+    }
+
+    function applyFilter() {
+      const filter = activeFilter();
+      const keyword = search.value.trim().toLowerCase();
+      rows.forEach(row => {
+        const statusMatch = filter === "all" || row.dataset.status === filter;
+        const keywordMatch = keyword.length === 0 || row.textContent.toLowerCase().includes(keyword);
+        row.style.display = statusMatch && keywordMatch ? "" : "none";
+      });
+    }
+
+    buttons.forEach(button => {
+      button.addEventListener("click", () => {
+        buttons.forEach(item => item.classList.remove("active"));
+        button.classList.add("active");
+        applyFilter();
+      });
+    });
+
+    search.addEventListener("input", applyFilter);
+    updateCounts();
+    applyFilter();
+  </script>
+</body>
+</html>

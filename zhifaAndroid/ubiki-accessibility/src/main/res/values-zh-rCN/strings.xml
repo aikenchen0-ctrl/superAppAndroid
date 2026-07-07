@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ubiki_accessibility_service_label">ubikiTouch 边缘触摸条</string>
+    <string name="ubiki_accessibility_service_description">通过透明屏幕边缘触摸条识别用户手势，并执行已配置的导航动作。</string>
+    <string name="ubiki_accessibility_service_summary">启用无障碍服务后显示可触摸的边缘区域。</string>
+    <string name="ubiki_launch_app_failed">无法启动目标应用。</string>
+    <string name="ubiki_persistent_channel_name">手势保活</string>
+    <string name="ubiki_persistent_notification_title">ICON 手势正在生效</string>
+    <string name="ubiki_persistent_notification_text">无障碍开启时保持边缘手势常驻运行。</string>
+    <string name="ubiki_recovery_notification_title">开启 ICON 手势保活</string>
+    <string name="ubiki_recovery_notification_text">如果重启或清理后台后手势未恢复，请重新确认无障碍和电池后台设置。</string>
+    <string name="ubiki_recovery_notification_action_accessibility">无障碍设置</string>
+    <string name="ubiki_recovery_notification_action_app_settings">应用设置</string>
+</resources>

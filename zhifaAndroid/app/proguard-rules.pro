@@ -1,0 +1,1 @@
+-keep class com.paifa.ubikitouch.accessibility.UbikiAccessibilityService { *; }

@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <queries>
+        <package android:name="com.tencent.mm" />
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.UbikiTouch">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.UbikiTouch">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".FloatingChatMediaPickerActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity="com.paifa.ubikitouch.floatingchat"
+            android:theme="@style/Theme.UbikiTouch.Transparent" />
+
+        <activity
+            android:name=".FloatingChatDocumentPickerActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity="com.paifa.ubikitouch.floatingchat"
+            android:theme="@style/Theme.UbikiTouch.Transparent" />
+
+        <activity
+            android:name=".FloatingChatDocumentViewerActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity="com.paifa.ubikitouch.floatingchat"
+            android:theme="@style/Theme.UbikiTouch.Transparent" />
+
+        <activity
+            android:name=".FloatingChatCameraActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:screenOrientation="fullUser"
+            android:taskAffinity="com.paifa.ubikitouch.floatingchat"
+            android:theme="@style/Theme.UbikiTouch.MediaPreview" />
+
+        <activity
+            android:name=".FloatingChatBlinkVoiceActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity="com.paifa.ubikitouch.floatingchat"
+            android:theme="@style/Theme.UbikiTouch.FloatingBlinkVoice" />
+
+        <activity
+            android:name=".FloatingChatVoicePermissionActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity="com.paifa.ubikitouch.floatingchat"
+            android:theme="@style/Theme.UbikiTouch.Transparent" />
+
+        <activity
+            android:name=".FloatingChatLocationPermissionActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity="com.paifa.ubikitouch.floatingchat"
+            android:theme="@style/Theme.UbikiTouch.Transparent" />
+
+        <activity
+            android:name=".FloatingChatMediaPreviewActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:screenOrientation="fullUser"
+            android:taskAffinity="com.paifa.ubikitouch.floatingchat"
+            android:theme="@style/Theme.UbikiTouch.MediaPreview" />
+
+        <service
+            android:name="com.paifa.ubikitouch.accessibility.UbikiAccessibilityService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"
+            android:label="@string/ubiki_accessibility_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:stopWithTask="false">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/ubiki_accessibility_service" />
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="persistent_edge_gesture_accessibility_overlay" />
+        </service>
+
+        <receiver
+            android:name=".GesturePersistenceReceiver"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.USER_UNLOCKED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="com.paifa.ubikitouch.action.RECOVER_GESTURE" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name="com.paifa.ubikitouch.accessibility.UbikiGestureKeepAliveService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"
+            android:stopWithTask="false">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="persistent_edge_gesture_keep_alive" />
+        </service>
+
+        <service
+            android:name=".UbikiQuickTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_edge"
+            android:label="@string/tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.TOGGLEABLE_TILE"
+                android:value="true" />
+        </service>
+
+    </application>
+</manifest>
