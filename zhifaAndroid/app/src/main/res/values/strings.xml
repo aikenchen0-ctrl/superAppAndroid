@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">ICON</string>
+    <string name="app_name">只发</string>
     <string name="tile_label">ubikiTouch</string>
     <string name="tile_active">Active</string>
     <string name="tile_paused">Paused</string>
@@ -100,4 +100,20 @@
     <string name="remaining_seconds">%1$ds</string>
     <string name="percent_suffix" formatted="false">%</string>
     <string name="dp_suffix">dp</string>
+    <string name="scrm_settings_title">SCRM API</string>
+    <string name="scrm_base_url">Server URL</string>
+    <string name="scrm_api_key">API Key</string>
+    <string name="scrm_show_api_key">Show API Key</string>
+    <string name="scrm_hide_api_key">Hide API Key</string>
+    <string name="scrm_save">Save</string>
+    <string name="scrm_test_connection">Test connection</string>
+    <string name="scrm_account_selection">Account</string>
+    <string name="scrm_capability_status">Capability status</string>
+    <string name="scrm_capability_group_counts">%1$d testable · %2$d blocked · %3$d paused · %4$d runtime unknown</string>
+    <string name="scrm_save_before_select">Save the configuration before selecting an account</string>
+    <string name="scrm_device_online">Device online</string>
+    <string name="scrm_device_offline">Device offline</string>
+    <string name="scrm_clear">Clear configuration</string>
+    <string name="scrm_clear_confirm_title">Clear SCRM configuration?</string>
+    <string name="scrm_clear_confirm_message">The encrypted API Key and selected account will be removed from this device.</string>
 </resources>

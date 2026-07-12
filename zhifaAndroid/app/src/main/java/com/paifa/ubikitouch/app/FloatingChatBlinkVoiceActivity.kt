@@ -61,6 +61,7 @@ import com.blinkvoice.visual.detector.BlinkDetector
 import com.blinkvoice.visual.events.BlinkEventClassifier
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
+import com.paifa.ubikitouch.accessibility.BlinkVoiceHeadlessExtraName
 import com.paifa.ubikitouch.accessibility.FloatingChatBlinkVoiceBridge
 import com.paifa.ubikitouch.accessibility.blinkVoiceCaptureAutoFinishOnEvent
 import com.paifa.ubikitouch.accessibility.blinkVoiceRealtimeStatusLabel
@@ -85,10 +86,15 @@ class FloatingChatBlinkVoiceActivity : ComponentActivity(), BlinkDetector.BlinkL
     private var detailText by mutableStateOf("识别到单眨、双眨、长闭眼后会在下方记录")
     private val recognitionLogs = mutableStateListOf<String>()
     private var closedNotified = false
+    private var headlessMode = false
+    private var lastDeliveredEventType: String? = null
+    private var lastDeliveredEventAtMs: Long = 0L
+    private val headlessCloseRequest: () -> Unit = { finishCapture() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         requestWindowFeature(Window.FEATURE_NO_TITLE)
         super.onCreate(savedInstanceState)
+        headlessMode = intent.getBooleanExtra(BlinkVoiceHeadlessExtraName, false)
         setFinishOnTouchOutside(false)
         configureFloatingWindow()
         previewView = PreviewView(this).apply {
@@ -98,14 +104,19 @@ class FloatingChatBlinkVoiceActivity : ComponentActivity(), BlinkDetector.BlinkL
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
         }
-        setContent {
-            BlinkVoiceFloatingCaptureContent(
-                previewView = previewView,
-                statusText = statusText,
-                detailText = detailText,
-                recognitionLogs = recognitionLogs,
-                onClose = ::finishCapture
-            )
+        if (headlessMode) {
+            FloatingChatBlinkVoiceBridge.registerHeadlessCaptureCloser(headlessCloseRequest)
+            setContentView(previewView)
+        } else {
+            setContent {
+                BlinkVoiceFloatingCaptureContent(
+                    previewView = previewView,
+                    statusText = statusText,
+                    detailText = detailText,
+                    recognitionLogs = recognitionLogs,
+                    onClose = ::finishCapture
+                )
+            }
         }
         if (hasCameraPermission()) {
             startDetection()
@@ -150,6 +161,7 @@ class FloatingChatBlinkVoiceActivity : ComponentActivity(), BlinkDetector.BlinkL
 
     override fun onResult(
         result: FaceLandmarkerResult,
+        frameTimeMs: Long,
         leftEyeEar: Float,
         rightEyeEar: Float,
         leftEyeClosed: Boolean,
@@ -160,6 +172,8 @@ class FloatingChatBlinkVoiceActivity : ComponentActivity(), BlinkDetector.BlinkL
         inputHeight: Int,
         rotationDegrees: Int
     ) {
+        @Suppress("UNUSED_VARIABLE")
+        val ignoredFrameTimeMs = frameTimeMs
         val hasFace = result.faceLandmarks().isNotEmpty()
         val now = SystemClock.elapsedRealtime()
         val event = classifier.accept(now, hasFace, leftEyeEar, rightEyeEar)
@@ -188,6 +202,9 @@ class FloatingChatBlinkVoiceActivity : ComponentActivity(), BlinkDetector.BlinkL
         cameraProvider?.unbindAll()
         detector?.close()
         cameraExecutor.shutdown()
+        if (headlessMode) {
+            FloatingChatBlinkVoiceBridge.clearHeadlessCaptureCloser(headlessCloseRequest)
+        }
         notifyCaptureClosed()
         super.onDestroy()
     }
@@ -196,11 +213,25 @@ class FloatingChatBlinkVoiceActivity : ComponentActivity(), BlinkDetector.BlinkL
         window.setBackgroundDrawable(ColorDrawable(android.graphics.Color.TRANSPARENT))
         window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
         window.setDimAmount(0f)
-        window.setGravity(Gravity.CENTER)
+        if (headlessMode) {
+            window.addFlags(
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+            )
+            window.setGravity(Gravity.TOP or Gravity.START)
+        } else {
+            window.setGravity(Gravity.CENTER)
+        }
         applyFloatingWindowSize()
     }
 
     private fun applyFloatingWindowSize() {
+        if (headlessMode) {
+            window.setLayout(dpToPx(HEADLESS_WINDOW_SIZE_DP), dpToPx(HEADLESS_WINDOW_SIZE_DP))
+            window.setGravity(Gravity.TOP or Gravity.START)
+            return
+        }
         val widthPx = min(dpToPx(FLOATING_WINDOW_WIDTH_DP), (resources.displayMetrics.widthPixels * 0.88f).roundToInt())
         val heightPx = min(dpToPx(FLOATING_WINDOW_HEIGHT_DP), (resources.displayMetrics.heightPixels * 0.72f).roundToInt())
         window.setLayout(widthPx, heightPx)
@@ -213,7 +244,7 @@ class FloatingChatBlinkVoiceActivity : ComponentActivity(), BlinkDetector.BlinkL
         runCatching {
             detector = BlinkDetector(this, this).also { blinkDetector ->
                 blinkDetector.setup()
-                blinkDetector.earThreshold = options.earCloseThreshold
+                blinkDetector.elaCloseThreshold = BlinkDetector.ELA_CLOSE_THRESHOLD
             }
         }.onFailure { error ->
             Log.e(TAG, "failed to initialize BlinkVoice detector", error)
@@ -290,11 +321,33 @@ class FloatingChatBlinkVoiceActivity : ComponentActivity(), BlinkDetector.BlinkL
         while (recognitionLogs.size > MAX_RECOGNITION_LOG_COUNT) {
             recognitionLogs.removeAt(0)
         }
+        deliverRecognizedEventIfNeeded(event)
     }
 
     private fun finishCapture() {
         notifyCaptureClosed()
         finish()
+    }
+
+    private fun deliverRecognizedEventIfNeeded(event: BlinkCaptureResult) {
+        val eventType = event.eventType.name
+        val now = SystemClock.elapsedRealtime()
+        if (eventType == lastDeliveredEventType &&
+            now - lastDeliveredEventAtMs < MIN_DELIVER_EVENT_INTERVAL_MS
+        ) {
+            return
+        }
+        lastDeliveredEventType = eventType
+        lastDeliveredEventAtMs = now
+        FloatingChatBlinkVoiceBridge.deliverResult(
+            eventType = eventType,
+            durationMs = event.durationMs,
+            confidence = event.confidence,
+            headless = headlessMode
+        )
+        if (headlessMode) {
+            finishCapture()
+        }
     }
 
     private fun notifyCaptureClosed() {
@@ -316,7 +369,9 @@ class FloatingChatBlinkVoiceActivity : ComponentActivity(), BlinkDetector.BlinkL
         const val REQUEST_CAMERA_PERMISSION = 9301
         const val FLOATING_WINDOW_WIDTH_DP = 330
         const val FLOATING_WINDOW_HEIGHT_DP = 470
+        const val HEADLESS_WINDOW_SIZE_DP = 1
         const val MAX_RECOGNITION_LOG_COUNT = 20
+        const val MIN_DELIVER_EVENT_INTERVAL_MS = 1200L
     }
 }
 

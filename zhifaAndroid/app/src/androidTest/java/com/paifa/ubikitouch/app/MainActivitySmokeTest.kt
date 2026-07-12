@@ -27,4 +27,14 @@ class MainActivitySmokeTest {
             .performScrollToNode(hasText(activity.getString(R.string.left_edge)))
         composeRule.onNodeWithText(activity.getString(R.string.left_edge)).assertIsDisplayed()
     }
+
+    @Test
+    fun mainScreenContainsScrmSettingsPanel() {
+        val activity = composeRule.activity
+
+        composeRule.onNode(hasScrollAction())
+            .performScrollToNode(hasText(activity.getString(R.string.scrm_settings_title)))
+        composeRule.onNodeWithText(activity.getString(R.string.scrm_settings_title))
+            .assertIsDisplayed()
+    }
 }

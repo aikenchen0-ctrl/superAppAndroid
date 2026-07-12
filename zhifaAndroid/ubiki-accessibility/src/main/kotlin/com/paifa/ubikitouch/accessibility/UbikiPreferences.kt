@@ -23,6 +23,10 @@ class UbikiPreferences(context: Context) {
         get() = prefs.getInt(KEY_OVERLAY_OPACITY, 42)
         set(value) = prefs.edit().putInt(KEY_OVERLAY_OPACITY, value.coerceIn(0, 100)).apply()
 
+    internal var gestureInputMode: GestureInputMode
+        get() = GestureInputMode.fromId(prefs.getString(KEY_GESTURE_INPUT_MODE, GestureInputMode.Auto.id))
+        set(value) = prefs.edit().putString(KEY_GESTURE_INPUT_MODE, value.id).apply()
+
     var floatingChatFrostedBackgroundEnabled: Boolean
         get() = prefs.getBoolean(
             KEY_FLOATING_CHAT_FROSTED_BACKGROUND_ENABLED,
@@ -303,6 +307,7 @@ class UbikiPreferences(context: Context) {
         const val KEY_GLOBAL_ENABLED = "global_enabled"
         const val KEY_SHOW_INDICATORS = "show_indicators"
         const val KEY_OVERLAY_OPACITY = "overlay_opacity"
+        const val KEY_GESTURE_INPUT_MODE = "gesture_input_mode"
         const val KEY_HAPTIC_FEEDBACK = "haptic_feedback"
         const val KEY_DISABLE_IN_LANDSCAPE = "disable_in_landscape"
         const val KEY_DISABLE_WHEN_KEYBOARD_SHOWN = "disable_when_keyboard_shown"

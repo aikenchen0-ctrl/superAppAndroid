@@ -4,6 +4,8 @@ internal data class LocalChatThread(
     val threadId: String,
     val kind: String,
     val title: String? = null,
+    val remoteConversationId: String? = null,
+    val accountWeChatId: String? = null,
     val createdAt: Long,
     val updatedAt: Long
 )
@@ -44,7 +46,13 @@ internal data class LocalChatMessage(
     val mediaDurationMs: Int? = null,
     val mediaMimeType: String? = null,
     val inlineTokens: String? = null,
-    val metadataJson: String? = null
+    val metadataJson: String? = null,
+    val remoteMessageServerId: String? = null,
+    val remoteTaskId: Long? = null,
+    val sendState: String = "LOCAL_ONLY",
+    val sendErrorCode: String? = null,
+    val sendErrorMessage: String? = null,
+    val clientRequestId: String? = null
 )
 
 internal data class LocalChatFile(

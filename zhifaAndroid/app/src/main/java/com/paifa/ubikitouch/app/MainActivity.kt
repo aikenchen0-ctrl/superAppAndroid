@@ -52,6 +52,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.paifa.ubikitouch.accessibility.UbikiAccessibilityService
 import com.paifa.ubikitouch.accessibility.UbikiPreferences
+import com.paifa.ubikitouch.accessibility.scrm.ScrmSettingsManager
 import com.paifa.ubikitouch.accessibility.defaultFloatingChatBackgroundColorRgb
 import com.paifa.ubikitouch.accessibility.floatingChatBackgroundColorPresetRgbs
 import com.paifa.ubikitouch.accessibility.sanitizeFloatingChatBackgroundOpacityPercent
@@ -68,6 +69,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val preferences = UbikiPreferences(this)
+        val scrmSettingsManager = ScrmSettingsManager(this)
         val launchableApps = loadLaunchableApps()
 
         setContent {
@@ -75,6 +77,7 @@ class MainActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     MainScreen(
                         preferences = preferences,
+                        scrmSettingsManager = scrmSettingsManager,
                         launchableApps = launchableApps,
                         openAccessibilitySettings = {
                             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
@@ -122,6 +125,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun MainScreen(
     preferences: UbikiPreferences,
+    scrmSettingsManager: ScrmSettingsManager,
     launchableApps: List<LaunchableApp>,
     openAccessibilitySettings: () -> Unit,
     openBatteryOptimizationSettings: () -> Unit,
@@ -234,6 +238,9 @@ private fun MainScreen(
                     refreshOverlays()
                 }
             )
+        }
+        item {
+            ScrmSettingsPanel(manager = scrmSettingsManager)
         }
         item {
             FloatingChatAppearancePanel(

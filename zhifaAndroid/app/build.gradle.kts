@@ -19,8 +19,9 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // BlinkVoice loads MediaPipe's native graph through reflection and crashes after R8 rewriting.
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -44,7 +45,7 @@ android {
 
 dependencies {
     implementation(project(":ubiki-accessibility"))
-    implementation(project(":blinkvoice-visual-sdk"))
+    implementation(files("libs/blinkvoice-visual-sdk-release.aar"))
 
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
     implementation("androidx.activity:activity-compose:1.9.3")
@@ -63,7 +64,9 @@ dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.exifinterface:exifinterface:1.3.7")
     implementation("com.google.guava:guava:33.3.1-android")
-    implementation("com.google.mediapipe:tasks-vision:0.10.14")
+    implementation("com.google.mediapipe:tasks-vision:0.10.14") {
+        exclude(group = "com.google.auto.value", module = "auto-value")
+    }
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

@@ -38,6 +38,11 @@ class UbikiAccessibilityService : AccessibilityService() {
     private lateinit var floatingChatOverlayController: FloatingChatOverlayController
     private lateinit var nativeBackGestureTakeoverController: NativeBackGestureTakeoverController
     private val overlays = mutableMapOf<OverlayKey, EdgeOverlayView>()
+    private var nativeEdgeGestureController: NativeEdgeGestureController? = null
+    private var nativeBackTakeoverApplied = false
+    private var nativeTouchInteractionRuntimeFailed = false
+    private var floatingChatExpanded = false
+    private var floatingChatExternalActivityVisible = false
     private val mainHandler = Handler(Looper.getMainLooper())
     private val pauseExpiredRunnable = Runnable {
         Log.d(TAG, "temporary pause expired")
@@ -111,7 +116,8 @@ class UbikiAccessibilityService : AccessibilityService() {
             onBackGestureProgress = ::handleFloatingChatBackGestureProgress,
             onBackGestureCommit = ::handleFloatingChatBackGestureCommit,
             onBackGestureEnd = ::handleFloatingChatBackGestureEnd,
-            onBackGestureCancel = ::handleFloatingChatBackGestureCancel
+            onBackGestureCancel = ::handleFloatingChatBackGestureCancel,
+            onExpandedChanged = ::handleFloatingChatExpandedChanged
         )
         preferences = UbikiPreferences(this)
         actionExecutor = UbikiActionExecutor(this, preferences.hapticFeedback, floatingChatOverlayController)
@@ -192,6 +198,23 @@ class UbikiAccessibilityService : AccessibilityService() {
             ) {
                 return@post
             }
+            if (
+                resolvedGestureInputMode() == ResolvedGestureInputMode.NativeTouchInteraction &&
+                overlays.isEmpty()
+            ) {
+                val nativeRunning = nativeEdgeGestureController?.isRunning == true
+                if (
+                    nativeTouchRecoveryNeeded(
+                        floatingChatExpanded = floatingChatExpanded,
+                        controllerRunning = nativeRunning,
+                        externalActivityVisible = floatingChatExternalActivityVisible
+                    )
+                ) {
+                    Log.d(TAG, "native gesture controller missing, recover")
+                    requestOverlayRefresh()
+                }
+                return@post
+            }
             val overlaysMissing = overlays.isEmpty() || overlays.values.any { overlay ->
                 !overlay.isAttachedToWindow
             }
@@ -212,10 +235,7 @@ class UbikiAccessibilityService : AccessibilityService() {
         mediaKind: FloatingChatPrototype.PickedMediaKind,
         target: FloatingChatMediaTarget = FloatingChatMediaTarget.Chat
     ) {
-        if (::floatingChatOverlayController.isInitialized) {
-            runCatching { floatingChatOverlayController.hideForMediaPicker() }
-                .onFailure { Log.w(TAG, "failed to hide floating chat for media picker", it) }
-        }
+        hideFloatingChatForExternalActivity("media picker")
         val intent = Intent()
             .setClassName(
                 packageName,
@@ -233,10 +253,7 @@ class UbikiAccessibilityService : AccessibilityService() {
     }
 
     fun requestFloatingChatMediaCapture() {
-        if (::floatingChatOverlayController.isInitialized) {
-            runCatching { floatingChatOverlayController.hideForMediaPicker() }
-                .onFailure { Log.w(TAG, "failed to hide floating chat for camera", it) }
-        }
+        hideFloatingChatForExternalActivity("camera")
         val intent = Intent()
             .setClassName(
                 packageName,
@@ -252,10 +269,7 @@ class UbikiAccessibilityService : AccessibilityService() {
     }
 
     fun requestFloatingChatBlinkVoiceCapture() {
-        if (::floatingChatOverlayController.isInitialized) {
-            runCatching { floatingChatOverlayController.hideForMediaPicker() }
-                .onFailure { Log.w(TAG, "failed to hide floating chat for BlinkVoice", it) }
-        }
+        hideFloatingChatForExternalActivity("BlinkVoice")
         val intent = Intent()
             .setClassName(packageName, blinkVoiceBridgeActivityClassName())
             .addFloatingChatBridgeFlags()
@@ -267,11 +281,21 @@ class UbikiAccessibilityService : AccessibilityService() {
         }
     }
 
-    fun requestFloatingChatDocumentPick() {
-        if (::floatingChatOverlayController.isInitialized) {
-            runCatching { floatingChatOverlayController.hideForMediaPicker() }
-                .onFailure { Log.w(TAG, "failed to hide floating chat for document picker", it) }
+    fun requestFloatingChatBlinkVoiceHeadlessCapture() {
+        val intent = Intent()
+            .setClassName(packageName, blinkVoiceBridgeActivityClassName())
+            .putExtra(BlinkVoiceHeadlessExtraName, true)
+            .addFloatingChatBridgeFlags()
+            .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        runCatching {
+            startActivity(intent)
+        }.onFailure {
+            Log.e(TAG, "failed to start headless BlinkVoice capture", it)
         }
+    }
+
+    fun requestFloatingChatDocumentPick() {
+        hideFloatingChatForExternalActivity("document picker")
         val intent = Intent()
             .setClassName(
                 packageName,
@@ -286,17 +310,43 @@ class UbikiAccessibilityService : AccessibilityService() {
         }
     }
 
+    private fun hideFloatingChatForExternalActivity(source: String) {
+        if (!::floatingChatOverlayController.isInitialized) return
+        runCatching {
+            floatingChatOverlayController.hideForMediaPicker()
+            setFloatingChatExternalActivityVisible(true)
+        }.onFailure { error ->
+            setFloatingChatExternalActivityVisible(false)
+            Log.w(TAG, "failed to hide floating chat for $source", error)
+        }
+    }
+
+    private fun setFloatingChatExternalActivityVisible(visible: Boolean) {
+        if (floatingChatExternalActivityVisible == visible) return
+        floatingChatExternalActivityVisible = visible
+        if (visible) {
+            removeAllOverlays()
+            createOverlays()
+            return
+        }
+
+        removeAllOverlays()
+        applyServiceRuntimeConfig()
+    }
+
     fun onFloatingChatBlinkVoiceResult(
         eventType: String,
         durationMs: Long,
-        confidence: Float
+        confidence: Float,
+        headless: Boolean = false
     ) {
         if (!::floatingChatOverlayController.isInitialized) return
         runCatching {
             floatingChatOverlayController.addBlinkVoiceResult(
                 eventType = eventType,
                 durationMs = durationMs,
-                confidence = confidence
+                confidence = confidence,
+                headless = headless
             )
         }.onFailure {
             Log.e(TAG, "failed to deliver BlinkVoice result to floating chat", it)
@@ -343,6 +393,7 @@ class UbikiAccessibilityService : AccessibilityService() {
     }
 
     fun onFloatingChatMediaPickerClosed() {
+        setFloatingChatExternalActivityVisible(false)
         if (::floatingChatOverlayController.isInitialized) {
             runCatching { floatingChatOverlayController.restoreAfterMediaPicker() }
                 .onFailure { Log.w(TAG, "failed to restore floating chat after media picker", it) }
@@ -426,6 +477,7 @@ class UbikiAccessibilityService : AccessibilityService() {
     }
 
     fun onFloatingChatExternalDocumentClosed() {
+        setFloatingChatExternalActivityVisible(false)
         if (::floatingChatOverlayController.isInitialized) {
             runCatching { floatingChatOverlayController.restoreAfterExternalDocument() }
                 .onFailure { Log.w(TAG, "failed to restore floating chat after external document", it) }
@@ -478,6 +530,7 @@ class UbikiAccessibilityService : AccessibilityService() {
     private fun applyNativeBackGestureTakeover() {
         if (!::nativeBackGestureTakeoverController.isInitialized) return
         val result = nativeBackGestureTakeoverController.applyTakeover()
+        nativeBackTakeoverApplied = result.applied
         if (!result.applied) {
             Log.w(TAG, "native back gesture takeover not applied error=${result.errorMessage}")
         }
@@ -526,7 +579,9 @@ class UbikiAccessibilityService : AccessibilityService() {
         isKeyboardVisible = keyboardVisible
         val disabledByKeyboard = preferences.disableWhenKeyboardShown && keyboardVisible
         val paused = preferences.isTemporarilyPaused()
+        applyServiceRuntimeConfig()
         if (!preferences.globalEnabled || !screenInteractiveState.isInteractive || currentPackageBlocked || disabledByLandscape || disabledByKeyboard || paused) {
+            stopNativeEdgeGestures()
             Log.d(
                 TAG,
                 "skip overlays enabled=${preferences.globalEnabled} interactive=${screenInteractiveState.isInteractive} blocked=$currentPackageBlocked landscape=$disabledByLandscape keyboard=$disabledByKeyboard paused=$paused"
@@ -534,7 +589,24 @@ class UbikiAccessibilityService : AccessibilityService() {
             return
         }
 
+        if (floatingChatOwnsGestureSurface(floatingChatExpanded, floatingChatExternalActivityVisible)) {
+            stopNativeEdgeGestures()
+            Log.d(TAG, "skip gesture input while floating chat is expanded")
+            return
+        }
+
         val (screenWidth, screenHeight) = currentDisplaySize()
+        val resolvedInputMode = resolvedGestureInputMode()
+        if (!shouldCreateGestureOverlayWindows(resolvedInputMode)) {
+            if (startNativeEdgeGestures(screenWidth, screenHeight)) {
+                Log.d(TAG, "native gesture input active mode=$resolvedInputMode")
+                return
+            }
+            nativeTouchInteractionRuntimeFailed = true
+            applyServiceRuntimeConfig()
+            Log.w(TAG, "native gesture input unavailable, falling back to slim overlay")
+        }
+        stopNativeEdgeGestures()
         EdgeSide.entries.forEach { side ->
             preferences.edgeConfigs(side).forEach { config ->
                 if (!config.enabled) return@forEach
@@ -554,7 +626,7 @@ class UbikiAccessibilityService : AccessibilityService() {
                     longSwipeThresholdDp = preferences.longPullThresholdDp,
                     onGesture = { type, data ->
                         Log.d(TAG, "gesture side=${side.id} type=${type.id}")
-                        actionExecutor.execute(preferences.actionFor(side, type), data)
+                        executeConfiguredGestureAction(preferences.actionFor(side, type), data)
                     },
                     onBackGestureProgress = { progress ->
                         handleBackGestureProgress(side, backWaveAnchor, progress)
@@ -607,7 +679,7 @@ class UbikiAccessibilityService : AccessibilityService() {
         if (!::preferences.isInitialized) return false
         val action = preferences.actionFor(side, progress.gestureType)
         if (action == GestureAction.None) return false
-        actionExecutor.execute(action, data)
+        executeConfiguredGestureAction(action, data)
         return true
     }
 
@@ -632,7 +704,15 @@ class UbikiAccessibilityService : AccessibilityService() {
     ) {
         if (!::preferences.isInitialized || !::actionExecutor.isInitialized) return
         Log.d(TAG, "floating chat internal gesture side=${side.id} type=${gestureType.id}")
-        actionExecutor.execute(preferences.actionFor(side, gestureType), data)
+        executeConfiguredGestureAction(preferences.actionFor(side, gestureType), data)
+    }
+
+    private fun executeConfiguredGestureAction(action: GestureAction, data: GestureData) {
+        if (shouldRestoreFloatingChatFromExternalActivity(action, floatingChatExternalActivityVisible)) {
+            Log.d(TAG, "restore floating chat from external activity gesture")
+            setFloatingChatExternalActivityVisible(false)
+        }
+        actionExecutor.execute(action, data)
     }
 
     private fun handleFloatingChatBackGestureProgress(
@@ -661,6 +741,65 @@ class UbikiAccessibilityService : AccessibilityService() {
         if (::backWaveOverlayController.isInitialized) {
             backWaveOverlayController.dismiss()
         }
+    }
+
+    private fun handleFloatingChatExpandedChanged(expanded: Boolean) {
+        floatingChatExpanded = expanded
+        if (floatingChatOwnsGestureSurface(floatingChatExpanded, floatingChatExternalActivityVisible)) {
+            stopNativeEdgeGestures()
+            applyServiceRuntimeConfig()
+            Log.d(TAG, "native gesture input suspended for expanded floating chat")
+            return
+        }
+
+        applyServiceRuntimeConfig()
+        if (resolvedGestureInputMode() != ResolvedGestureInputMode.NativeTouchInteraction) {
+            requestOverlayRefresh()
+            return
+        }
+        val (screenWidth, screenHeight) = currentDisplaySize()
+        if (startNativeEdgeGestures(screenWidth, screenHeight)) {
+            Log.d(TAG, "native gesture input resumed after floating chat collapse")
+        } else {
+            nativeTouchInteractionRuntimeFailed = true
+            applyServiceRuntimeConfig()
+            requestOverlayRefresh()
+        }
+    }
+
+    private fun startNativeEdgeGestures(screenWidth: Int, screenHeight: Int): Boolean {
+        if (Build.VERSION.SDK_INT < NATIVE_TOUCH_INTERACTION_MIN_SDK) return false
+        val density = resources.displayMetrics.density
+        val controller = nativeEdgeGestureController ?: NativeEdgeGestureController(
+            service = this,
+            mainHandler = mainHandler,
+            onGesture = { side, type, data ->
+                Log.d(TAG, "native gesture side=${side.id} type=${type.id}")
+                executeConfiguredGestureAction(preferences.actionFor(side, type), data)
+            },
+            onBackGestureProgress = ::handleFloatingChatBackGestureProgress,
+            onBackGestureCommit = ::handleFloatingChatBackGestureCommit,
+            onBackGestureEnd = ::handleFloatingChatBackGestureEnd,
+            onBackGestureCancel = ::handleFloatingChatBackGestureCancel
+        ).also { nativeEdgeGestureController = it }
+        controller.setFloatingChatExpanded(
+            floatingChatOwnsGestureSurface(floatingChatExpanded, floatingChatExternalActivityVisible)
+        )
+        return controller.start(
+            NativeEdgeGestureConfig(
+                screenWidthPx = screenWidth,
+                screenHeightPx = screenHeight,
+                density = density,
+                leftConfigs = preferences.edgeConfigs(EdgeSide.LEFT),
+                rightConfigs = preferences.edgeConfigs(EdgeSide.RIGHT),
+                shortThresholdPx = nativeGestureThresholdPx(preferences.shortPullThresholdDp, density),
+                longThresholdPx = nativeGestureThresholdPx(preferences.longPullThresholdDp, density)
+            )
+        )
+    }
+
+    private fun stopNativeEdgeGestures() {
+        nativeEdgeGestureController?.stop()
     }
 
     private fun floatingChatBackWaveAnchor(side: EdgeSide): BackWaveAnchor {
@@ -696,7 +835,42 @@ class UbikiAccessibilityService : AccessibilityService() {
         } else {
             info.flags and AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS.inv()
         }
+        val wantsNativeTouch = shouldRequestNativeTouchInteraction(
+            eligibility = NativeTouchInteractionEligibility(
+                sdkInt = Build.VERSION.SDK_INT,
+                requestedMode = preferences.gestureInputMode,
+                runtimeFailed = nativeTouchInteractionRuntimeFailed,
+                globalEnabled = preferences.globalEnabled,
+                screenInteractive = screenInteractiveState.isInteractive,
+                packageBlocked = currentPackageBlocked,
+                paused = preferences.isTemporarilyPaused(),
+                landscapeDisabled = preferences.disableInLandscape &&
+                    resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE,
+                keyboardDisabled = preferences.disableWhenKeyboardShown && isKeyboardVisible
+            ),
+            floatingChatExpanded = floatingChatExpanded,
+            externalActivityVisible = floatingChatExternalActivityVisible
+        )
+        info.flags = if (wantsNativeTouch) {
+            info.flags or
+                AccessibilityServiceInfo.FLAG_REQUEST_TOUCH_EXPLORATION_MODE or
+                AccessibilityServiceInfo.FLAG_SEND_MOTION_EVENTS
+        } else {
+            info.flags and AccessibilityServiceInfo.FLAG_REQUEST_TOUCH_EXPLORATION_MODE.inv() and
+                AccessibilityServiceInfo.FLAG_SEND_MOTION_EVENTS.inv()
+        }
         serviceInfo = info
+    }
+
+    private fun resolvedGestureInputMode(): ResolvedGestureInputMode {
+        if (!::preferences.isInitialized) return ResolvedGestureInputMode.SlimOverlayFallback
+        return resolveGestureInputMode(
+            requestedMode = preferences.gestureInputMode,
+            sdkInt = Build.VERSION.SDK_INT,
+            nativeTouchInteractionAvailable = Build.VERSION.SDK_INT >= NATIVE_TOUCH_INTERACTION_MIN_SDK &&
+                !nativeTouchInteractionRuntimeFailed,
+            secureTakeoverApplied = nativeBackTakeoverApplied
+        )
     }
 
     private fun schedulePauseExpiryIfNeeded() {
@@ -740,6 +914,7 @@ class UbikiAccessibilityService : AccessibilityService() {
     }
 
     private fun removeAllOverlays() {
+        stopNativeEdgeGestures()
         if (::backWaveOverlayController.isInitialized) {
             runCatching { backWaveOverlayController.dismiss() }
                 .onFailure { Log.w(TAG, "failed to dismiss back wave overlay", it) }
@@ -856,10 +1031,10 @@ internal fun gestureOverlayThicknessDp(configuredThicknessDp: Int): Int {
 
 internal fun gestureOverlayTouchTargetDp(configuredThicknessDp: Int): Int {
     return gestureOverlayThicknessDp(configuredThicknessDp)
-        .coerceAtLeast(DEFAULT_EDGE_GESTURE_TOUCH_TARGET_DP)
+        .coerceAtLeast(MIN_USABLE_EDGE_GESTURE_TOUCH_TARGET_DP)
 }
 
-private const val DEFAULT_EDGE_GESTURE_TOUCH_TARGET_DP = 24
+private const val MIN_USABLE_EDGE_GESTURE_TOUCH_TARGET_DP = 8
 
 private fun Intent.addFloatingChatBridgeFlags(): Intent {
     return addFlags(

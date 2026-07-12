@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.Gravity
 import android.view.View
@@ -11,6 +13,8 @@ import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
+import com.paifa.ubikitouch.core.model.FloatingChatMessageType
+import com.paifa.ubikitouch.core.model.FloatingChatSendState
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.lifecycle.setViewTreeLifecycleOwner
@@ -25,8 +29,19 @@ import com.paifa.ubikitouch.core.model.GestureType
 import com.paifa.ubikitouch.accessibility.data.FloatingChatMessageStore
 import com.paifa.ubikitouch.accessibility.data.LocalContactProfile
 import com.paifa.ubikitouch.accessibility.data.LocalGroupProfile
+import com.paifa.ubikitouch.accessibility.data.ScrmOperationStore
 import com.paifa.ubikitouch.accessibility.data.localThreadIdForSelection
+import com.paifa.ubikitouch.accessibility.data.toLocalChatMessage
+import com.paifa.ubikitouch.accessibility.scrm.ScrmOperationProcessorResult
+import com.paifa.ubikitouch.accessibility.scrm.ScrmOperationRunner
+import com.paifa.ubikitouch.accessibility.scrm.ScrmSettingsManager
+import com.paifa.ubikitouch.accessibility.scrm.ScrmTextMessageRoute
+import com.paifa.ubikitouch.accessibility.scrm.scrmTextOutboxItemForMessage
+import com.paifa.ubikitouch.accessibility.scrm.scrmTextRouteForThread
+import com.paifa.ubikitouch.accessibility.scrm.withScrmQueueState
 import java.util.concurrent.Executors
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
 
 internal class FloatingChatOverlayController(
@@ -37,6 +52,7 @@ internal class FloatingChatOverlayController(
     private val onBackGestureCommit: (EdgeSide, BackGestureProgress, GestureData) -> Boolean = { _, _, _ -> false },
     private val onBackGestureEnd: (EdgeSide, BackGestureProgress) -> Unit = { _, _ -> },
     private val onBackGestureCancel: () -> Unit = {},
+    private val onExpandedChanged: (Boolean) -> Unit = {},
     private val onOverlayRecreated: () -> Unit = {}
 ) {
     private var composeView: ComposeView? = null
@@ -45,7 +61,16 @@ internal class FloatingChatOverlayController(
     private var state: FloatingChatOverlayState = FloatingChatOverlayState.Collapsed
     private val conversation = FloatingChatPrototype.sampleConversation()
     private val messageStore = FloatingChatMessageStore(context.applicationContext)
+    private val scrmOperationStore = ScrmOperationStore(context.applicationContext)
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val scrmOperationRunner = ScrmOperationRunner(
+        context = context.applicationContext,
+        operationStore = scrmOperationStore,
+        onProcessed = ::handleScrmOperationProcessed
+    )
+    private val scrmSettingsManager = ScrmSettingsManager(context.applicationContext)
     private val runtimeState = FloatingChatOverlayRuntimeState()
+    private val pendingScrmTextRoutes = ConcurrentHashMap<String, ScrmTextMessageRoute>()
     private val localMessages = mutableListOf<FloatingChatMessage>().apply {
         addAll(loadPersistedLocalMessages())
     }
@@ -73,6 +98,10 @@ internal class FloatingChatOverlayController(
         }
     }
 
+    init {
+        scrmOperationRunner.requestRun()
+    }
+
     fun show() {
         showState(state)
     }
@@ -82,6 +111,15 @@ internal class FloatingChatOverlayController(
     }
 
     fun expand() {
+        if (
+            shouldRestoreHiddenExpandedChatView(
+                floatingChatExpanded = state == FloatingChatOverlayState.Expanded,
+                chatViewHidden = composeView?.visibility == View.GONE
+            )
+        ) {
+            restoreAfterMediaPicker()
+            return
+        }
         showState(FloatingChatOverlayState.Expanded)
     }
 
@@ -89,7 +127,7 @@ internal class FloatingChatOverlayController(
         if (!hideExpandedViewForCollapse()) {
             dismissView()
         }
-        state = FloatingChatOverlayState.Collapsed
+        updateOverlayState(FloatingChatOverlayState.Collapsed)
     }
 
     fun dismissPreviewOrSheet(): Boolean {
@@ -277,7 +315,8 @@ internal class FloatingChatOverlayController(
     fun addBlinkVoiceResult(
         eventType: String,
         durationMs: Long,
-        confidence: Float
+        confidence: Float,
+        headless: Boolean = false
     ) {
         if (state != FloatingChatOverlayState.Expanded) {
             showState(FloatingChatOverlayState.Expanded, force = true)
@@ -285,7 +324,8 @@ internal class FloatingChatOverlayController(
         runtimeState.deliverBlinkVoiceResult(
             eventType = eventType,
             durationMs = durationMs,
-            confidence = confidence
+            confidence = confidence,
+            headless = headless
         )
     }
 
@@ -328,19 +368,20 @@ internal class FloatingChatOverlayController(
             composeView != null
         ) {
             if (restoreRetainedExpandedView()) {
-                state = FloatingChatOverlayState.Expanded
+                updateOverlayState(FloatingChatOverlayState.Expanded)
                 return
             }
             dismissView()
         }
         dismissView()
-        state = nextState
+        updateOverlayState(nextState)
         if (nextState == FloatingChatOverlayState.Collapsed) return
         val owner = AccessibilityOverlayComposeOwner()
         val view = ComposeView(context).apply {
             setViewTreeLifecycleOwner(owner)
             setViewTreeSavedStateRegistryOwner(owner)
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnLifecycleDestroyed(owner.lifecycle))
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
             if (mediaPreviewCoversSystemBars()) {
                 systemUiVisibility = expandedSystemUiVisibility(previewVisible = false)
             }
@@ -363,6 +404,9 @@ internal class FloatingChatOverlayController(
                             localMessages.clear()
                             localMessages.addAll(messages)
                             localMessageSequence = sequence
+                        },
+                        onPrepareOutgoingTextMessage = { message, threadId ->
+                            prepareOutgoingTextMessageForScrm(message, threadId)
                         },
                         onPersistLocalMessage = { message, threadId ->
                             persistLocalMessage(message, threadId)
@@ -498,14 +542,88 @@ internal class FloatingChatOverlayController(
         }.getOrDefault(emptyList())
     }
 
+    private fun prepareOutgoingTextMessageForScrm(
+        message: FloatingChatMessage,
+        threadId: String
+    ): FloatingChatMessage {
+        if (message.type != FloatingChatMessageType.Text || !message.fromMe) return message
+        val route = currentScrmTextRoute(threadId) ?: return message
+        val clientRequestId = UUID.randomUUID().toString()
+        pendingScrmTextRoutes[clientRequestId] = route
+        return message.withScrmQueueState(clientRequestId)
+    }
+
     private fun persistLocalMessage(message: FloatingChatMessage, threadId: String) {
         messageDatabaseExecutor.execute {
             runCatching {
-                messageStore.insertFloatingMessage(message = message, threadId = threadId)
+                if (!enqueueScrmTextMessageIfNeeded(message, threadId)) {
+                    messageStore.insertFloatingMessage(message = message, threadId = threadId)
+                }
             }.onFailure { error ->
                 Log.e(TAG, "failed to persist floating chat message ${message.id}", error)
             }
         }
+    }
+
+    private fun enqueueScrmTextMessageIfNeeded(
+        message: FloatingChatMessage,
+        threadId: String
+    ): Boolean {
+        if (message.sendState != FloatingChatSendState.Queued && message.clientRequestId == null) {
+            return false
+        }
+        require(message.type == FloatingChatMessageType.Text && message.fromMe) {
+            "只有我方文本消息可以进入 SCRM Outbox"
+        }
+        require(message.sendState == FloatingChatSendState.Queued) {
+            "SCRM 文本消息必须处于 QUEUED 状态"
+        }
+        val clientRequestId = requireNotNull(message.clientRequestId) {
+            "SCRM 文本消息缺少 clientRequestId"
+        }
+        val route = pendingScrmTextRoutes.remove(clientRequestId)
+            ?: currentScrmTextRoute(threadId)
+            ?: error("SCRM 文本消息缺少远端路由")
+        val now = System.currentTimeMillis()
+        scrmOperationStore.enqueueMessage(
+            message = message.toLocalChatMessage(threadId = threadId, createdAt = now),
+            item = scrmTextOutboxItemForMessage(
+                message = message,
+                route = route,
+                now = now
+            )
+        )
+        scrmOperationRunner.requestRun()
+        return true
+    }
+
+    private fun handleScrmOperationProcessed(result: ScrmOperationProcessorResult) {
+        if (result.dispatchedCount == 0 && result.polledCount == 0) return
+        refreshLocalMessagesFromStore()
+    }
+
+    private fun refreshLocalMessagesFromStore() {
+        messageDatabaseExecutor.execute {
+            val messages = loadPersistedLocalMessages()
+            val sequence = nextLocalMessageSequence(messages)
+            mainHandler.post {
+                localMessages.clear()
+                localMessages.addAll(messages)
+                localMessageSequence = sequence
+                runtimeState.deliverLocalMessagesUpdate(
+                    messages = messages,
+                    messageSequence = sequence
+                )
+            }
+        }
+    }
+
+    private fun currentScrmTextRoute(threadId: String): ScrmTextMessageRoute? {
+        return runCatching {
+            scrmTextRouteForThread(scrmSettingsManager.loadSummary(), threadId)
+        }.onFailure { error ->
+            Log.w(TAG, "failed to load SCRM routing context", error)
+        }.getOrNull()
     }
 
     private fun persistMomentPost(post: AppMomentPost) {
@@ -633,7 +751,13 @@ internal class FloatingChatOverlayController(
 
     fun dismiss() {
         dismissView()
-        state = FloatingChatOverlayState.Collapsed
+        updateOverlayState(FloatingChatOverlayState.Collapsed)
+    }
+
+    private fun updateOverlayState(nextState: FloatingChatOverlayState) {
+        if (state == nextState) return
+        state = nextState
+        onExpandedChanged(nextState == FloatingChatOverlayState.Expanded)
     }
 
     private fun dismissView() {
@@ -652,13 +776,10 @@ internal class FloatingChatOverlayController(
     private fun hideExpandedViewForCollapse(): Boolean {
         val view = composeView ?: return false
         val params = view.layoutParams as? WindowManager.LayoutParams ?: return false
+        val presentation = floatingChatWindowPresentation(expanded = false)
         previewChromeVisible = false
-        view.visibility = View.GONE
-        params.width = 0
-        params.height = 0
-        params.flags = params.flags or
-            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+        view.visibility = View.VISIBLE
+        applyWindowPresentation(params, presentation)
         params.flags = params.flags and WindowManager.LayoutParams.FLAG_FULLSCREEN.inv()
         params.flags = params.flags and WindowManager.LayoutParams.FLAG_LAYOUT_IN_OVERSCAN.inv()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -676,10 +797,10 @@ internal class FloatingChatOverlayController(
     private fun restoreRetainedExpandedView(): Boolean {
         val view = composeView ?: return false
         val params = view.layoutParams as? WindowManager.LayoutParams ?: return false
-        params.width = WindowManager.LayoutParams.MATCH_PARENT
-        params.height = WindowManager.LayoutParams.MATCH_PARENT
-        params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
-        params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
+        applyWindowPresentation(
+            params = params,
+            presentation = floatingChatWindowPresentation(expanded = true)
+        )
         params.flags = params.flags or
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
@@ -695,6 +816,25 @@ internal class FloatingChatOverlayController(
         }.onFailure {
             Log.w(TAG, "failed to restore retained floating chat overlay", it)
         }.isSuccess
+    }
+
+    private fun applyWindowPresentation(
+        params: WindowManager.LayoutParams,
+        presentation: FloatingChatWindowPresentation
+    ) {
+        params.width = presentation.width
+        params.height = presentation.height
+        params.alpha = presentation.alpha
+        params.flags = if (presentation.touchable) {
+            params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+        } else {
+            params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        }
+        params.flags = if (presentation.focusable) {
+            params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
+        } else {
+            params.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+        }
     }
 
     private fun setPreviewChromeVisible(visible: Boolean) {
@@ -833,11 +973,38 @@ private enum class FloatingChatOverlayState {
     Expanded
 }
 
+internal fun shouldRestoreHiddenExpandedChatView(
+    floatingChatExpanded: Boolean,
+    chatViewHidden: Boolean
+): Boolean {
+    return floatingChatExpanded && chatViewHidden
+}
+
+internal data class FloatingChatWindowPresentation(
+    val width: Int,
+    val height: Int,
+    val alpha: Float,
+    val touchable: Boolean,
+    val focusable: Boolean
+)
+
+internal fun floatingChatWindowPresentation(expanded: Boolean): FloatingChatWindowPresentation {
+    return FloatingChatWindowPresentation(
+        width = WindowManager.LayoutParams.MATCH_PARENT,
+        height = WindowManager.LayoutParams.MATCH_PARENT,
+        alpha = if (expanded) 1f else 0f,
+        touchable = expanded,
+        focusable = expanded
+    )
+}
+
 internal fun floatingChatShouldRefreshExpandedWindowZOrder(
     force: Boolean,
     hasComposeView: Boolean,
     currentExpanded: Boolean,
     nextExpanded: Boolean
 ): Boolean {
-    return !force && hasComposeView && currentExpanded && nextExpanded
+    return false
 }
+
+internal fun floatingChatOverlayHidesSemanticsFromItsOwningAccessibilityService(): Boolean = true

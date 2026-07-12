@@ -5,6 +5,7 @@
     android:accessibilityFlags="flagDefault|flagRetrieveInteractiveWindows"
     android:canPerformGestures="true"
     android:canRetrieveWindowContent="true"
+    android:canRequestTouchExplorationMode="true"
     android:description="@string/ubiki_accessibility_service_description"
     android:notificationTimeout="100"
     android:summary="@string/ubiki_accessibility_service_summary" />

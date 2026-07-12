@@ -27,7 +27,7 @@ class FloatingChatConnectorGeometryTest {
         assertEquals(Offset(38f, 37f), line.start)
         assertEquals(Offset(86f, 37f), line.cornerStart)
         assertEquals(Offset(86f, 94f), line.cornerEnd)
-        assertEquals(Offset(101f, 94f), line.end)
+        assertEquals(Offset(106f, 94f), line.end)
     }
 
     @Test
@@ -46,7 +46,7 @@ class FloatingChatConnectorGeometryTest {
         assertEquals(Offset(254f, 37f), line.start)
         assertEquals(Offset(206f, 37f), line.cornerStart)
         assertEquals(Offset(206f, 94f), line.cornerEnd)
-        assertEquals(Offset(201f, 94f), line.end)
+        assertEquals(Offset(196f, 94f), line.end)
     }
 
     @Test
@@ -73,11 +73,59 @@ class FloatingChatConnectorGeometryTest {
         assertEquals(ChatConnectorBranch(Offset(42f, 49f), Offset(90f, 49f)), tree.avatarBranch)
         assertEquals(
             listOf(
-                ChatConnectorBranch(Offset(90f, 74f), Offset(119f, 74f)),
-                ChatConnectorBranch(Offset(90f, 136f), Offset(145f, 136f))
+                ChatConnectorBranch(Offset(90f, 74f), Offset(124f, 74f)),
+                ChatConnectorBranch(Offset(90f, 136f), Offset(150f, 136f))
             ),
             tree.messageBranches
         )
+    }
+
+    @Test
+    fun connectorTreeMovesTrunkLeftWhenWideHomeBubbleTouchesDefaultTrunk() {
+        val layerBounds = Rect(left = 0f, top = 0f, right = 320f, bottom = 520f)
+        val messageViewportBounds = Rect(left = 70f, top = 20f, right = 270f, bottom = 460f)
+        val avatarBounds = Rect(left = 8f, top = 32f, right = 42f, bottom = 66f)
+        val bubbleBounds = Rect(left = 92f, top = 116f, right = 270f, bottom = 166f)
+
+        val tree = createChatConnectorTree(
+            avatarBounds = avatarBounds,
+            bubbleBounds = listOf(bubbleBounds),
+            layerBounds = layerBounds,
+            visibleRootBounds = messageViewportBounds,
+            target = FloatingChatConnectionTarget.User,
+            hasMessagesAbove = false,
+            hasMessagesBelow = false
+        ) ?: error("Expected connector tree")
+        val branch = tree.messageBranches.single()
+
+        assertTrue(tree.trunkStart.x < branch.end.x)
+        assertEquals(bubbleBounds.left + imModuleConnectionLineBubbleOverlapPx(), branch.end.x)
+        assertTrue(branch.end.x - tree.trunkStart.x >= imModuleConnectionLineMinimumBranchPx())
+        assertTrue(tree.avatarBranch!!.end.x > tree.avatarBranch.start.x)
+    }
+
+    @Test
+    fun connectorTreeMovesTrunkRightWhenWideAccountBubbleTouchesDefaultTrunk() {
+        val layerBounds = Rect(left = 0f, top = 0f, right = 320f, bottom = 520f)
+        val messageViewportBounds = Rect(left = 70f, top = 20f, right = 270f, bottom = 460f)
+        val avatarBounds = Rect(left = 278f, top = 32f, right = 312f, bottom = 66f)
+        val bubbleBounds = Rect(left = 70f, top = 116f, right = 228f, bottom = 166f)
+
+        val tree = createChatConnectorTree(
+            avatarBounds = avatarBounds,
+            bubbleBounds = listOf(bubbleBounds),
+            layerBounds = layerBounds,
+            visibleRootBounds = messageViewportBounds,
+            target = FloatingChatConnectionTarget.Account,
+            hasMessagesAbove = false,
+            hasMessagesBelow = false
+        ) ?: error("Expected connector tree")
+        val branch = tree.messageBranches.single()
+
+        assertTrue(tree.trunkStart.x > branch.end.x)
+        assertEquals(bubbleBounds.right - imModuleConnectionLineBubbleOverlapPx(), branch.end.x)
+        assertTrue(tree.trunkStart.x - branch.end.x >= imModuleConnectionLineMinimumBranchPx())
+        assertTrue(tree.avatarBranch!!.end.x < tree.avatarBranch.start.x)
     }
 
     @Test
@@ -197,7 +245,7 @@ class FloatingChatConnectorGeometryTest {
     }
 
     @Test
-    fun homeOverviewConnectorKeysAreScopedPerUnreadBubble() {
+    fun homeOverviewConnectorKeysAreScopedPerUnreadSource() {
         val first = FloatingChatMessage(
             id = "home-unread-account-a-li-si",
             type = FloatingChatMessageType.Text,
@@ -209,10 +257,37 @@ class FloatingChatConnectorGeometryTest {
             connectionTargetId = "li-si"
         )
         val second = first.copy(id = "home-unread-account-b-li-si")
+        val otherSource = first.copy(
+            id = "home-unread-account-a-he-miao",
+            connectionTargetId = "he-miao"
+        )
 
-        assertNotEquals(
+        assertEquals(
             homeOverviewConnectorKeyDebugId(first),
             homeOverviewConnectorKeyDebugId(second)
         )
+        assertNotEquals(
+            homeOverviewConnectorKeyDebugId(first),
+            homeOverviewConnectorKeyDebugId(otherSource)
+        )
+    }
+
+    @Test
+    fun leftRailVirtualSessionAvatarBoundsInferOffscreenItemsFromVisibleItems() {
+        val viewport = Rect(left = 0f, top = 0f, right = 56f, bottom = 220f)
+
+        val bounds = leftRailVirtualSessionAvatarBounds(
+            sessionIds = listOf("session-0", "session-1", "session-2"),
+            visibleItems = listOf(
+                LeftRailVisibleSessionItem(index = 1, offset = 18, size = 42),
+                LeftRailVisibleSessionItem(index = 2, offset = 66, size = 42)
+            ),
+            viewport = viewport,
+            fallbackStepPx = 48f
+        )
+
+        assertEquals(Rect(left = 0f, top = -30f, right = 42f, bottom = 12f), bounds["session-0"])
+        assertEquals(Rect(left = 0f, top = 18f, right = 42f, bottom = 60f), bounds["session-1"])
+        assertEquals(Rect(left = 0f, top = 66f, right = 42f, bottom = 108f), bounds["session-2"])
     }
 }

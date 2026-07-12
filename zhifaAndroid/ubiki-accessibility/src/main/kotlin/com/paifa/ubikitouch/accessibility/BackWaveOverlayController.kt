@@ -14,6 +14,7 @@ import com.paifa.ubikitouch.core.gesture.BackGestureProgress
 import com.paifa.ubikitouch.core.model.EdgeSide
 import com.paifa.ubikitouch.core.model.GestureType
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 internal class BackWaveOverlayController(
     private val context: Context,
@@ -23,32 +24,37 @@ internal class BackWaveOverlayController(
     private var activeAnchor: BackWaveAnchor? = null
 
     fun update(progress: BackGestureProgress, anchor: BackWaveAnchor) {
-        ensureView(anchor).update(
-            BackWaveState.Visible(
-                side = progress.side,
-                progress = progress.visualProgress,
-                stretchProgress = progress.visualProgress,
-                longDistance = progress.longCommitted,
-                touchY = progress.touchY,
-                startY = progress.startY,
-                gestureType = progress.gestureType
-            )
+        val localizedAnchor = localizedBackWaveAnchor(
+            anchor = anchor,
+            startY = progress.startY,
+            density = context.resources.displayMetrics.density
         )
+        ensureView(localizedAnchor).update(visibleState(progress, localizedAnchor))
     }
 
     fun finish(progress: BackGestureProgress, anchor: BackWaveAnchor) {
-        ensureView(anchor).update(
-            BackWaveState.Visible(
-                side = progress.side,
-                progress = progress.visualProgress,
-                stretchProgress = progress.visualProgress,
-                longDistance = progress.longCommitted,
-                touchY = progress.touchY,
-                startY = progress.startY,
-                gestureType = progress.gestureType
-            )
+        val localizedAnchor = localizedBackWaveAnchor(
+            anchor = anchor,
+            startY = progress.startY,
+            density = context.resources.displayMetrics.density
         )
+        ensureView(localizedAnchor).update(visibleState(progress, localizedAnchor))
         dismiss()
+    }
+
+    private fun visibleState(
+        progress: BackGestureProgress,
+        anchor: BackWaveAnchor
+    ): BackWaveState.Visible {
+        return BackWaveState.Visible(
+            side = progress.side,
+            progress = progress.visualProgress,
+            stretchProgress = progress.visualProgress,
+            longDistance = progress.longCommitted,
+            touchY = progress.touchY - anchor.y,
+            startY = progress.startY - anchor.y,
+            gestureType = progress.gestureType
+        )
     }
 
     fun dismiss() {
@@ -89,7 +95,8 @@ internal class BackWaveOverlayController(
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
@@ -133,7 +140,6 @@ private class BackWaveView(context: Context) : View(context) {
     private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
         color = Color.argb(92, 9, 12, 18)
-        setShadowLayer(18f, 0f, 6f, Color.argb(120, 0, 0, 0))
     }
     private val bubblePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
@@ -154,7 +160,7 @@ private class BackWaveView(context: Context) : View(context) {
     private val cuePath = Path()
 
     init {
-        setLayerType(LAYER_TYPE_SOFTWARE, null)
+        setLayerType(backWaveLayerType(), null)
     }
 
     fun update(nextState: BackWaveState) {
@@ -210,7 +216,13 @@ private class BackWaveView(context: Context) : View(context) {
         highlightPaint.alpha = (alpha * 0.28f).toInt().coerceIn(0, 72)
         cuePaint.alpha = (alpha * 0.82f).toInt().coerceIn(0, 210)
         cuePaint.strokeWidth = layout.cueStrokeWidthPx
+        canvas.save()
+        canvas.translate(
+            if (visible.side == EdgeSide.LEFT) density * 1.5f else -density * 1.5f,
+            density * 2f
+        )
         canvas.drawPath(surfacePath, shadowPaint)
+        canvas.restore()
         canvas.drawPath(surfacePath, bubblePaint)
         canvas.drawPath(highlightPath, highlightPaint)
         canvas.drawPath(cuePath, cuePaint)
@@ -219,6 +231,26 @@ private class BackWaveView(context: Context) : View(context) {
     private companion object {
         const val SURFACE_SAMPLE_COUNT = 31
     }
+}
+
+internal fun backWaveLayerType(): Int = View.LAYER_TYPE_NONE
+
+internal fun localizedBackWaveAnchor(
+    anchor: BackWaveAnchor,
+    startY: Float,
+    density: Float
+): BackWaveAnchor {
+    val height = (BACK_WAVE_WINDOW_HEIGHT_DP * density.coerceAtLeast(0.1f))
+        .roundToInt()
+        .coerceAtLeast(1)
+        .coerceAtMost(anchor.height.coerceAtLeast(1))
+    val minY = anchor.y
+    val maxY = (anchor.y + anchor.height - height).coerceAtLeast(minY)
+    val centeredY = startY.roundToInt() - height / 2
+    return anchor.copy(
+        y = centeredY.coerceIn(minY, maxY),
+        height = height
+    )
 }
 
 internal data class BackWaveVisualLayout(
@@ -370,6 +402,7 @@ private fun easeOutQuart(value: Float): Float {
 private const val MAX_RUBBER_BEND_DP = 96f
 private const val MAX_HALF_HEIGHT_DP = 58f
 private const val MAX_DEPTH_DP = 36f
+private const val BACK_WAVE_WINDOW_HEIGHT_DP = 144f
 
 internal fun backWaveShowsFromFirstDragPixel(): Boolean = true
 

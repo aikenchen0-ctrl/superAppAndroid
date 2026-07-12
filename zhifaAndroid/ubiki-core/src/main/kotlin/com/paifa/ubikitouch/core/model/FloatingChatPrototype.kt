@@ -60,8 +60,27 @@ data class FloatingChatMessage(
     val thumbnailUrl: String? = null,
     val mediaDurationMs: Int? = null,
     val mediaMimeType: String? = null,
-    val inlineTokens: List<FloatingChatInlineToken> = emptyList()
+    val inlineTokens: List<FloatingChatInlineToken> = emptyList(),
+    val remoteMessageServerId: String? = null,
+    val remoteTaskId: Long? = null,
+    val sendState: FloatingChatSendState = FloatingChatSendState.LocalOnly,
+    val sendErrorCode: String? = null,
+    val sendErrorMessage: String? = null,
+    val clientRequestId: String? = null
 )
+
+enum class FloatingChatSendState {
+    LocalOnly,
+    Queued,
+    Uploading,
+    Submitted,
+    Processing,
+    Succeeded,
+    FailedRetryable,
+    FailedFinal,
+    Unknown,
+    Cancelled
+}
 
 enum class FloatingChatMessageType(val label: String) {
     Location("位置消息"),

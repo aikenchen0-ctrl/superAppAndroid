@@ -96,7 +96,7 @@ class FloatingChatMessageStoreContractTest {
             newVersion = 2
         ).joinToString("\n")
 
-        assertEquals(4, FloatingChatDatabaseContract.databaseVersion)
+        assertEquals(5, FloatingChatDatabaseContract.databaseVersion)
         assertTrue(schema.contains("moment_posts"))
         assertTrue(schema.contains("post_id TEXT PRIMARY KEY"))
         assertTrue(schema.contains("media_uri TEXT"))
@@ -113,7 +113,7 @@ class FloatingChatMessageStoreContractTest {
             newVersion = 3
         ).joinToString("\n")
 
-        assertEquals(4, FloatingChatDatabaseContract.databaseVersion)
+        assertEquals(5, FloatingChatDatabaseContract.databaseVersion)
         assertTrue(schema.contains("contact_profiles"))
         assertTrue(schema.contains("PRIMARY KEY(account_id, contact_id)"))
         assertTrue(schema.contains("remark TEXT"))
@@ -136,7 +136,7 @@ class FloatingChatMessageStoreContractTest {
             newVersion = 4
         ).joinToString("\n")
 
-        assertEquals(4, FloatingChatDatabaseContract.databaseVersion)
+        assertEquals(5, FloatingChatDatabaseContract.databaseVersion)
         assertTrue(schema.contains("group_profiles"))
         assertTrue(schema.contains("PRIMARY KEY(account_id, group_id)"))
         assertTrue(schema.contains("group_name TEXT"))
@@ -145,5 +145,35 @@ class FloatingChatMessageStoreContractTest {
         assertTrue(schema.contains("show_member_avatars INTEGER NOT NULL DEFAULT 1"))
         assertTrue(schema.contains("show_member_nicknames INTEGER NOT NULL DEFAULT 1"))
         assertTrue(v3ToV4Migration.contains("CREATE TABLE IF NOT EXISTS group_profiles"))
+    }
+
+    @Test
+    fun `sqlite v5 adds remote routing outbox and task state without destructive migration`() {
+        val schema = FloatingChatDatabaseContract.createStatements.joinToString("\n")
+        val migrationStatements = FloatingChatDatabaseContract.migrationStatements(
+            oldVersion = 4,
+            newVersion = 5
+        )
+        val migration = migrationStatements.joinToString("\n")
+
+        assertEquals(5, FloatingChatDatabaseContract.databaseVersion)
+        assertTrue(schema.contains("remote_conversation_id TEXT"))
+        assertTrue(schema.contains("account_wechat_id TEXT"))
+        assertTrue(schema.contains("remote_msg_svr_id TEXT"))
+        assertTrue(schema.contains("remote_task_id INTEGER"))
+        assertTrue(schema.contains("send_state TEXT NOT NULL DEFAULT 'LOCAL_ONLY'"))
+        assertTrue(schema.contains("client_request_id TEXT"))
+        assertTrue(schema.contains("CREATE TABLE IF NOT EXISTS scrm_accounts"))
+        assertTrue(schema.contains("CREATE TABLE IF NOT EXISTS scrm_outbox"))
+        assertTrue(schema.contains("client_request_id TEXT NOT NULL UNIQUE"))
+        assertTrue(schema.contains("CREATE TABLE IF NOT EXISTS scrm_tasks"))
+        assertTrue(schema.contains("task_id INTEGER PRIMARY KEY"))
+
+        assertTrue(migration.contains("ALTER TABLE chat_threads ADD COLUMN remote_conversation_id TEXT"))
+        assertTrue(migration.contains("ALTER TABLE chat_messages ADD COLUMN remote_task_id INTEGER"))
+        assertTrue(migration.contains("CREATE TABLE IF NOT EXISTS scrm_outbox"))
+        assertTrue(migration.contains("CREATE TABLE IF NOT EXISTS scrm_tasks"))
+        assertTrue(migrationStatements.none { it.trimStart().startsWith("DROP ", ignoreCase = true) })
+        assertTrue(migrationStatements.none { it.trimStart().startsWith("DELETE ", ignoreCase = true) })
     }
 }

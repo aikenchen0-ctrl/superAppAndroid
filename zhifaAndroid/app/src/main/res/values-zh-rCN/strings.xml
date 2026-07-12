@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">ICON</string>
+    <string name="app_name">只发</string>
     <string name="tile_label">ubikiTouch</string>
     <string name="tile_active">运行中</string>
     <string name="tile_paused">已暂停</string>
@@ -100,4 +100,20 @@
     <string name="remaining_seconds">%1$d 秒</string>
     <string name="percent_suffix" formatted="false">%</string>
     <string name="dp_suffix">dp</string>
+    <string name="scrm_settings_title">SCRM 接口</string>
+    <string name="scrm_base_url">服务器地址</string>
+    <string name="scrm_api_key">API Key</string>
+    <string name="scrm_show_api_key">显示 API Key</string>
+    <string name="scrm_hide_api_key">隐藏 API Key</string>
+    <string name="scrm_save">保存配置</string>
+    <string name="scrm_test_connection">测试连接</string>
+    <string name="scrm_account_selection">选择账号</string>
+    <string name="scrm_capability_status">能力状态</string>
+    <string name="scrm_capability_group_counts">%1$d 项可测试 · %2$d 项阻塞 · %3$d 项暂停 · %4$d 项运行时未知</string>
+    <string name="scrm_save_before_select">保存配置后才能选择账号</string>
+    <string name="scrm_device_online">设备在线</string>
+    <string name="scrm_device_offline">设备离线</string>
+    <string name="scrm_clear">清除配置</string>
+    <string name="scrm_clear_confirm_title">清除 SCRM 配置？</string>
+    <string name="scrm_clear_confirm_message">本机保存的加密 API Key 和账号选择将被删除。</string>
 </resources>

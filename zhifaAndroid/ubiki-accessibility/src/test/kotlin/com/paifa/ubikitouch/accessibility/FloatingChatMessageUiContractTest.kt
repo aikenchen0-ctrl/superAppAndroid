@@ -4,11 +4,14 @@ import com.paifa.ubikitouch.core.model.FloatingChatThumbnailOrientation
 import com.paifa.ubikitouch.core.model.FloatingChatToolAction
 import com.paifa.ubikitouch.core.model.FloatingChatPrototype
 import com.paifa.ubikitouch.core.model.FloatingChatConnectionTarget
+import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatFileFormat
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import com.paifa.ubikitouch.core.model.FloatingChatMessagePresentation
 import com.paifa.ubikitouch.core.model.FloatingChatMessageType
+import com.paifa.ubikitouch.core.model.FloatingChatSendState
 import com.paifa.ubikitouch.core.model.FloatingChatContactCardKind
+import com.paifa.ubikitouch.core.model.GestureAction
 import com.paifa.ubikitouch.core.model.gestureMappingOrder
 import com.paifa.ubikitouch.accessibility.data.LocalGroupProfile
 import org.junit.Assert.assertEquals
@@ -32,6 +35,63 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
+    fun outgoingScrmMessagesExposeSendStateLabels() {
+        val queued = sendStateMessage(FloatingChatSendState.Queued)
+        val succeeded = sendStateMessage(FloatingChatSendState.Succeeded)
+        val failed = sendStateMessage(
+            FloatingChatSendState.FailedFinal,
+            sendErrorMessage = "无权限发送"
+        )
+        val localOnly = sendStateMessage(FloatingChatSendState.LocalOnly)
+
+        assertEquals("待提交", scrmSendStatusTextFor(queued))
+        assertEquals("已发送", scrmSendStatusTextFor(succeeded))
+        assertEquals("发送失败：无权限发送", scrmSendStatusTextFor(failed))
+        assertEquals(null, scrmSendStatusTextFor(localOnly))
+    }
+
+    @Test
+    fun switchingThreadsRetargetsTheReusedMessageViewportBeforeMeasure() {
+        val first = messageListViewportKey(
+            selection = ChatThreadSelection.Private("he-miao"),
+            selectedAccountId = "account-main",
+            homeOverviewVisible = false
+        )
+        val second = messageListViewportKey(
+            selection = ChatThreadSelection.Private("qian-yue"),
+            selectedAccountId = "account-main",
+            homeOverviewVisible = false
+        )
+
+        assertEquals(false, first == second)
+        assertEquals(true, shouldRetargetMessageList(first, second))
+        assertEquals(false, shouldRetargetMessageList(first, first))
+        assertEquals(0, messageListInitialFirstVisibleItemIndex(messageCount = 0))
+        assertEquals(4, messageListInitialFirstVisibleItemIndex(messageCount = 5))
+        assertEquals(
+            messageListReusableContentType(FloatingChatMessageType.Text),
+            messageListReusableContentType(FloatingChatMessageType.FilePreview)
+        )
+        assertEquals(true, floatingChatOverlayUsesRuntimeSizedCompositionSections())
+    }
+
+    private fun sendStateMessage(
+        sendState: FloatingChatSendState,
+        sendErrorMessage: String? = null
+    ): FloatingChatMessage {
+        return FloatingChatMessage(
+            id = "message-$sendState",
+            type = FloatingChatMessageType.Text,
+            text = "hello",
+            fromMe = true,
+            senderName = "me",
+            time = "刚刚",
+            sendState = sendState,
+            sendErrorMessage = sendErrorMessage
+        )
+    }
+
+    @Test
     fun gestureOverlayUsesConfiguredTriggerBarWidth() {
         assertEquals(1, gestureOverlayThicknessDp(0))
         assertEquals(1, gestureOverlayThicknessDp(1))
@@ -43,13 +103,321 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
-    fun gestureOverlaySeparatesVisibleHandleFromEdgeTouchTarget() {
+    fun gestureOverlayTouchTargetUsesSmallUsableMinimum() {
         assertEquals(1, gestureOverlayThicknessDp(1))
-        assertEquals(24, gestureOverlayTouchTargetDp(1))
-        assertEquals(24, gestureOverlayTouchTargetDp(8))
+        assertEquals(8, gestureOverlayTouchTargetDp(1))
+        assertEquals(8, gestureOverlayTouchTargetDp(8))
         assertEquals(24, gestureOverlayTouchTargetDp(24))
         assertEquals(48, gestureOverlayTouchTargetDp(48))
         assertEquals(96, gestureOverlayTouchTargetDp(120))
+    }
+
+    @Test
+    fun autoGestureInputModePrefersNativeTouchInteractionOnAndroid13AndNewer() {
+        assertEquals(
+            ResolvedGestureInputMode.NativeTouchInteraction,
+            resolveGestureInputMode(
+                requestedMode = GestureInputMode.Auto,
+                sdkInt = 33,
+                nativeTouchInteractionAvailable = true,
+                secureTakeoverApplied = false
+            )
+        )
+        assertEquals(
+            ResolvedGestureInputMode.SlimOverlayFallback,
+            resolveGestureInputMode(
+                requestedMode = GestureInputMode.Auto,
+                sdkInt = 32,
+                nativeTouchInteractionAvailable = false,
+                secureTakeoverApplied = false
+            )
+        )
+        assertEquals(
+            ResolvedGestureInputMode.SecureSlimOverlay,
+            resolveGestureInputMode(
+                requestedMode = GestureInputMode.Auto,
+                sdkInt = 32,
+                nativeTouchInteractionAvailable = false,
+                secureTakeoverApplied = true
+            )
+        )
+    }
+
+    @Test
+    fun nativeTouchInteractionModeDoesNotCreateEdgeOverlayWindows() {
+        assertEquals(false, shouldCreateGestureOverlayWindows(ResolvedGestureInputMode.NativeTouchInteraction))
+        assertEquals(true, shouldCreateGestureOverlayWindows(ResolvedGestureInputMode.SecureSlimOverlay))
+        assertEquals(true, shouldCreateGestureOverlayWindows(ResolvedGestureInputMode.SlimOverlayFallback))
+    }
+
+    @Test
+    fun nativeTouchExplorationRunsOnlyWhileFloatingChatIsCollapsed() {
+        val enabled = NativeTouchInteractionEligibility(
+            sdkInt = 34,
+            requestedMode = GestureInputMode.Auto,
+            runtimeFailed = false,
+            globalEnabled = true,
+            screenInteractive = true,
+            packageBlocked = false,
+            paused = false,
+            landscapeDisabled = false,
+            keyboardDisabled = false
+        )
+
+        assertEquals(true, shouldRequestNativeTouchInteraction(enabled, floatingChatExpanded = false))
+        assertEquals(false, shouldRequestNativeTouchInteraction(enabled, floatingChatExpanded = true))
+        assertEquals(false, nativeTouchRecoveryNeeded(floatingChatExpanded = true, controllerRunning = false))
+        assertEquals(true, nativeTouchRecoveryNeeded(floatingChatExpanded = false, controllerRunning = false))
+        assertEquals(false, nativeTouchRecoveryNeeded(floatingChatExpanded = false, controllerRunning = true))
+        assertEquals(
+            false,
+            shouldRequestNativeTouchInteraction(
+                enabled.copy(globalEnabled = false),
+                floatingChatExpanded = false
+            )
+        )
+    }
+
+    @Test
+    fun nativeTouchInteractionResumesWhenExpandedChatIsCoveredByExternalPicker() {
+        val enabled = NativeTouchInteractionEligibility(
+            sdkInt = 34,
+            requestedMode = GestureInputMode.Auto,
+            runtimeFailed = false,
+            globalEnabled = true,
+            screenInteractive = true,
+            packageBlocked = false,
+            paused = false,
+            landscapeDisabled = false,
+            keyboardDisabled = false
+        )
+
+        assertEquals(
+            false,
+            floatingChatOwnsGestureSurface(
+                floatingChatExpanded = true,
+                externalActivityVisible = true
+            )
+        )
+        assertEquals(
+            true,
+            shouldRequestNativeTouchInteraction(
+                eligibility = enabled,
+                floatingChatExpanded = true,
+                externalActivityVisible = true
+            )
+        )
+        assertEquals(
+            false,
+            shouldRequestNativeTouchInteraction(
+                eligibility = enabled,
+                floatingChatExpanded = true,
+                externalActivityVisible = false
+            )
+        )
+    }
+
+    @Test
+    fun expandActionRestoresChatWhenAnExternalPickerIsCoveringIt() {
+        assertEquals(
+            true,
+            shouldRestoreFloatingChatFromExternalActivity(
+                action = GestureAction.ExpandFloatingChat,
+                externalActivityVisible = true
+            )
+        )
+        assertEquals(
+            false,
+            shouldRestoreFloatingChatFromExternalActivity(
+                action = GestureAction.Back,
+                externalActivityVisible = true
+            )
+        )
+        assertEquals(
+            false,
+            shouldRestoreFloatingChatFromExternalActivity(
+                action = GestureAction.ExpandFloatingChat,
+                externalActivityVisible = false
+            )
+        )
+    }
+
+    @Test
+    fun hiddenExpandedChatViewIsRestoredInsteadOfIgnoringExpand() {
+        assertEquals(
+            true,
+            shouldRestoreHiddenExpandedChatView(
+                floatingChatExpanded = true,
+                chatViewHidden = true
+            )
+        )
+        assertEquals(
+            false,
+            shouldRestoreHiddenExpandedChatView(
+                floatingChatExpanded = false,
+                chatViewHidden = true
+            )
+        )
+        assertEquals(
+            false,
+            shouldRestoreHiddenExpandedChatView(
+                floatingChatExpanded = true,
+                chatViewHidden = false
+            )
+        )
+    }
+
+    @Test
+    fun nativeTouchInteractionKeepsSystemSizedEdgeStartAreaWithoutOverlayBlocking() {
+        assertEquals(24, nativeTouchInteractionEdgeStartTargetDp(1))
+        assertEquals(24, nativeTouchInteractionEdgeStartTargetDp(8))
+        assertEquals(24, nativeTouchInteractionEdgeStartTargetDp(24))
+        assertEquals(48, nativeTouchInteractionEdgeStartTargetDp(48))
+        assertEquals(96, nativeTouchInteractionEdgeStartTargetDp(120))
+    }
+
+    @Test
+    fun nativeTouchInteractionHitTestHonorsEdgeZones() {
+        val leftConfig = com.paifa.ubikitouch.core.model.EdgeZoneConfig(
+            side = com.paifa.ubikitouch.core.model.EdgeSide.LEFT,
+            zoneId = 0,
+            enabled = true,
+            thicknessDp = 1,
+            topInsetPercent = 10,
+            bottomInsetPercent = 10
+        )
+        val rightConfig = leftConfig.copy(
+            side = com.paifa.ubikitouch.core.model.EdgeSide.RIGHT,
+            zoneId = 1
+        )
+
+        assertEquals(
+            NativeEdgeGestureHit(com.paifa.ubikitouch.core.model.EdgeSide.LEFT, 0),
+            nativeEdgeGestureHitTest(
+                x = 12f,
+                y = 500f,
+                screenWidthPx = 1080,
+                screenHeightPx = 1000,
+                density = 1f,
+                leftConfigs = listOf(leftConfig),
+                rightConfigs = listOf(rightConfig)
+            )
+        )
+        assertEquals(
+            NativeEdgeGestureHit(com.paifa.ubikitouch.core.model.EdgeSide.RIGHT, 1),
+            nativeEdgeGestureHitTest(
+                x = 1068f,
+                y = 500f,
+                screenWidthPx = 1080,
+                screenHeightPx = 1000,
+                density = 1f,
+                leftConfigs = listOf(leftConfig),
+                rightConfigs = listOf(rightConfig)
+            )
+        )
+        assertEquals(
+            null,
+            nativeEdgeGestureHitTest(
+                x = 60f,
+                y = 500f,
+                screenWidthPx = 1080,
+                screenHeightPx = 1000,
+                density = 1f,
+                leftConfigs = listOf(leftConfig),
+                rightConfigs = listOf(rightConfig)
+            )
+        )
+        assertEquals(
+            null,
+            nativeEdgeGestureHitTest(
+                x = 12f,
+                y = 40f,
+                screenWidthPx = 1080,
+                screenHeightPx = 1000,
+                density = 1f,
+                leftConfigs = listOf(leftConfig),
+                rightConfigs = listOf(rightConfig)
+            )
+        )
+    }
+
+    @Test
+    fun nativeTouchDelegationIsRequestedOnlyOncePerGesture() {
+        assertEquals(
+            true,
+            shouldRequestNativeTouchDelegation(
+                alreadyDelegated = false,
+                platformIsDelegating = false
+            )
+        )
+        assertEquals(
+            false,
+            shouldRequestNativeTouchDelegation(
+                alreadyDelegated = true,
+                platformIsDelegating = false
+            )
+        )
+        assertEquals(
+            false,
+            shouldRequestNativeTouchDelegation(
+                alreadyDelegated = false,
+                platformIsDelegating = true
+            )
+        )
+    }
+
+    @Test
+    fun nativeTouchInterceptsOnlyConfiguredEdgesWhenCollapsedAndNothingWhenChatExpanded() {
+        val leftConfig = com.paifa.ubikitouch.core.model.EdgeZoneConfig(
+            side = com.paifa.ubikitouch.core.model.EdgeSide.LEFT,
+            zoneId = 0,
+            enabled = true,
+            thicknessDp = 1,
+            topInsetPercent = 10,
+            bottomInsetPercent = 20
+        )
+        val rightConfig = leftConfig.copy(
+            side = com.paifa.ubikitouch.core.model.EdgeSide.RIGHT,
+            zoneId = 1,
+            thicknessDp = 32,
+            topInsetPercent = 20,
+            bottomInsetPercent = 10
+        )
+        val config = NativeEdgeGestureConfig(
+            screenWidthPx = 1080,
+            screenHeightPx = 2000,
+            density = 1f,
+            leftConfigs = listOf(leftConfig),
+            rightConfigs = listOf(rightConfig),
+            shortThresholdPx = 24f,
+            longThresholdPx = 72f
+        )
+
+        assertEquals(
+            listOf(
+                NativeTouchInterceptRect(
+                    side = com.paifa.ubikitouch.core.model.EdgeSide.LEFT,
+                    zoneId = 0,
+                    left = 0,
+                    top = 200,
+                    right = 24,
+                    bottom = 1600
+                ),
+                NativeTouchInterceptRect(
+                    side = com.paifa.ubikitouch.core.model.EdgeSide.RIGHT,
+                    zoneId = 1,
+                    left = 1048,
+                    top = 400,
+                    right = 1080,
+                    bottom = 1800
+                )
+            ),
+            nativeTouchInterceptRects(config, floatingChatExpanded = false)
+        )
+        assertEquals(
+            emptyList<NativeTouchInterceptRect>(),
+            nativeTouchInterceptRects(config, floatingChatExpanded = true)
+        )
     }
 
     @Test
@@ -363,6 +731,10 @@ class FloatingChatMessageUiContractTest {
         assertEquals(32, paymentCardGlyphSizeDp())
         assertEquals(7, paymentCardOuterVerticalPaddingDp())
         assertEquals(false, paymentCardTextUsesShadow())
+        assertEquals(0xFFFFC98F.toInt(), paymentCardClaimedMessageColorArgb())
+        assertEquals(0xFFE7A967.toInt(), paymentCardClaimedBorderColorArgb())
+        assertEquals("已领取", paymentCardClaimedStatusLabel(isTransfer = false))
+        assertEquals("已收款", paymentCardClaimedStatusLabel(isTransfer = true))
         assertEquals("红包", paymentCardKindLabelFor("https://aiff.app/app/red-packet/1", "浮窗红包", "浮窗红包 ¥8.88"))
         assertEquals("转账", paymentCardKindLabelFor("https://aiff.app/app/transfer/1", "浮窗转账", "转账 ¥50.00"))
         assertEquals("¥50.00", paymentCardAmountTextFor("转账 ¥50.00"))
@@ -397,6 +769,101 @@ class FloatingChatMessageUiContractTest {
 
         assertEquals(true, transferPanelSupportsGroupRecipientSelection())
         assertEquals(listOf("孙临", "何苗", "顾言"), recipients.map { it.name })
+    }
+
+    @Test
+    fun transferClaimRequiresDesignatedRecipient() {
+        val account = FloatingChatContact(
+            id = "account-store",
+            name = "门店服务",
+            initials = "门店",
+            description = "线下门店",
+            avatarColor = 0xFFB56576
+        )
+        val otherAccount = FloatingChatContact(
+            id = "account-main",
+            name = "林舟",
+            initials = "林舟",
+            description = "个人微信",
+            avatarColor = 0xFF3A86FF
+        )
+        val incomingTransfer = FloatingChatMessage(
+            id = "transfer-incoming",
+            type = FloatingChatMessageType.MiniProgramLink,
+            text = "转账 ¥88.00",
+            fromMe = false,
+            senderName = "何苗",
+            time = "刚刚",
+            presentation = FloatingChatMessagePresentation.SpecialCard,
+            connectionTarget = FloatingChatConnectionTarget.User,
+            connectionTargetId = "he-miao",
+            threadContactId = "he-miao",
+            appName = "浮窗转账",
+            resourceUrl = "https://aiff.app/app/transfer/1"
+        )
+        val incomingGroupTransferForAccount = incomingTransfer.copy(
+            id = "transfer-group-incoming",
+            threadContactId = "group-ops",
+            cardName = account.name,
+            resourceUrl = transferResourceUrlWithRecipient(
+                resourceUrl = "https://aiff.app/app/transfer/2",
+                recipientId = account.id
+            )
+        )
+        val outgoingTransferToContact = incomingTransfer.copy(
+            id = "transfer-outgoing",
+            fromMe = true,
+            senderName = account.name,
+            connectionTarget = FloatingChatConnectionTarget.Account,
+            connectionTargetId = account.id,
+            threadContactId = "group-ops",
+            cardName = "何苗",
+            resourceUrl = transferResourceUrlWithRecipient(
+                resourceUrl = "https://aiff.app/app/transfer/3",
+                recipientId = "he-miao"
+            )
+        )
+
+        assertEquals(
+            true,
+            transferCanClaimInThread(
+                message = incomingTransfer,
+                selectedThread = ChatThreadSelection.Private("he-miao"),
+                selectedAccount = account
+            )
+        )
+        assertEquals(
+            false,
+            transferCanClaimInThread(
+                message = incomingTransfer.copy(fromMe = true),
+                selectedThread = ChatThreadSelection.Private("he-miao"),
+                selectedAccount = account
+            )
+        )
+        assertEquals(
+            true,
+            transferCanClaimInThread(
+                message = incomingGroupTransferForAccount,
+                selectedThread = ChatThreadSelection.GroupChat("group-ops"),
+                selectedAccount = account
+            )
+        )
+        assertEquals(
+            false,
+            transferCanClaimInThread(
+                message = incomingGroupTransferForAccount,
+                selectedThread = ChatThreadSelection.GroupChat("group-ops"),
+                selectedAccount = otherAccount
+            )
+        )
+        assertEquals(
+            false,
+            transferCanClaimInThread(
+                message = outgoingTransferToContact,
+                selectedThread = ChatThreadSelection.GroupChat("group-ops"),
+                selectedAccount = account
+            )
+        )
     }
 
     @Test
@@ -568,6 +1035,8 @@ class FloatingChatMessageUiContractTest {
         assertEquals(false, leftRailScrollsSelectedThreadAvatarIntoViewForConnectors())
         assertEquals(true, leftRailKeepsScrollPositionWhenSelectingVisibleAvatar())
         assertEquals(true, leftRailClearsDisposedAvatarConnectorBounds())
+        assertEquals(true, leftRailKeepsAnySessionConnectorAnchorWhenScrolledOffscreen())
+        assertEquals(0f, leftRailSessionConnectorAnchorFollowsVirtualOffscreenPosition())
         assertEquals(true, leftRailFollowTextIncludesNameLastMessageAndTime())
         assertEquals(true, leftRailFollowTextUsesDarkTextShadow())
         assertEquals(conversation.contacts.first { contact -> contact.id == "li-si" }.name, info.name)
@@ -645,6 +1114,31 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
+    fun inputFocusStartsHeadlessBlinkVoiceAiControl() {
+        assertEquals(true, floatingChatInputFocusStartsHeadlessBlinkVoice())
+        assertEquals(true, blinkVoiceHeadlessCaptureKeepsFloatingChatVisible())
+        assertEquals(true, blinkVoiceHeadlessCaptureStopsWhenInputBlurred())
+        assertEquals(true, blinkVoiceHeadlessCaptureStopsAfterFirstRecognizedEvent())
+        assertEquals(true, blinkVoiceResultEventMarksHeadlessSource())
+    }
+
+    @Test
+    fun blinkVoiceInputStatusUsesFloatingMarqueeHint() {
+        assertEquals(true, blinkVoiceInputStatusUsesFloatingHintBar())
+        assertEquals(true, blinkVoiceInputStatusUsesMarquee())
+        assertEquals(true, blinkVoiceInputStatusAppearsAboveInputBar())
+        assertEquals(true, blinkVoiceInputStatusAutoDismisses())
+        assertEquals(2600, blinkVoiceInputStatusAutoDismissMs())
+    }
+
+    @Test
+    fun aiGeneratedInputCanBeClearedWithOneTap() {
+        assertEquals(true, blinkVoiceAiGeneratedInputTracksClearableState())
+        assertEquals(true, bottomInputBarShowsAiGeneratedClearAction())
+        assertEquals(true, aiGeneratedInputClearActionClearsInputAndHint())
+    }
+
+    @Test
     fun chatConnectorsStayWhiteSingleLineTree() {
         assertEquals(0xF2F8FCFF.toInt(), imModuleConnectionLineColorArgb())
         assertEquals(6f, imModuleConnectionLineStrokeWidthPx())
@@ -653,11 +1147,13 @@ class FloatingChatMessageUiContractTest {
         assertEquals(1f, imModuleConnectionLineShadowOffsetXPx())
         assertEquals(1f, imModuleConnectionLineShadowOffsetYPx())
         assertEquals(48f, imModuleConnectionLineHorizontalOffsetPx())
+        assertEquals(32f, imModuleConnectionLineMinimumBranchPx())
         assertEquals(12f, imModuleConnectionLineCornerRadiusPx())
         assertEquals(0.25f, imModuleConnectionLineCornerArcFraction())
         assertEquals(true, imModuleConnectionLineUsesRoundedElbows())
         assertEquals(12f, connectorRoundedElbowRadiusPx(48f))
-        assertEquals(1f, imModuleConnectionLineBubbleGapPx())
+        assertEquals(0f, imModuleConnectionLineBubbleGapPx())
+        assertEquals(4f, imModuleConnectionLineBubbleOverlapPx())
         assertEquals(true, imModuleConnectionLineUsesBraceHooks())
         assertEquals(true, imModuleConnectionLineUsesNativeCanvasShadow())
         assertEquals(false, imModuleConnectionLineDrawsEndpointDots())
@@ -768,7 +1264,8 @@ class FloatingChatMessageUiContractTest {
         assertEquals(true, bottomInputBarUsesKeyboardInsets())
         assertEquals(true, bottomInputControlsUseCenterAlignment())
         assertEquals(true, bottomInputUsesCustomBasicTextField())
-        assertEquals(13, bottomInputPlaceholderTextSizeSp())
+        assertEquals(11, bottomInputTextSizeSp())
+        assertEquals(11, bottomInputPlaceholderTextSizeSp())
         assertEquals(32, bottomInputIconButtonSizeDp())
         assertEquals(18, bottomInputIconSizeDp())
         assertEquals(1, bottomInputMinLines())
@@ -787,6 +1284,8 @@ class FloatingChatMessageUiContractTest {
         assertEquals(BottomInputAction.Emoji, bottomInputLeadingAction(inputFocused = true))
         assertEquals(true, bottomHomeButtonShowsUnreadOverview())
         assertEquals(true, bottomHomeButtonSwapsToEmojiWhenInputFocused())
+        assertEquals(false, bottomInputBarVisibleForCenteredToolPanel(centeredToolFeaturePanelVisible = true))
+        assertEquals(true, bottomInputBarVisibleForCenteredToolPanel(centeredToolFeaturePanelVisible = false))
     }
 
     @Test
@@ -809,9 +1308,15 @@ class FloatingChatMessageUiContractTest {
         assertEquals(true, homeUnreadOverviewClearsUnreadAfterOpen())
         assertEquals(true, homeUnreadOverviewKeepsConnectorLines())
         assertEquals(true, homeUnreadAvatarGreenDotReflectsThreadState())
-        assertEquals(true, homeUnreadOverviewUsesMessageScopedConnectorLines())
+        assertEquals(true, homeUnreadOverviewUsesSourceScopedConnectorLines())
+        assertEquals(5, unreadThreadIds.size)
+        assertEquals(5, summaries.size)
         assertEquals(summaries.map { it.threadId }.distinct(), summaries.map { it.threadId })
         assertEquals(false, afterOpen.contains(first.threadId))
+        assertEquals(true, summaries.all { it.message.type == FloatingChatMessageType.Text })
+        assertEquals(true, summaries.all { it.message.presentation == FloatingChatMessagePresentation.Bubble })
+        assertEquals(true, summaries.all { !it.message.fromMe })
+        assertEquals(true, summaries.all { it.message.text.isNotBlank() })
         assertEquals(true, summaries.any { it.selection is ChatThreadSelection.GroupChat })
         assertEquals(true, summaries.any { it.selection is ChatThreadSelection.Private })
         assertEquals(true, summaries.map { it.accountId }.distinct().size > 1)
@@ -857,7 +1362,7 @@ class FloatingChatMessageUiContractTest {
         )
         assertEquals(true, homeUnreadOverviewSuppressesGroupMemberAvatars())
         assertEquals(
-            "home-message:home-private-unread",
+            "home-source:${contact.id}",
             homeOverviewConnectorKeyDebugId(message)
         )
     }
@@ -875,7 +1380,7 @@ class FloatingChatMessageUiContractTest {
             connectionTargetId = "account-a__he-miao"
         )
 
-        assertEquals("home-message:home-private-unread", homeOverviewConnectorKeyDebugId(message))
+        assertEquals("home-source:account-a__he-miao", homeOverviewConnectorKeyDebugId(message))
         assertEquals("account-a__he-miao", homeOverviewConnectorSourceKeyDebugId(message))
     }
 
@@ -903,7 +1408,7 @@ class FloatingChatMessageUiContractTest {
 
         assertEquals(42f, fallbackBounds.right)
         assertEquals(90f, tree?.trunkStart?.x)
-        assertEquals(119f, tree?.messageBranches?.single()?.end?.x)
+        assertEquals(124f, tree?.messageBranches?.single()?.end?.x)
         assertEquals(true, homeUnreadOverviewUsesFallbackConnectorSourceWhenRailAvatarIsOffscreen())
     }
 
@@ -1100,11 +1605,15 @@ class FloatingChatMessageUiContractTest {
     @Test
     fun rightRailToolActionThatDirectlySendsSimulatedMessageIsExplicit() {
         assertEquals(
-            setOf(
-                FloatingChatToolAction.Assistant
-            ),
+            emptySet<FloatingChatToolAction>(),
             simulatedMessageToolActions()
         )
+        assertEquals(true, rightRailAssistantOpensAiConfigPanel())
+        assertEquals(true, bottomInputAssistantUsesAiDraftPrediction())
+        assertEquals(true, assistantPredictionRequiresAiConfiguration())
+        assertEquals(true, aiConfigPanelSupportsConnectionTest())
+        assertEquals("\u751f\u6210\u5185\u5bb9\u6e29\u5ea6", aiConfigTemperatureLabel())
+        assertEquals(true, localMessageReplacementInvalidatesDisplayConversation())
         assertEquals(true, documentToolRequestsSystemFilePicker())
         assertEquals(true, pickedDocumentCreatesRealFileMessage())
     }
@@ -1412,7 +1921,7 @@ class FloatingChatMessageUiContractTest {
 
         assertEquals(38f, branch.start.x)
         assertEquals(34f, branch.start.y)
-        assertEquals(47f, branch.end.x)
+        assertEquals(52f, branch.end.x)
         assertEquals(34f, branch.end.y)
     }
 
@@ -1583,7 +2092,7 @@ class FloatingChatMessageUiContractTest {
         assertEquals(true, floatingChatOverlayStaysAboveGestureOverlay())
         assertEquals(false, gestureOverlayIsBroughtToFrontAfterFloatingChatRecreated())
         assertEquals(
-            true,
+            false,
             floatingChatShouldRefreshExpandedWindowZOrder(
                 force = false,
                 hasComposeView = true,
@@ -1602,6 +2111,7 @@ class FloatingChatMessageUiContractTest {
         )
         assertEquals(true, floatingChatOverlayHandlesOwnEdgeGestures())
         assertEquals(false, floatingChatOverlayEdgeGestureConsumesPlainTaps())
+        assertEquals(true, floatingChatOverlayHidesSemanticsFromItsOwningAccessibilityService())
         assertEquals(false, messageBlockUsesNegativePadding())
     }
 

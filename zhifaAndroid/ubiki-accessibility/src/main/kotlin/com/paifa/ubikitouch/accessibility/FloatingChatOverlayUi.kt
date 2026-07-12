@@ -48,6 +48,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -61,6 +62,7 @@ import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -137,6 +139,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
 import androidx.compose.material3.Surface as MaterialSurface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -192,6 +195,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.input.pointer.pointerInput
@@ -202,6 +206,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.exifinterface.media.ExifInterface
 import androidx.compose.ui.text.AnnotatedString
@@ -233,6 +238,7 @@ import com.paifa.ubikitouch.core.model.FloatingChatMessageKind
 import com.paifa.ubikitouch.core.model.FloatingChatMessagePresentation
 import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 import com.paifa.ubikitouch.core.model.FloatingChatPrototype
+import com.paifa.ubikitouch.core.model.FloatingChatSendState
 import com.paifa.ubikitouch.core.model.FloatingChatThumbnailOrientation
 import com.paifa.ubikitouch.core.model.FloatingChatToolAction
 import com.paifa.ubikitouch.core.model.FloatingChatVisibilityScope
@@ -271,6 +277,7 @@ internal fun FloatingChatOverlay(
     initialGroupProfiles: List<LocalGroupProfile> = emptyList(),
     initialSelectedAccountId: String? = null,
     onLocalMessagesChanged: (List<FloatingChatMessage>, Int) -> Unit = { _, _ -> },
+    onPrepareOutgoingTextMessage: (FloatingChatMessage, String) -> FloatingChatMessage = { message, _ -> message },
     onPersistLocalMessage: (FloatingChatMessage, String) -> Unit = { _, _ -> },
     onPersistForwardedMessage: (FloatingChatMessage, FloatingChatMessage, String, String?) -> Unit = { _, _, _, _ -> },
     onPersistMomentPost: (AppMomentPost) -> Unit = {},
@@ -295,9 +302,21 @@ internal fun FloatingChatOverlay(
     val clipboardManager = LocalClipboardManager.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val coroutineScope = rememberCoroutineScope()
     var inputText by remember { mutableStateOf("") }
     var inputFocused by remember { mutableStateOf(false) }
     var bottomPanelMode by remember { mutableStateOf(BottomPanelMode.None) }
+    var aiConfig by remember(context) { mutableStateOf(loadFloatingChatAiConfig(context)) }
+    var aiConfigStatus by remember { mutableStateOf<String?>(null) }
+    var aiPredicting by remember { mutableStateOf(false) }
+    var blinkInputAiBusy by remember { mutableStateOf(false) }
+    var blinkInputStatusText by remember { mutableStateOf<String?>(null) }
+    var blinkInputStatusAutoDismiss by remember { mutableStateOf(false) }
+    var blinkInputStatusVersion by remember { mutableIntStateOf(0) }
+    var blinkGeneratedInputClearable by remember { mutableStateOf(false) }
+    var aiConfigTesting by remember { mutableStateOf(false) }
+    var aiDraftActionMessage by remember { mutableStateOf<FloatingChatMessage?>(null) }
+    var aiDraftEditMessage by remember { mutableStateOf<FloatingChatMessage?>(null) }
     var mediaActionMessage by remember { mutableStateOf<FloatingChatMessage?>(null) }
     var mediaActionStatus by remember { mutableStateOf<String?>(null) }
     var longPressMessage by remember { mutableStateOf<FloatingChatMessage?>(null) }
@@ -316,7 +335,8 @@ internal fun FloatingChatOverlay(
     val favoriteMediaIds = remember { mutableStateMapOf<String, Boolean>() }
     val favoriteMessageIds = remember { mutableStateMapOf<String, Boolean>() }
     val reminderMessageIds = remember { mutableStateMapOf<String, Boolean>() }
-    val claimedRedPacketIds = remember { mutableStateMapOf<String, Boolean>() }
+    val claimedPaymentMessageIds = remember { mutableStateMapOf<String, Boolean>() }
+    val sentAiDraftMessageIds = remember { mutableStateMapOf<String, Boolean>() }
     val selectedMessageIds = remember { mutableStateMapOf<String, Boolean>() }
     val selectedFavoriteItemIds = remember { mutableStateMapOf<String, Boolean>() }
     val hiddenMessageIds = remember { mutableStateMapOf<String, Boolean>() }
@@ -430,6 +450,9 @@ internal fun FloatingChatOverlay(
     var localMessageSequence by remember(conversation, initialMessageSequence) {
         mutableStateOf(initialMessageSequence)
     }
+    var localMessageVersion by remember(conversation) {
+        mutableIntStateOf(0)
+    }
     val selectedAccount = remember(contactProfiledConversation, selectedThread, activeAccountId) {
         selectedAccountForThread(
             conversation = contactProfiledConversation,
@@ -437,7 +460,7 @@ internal fun FloatingChatOverlay(
             overrideAccountId = activeAccountId
         )
     }
-    val displayConversation = remember(contactProfiledConversation, localMessages.size, hiddenMessageIds.size) {
+    val displayConversation = remember(contactProfiledConversation, localMessages.size, localMessageVersion, hiddenMessageIds.size) {
         applyContactProfilesToConversation(
             conversation = contactProfiledConversation.copy(
                 messages = (contactProfiledConversation.messages + localMessages).filter { message ->
@@ -452,6 +475,7 @@ internal fun FloatingChatOverlay(
         contactProfileList,
         groupProfileList,
         localMessages.size,
+        localMessageVersion,
         hiddenMessageIds.size
     ) {
         val visibleLocalMessages = localMessages.filter { message -> hiddenMessageIds[message.id] != true }
@@ -564,6 +588,18 @@ internal fun FloatingChatOverlay(
         selectedFavoriteItemIds.clear()
         favoriteMultiSelectMode = false
     }
+    fun syncLocalMessageState() {
+        localMessageVersion += 1
+        onLocalMessagesChanged(localMessages.toList(), localMessageSequence)
+    }
+    LaunchedEffect(runtimeState.localMessagesUpdateEvent) {
+        val event = runtimeState.localMessagesUpdateEvent ?: return@LaunchedEffect
+        localMessages.clear()
+        localMessages.addAll(event.messages)
+        localMessageSequence = event.messageSequence
+        syncLocalMessageState()
+        runtimeState.clearLocalMessagesUpdate(event.token)
+    }
     fun addOutgoingTextMessage(outgoingText: String) {
         localMessageSequence += 1
         val baseMessage = when (val thread = selectedThread) {
@@ -594,10 +630,14 @@ internal fun FloatingChatOverlay(
                 )
             }
         }
-        val message = outgoingTextMessageWithOptionalQuote(baseMessage, quotedMessage)
+        val threadId = selectedThread.toLocalThreadId()
+        val message = onPrepareOutgoingTextMessage(
+            outgoingTextMessageWithOptionalQuote(baseMessage, quotedMessage),
+            threadId
+        )
         localMessages += message
-        onLocalMessagesChanged(localMessages.toList(), localMessageSequence)
-        onPersistLocalMessage(message, selectedThread.toLocalThreadId())
+        syncLocalMessageState()
+        onPersistLocalMessage(message, threadId)
         quotedMessage = null
     }
     fun updateAccountProfile(accountId: String, profile: FloatingChatAccountProfile) {
@@ -639,9 +679,279 @@ internal fun FloatingChatOverlay(
             )
         )
         localMessages += message
-        onLocalMessagesChanged(localMessages.toList(), localMessageSequence)
+        syncLocalMessageState()
         onPersistLocalMessage(message, selectedThread.toLocalThreadId())
         bottomPanelMode = BottomPanelMode.None
+    }
+    fun upsertAiDraftMessage(draft: FloatingChatMessage, replaceMessageId: String? = null) {
+        val replacedIndex = replaceMessageId?.let { messageId ->
+            localMessages.indexOfFirst { message -> message.id == messageId }
+        } ?: -1
+        if (replacedIndex >= 0) {
+            localMessages[replacedIndex] = draft
+        } else {
+            replaceMessageId?.let { messageId -> hiddenMessageIds[messageId] = true }
+            localMessages += draft
+        }
+        syncLocalMessageState()
+    }
+    fun removeAiDraftMessage(message: FloatingChatMessage) {
+        val removed = localMessages.removeAll { draft -> draft.id == message.id }
+        if (!removed) {
+            hiddenMessageIds[message.id] = true
+        }
+        syncLocalMessageState()
+    }
+    fun editedAiDraftMessage(message: FloatingChatMessage, text: String): FloatingChatMessage {
+        val trimmedText = text.trim()
+        return message.copy(
+            text = trimmedText,
+            type = FloatingChatMessageType.MixedText,
+            kind = FloatingChatMessageKind.AiDraft,
+            presentation = FloatingChatMessagePresentation.Bubble,
+            inlineTokens = listOf(
+                com.paifa.ubikitouch.core.model.FloatingChatInlineToken(
+                    FloatingChatInlineTokenType.Ai,
+                    "AI"
+                ),
+                com.paifa.ubikitouch.core.model.FloatingChatInlineToken(
+                    FloatingChatInlineTokenType.Plain,
+                    " $trimmedText"
+                )
+            )
+        )
+    }
+    fun updateAiDraftText(message: FloatingChatMessage, text: String) {
+        val trimmedText = text.trim()
+        if (trimmedText.isBlank()) return
+        val edited = editedAiDraftMessage(message, trimmedText)
+        val localIndex = localMessages.indexOfFirst { draft -> draft.id == message.id }
+        if (localIndex >= 0) {
+            localMessages[localIndex] = edited
+        } else {
+            hiddenMessageIds[message.id] = true
+            localMessageSequence += 1
+            localMessages += edited.copy(id = "local-ai-draft-edited-${selectedThread.toLocalThreadId()}-${selectedAccount.id}-$localMessageSequence")
+        }
+        syncLocalMessageState()
+    }
+    fun sendAiDraftMessage(message: FloatingChatMessage, overrideText: String? = null) {
+        val text = (overrideText ?: message.text).trim()
+        if (text.isBlank()) return
+        if (aiDraftSendAlreadyHandled(message.id, sentAiDraftMessageIds)) return
+        sentAiDraftMessageIds[message.id] = true
+        localMessageSequence += 1
+        val sentMessage = draftTextMessageFromAiDraft(
+            editedAiDraftMessage(message, text)
+        ).copy(
+            id = "local-ai-send-${selectedThread.toLocalThreadId()}-${selectedAccount.id}-$localMessageSequence",
+            time = "刚刚"
+        )
+        val localIndex = localMessages.indexOfFirst { draft -> draft.id == message.id }
+        if (localIndex >= 0) {
+            localMessages[localIndex] = sentMessage
+        } else {
+            hiddenMessageIds[message.id] = true
+            localMessages += sentMessage
+        }
+        syncLocalMessageState()
+        onPersistLocalMessage(sentMessage, selectedThread.toLocalThreadId())
+        aiDraftActionMessage = null
+        aiDraftEditMessage = null
+    }
+    fun generateAiDraft(replaceMessage: FloatingChatMessage? = null) {
+        if (aiPredicting) return
+        if (!aiConfig.isConfigured) {
+            aiConfigStatus = "请先配置 AI API"
+            bottomPanelMode = BottomPanelMode.Assistant
+            return
+        }
+        val configSnapshot = aiConfig
+        val threadMessages = visibleMessagesForThread(
+            conversation = displayConversation,
+            selection = selectedThread,
+            selectedAccountId = selectedAccount.id
+        ).filterNot { message -> message.id == replaceMessage?.id }
+        val prompt = buildFloatingChatAiDraftPrompt(
+            messages = threadMessages,
+            selectedAccountName = selectedAccount.name
+        )
+        aiPredicting = true
+        aiConfigStatus = "AI 姝ｅ湪鐢熸垚鑽夌..."
+        localMessageSequence += 1
+        val loadingDraft = if (replaceMessage != null) {
+            editedAiDraftMessage(replaceMessage, floatingChatAiDraftLoadingText())
+        } else {
+            createFloatingChatAiLoadingDraftMessage(
+                conversation = effectiveConversation,
+                selection = selectedThread,
+                accountId = selectedAccount.id,
+                sequence = localMessageSequence
+            )
+        }
+        sentAiDraftMessageIds.remove(loadingDraft.id)
+        upsertAiDraftMessage(loadingDraft, replaceMessage?.id)
+        coroutineScope.launch {
+            aiPredicting = true
+            aiConfigStatus = "AI 正在生成草稿..."
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    FloatingChatAiClient().generateDraft(configSnapshot, prompt)
+                }
+            }.onSuccess { draftText ->
+                val draft = createFloatingChatAiDraftMessage(
+                    conversation = effectiveConversation,
+                    selection = selectedThread,
+                    accountId = selectedAccount.id,
+                    text = draftText,
+                    sequence = localMessageSequence
+                ).copy(id = loadingDraft.id)
+                upsertAiDraftMessage(draft, loadingDraft.id)
+                aiConfigStatus = "AI 草稿已生成"
+                bottomPanelMode = BottomPanelMode.None
+            }.onFailure { error ->
+                aiConfigStatus = "AI 生成失败：${error.message?.take(80) ?: "未知错误"}"
+                val failedDraft = editedAiDraftMessage(
+                    loadingDraft,
+                    "AI草稿生成失败，点击草稿可重新生成"
+                )
+                upsertAiDraftMessage(failedDraft, loadingDraft.id)
+                Toast.makeText(context, aiConfigStatus, Toast.LENGTH_SHORT).show()
+                bottomPanelMode = BottomPanelMode.Assistant
+            }
+            aiPredicting = false
+        }
+    }
+    fun showBlinkInputStatus(message: String, autoDismiss: Boolean) {
+        blinkInputStatusText = message
+        blinkInputStatusAutoDismiss = autoDismiss
+        blinkInputStatusVersion += 1
+    }
+    fun runBlinkInputAiAction(
+        action: FloatingChatBlinkInputAiAction,
+        eventType: String
+    ) {
+        if (action == FloatingChatBlinkInputAiAction.None || blinkInputAiBusy || aiPredicting) return
+        if (!aiConfig.isConfigured) {
+            aiConfigStatus = "\u8bf7\u5148\u914d\u7f6e AI API"
+            showBlinkInputStatus(
+                message = "\u8bf7\u5148\u914d\u7f6e AI API",
+                autoDismiss = true
+            )
+            bottomPanelMode = BottomPanelMode.Assistant
+            Toast.makeText(context, aiConfigStatus, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val originalInput = inputText.trim()
+        val configSnapshot = aiConfig
+        val prompt = when (action) {
+            FloatingChatBlinkInputAiAction.PredictReply -> {
+                val threadMessages = visibleMessagesForThread(
+                    conversation = displayConversation,
+                    selection = selectedThread,
+                    selectedAccountId = selectedAccount.id
+                )
+                buildFloatingChatAiDraftPrompt(
+                    messages = threadMessages,
+                    selectedAccountName = selectedAccount.name
+                )
+            }
+            FloatingChatBlinkInputAiAction.PolishInput -> {
+                buildFloatingChatAiInputPolishPrompt(originalInput)
+            }
+            FloatingChatBlinkInputAiAction.None -> return
+        }
+        coroutineScope.launch {
+            blinkInputAiBusy = true
+            aiConfigStatus = when (action) {
+                FloatingChatBlinkInputAiAction.PredictReply -> "\u0041\u0049\u9884\u6d4b\u56de\u590d\u751f\u6210\u4e2d..."
+                FloatingChatBlinkInputAiAction.PolishInput -> "\u0041\u0049\u6b63\u5728\u6da6\u8272\u8f93\u5165\u5185\u5bb9..."
+                FloatingChatBlinkInputAiAction.None -> null
+            }
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    FloatingChatAiClient().generateDraft(configSnapshot, prompt)
+                }
+            }.onSuccess { generatedText ->
+                val nextText = generatedText.trim()
+                when (action) {
+                    FloatingChatBlinkInputAiAction.PredictReply -> {
+                        if (inputText.isBlank()) {
+                            inputText = nextText
+                            blinkGeneratedInputClearable = true
+                            aiConfigStatus = "\u0041\u0049\u9884\u6d4b\u56de\u590d\u5df2\u751f\u6210"
+                            showBlinkInputStatus(
+                                message = blinkVoiceInputStatusMessageFor(
+                                    eventType = eventType,
+                                    action = action,
+                                    phase = FloatingChatBlinkInputStatusPhase.Completed
+                                ),
+                                autoDismiss = true
+                            )
+                        } else {
+                            showBlinkInputStatus(
+                                message = "\u8f93\u5165\u6846\u5df2\u6709\u5185\u5bb9\uff0c\u672a\u8986\u76d6\u9884\u6d4b\u56de\u590d",
+                                autoDismiss = true
+                            )
+                        }
+                    }
+                    FloatingChatBlinkInputAiAction.PolishInput -> {
+                        if (inputText.trim() == originalInput) {
+                            inputText = nextText
+                            blinkGeneratedInputClearable = true
+                            aiConfigStatus = "\u0041\u0049\u6da6\u8272\u5df2\u5b8c\u6210"
+                            showBlinkInputStatus(
+                                message = blinkVoiceInputStatusMessageFor(
+                                    eventType = eventType,
+                                    action = action,
+                                    phase = FloatingChatBlinkInputStatusPhase.Completed
+                                ),
+                                autoDismiss = true
+                            )
+                        } else {
+                            showBlinkInputStatus(
+                                message = "\u8f93\u5165\u5185\u5bb9\u5df2\u53d8\u5316\uff0c\u672a\u8986\u76d6\u6da6\u8272\u7ed3\u679c",
+                                autoDismiss = true
+                            )
+                        }
+                    }
+                    FloatingChatBlinkInputAiAction.None -> Unit
+                }
+            }.onFailure { error ->
+                aiConfigStatus = "\u0041\u0049\u5904\u7406\u5931\u8d25\uff1a${error.message?.take(80) ?: "\u672a\u77e5\u9519\u8bef"}"
+                showBlinkInputStatus(
+                    message = blinkVoiceInputStatusMessageFor(
+                        eventType = eventType,
+                        action = action,
+                        phase = FloatingChatBlinkInputStatusPhase.Failed
+                    ),
+                    autoDismiss = true
+                )
+                Toast.makeText(context, aiConfigStatus, Toast.LENGTH_SHORT).show()
+            }
+            blinkInputAiBusy = false
+        }
+    }
+    fun testAiConfig(candidate: FloatingChatAiConfig) {
+        if (aiConfigTesting) return
+        if (!candidate.isConfigured) {
+            aiConfigStatus = "请先填写 API 地址、Key 和模型"
+            return
+        }
+        coroutineScope.launch {
+            aiConfigTesting = true
+            aiConfigStatus = "正在测试 AI 配置..."
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    FloatingChatAiClient().testConfig(candidate)
+                }
+            }.onSuccess { reply ->
+                aiConfigStatus = "AI 配置测试成功：${reply.take(40)}"
+            }.onFailure { error ->
+                aiConfigStatus = "AI 配置测试失败：${error.message?.take(80) ?: "未知错误"}"
+            }
+            aiConfigTesting = false
+        }
     }
     fun sendAccountCard(accountId: String) {
         val account = effectiveConversation.accountContacts.firstOrNull { it.id == accountId }
@@ -658,7 +968,7 @@ internal fun FloatingChatOverlay(
         )
         val message = accountProfileCardMessage(profile = profile, baseMessage = baseMessage)
         localMessages += message
-        onLocalMessagesChanged(localMessages.toList(), localMessageSequence)
+        syncLocalMessageState()
         onPersistLocalMessage(message, selectedThread.toLocalThreadId())
         bottomPanelMode = BottomPanelMode.None
     }
@@ -705,6 +1015,10 @@ internal fun FloatingChatOverlay(
                 bottomPanelMode = BottomPanelMode.None
                 FloatingChatMediaPickerBridge.requestDocumentPick()
             }
+            FloatingChatToolAction.Assistant -> {
+                aiConfigStatus = null
+                bottomPanelMode = BottomPanelMode.Assistant
+            }
             in simulatedMessageToolActions() -> {
                 addToolMessage(action)
             }
@@ -716,6 +1030,7 @@ internal fun FloatingChatOverlay(
         if (outgoingText.isNotEmpty()) {
             addOutgoingTextMessage(outgoingText)
             inputText = ""
+            blinkGeneratedInputClearable = false
             bottomPanelMode = BottomPanelMode.None
         }
     }
@@ -761,7 +1076,7 @@ internal fun FloatingChatOverlay(
             }
         }
         localMessages += message
-        onLocalMessagesChanged(localMessages.toList(), localMessageSequence)
+        syncLocalMessageState()
         onPersistLocalMessage(message, selectedThread.toLocalThreadId())
         bottomPanelMode = BottomPanelMode.None
     }
@@ -775,7 +1090,7 @@ internal fun FloatingChatOverlay(
             sequence = localMessageSequence
         )
         localMessages += message
-        onLocalMessagesChanged(localMessages.toList(), localMessageSequence)
+        syncLocalMessageState()
         onPersistForwardedMessage(source, message, target.toLocalThreadId(), account.id)
     }
     fun selectedMessagesForAction(): List<FloatingChatMessage> {
@@ -875,7 +1190,7 @@ internal fun FloatingChatOverlay(
             sequence = localMessageSequence
         )
         localMessages += message
-        onLocalMessagesChanged(localMessages.toList(), localMessageSequence)
+        syncLocalMessageState()
         onPersistLocalMessage(message, selectedThread.toLocalThreadId())
         runtimeState.clearPickedMediaEvent(event.token)
     }
@@ -895,14 +1210,59 @@ internal fun FloatingChatOverlay(
             sequence = localMessageSequence
         )
         localMessages += message
-        onLocalMessagesChanged(localMessages.toList(), localMessageSequence)
+        syncLocalMessageState()
         onPersistLocalMessage(message, selectedThread.toLocalThreadId())
         runtimeState.clearPickedDocumentEvent(event.token)
     }
     LaunchedEffect(runtimeState.blinkVoiceResultEvent) {
         val event = runtimeState.blinkVoiceResultEvent ?: return@LaunchedEffect
-        addOutgoingTextMessage(blinkVoiceResultMessageText(event.eventType, event.durationMs))
+        if (event.headless) {
+            if (inputFocused) {
+                val action = blinkVoiceInputActionFor(
+                    eventType = event.eventType,
+                    inputText = inputText
+                )
+                showBlinkInputStatus(
+                    message = blinkVoiceInputStatusMessageFor(
+                        eventType = event.eventType,
+                        action = action,
+                        phase = FloatingChatBlinkInputStatusPhase.Recognized
+                    ),
+                    autoDismiss = action == FloatingChatBlinkInputAiAction.None || blinkInputAiBusy || aiPredicting
+                )
+                runBlinkInputAiAction(
+                    action = action,
+                    eventType = event.eventType
+                )
+            }
+        } else {
+            addOutgoingTextMessage(blinkVoiceResultMessageText(event.eventType, event.durationMs))
+        }
         runtimeState.clearBlinkVoiceResultEvent(event.token)
+    }
+    LaunchedEffect(inputFocused) {
+        if (inputFocused) {
+            FloatingChatBlinkVoiceBridge.requestHeadlessCapture()
+        } else {
+            blinkInputStatusText = null
+            blinkInputStatusAutoDismiss = false
+            FloatingChatBlinkVoiceBridge.stopHeadlessCapture()
+        }
+    }
+    LaunchedEffect(blinkInputStatusVersion) {
+        val version = blinkInputStatusVersion
+        if (blinkInputStatusText != null && blinkInputStatusAutoDismiss) {
+            delay(blinkVoiceInputStatusAutoDismissMs().toLong())
+            if (version == blinkInputStatusVersion) {
+                blinkInputStatusText = null
+                blinkInputStatusAutoDismiss = false
+            }
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            FloatingChatBlinkVoiceBridge.stopHeadlessCapture()
+        }
     }
     val handleMediaAction: (FloatingChatMessage, MediaActionContract) -> Unit = { message, action ->
         val result = performMediaAction(
@@ -929,7 +1289,11 @@ internal fun FloatingChatOverlay(
     }
     LaunchedEffect(effectiveConversation.groupContacts, effectiveConversation.contacts) {
         selectedThread = initialChatThreadSelection(effectiveConversation, selectedThread)
-        defaultAllAccountHomeUnreadThreadIds(profiledConversation).forEach { threadId ->
+        val defaultUnreadThreadIds = defaultAllAccountHomeUnreadThreadIds(profiledConversation)
+        unreadThreadIds.keys
+            .filterNot { threadId -> threadId in defaultUnreadThreadIds }
+            .forEach { threadId -> unreadThreadIds.remove(threadId) }
+        defaultUnreadThreadIds.forEach { threadId ->
             if (!unreadThreadIds.containsKey(threadId)) {
                 unreadThreadIds[threadId] = true
             }
@@ -991,9 +1355,10 @@ internal fun FloatingChatOverlay(
     val currentOnBackGestureCommit by rememberUpdatedState(onBackGestureCommit)
     val currentOnBackGestureEnd by rememberUpdatedState(onBackGestureEnd)
     val currentOnBackGestureCancel by rememberUpdatedState(onBackGestureCancel)
-    Box(
+    FloatingChatOverlayRuntimeSections(
         modifier = Modifier
             .fillMaxSize()
+            .clearAndSetSemantics { }
             .floatingChatInternalEdgeGesture(
                 touchTargetPx = edgeGestureTouchTargetPx,
                 touchSlopPx = viewConfiguration.touchSlop,
@@ -1010,9 +1375,9 @@ internal fun FloatingChatOverlay(
                 opacityPercent = backgroundOpacityPercent,
                 blurRadiusDp = blurRadiusDp,
                 backgroundColorRgb = backgroundColorRgb
-            )
-    ) {
-        CoordinateChatBody(
+            ),
+        mainContent = {
+            CoordinateChatBody(
             conversation = if (homeOverviewVisible) homeDisplayConversation else displayConversation,
             homeOverviewConversations = accountScopedDisplayConversations,
             accountProfiles = accountProfiles,
@@ -1059,6 +1424,10 @@ internal fun FloatingChatOverlay(
                 paymentDetailMessage = message
                 bottomPanelMode = BottomPanelMode.None
             },
+            onAiDraftClick = { message ->
+                aiDraftActionMessage = message
+                bottomPanelMode = BottomPanelMode.None
+            },
             onLongPressMessage = { message, bounds ->
                 longPressMessage = message
                 longPressAnchorBounds = bounds
@@ -1067,6 +1436,7 @@ internal fun FloatingChatOverlay(
             selectedMessageIds = selectedMessageIds,
             remindedMessageIds = reminderMessageIds,
             favoriteMessageIds = favoriteMessageIds,
+            claimedPaymentMessageIds = claimedPaymentMessageIds,
             onToggleMessageSelection = { message ->
                 if (selectedMessageIds[message.id] == true) {
                     selectedMessageIds.remove(message.id)
@@ -1081,6 +1451,8 @@ internal fun FloatingChatOverlay(
             },
             modifier = Modifier.fillMaxSize()
         )
+        },
+        panelContent = {
         if (bottomPanelMode != BottomPanelMode.None) {
             if (bottomPanelMode.isCenteredToolFeaturePanel()) {
                 Box(
@@ -1110,11 +1482,25 @@ internal fun FloatingChatOverlay(
                 favoriteItems = favoriteItems,
                 accounts = effectiveConversation.accountContacts,
                 accountProfiles = accountProfiles,
+                aiConfig = aiConfig,
+                aiConfigStatus = aiConfigStatus,
+                aiPredicting = aiPredicting,
+                aiConfigTesting = aiConfigTesting,
                 transferRecipients = transferRecipientCandidatesForThread(
                     conversation = displayConversation,
                     selectedThread = selectedThread,
                     selectedAccountId = selectedAccount.id
                 ),
+                onSaveAiConfig = { nextConfig ->
+                    aiConfig = nextConfig
+                    saveFloatingChatAiConfig(context, nextConfig)
+                    aiConfigStatus = if (nextConfig.isConfigured) {
+                        "AI 配置已保存"
+                    } else {
+                        "请填写 API 地址、Key 和模型"
+                    }
+                },
+                onTestAiConfig = { candidate -> testAiConfig(candidate) },
                 onSendQuickPhrase = sendQuickPhrase,
                 onAddQuickPhrase = { phrase ->
                     updateQuickPhrases(listOf(phrase) + quickPhrases)
@@ -1199,13 +1585,21 @@ internal fun FloatingChatOverlay(
                 },
                 onSendTransfer = { amount, note, recipient ->
                     val safeAmount = amount.ifBlank { "88.00" }
+                    val privateRecipient = (selectedThread as? ChatThreadSelection.Private)?.let { thread ->
+                        displayConversation.contacts.firstOrNull { contact -> contact.id == thread.contactId }
+                    }
+                    val targetRecipient = recipient ?: privateRecipient
                     addToolMessage(FloatingChatToolAction.Transfer) { message ->
                         message.copy(
                             text = "转账 ¥$safeAmount",
                             appName = "浮窗转账",
-                            detail = transferMessageDetailForRecipient(recipient?.name, note),
-                            cardName = recipient?.name,
-                            cardSubtitle = recipient?.description
+                            detail = transferMessageDetailForRecipient(targetRecipient?.name, note),
+                            cardName = targetRecipient?.name,
+                            cardSubtitle = targetRecipient?.description,
+                            resourceUrl = transferResourceUrlWithRecipient(
+                                resourceUrl = message.resourceUrl,
+                                recipientId = targetRecipient?.id
+                            )
                         )
                     }
                 },
@@ -1233,27 +1627,54 @@ internal fun FloatingChatOverlay(
                 }
             )
         }
-        BottomInputBar(
-            inputText = inputText,
-            onInputTextChange = { inputText = it },
-            quotedMessage = quotedMessage,
-            onClearQuote = { quotedMessage = null },
-            inputFocused = inputFocused,
-            onInputFocusedChange = { inputFocused = it },
-            panelMode = bottomPanelMode,
-            onPanelModeChange = { bottomPanelMode = it },
-            onSend = sendInputMessage,
-            onHome = {
-                homeOverviewVisible = true
-                bottomPanelMode = BottomPanelMode.None
-            },
-            onAssistantPredict = { sendToolMessage(FloatingChatToolAction.Assistant) },
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .imePadding()
-                .navigationBarsPadding()
-                .padding(start = 44.dp, end = 44.dp, bottom = 10.dp)
-        )
+        if (bottomInputBarVisibleForCenteredToolPanel(bottomPanelMode.isCenteredToolFeaturePanel())) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .imePadding()
+                    .navigationBarsPadding()
+                    .padding(start = 44.dp, end = 44.dp, bottom = 10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                blinkInputStatusText?.let { statusText ->
+                    BlinkVoiceInputStatusBar(
+                        text = statusText,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp)
+                    )
+                }
+                BottomInputBar(
+                    inputText = inputText,
+                    onInputTextChange = {
+                        inputText = it
+                        blinkGeneratedInputClearable = false
+                    },
+                    quotedMessage = quotedMessage,
+                    onClearQuote = { quotedMessage = null },
+                    aiGeneratedClearable = blinkGeneratedInputClearable,
+                    onClearAiGeneratedInput = {
+                        inputText = ""
+                        blinkGeneratedInputClearable = false
+                        blinkInputStatusText = null
+                        blinkInputStatusAutoDismiss = false
+                    },
+                    inputFocused = inputFocused,
+                    onInputFocusedChange = { inputFocused = it },
+                    panelMode = bottomPanelMode,
+                    onPanelModeChange = { bottomPanelMode = it },
+                    onSend = sendInputMessage,
+                    onHome = {
+                        homeOverviewVisible = true
+                        bottomPanelMode = BottomPanelMode.None
+                    },
+                    onAssistantPredict = { generateAiDraft() },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+        },
+        overlayContent = {
         favoritePreviewItem?.let { item ->
             FavoriteCollectionPreviewOverlay(
                 item = item,
@@ -1297,11 +1718,48 @@ internal fun FloatingChatOverlay(
             PaymentDetailOverlay(
                 message = message,
                 selectedThread = selectedThread,
-                claimed = claimedRedPacketIds[message.id] == true,
+                selectedAccount = selectedAccount,
+                claimed = claimedPaymentMessageIds[message.id] == true,
                 onClaim = {
-                    claimedRedPacketIds[message.id] = true
+                    claimedPaymentMessageIds[message.id] = true
                 },
                 onDismiss = { paymentDetailMessage = null },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        aiDraftActionMessage?.let { message ->
+            AiDraftActionOverlay(
+                message = message,
+                onDismiss = { aiDraftActionMessage = null },
+                onAction = { action ->
+                    when (action) {
+                        FloatingChatAiDraftAction.Edit -> {
+                            aiDraftEditMessage = message
+                        }
+                        FloatingChatAiDraftAction.Regenerate -> {
+                            generateAiDraft(replaceMessage = message)
+                        }
+                        FloatingChatAiDraftAction.Cancel -> {
+                            removeAiDraftMessage(message)
+                        }
+                        FloatingChatAiDraftAction.Send -> {
+                            sendAiDraftMessage(message)
+                        }
+                    }
+                    aiDraftActionMessage = null
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        aiDraftEditMessage?.let { message ->
+            AiDraftEditOverlay(
+                message = message,
+                onDismiss = { aiDraftEditMessage = null },
+                onSave = { text ->
+                    updateAiDraftText(message, text)
+                    aiDraftEditMessage = null
+                },
+                onSend = { text -> sendAiDraftMessage(message, text) },
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -1417,8 +1875,25 @@ internal fun FloatingChatOverlay(
                 modifier = Modifier.fillMaxSize()
             )
         }
+        }
+    )
+}
+
+@Composable
+private fun FloatingChatOverlayRuntimeSections(
+    modifier: Modifier,
+    mainContent: @Composable BoxScope.() -> Unit,
+    panelContent: @Composable BoxScope.() -> Unit,
+    overlayContent: @Composable BoxScope.() -> Unit
+) {
+    Box(modifier = modifier) {
+        mainContent()
+        panelContent()
+        overlayContent()
     }
 }
+
+internal fun floatingChatOverlayUsesRuntimeSizedCompositionSections(): Boolean = true
 
 @Composable
 private fun TopBar(conversation: FloatingChatConversation, onCollapse: () -> Unit) {
@@ -1526,16 +2001,17 @@ private fun CoordinateChatBody(
     onPreviewDocument: (FloatingChatMessage) -> Unit,
     onOpenMediaActions: (FloatingChatMessage) -> Unit,
     onPaymentCardClick: (FloatingChatMessage) -> Unit,
+    onAiDraftClick: (FloatingChatMessage) -> Unit,
     onLongPressMessage: (FloatingChatMessage, Rect?) -> Unit,
     multiSelectMode: Boolean,
     selectedMessageIds: Map<String, Boolean>,
     remindedMessageIds: Map<String, Boolean>,
     favoriteMessageIds: Map<String, Boolean>,
+    claimedPaymentMessageIds: Map<String, Boolean>,
     onToggleMessageSelection: (FloatingChatMessage) -> Unit,
     onBlankAreaTap: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val messageListState = rememberLazyListState()
     val connectorState = remember { ConnectorCoordinateState() }
     val density = LocalDensity.current
     val imeBottomPx = WindowInsets.ime.getBottom(density)
@@ -1568,6 +2044,26 @@ private fun CoordinateChatBody(
             threadMessages
         }
     }
+    val viewportKey = remember(selectedThread, selectedAccount.id, homeOverviewVisible) {
+        messageListViewportKey(
+            selection = selectedThread,
+            selectedAccountId = selectedAccount.id,
+            homeOverviewVisible = homeOverviewVisible
+        )
+    }
+    val messageListState = rememberLazyListState(
+        initialFirstVisibleItemIndex = messageListInitialFirstVisibleItemIndex(visibleMessages.size)
+    )
+    val viewportTracker = remember {
+        MessageListViewportTracker(viewportKey, visibleMessages.size)
+    }
+    if (shouldRetargetMessageList(viewportTracker.viewportKey, viewportKey)) {
+        messageListState.requestScrollToItem(
+            index = messageListInitialFirstVisibleItemIndex(visibleMessages.size)
+        )
+        viewportTracker.viewportKey = viewportKey
+        viewportTracker.messageCount = visibleMessages.size
+    }
     val visibleMessageIds = remember(visibleMessages) {
         visibleMessages.map { message -> message.id }.toSet()
     }
@@ -1592,17 +2088,13 @@ private fun CoordinateChatBody(
     LaunchedEffect(visibleMessageIds) {
         connectorState.retainMessageBounds(visibleMessageIds)
     }
-    LaunchedEffect(selectedThread, visibleMessages.size) {
-        if (visibleMessages.isNotEmpty()) {
-            messageListState.scrollToItem(visibleMessages.lastIndex)
+    LaunchedEffect(viewportKey, visibleMessages.size) {
+        if (visibleMessages.size > viewportTracker.messageCount && visibleMessages.isNotEmpty()) {
+            messageListState.animateScrollToItem(visibleMessages.lastIndex)
         }
+        viewportTracker.messageCount = visibleMessages.size
     }
-    LaunchedEffect(inputFocused, visibleMessages.size) {
-        if (inputFocused && visibleMessages.isNotEmpty()) {
-            messageListState.scrollToItem(visibleMessages.lastIndex)
-        }
-    }
-    LaunchedEffect(inputFocused, inputText, imeBottomPx, visibleMessages.size) {
+    LaunchedEffect(viewportKey, inputFocused, inputText, imeBottomPx, visibleMessages.size) {
         if (inputFocused && visibleMessages.isNotEmpty()) {
             messageListState.animateScrollToItem(visibleMessages.lastIndex)
         }
@@ -1624,10 +2116,13 @@ private fun CoordinateChatBody(
             selectedMessageIds = selectedMessageIds,
             remindedMessageIds = remindedMessageIds,
             favoriteMessageIds = favoriteMessageIds,
+            claimedPaymentMessageIds = claimedPaymentMessageIds,
             onToggleMessageSelection = onToggleMessageSelection,
             onMessageClick = { message ->
                 if (homeOverviewVisible) {
                     homeUnreadSummaryByMessageId[message.id]?.let(onHomeUnreadSelected)
+                } else if (message.kind == FloatingChatMessageKind.AiDraft) {
+                    onAiDraftClick(message)
                 } else if (message.isPaymentCardMessage()) {
                     onPaymentCardClick(message)
                 } else if (message.type == FloatingChatMessageType.FilePreview) {
@@ -1745,6 +2240,14 @@ private fun ScrollableSessionRail(
             contacts.forEach { contact -> add(SessionRailItem.Contact(contact)) }
         }
     }
+    val sessionConnectorIds = remember(railItems) {
+        railItems.map { item ->
+            when (item) {
+                is SessionRailItem.Group -> item.contact.groupConnectorId()
+                is SessionRailItem.Contact -> item.contact.id
+            }
+        }
+    }
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = leftRailInitialFirstVisibleItemIndex()
     )
@@ -1768,6 +2271,10 @@ private fun ScrollableSessionRail(
     }
     var railRootLeftPx by remember { mutableStateOf(0f) }
     var railRootTopPx by remember { mutableStateOf(0f) }
+    var sessionViewportBounds by remember { mutableStateOf<Rect?>(null) }
+    val sessionVirtualFallbackStepPx = remember(density) {
+        with(density) { (RailAvatarSize + LeftRailItemGapDp.dp).toPx() }
+    }
     val followInfos by remember(conversation, selectedAccountId, railItems, avatarBoundsVersion) {
         derivedStateOf {
             railItems.mapNotNull { item ->
@@ -1808,6 +2315,30 @@ private fun ScrollableSessionRail(
             connectorState.updatePrivateThreadAvatar(contactId, bounds)
         } else if (contactId == null) {
             connectorState.clearPrivateThreadAvatar()
+        }
+    }
+    LaunchedEffect(sessionConnectorIds, listState, sessionViewportBounds, sessionVirtualFallbackStepPx) {
+        snapshotFlow {
+            listState.layoutInfo.visibleItemsInfo.mapNotNull { item ->
+                val sessionIndex = item.index - LeftRailLeadingSpacerItemCount
+                if (sessionIndex < 0) {
+                    null
+                } else {
+                    LeftRailVisibleSessionItem(
+                        index = sessionIndex,
+                        offset = item.offset,
+                        size = item.size
+                    )
+                }
+            }
+        }.collectLatest { visibleItems ->
+            val viewport = sessionViewportBounds ?: return@collectLatest
+            connectorState.updateVirtualUserAvatars(
+                sessionIds = sessionConnectorIds,
+                visibleItems = visibleItems,
+                viewport = viewport,
+                fallbackStepPx = sessionVirtualFallbackStepPx
+            )
         }
     }
     val topOverscrollConnection = remember(listState, maxTopOverscrollPx) {
@@ -1881,6 +2412,11 @@ private fun ScrollableSessionRail(
             modifier = Modifier
                 .width(SessionRailWidth)
                 .fillMaxHeight()
+                .onGloballyPositioned { coordinates ->
+                    val bounds = coordinates.boundsInRoot()
+                    sessionViewportBounds = bounds
+                    connectorState.updateUserViewport(bounds)
+                }
                 .nestedScroll(topOverscrollConnection)
                 .graphicsLayer {
                     translationY = topOverscrollPx
@@ -2076,6 +2612,7 @@ private fun MessageCoordinatePane(
     selectedMessageIds: Map<String, Boolean>,
     remindedMessageIds: Map<String, Boolean>,
     favoriteMessageIds: Map<String, Boolean>,
+    claimedPaymentMessageIds: Map<String, Boolean>,
     onToggleMessageSelection: (FloatingChatMessage) -> Unit,
     onMessageClick: (FloatingChatMessage) -> Unit,
     onBlankAreaTap: () -> Unit,
@@ -2102,7 +2639,7 @@ private fun MessageCoordinatePane(
             itemsIndexed(
                 items = messages,
                 key = { _, message -> message.id },
-                contentType = { _, message -> message.type }
+                contentType = { _, message -> messageListReusableContentType(message.type) }
             ) { index, message ->
                 MessageRow(
                     message = message,
@@ -2119,6 +2656,7 @@ private fun MessageCoordinatePane(
                     selected = selectedMessageIds[message.id] == true,
                     reminded = remindedMessageIds[message.id] == true,
                     favorite = favoriteMessageIds[message.id] == true,
+                    claimed = claimedPaymentMessageIds[message.id] == true,
                     onToggleSelection = { onToggleMessageSelection(message) },
                     onClick = { onMessageClick(message) },
                     onBubbleBoundsChanged = { bounds ->
@@ -2242,15 +2780,15 @@ private fun ChatConnectorLayer(
                         selection.isGroupThread() &&
                         avatarSourceKey.targetId == selection.groupConnectorId()
                     ) {
-                        connectorState.groupThreadAvatar ?: connectorState.userAvatars[avatarSourceKey.targetId]
+                        connectorState.groupThreadAvatar ?: connectorState.userAvatarFor(avatarSourceKey.targetId)
                     } else if (
                         selection is ChatThreadSelection.Private &&
                         avatarSourceKey.targetId == selection.contactId
                     ) {
                         connectorState.privateThreadAvatarFor(avatarSourceKey.targetId)
-                            ?: connectorState.userAvatars[avatarSourceKey.targetId]
+                            ?: connectorState.userAvatarFor(avatarSourceKey.targetId)
                     } else {
-                        connectorState.userAvatars[avatarSourceKey.targetId]
+                        connectorState.userAvatarFor(avatarSourceKey.targetId)
                     }
                 }
                 ConnectorAvatarLane.GroupMember -> {
@@ -2381,6 +2919,7 @@ private fun MessageRow(
     selected: Boolean,
     reminded: Boolean,
     favorite: Boolean,
+    claimed: Boolean,
     onToggleSelection: () -> Unit,
     onClick: () -> Unit,
     onBubbleBoundsChanged: (Rect) -> Unit,
@@ -2450,6 +2989,7 @@ private fun MessageRow(
             selected = selected,
             reminded = reminded,
             favorite = favorite,
+            claimed = claimed,
             onToggleSelection = onToggleSelection,
             onClick = onClick,
             onBubbleBoundsChanged = onBubbleBoundsChanged,
@@ -2481,6 +3021,7 @@ private fun MessageBlock(
     selected: Boolean,
     reminded: Boolean,
     favorite: Boolean,
+    claimed: Boolean,
     onToggleSelection: () -> Unit,
     onClick: () -> Unit,
     onBubbleBoundsChanged: (Rect) -> Unit,
@@ -2497,8 +3038,8 @@ private fun MessageBlock(
     val isPaymentCard = message.isPaymentCardMessage()
     val usesBubbleChrome = messageUsesBubbleChrome(message.presentation)
     val bubbleShape = RoundedCornerShape(if (isSpecialCard) 7.dp else 8.dp)
-    val bubbleColor = messageBubbleColor(message)
-    val bubbleBorderColor = messageBubbleBorderColor(message)
+    val bubbleColor = messageBubbleColor(message, claimed)
+    val bubbleBorderColor = messageBubbleBorderColor(message, claimed)
     val aiDraftDashedBubble = aiDraftMessageUsesGreenDashedBubble(message)
     val usesDemoBubble = messageTypeUsesImModuleBubble(message.type) && !isSystem
     Column(
@@ -2581,7 +3122,8 @@ private fun MessageBlock(
                         onOpenMediaActions = onOpenMediaActions,
                         onLongPressMessage = onLongPressMessage,
                         multiSelectMode = multiSelectMode,
-                        onToggleSelection = onToggleSelection
+                        onToggleSelection = onToggleSelection,
+                        claimed = claimed
                     )
                 }
             } else {
@@ -2607,6 +3149,7 @@ private fun MessageBlock(
                         onLongPressMessage = onLongPressMessage,
                         multiSelectMode = multiSelectMode,
                         onToggleSelection = onToggleSelection,
+                        claimed = claimed,
                         onContentBoundsChanged = ::updateCurrentBounds
                     )
                 }
@@ -2646,6 +3189,7 @@ private fun MessageContent(
     onLongPressMessage: (FloatingChatMessage, Rect?) -> Unit,
     multiSelectMode: Boolean,
     onToggleSelection: () -> Unit,
+    claimed: Boolean = false,
     onContentBoundsChanged: ((Rect) -> Unit)? = null
 ) {
     val isSystem = message.presentation == FloatingChatMessagePresentation.System
@@ -2653,7 +3197,7 @@ private fun MessageContent(
         when (message.type) {
             FloatingChatMessageType.Location -> LocationMessageContent(message)
             FloatingChatMessageType.ContactLink -> ContactLinkCardContent(message)
-            FloatingChatMessageType.MiniProgramLink -> MiniProgramLinkContent(message)
+            FloatingChatMessageType.MiniProgramLink -> MiniProgramLinkContent(message, claimed)
             FloatingChatMessageType.Text -> SimpleTextMessageContent(message = message, index = index)
             FloatingChatMessageType.MixedText -> MixedTextMessageContent(message)
             FloatingChatMessageType.Quote -> QuoteMessageContent(message)
@@ -2682,7 +3226,21 @@ private fun MessageContent(
         if (message.kind == FloatingChatMessageKind.AiDraft && !isSystem) {
             DraftBadge()
         }
+        scrmSendStatusTextFor(message)?.let { statusText ->
+            ScrmSendStatusLabel(statusText)
+        }
     }
+}
+
+@Composable
+private fun ScrmSendStatusLabel(text: String) {
+    TextLabel(
+        text = text,
+        size = 10.sp,
+        color = OverlayTokens.cardSecondaryText,
+        maxLines = 1,
+        shadow = OverlayTokens.imModuleTextShadow
+    )
 }
 
 @Composable
@@ -2912,9 +3470,12 @@ private fun ContactLinkCardContent(message: FloatingChatMessage) {
 }
 
 @Composable
-private fun MiniProgramLinkContent(message: FloatingChatMessage) {
+private fun MiniProgramLinkContent(
+    message: FloatingChatMessage,
+    claimed: Boolean = false
+) {
     if (message.isPaymentCardMessage()) {
-        PaymentCardContent(message)
+        PaymentCardContent(message, claimed)
         return
     }
     Row(
@@ -3005,7 +3566,10 @@ private fun FilePreviewContent(message: FloatingChatMessage) {
 }
 
 @Composable
-private fun PaymentCardContent(message: FloatingChatMessage) {
+private fun PaymentCardContent(
+    message: FloatingChatMessage,
+    claimed: Boolean
+) {
     val kind = paymentCardKindFor(message.resourceUrl, message.appName, message.text) ?: PaymentCardKind.RedPacket
     val isTransfer = kind == PaymentCardKind.Transfer
     val title = if (isTransfer) {
@@ -3018,7 +3582,13 @@ private fun PaymentCardContent(message: FloatingChatMessage) {
     } else {
         null
     }
-    val footer = if (isTransfer) "转账" else paymentCardRedPacketFooter()
+    val footer = if (claimed) {
+        paymentCardClaimedStatusLabel(isTransfer)
+    } else if (isTransfer) {
+        "转账"
+    } else {
+        paymentCardRedPacketFooter()
+    }
 
     Column(
         modifier = Modifier
@@ -3080,6 +3650,7 @@ private fun PaymentCardContent(message: FloatingChatMessage) {
 private fun PaymentDetailOverlay(
     message: FloatingChatMessage,
     selectedThread: ChatThreadSelection,
+    selectedAccount: FloatingChatContact,
     claimed: Boolean,
     onClaim: () -> Unit,
     onDismiss: () -> Unit,
@@ -3098,9 +3669,14 @@ private fun PaymentDetailOverlay(
         animationSpec = tween(durationMillis = redPacketClaimAnimationDurationMs()),
         label = "redPacketClaimProgress"
     )
-    val canClaim = !isTransfer && redPacketCanClaimInThread(
+    val canClaimRedPacket = !isTransfer && redPacketCanClaimInThread(
         fromMe = message.fromMe,
         selectedThread = selectedThread
+    )
+    val canClaimTransfer = isTransfer && transferCanClaimInThread(
+        message = message,
+        selectedThread = selectedThread,
+        selectedAccount = selectedAccount
     )
     LaunchedEffect(claiming, claimed) {
         if (claimed) {
@@ -3198,27 +3774,47 @@ private fun PaymentDetailOverlay(
                 )
                 if (isTransfer) {
                     TextLabel(
-                        text = transferDetailStatusLabel(message.fromMe),
+                        text = if (claimed) {
+                            paymentCardClaimedStatusLabel(isTransfer = true)
+                        } else if (!canClaimTransfer && !message.fromMe) {
+                            transferOnlyRecipientCanClaimLabel()
+                        } else {
+                            transferDetailStatusLabel(message.fromMe)
+                        },
                         size = 11.sp,
                         color = OverlayTokens.panelSecondaryText,
                         maxLines = 1,
                         textAlign = TextAlign.Center
                     )
                     Button(
-                        onClick = onDismiss,
+                        onClick = {
+                            if (!claimed && canClaimTransfer) {
+                                onClaim()
+                            } else {
+                                onDismiss()
+                            }
+                        },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = OverlayTokens.paymentCard,
+                            containerColor = if (claimed || !canClaimTransfer) {
+                                OverlayTokens.control
+                            } else {
+                                OverlayTokens.paymentCard
+                            },
                             contentColor = OverlayTokens.paymentCardText
                         )
                     ) {
                         TextLabel(
-                            text = "完成",
+                            text = if (!claimed && canClaimTransfer) "确认收款" else "完成",
                             size = 12.sp,
-                            color = OverlayTokens.paymentCardText,
+                            color = if (claimed || !canClaimTransfer) {
+                                OverlayTokens.panelSecondaryText
+                            } else {
+                                OverlayTokens.paymentCardText
+                            },
                             maxLines = 1
                         )
                     }
-                } else if (canClaim) {
+                } else if (canClaimRedPacket) {
                     Button(
                         onClick = {
                             if (!claimed && !claiming) {
@@ -3529,7 +4125,11 @@ private fun rememberAsyncImageThumbnailBitmap(
     context: Context,
     uriText: String?
 ): Bitmap? {
-    return produceState<Bitmap?>(initialValue = null, context, uriText) {
+    return produceState(
+        initialValue = cachedImageThumbnailBitmap(uriText),
+        context,
+        uriText
+    ) {
         value = withContext(Dispatchers.IO) {
             loadImageThumbnailBitmap(
                 context = context.applicationContext,
@@ -3542,7 +4142,13 @@ private fun rememberAsyncImageThumbnailBitmap(
 @Composable
 private fun rememberAsyncMediaThumbnailBitmap(message: FloatingChatMessage): Bitmap? {
     val context = LocalContext.current
-    return produceState<Bitmap?>(initialValue = null, context, message.type, message.resourceUrl, message.thumbnailUrl) {
+    return produceState(
+        initialValue = cachedMediaThumbnailBitmap(message),
+        context,
+        message.type,
+        message.resourceUrl,
+        message.thumbnailUrl
+    ) {
         value = withContext(Dispatchers.IO) {
             when (message.type) {
                 FloatingChatMessageType.VideoPreview -> loadVideoPreviewBitmap(
@@ -5522,9 +6128,9 @@ private fun MiniVideoControlButton(
     }
 }
 
-private fun messageBubbleColor(message: FloatingChatMessage): Color {
+private fun messageBubbleColor(message: FloatingChatMessage, claimed: Boolean = false): Color {
     if (message.isPaymentCardMessage()) {
-        return OverlayTokens.paymentCard
+        return if (claimed) OverlayTokens.paymentCardClaimed else OverlayTokens.paymentCard
     }
     if (!messageTypeUsesImModuleBubble(message.type)) {
         return cardMessageColor(message)
@@ -5536,12 +6142,12 @@ private fun messageBubbleColor(message: FloatingChatMessage): Color {
     }
 }
 
-private fun messageBubbleBorderColor(message: FloatingChatMessage): Color {
+private fun messageBubbleBorderColor(message: FloatingChatMessage, claimed: Boolean = false): Color {
     if (aiDraftMessageUsesGreenDashedBubble(message)) {
         return OverlayTokens.aiDashedBorder
     }
     if (message.isPaymentCardMessage()) {
-        return OverlayTokens.paymentCardBorder
+        return if (claimed) OverlayTokens.paymentCardClaimedBorder else OverlayTokens.paymentCardBorder
     }
     if (!messageTypeUsesImModuleBubble(message.type)) {
         return when {
@@ -5621,6 +6227,8 @@ internal fun transferDetailStatusLabel(fromMe: Boolean): String {
     return if (fromMe) "已发起转账" else "待确认收款"
 }
 
+internal fun transferOnlyRecipientCanClaimLabel(): String = "仅指定收款人可收款"
+
 internal fun transferPanelSupportsGroupRecipientSelection(): Boolean = true
 
 internal fun transferMessageDetailForRecipient(recipientName: String?, note: String): String {
@@ -5631,6 +6239,47 @@ internal fun transferMessageDetailForRecipient(recipientName: String?, note: Str
         note.isBlank() -> "转账给 $safeRecipientName"
         else -> "转账给 $safeRecipientName：$safeNote"
     }
+}
+
+internal fun transferResourceUrlWithRecipient(resourceUrl: String?, recipientId: String?): String? {
+    val base = resourceUrl?.ifBlank { null } ?: return null
+    val safeRecipientId = recipientId?.trim().orEmpty()
+    if (safeRecipientId.isBlank()) return base
+    val separator = if (base.contains("?")) "&" else "?"
+    return "$base${separator}recipient=$safeRecipientId"
+}
+
+internal fun transferCanClaimInThread(
+    message: FloatingChatMessage,
+    selectedThread: ChatThreadSelection,
+    selectedAccount: FloatingChatContact
+): Boolean {
+    if (paymentCardKindFor(message.resourceUrl, message.appName, message.text) != PaymentCardKind.Transfer) {
+        return false
+    }
+    if (message.fromMe && message.connectionTargetId == selectedAccount.id) {
+        return false
+    }
+
+    val recipientId = transferRecipientIdFromResourceUrl(message.resourceUrl)
+    if (!recipientId.isNullOrBlank()) {
+        return recipientId == selectedAccount.id
+    }
+
+    return when (selectedThread) {
+        ChatThreadSelection.Group -> false
+        is ChatThreadSelection.GroupChat -> {
+            !message.fromMe && message.cardName?.trim() == selectedAccount.name.trim()
+        }
+        is ChatThreadSelection.Private -> !message.fromMe
+    }
+}
+
+private fun transferRecipientIdFromResourceUrl(resourceUrl: String?): String? {
+    val uri = runCatching {
+        resourceUrl?.takeIf { it.isNotBlank() }?.let(Uri::parse)
+    }.getOrNull() ?: return null
+    return uri.getQueryParameter("recipient")?.takeIf { it.isNotBlank() }
 }
 
 internal fun transferRecipientCandidatesForThread(
@@ -5663,6 +6312,10 @@ internal fun transferRecipientCandidatesForThread(
 }
 
 internal fun paymentCardRedPacketFooter(): String = "红包"
+
+internal fun paymentCardClaimedStatusLabel(isTransfer: Boolean): String {
+    return if (isTransfer) "已收款" else "已领取"
+}
 
 internal fun redPacketCardClickOpensAmountViewer(): Boolean = true
 
@@ -5997,35 +6650,48 @@ private fun loadImageThumbnailBitmap(
     context: Context,
     uriText: String?
 ): Bitmap? {
-    if (!isLocalMediaUri(uriText)) return null
-    val uri = Uri.parse(uriText)
-    return runCatching {
-        when {
-            uri.scheme == "file" -> decodeFileBitmapRespectingExif(uri.path)
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.P -> {
-                val source = ImageDecoder.createSource(context.contentResolver, uri)
-                ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
-                    val width = info.size.width.coerceAtLeast(1)
-                    val height = info.size.height.coerceAtLeast(1)
-                    val scale = (width.coerceAtLeast(height).toFloat() / REAL_MEDIA_DECODE_MAX_SIZE_PX)
-                        .coerceAtLeast(1f)
-                    decoder.setTargetSize(
-                        (width / scale).toInt().coerceAtLeast(1),
-                        (height / scale).toInt().coerceAtLeast(1)
-                    )
+    val cacheKey = imageThumbnailCacheKey(uriText) ?: return null
+    return SharedBitmapMemoryCache.getOrPut(cacheKey) {
+        val uri = Uri.parse(uriText)
+        runCatching {
+            when {
+                uri.scheme == "file" -> decodeFileBitmapRespectingExif(uri.path)
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.P -> {
+                    val source = ImageDecoder.createSource(context.contentResolver, uri)
+                    ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                        val width = info.size.width.coerceAtLeast(1)
+                        val height = info.size.height.coerceAtLeast(1)
+                        val scale = (width.coerceAtLeast(height).toFloat() / REAL_MEDIA_DECODE_MAX_SIZE_PX)
+                            .coerceAtLeast(1f)
+                        decoder.setTargetSize(
+                            (width / scale).toInt().coerceAtLeast(1),
+                            (height / scale).toInt().coerceAtLeast(1)
+                        )
+                    }
+                }
+                else -> {
+                    @Suppress("DEPRECATION")
+                    MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
                 }
             }
-            else -> {
-                @Suppress("DEPRECATION")
-                MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
-            }
-        }
-    }.getOrNull()
+        }.getOrNull()
+    }
 }
 
 private fun decodeFileBitmapRespectingExif(path: String?): Bitmap? {
     if (path.isNullOrBlank()) return null
-    val bitmap = BitmapFactory.decodeFile(path) ?: return null
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(path, bounds)
+    val bitmap = BitmapFactory.decodeFile(
+        path,
+        BitmapFactory.Options().apply {
+            inSampleSize = imageDecodeSampleSize(
+                width = bounds.outWidth,
+                height = bounds.outHeight,
+                maxSize = REAL_MEDIA_DECODE_MAX_SIZE_PX
+            )
+        }
+    ) ?: return null
     val rotationDegrees = runCatching {
         when (ExifInterface(path).getAttributeInt(
             ExifInterface.TAG_ORIENTATION,
@@ -6062,14 +6728,62 @@ private fun loadVideoThumbnailBitmap(
     context: Context,
     uriText: String?
 ): Bitmap? {
-    if (!isLocalMediaUri(uriText)) return null
-    val uri = Uri.parse(uriText)
-    return runCatching {
-        MediaMetadataRetriever().use { retriever ->
-            retriever.setDataSource(context, uri)
-            retriever.getFrameAtTime(0L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-        }
-    }.getOrNull()
+    val cacheKey = videoThumbnailCacheKey(uriText) ?: return null
+    return SharedBitmapMemoryCache.getOrPut(cacheKey) {
+        val uri = Uri.parse(uriText)
+        runCatching {
+            MediaMetadataRetriever().use { retriever ->
+                retriever.setDataSource(context, uri)
+                retriever.getFrameAtTime(0L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+            }
+        }.getOrNull()
+    }
+}
+
+internal fun imageDecodeSampleSize(width: Int, height: Int, maxSize: Int): Int {
+    if (width <= 0 || height <= 0 || maxSize <= 0) return 1
+    val largestDimension = maxOf(width, height)
+    var sampleSize = 1
+    while (largestDimension / sampleSize > maxSize && sampleSize <= Int.MAX_VALUE / 2) {
+        sampleSize *= 2
+    }
+    return sampleSize
+}
+
+private fun imageThumbnailCacheKey(uriText: String?): String? {
+    return uriText
+        ?.takeIf(::isLocalMediaUri)
+        ?.let { uri -> "image:$uri" }
+}
+
+private fun videoThumbnailCacheKey(uriText: String?): String? {
+    return uriText
+        ?.takeIf(::isLocalMediaUri)
+        ?.let { uri -> "video:$uri" }
+}
+
+private fun cachedImageThumbnailBitmap(uriText: String?): Bitmap? {
+    return imageThumbnailCacheKey(uriText)?.let(SharedBitmapMemoryCache::get)
+}
+
+private fun cachedMediaThumbnailBitmap(message: FloatingChatMessage): Bitmap? {
+    return if (message.type == FloatingChatMessageType.VideoPreview) {
+        cachedImageThumbnailBitmap(message.thumbnailUrl)
+            ?: videoThumbnailCacheKey(message.resourceUrl ?: message.thumbnailUrl)
+                ?.let(SharedBitmapMemoryCache::get)
+    } else {
+        cachedImageThumbnailBitmap(message.thumbnailUrl)
+    }
+}
+
+private val SharedBitmapMemoryCache = WeightedLruCache<String, Bitmap>(
+    maxWeight = sharedBitmapMemoryCacheBytes(Runtime.getRuntime().maxMemory()),
+    weightOf = { bitmap -> bitmap.allocationByteCount }
+)
+
+private fun sharedBitmapMemoryCacheBytes(runtimeMaxMemoryBytes: Long): Int {
+    val targetBytes = (runtimeMaxMemoryBytes / 16L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+    return targetBytes.coerceIn(MIN_BITMAP_MEMORY_CACHE_BYTES, MAX_BITMAP_MEMORY_CACHE_BYTES)
 }
 
 internal fun fixedThumbnailHeightDp(orientation: FloatingChatThumbnailOrientation?): Int {
@@ -6380,6 +7094,10 @@ internal fun cardMessageColorArgbFor(type: FloatingChatMessageType): Int {
 
 internal fun paymentCardMessageColorArgb(): Int = OverlayTokens.paymentCard.toArgb()
 
+internal fun paymentCardClaimedMessageColorArgb(): Int = OverlayTokens.paymentCardClaimed.toArgb()
+
+internal fun paymentCardClaimedBorderColorArgb(): Int = OverlayTokens.paymentCardClaimedBorder.toArgb()
+
 internal fun cardMessagePrimaryTextColorArgb(): Int = OverlayTokens.cardPrimaryText.toArgb()
 
 internal fun cardMessageSecondaryTextColorArgb(): Int = OverlayTokens.cardSecondaryText.toArgb()
@@ -6419,6 +7137,34 @@ internal fun leftRailScrollsSelectedThreadAvatarIntoViewForConnectors(): Boolean
 internal fun leftRailKeepsScrollPositionWhenSelectingVisibleAvatar(): Boolean = true
 
 internal fun leftRailClearsDisposedAvatarConnectorBounds(): Boolean = true
+
+internal fun leftRailKeepsAnySessionConnectorAnchorWhenScrolledOffscreen(): Boolean {
+    val state = ConnectorCoordinateState()
+    val avatarBounds = Rect(0f, -32f, 42f, 10f)
+    state.updateUserViewport(Rect(0f, 0f, 56f, 220f))
+    state.updateUserAvatar("session-store", avatarBounds)
+    state.removeUserAvatar("session-store")
+    return state.userAvatarFor("session-store")?.center?.y == 0f &&
+        state.userAvatarFor("session-work") == null
+}
+
+internal fun leftRailSessionConnectorAnchorFollowsVirtualOffscreenPosition(): Float {
+    val state = ConnectorCoordinateState()
+    val viewport = Rect(0f, 0f, 56f, 220f)
+    state.updateUserViewport(viewport)
+    state.updateUserAvatar("session-0", Rect(0f, 45f, 42f, 87f))
+    state.removeUserAvatar("session-0")
+    state.updateVirtualUserAvatars(
+        sessionIds = listOf("session-0", "session-1", "session-2"),
+        visibleItems = listOf(
+            LeftRailVisibleSessionItem(index = 1, offset = 18, size = 42),
+            LeftRailVisibleSessionItem(index = 2, offset = 66, size = 42)
+        ),
+        viewport = viewport,
+        fallbackStepPx = 48f
+    )
+    return state.userAvatarFor("session-0")?.center?.y ?: -1f
+}
 
 internal fun leftRailScrollableTopPaddingDp(
     itemCount: Int,
@@ -6609,6 +7355,8 @@ internal fun imModuleConnectionLineUsesNativeCanvasShadow(): Boolean = true
 
 internal fun imModuleConnectionLineHorizontalOffsetPx(): Float = 48f
 
+internal fun imModuleConnectionLineMinimumBranchPx(): Float = 32f
+
 internal fun imModuleConnectionLineCornerRadiusPx(): Float = 12f
 
 internal fun imModuleConnectionLineCornerArcFraction(): Float = 0.25f
@@ -6620,7 +7368,9 @@ internal fun connectorRoundedElbowRadiusPx(horizontalRoom: Float): Float {
         .coerceIn(1f, imModuleConnectionLineCornerRadiusPx())
 }
 
-internal fun imModuleConnectionLineBubbleGapPx(): Float = 1f
+internal fun imModuleConnectionLineBubbleGapPx(): Float = 0f
+
+internal fun imModuleConnectionLineBubbleOverlapPx(): Float = 4f
 
 internal fun imModuleConnectionLineUsesBraceHooks(): Boolean = true
 
@@ -6854,9 +7604,15 @@ internal fun bottomInputBarBottomPaddingDp(): Int = BottomInputBarBottomPaddingD
 
 internal fun bottomInputBarUsesKeyboardInsets(): Boolean = true
 
+internal fun bottomInputBarVisibleForCenteredToolPanel(
+    centeredToolFeaturePanelVisible: Boolean
+): Boolean = !centeredToolFeaturePanelVisible
+
 internal fun bottomInputControlsUseCenterAlignment(): Boolean = true
 
 internal fun bottomInputUsesCustomBasicTextField(): Boolean = true
+
+internal fun bottomInputTextSizeSp(): Int = BottomInputTextSizeSp
 
 internal fun bottomInputPlaceholderTextSizeSp(): Int = BottomInputPlaceholderTextSizeSp
 
@@ -6887,6 +7643,18 @@ internal fun bottomHomeButtonShowsUnreadOverview(): Boolean = true
 internal fun bottomHomeButtonSwapsToEmojiWhenInputFocused(): Boolean = true
 
 internal fun bottomInputAssistantActionSendsPredictedMessage(): Boolean = true
+
+internal fun bottomInputAssistantUsesAiDraftPrediction(): Boolean = true
+
+internal fun assistantPredictionRequiresAiConfiguration(): Boolean = true
+
+internal fun rightRailAssistantOpensAiConfigPanel(): Boolean = true
+
+internal fun aiConfigPanelSupportsConnectionTest(): Boolean = true
+
+internal fun aiConfigTemperatureLabel(): String = "生成内容温度"
+
+internal fun localMessageReplacementInvalidatesDisplayConversation(): Boolean = true
 
 internal fun bottomEmojiPanelUsesAndroidXEmojiPicker(): Boolean = true
 
@@ -7292,10 +8060,7 @@ private fun GroupChatAvatar(
     MaterialSurface(
         modifier = Modifier
             .size(RailAvatarSize)
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick
-            )
+            .then(avatarPressModifier(onClick = onClick, onLongClick = onLongClick))
             .onGloballyPositioned { coordinates ->
                 onBoundsChanged(
                     rootBoundsFromPosition(
@@ -7413,10 +8178,7 @@ private fun CompactAvatar(
         modifier = Modifier
             .then(modifier)
             .size(sizeDp.dp)
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick
-            )
+            .then(avatarPressModifier(onClick = onClick, onLongClick = onLongClick))
             .onGloballyPositioned { coordinates ->
                 onBoundsChanged(
                     rootBoundsFromPosition(
@@ -7504,6 +8266,87 @@ private fun CompactAvatar(
 }
 }
 
+internal enum class AvatarPressResult {
+    None,
+    Click,
+    LongClick
+}
+
+internal fun classifyAvatarPress(
+    durationMillis: Long,
+    travelDistancePx: Float,
+    touchSlopPx: Float,
+    longPressTimeoutMillis: Long,
+    cancelled: Boolean
+): AvatarPressResult {
+    if (cancelled || durationMillis < 0 || travelDistancePx > touchSlopPx) {
+        return AvatarPressResult.None
+    }
+    return if (durationMillis >= longPressTimeoutMillis) {
+        AvatarPressResult.LongClick
+    } else {
+        AvatarPressResult.Click
+    }
+}
+
+@Composable
+private fun avatarPressModifier(
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+): Modifier {
+    val currentOnClick by rememberUpdatedState(onClick)
+    val currentOnLongClick by rememberUpdatedState(onLongClick)
+    val viewConfiguration = LocalViewConfiguration.current
+    return Modifier.pointerInput(
+        viewConfiguration.touchSlop,
+        viewConfiguration.longPressTimeoutMillis
+    ) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            var travelDistancePx = 0f
+            var upTimeMillis: Long? = null
+            var upChange: androidx.compose.ui.input.pointer.PointerInputChange? = null
+            var cancelled = false
+
+            while (upTimeMillis == null && !cancelled) {
+                val event = awaitPointerEvent()
+                val change = event.changes.firstOrNull { it.id == down.id }
+                if (change == null) {
+                    cancelled = true
+                    continue
+                }
+                travelDistancePx = maxOf(
+                    travelDistancePx,
+                    (change.position - down.position).getDistance()
+                )
+                if (!change.pressed) {
+                    upTimeMillis = change.uptimeMillis
+                    upChange = change
+                }
+            }
+
+            when (
+                classifyAvatarPress(
+                    durationMillis = (upTimeMillis ?: down.uptimeMillis) - down.uptimeMillis,
+                    travelDistancePx = travelDistancePx,
+                    touchSlopPx = viewConfiguration.touchSlop,
+                    longPressTimeoutMillis = viewConfiguration.longPressTimeoutMillis,
+                    cancelled = cancelled
+                )
+            ) {
+                AvatarPressResult.None -> Unit
+                AvatarPressResult.Click -> {
+                    upChange?.consume()
+                    currentOnClick()
+                }
+                AvatarPressResult.LongClick -> {
+                    upChange?.consume()
+                    currentOnLongClick()
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun RightRailDivider() {
@@ -9269,6 +10112,207 @@ private fun FavoriteCollectionLongPressMenuOverlay(
 }
 
 @Composable
+private fun AiDraftActionOverlay(
+    message: FloatingChatMessage,
+    onDismiss: () -> Unit,
+    onAction: (FloatingChatAiDraftAction) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(Color(0x22000000))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onDismiss
+                )
+        )
+        MaterialSurface(
+            onClick = {},
+            modifier = Modifier
+                .widthIn(min = 250.dp, max = 320.dp),
+            shape = RoundedCornerShape(8.dp),
+            color = OverlayTokens.longPressMenu,
+            shadowElevation = 0.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                TextLabel(
+                    text = "AI 草稿",
+                    size = 12.sp,
+                    weight = FontWeight.SemiBold,
+                    color = Color(0xFFF5F8FA),
+                    maxLines = 1
+                )
+                TextLabel(
+                    text = message.text,
+                    size = 11.sp,
+                    color = Color(0xEAF5F8FA),
+                    maxLines = 3
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
+                    floatingChatAiDraftActions().forEach { action ->
+                        Button(
+                            onClick = { onAction(action) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp),
+                            shape = RoundedCornerShape(5.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0x22FFFFFF),
+                                contentColor = Color.White
+                            ),
+                            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
+                        ) {
+                            TextLabel(
+                                text = action.label,
+                                size = 10.sp,
+                                color = Color.White,
+                                maxLines = 1,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AiDraftEditOverlay(
+    message: FloatingChatMessage,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+    onSend: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var draftText by remember(message.id) { mutableStateOf(message.text) }
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(Color(0x22000000))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onDismiss
+                )
+        )
+        MaterialSurface(
+            onClick = {},
+            modifier = Modifier
+                .padding(horizontal = 22.dp)
+                .widthIn(min = 260.dp, max = 360.dp),
+            shape = RoundedCornerShape(8.dp),
+            color = OverlayTokens.panel,
+            border = BorderStroke(1.dp, OverlayTokens.panelBorder),
+            shadowElevation = 0.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                TextLabel(
+                    text = "编辑 AI 草稿",
+                    size = 13.sp,
+                    weight = FontWeight.SemiBold,
+                    color = OverlayTokens.panelPrimaryText,
+                    maxLines = 1
+                )
+                OutlinedTextField(
+                    value = draftText,
+                    onValueChange = { draftText = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 96.dp),
+                    minLines = 4,
+                    textStyle = TextStyle(fontSize = 13.sp, color = OverlayTokens.panelPrimaryText),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = OverlayTokens.panelPrimaryText,
+                        unfocusedTextColor = OverlayTokens.panelPrimaryText,
+                        focusedBorderColor = OverlayTokens.panelBorder,
+                        unfocusedBorderColor = OverlayTokens.panelBorder,
+                        cursorColor = OverlayTokens.panelPrimaryText
+                    )
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(6.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = OverlayTokens.resourcePanel,
+                            contentColor = OverlayTokens.panelPrimaryText
+                        )
+                    ) {
+                        TextLabel(
+                            text = "取消",
+                            size = 11.sp,
+                            color = OverlayTokens.panelPrimaryText,
+                            maxLines = 1,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                    Button(
+                        onClick = { onSave(draftText) },
+                        enabled = draftText.isNotBlank(),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(6.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = OverlayTokens.resourcePanel,
+                            contentColor = OverlayTokens.panelPrimaryText
+                        )
+                    ) {
+                        TextLabel(
+                            text = "保存",
+                            size = 11.sp,
+                            color = OverlayTokens.panelPrimaryText,
+                            maxLines = 1,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                    Button(
+                        onClick = { onSend(draftText) },
+                        enabled = draftText.isNotBlank(),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(6.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = OverlayTokens.accent,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        TextLabel(
+                            text = "发送",
+                            size = 11.sp,
+                            color = Color.White,
+                            maxLines = 1,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun MessageLongPressMenuOverlay(
     message: FloatingChatMessage,
     messageBounds: Rect?,
@@ -11026,12 +12070,54 @@ private fun LongPressBarButton(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun BlinkVoiceInputStatusBar(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    MaterialSurface(
+        modifier = modifier.height(32.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xE8F3F8FA),
+        border = BorderStroke(1.dp, OverlayTokens.accent.copy(alpha = 0.68f)),
+        shadowElevation = 5.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 11.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Visibility,
+                contentDescription = null,
+                tint = OverlayTokens.accent,
+                modifier = Modifier.size(15.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = text,
+                color = Color(0xFF273238),
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Clip,
+                modifier = Modifier
+                    .weight(1f)
+                    .basicMarquee()
+            )
+        }
+    }
+}
+
 @Composable
 private fun BottomInputBar(
     inputText: String,
     onInputTextChange: (String) -> Unit,
     quotedMessage: FloatingChatMessage?,
     onClearQuote: () -> Unit,
+    aiGeneratedClearable: Boolean,
+    onClearAiGeneratedInput: () -> Unit,
     inputFocused: Boolean,
     onInputFocusedChange: (Boolean) -> Unit,
     panelMode: BottomPanelMode,
@@ -11107,6 +12193,25 @@ private fun BottomInputBar(
                             max = BottomInputFieldMaxHeightDp.dp
                         )
                 )
+                if (aiGeneratedClearable) {
+                    CompactInteractiveSize {
+                        IconButton(
+                            onClick = onClearAiGeneratedInput,
+                            modifier = Modifier
+                                .size(BottomInputIconButtonSizeDp.dp)
+                                .clip(CircleShape)
+                                .background(OverlayTokens.bottomIconButton)
+                                .border(1.dp, OverlayTokens.accent.copy(alpha = 0.72f), CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = "\u6e05\u9664 AI \u751f\u6210\u5185\u5bb9",
+                                tint = OverlayTokens.accent,
+                                modifier = Modifier.size(BottomInputIconSizeDp.dp)
+                            )
+                        }
+                    }
+                }
                 BottomIcon(
                     action = BottomInputAction.Gift,
                     active = panelMode == BottomPanelMode.Gift,
@@ -11357,7 +12462,13 @@ private fun FloatingBottomPanel(
     favoriteItems: List<FavoriteCollectionItem>,
     accounts: List<FloatingChatContact>,
     accountProfiles: Map<String, FloatingChatAccountProfile>,
+    aiConfig: FloatingChatAiConfig,
+    aiConfigStatus: String?,
+    aiPredicting: Boolean,
+    aiConfigTesting: Boolean,
     transferRecipients: List<FloatingChatContact>,
+    onSaveAiConfig: (FloatingChatAiConfig) -> Unit,
+    onTestAiConfig: (FloatingChatAiConfig) -> Unit,
     onSendQuickPhrase: (String) -> Unit,
     onAddQuickPhrase: (String) -> Unit,
     onUpdateQuickPhrase: (Int, String) -> Unit,
@@ -11388,6 +12499,7 @@ private fun FloatingBottomPanel(
         BottomPanelMode.Card -> 0.82f
         BottomPanelMode.Moments -> 0.92f
         BottomPanelMode.Favorite -> 0.86f
+        BottomPanelMode.Assistant -> 0.86f
         BottomPanelMode.RedPacket,
         BottomPanelMode.Transfer,
         BottomPanelMode.Location -> 0.76f
@@ -11399,6 +12511,7 @@ private fun FloatingBottomPanel(
         BottomPanelMode.Card -> 360.dp
         BottomPanelMode.Moments -> 520.dp
         BottomPanelMode.Favorite -> 380.dp
+        BottomPanelMode.Assistant -> 430.dp
         BottomPanelMode.RedPacket,
         BottomPanelMode.Transfer,
         BottomPanelMode.Location -> 300.dp
@@ -11493,11 +12606,218 @@ private fun FloatingBottomPanel(
                     message = "已记录当前会话入口，可从悬浮按钮继续打开。",
                     onClose = onClose
                 )
-                BottomPanelMode.Assistant -> Unit
+                BottomPanelMode.Assistant -> AiConfigPanel(
+                    config = aiConfig,
+                    status = aiConfigStatus,
+                    predicting = aiPredicting,
+                    testing = aiConfigTesting,
+                    onSave = onSaveAiConfig,
+                    onTest = onTestAiConfig,
+                    onClose = onClose
+                )
                 BottomPanelMode.None -> Unit
             }
         }
     }
+}
+
+@Composable
+private fun AiConfigPanel(
+    config: FloatingChatAiConfig,
+    status: String?,
+    predicting: Boolean,
+    testing: Boolean,
+    onSave: (FloatingChatAiConfig) -> Unit,
+    onTest: (FloatingChatAiConfig) -> Unit,
+    onClose: () -> Unit
+) {
+    var baseUrl by remember(config) { mutableStateOf(config.baseUrl.ifBlank { "https://api.openai.com/v1" }) }
+    var apiKey by remember(config) { mutableStateOf(config.apiKey) }
+    var model by remember(config) { mutableStateOf(config.model.ifBlank { "gpt-4.1-mini" }) }
+    var systemPrompt by remember(config) { mutableStateOf(config.systemPrompt) }
+    var temperatureText by remember(config) { mutableStateOf(config.temperature.toString()) }
+    var maxTokensText by remember(config) { mutableStateOf(config.maxTokens.toString()) }
+    fun currentConfig(): FloatingChatAiConfig {
+        return FloatingChatAiConfig(
+            baseUrl = baseUrl,
+            apiKey = apiKey,
+            model = model,
+            systemPrompt = systemPrompt,
+            temperature = temperatureText.toFloatOrNull() ?: config.temperature,
+            maxTokens = maxTokensText.toIntOrNull() ?: config.maxTokens
+        )
+    }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            TextLabel(
+                text = "AI 配置",
+                size = 13.sp,
+                weight = FontWeight.SemiBold,
+                color = OverlayTokens.panelPrimaryText,
+                maxLines = 1,
+                modifier = Modifier.weight(1f)
+            )
+            SmallChoiceButton(label = "关闭", onClick = onClose)
+        }
+        AiConfigTextField(
+            value = baseUrl,
+            onValueChange = { baseUrl = it },
+            label = "API 地址",
+            singleLine = true
+        )
+        AiConfigTextField(
+            value = apiKey,
+            onValueChange = { apiKey = it },
+            label = "API Key",
+            singleLine = true,
+            password = true
+        )
+        AiConfigTextField(
+            value = model,
+            onValueChange = { model = it },
+            label = "模型",
+            singleLine = true
+        )
+        AiConfigTextField(
+            value = systemPrompt,
+            onValueChange = { systemPrompt = it },
+            label = "系统提示词",
+            singleLine = false,
+            minLines = 2
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            AiConfigTextField(
+                value = temperatureText,
+                onValueChange = { temperatureText = it },
+                label = aiConfigTemperatureLabel(),
+                singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
+            AiConfigTextField(
+                value = maxTokensText,
+                onValueChange = { maxTokensText = it },
+                label = "最大 Token",
+                singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        status?.takeIf { it.isNotBlank() }?.let { message ->
+            TextLabel(
+                text = message,
+                size = 10.sp,
+                color = if (message.contains("失败") || message.contains("请")) {
+                    OverlayTokens.alertCore
+                } else {
+                    OverlayTokens.panelSecondaryText
+                },
+                maxLines = 2
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = { onTest(currentConfig()) },
+                enabled = !predicting && !testing,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(6.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = OverlayTokens.resourcePanel,
+                    contentColor = OverlayTokens.panelPrimaryText
+                )
+            ) {
+                TextLabel(
+                    text = if (testing) "测试中" else "测试配置",
+                    size = 10.sp,
+                    color = OverlayTokens.panelPrimaryText,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center
+                )
+            }
+            Button(
+                onClick = { onSave(currentConfig()) },
+                enabled = !predicting && !testing,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(6.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = OverlayTokens.accent,
+                    contentColor = Color.White
+                )
+            ) {
+                TextLabel(
+                    text = if (predicting) "生成中..." else "保存配置",
+                    size = 10.sp,
+                    color = Color.White,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center
+                )
+            }
+            Button(
+                onClick = onClose,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(6.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = OverlayTokens.resourcePanel,
+                    contentColor = OverlayTokens.panelPrimaryText
+                )
+            ) {
+                TextLabel(
+                    text = "完成",
+                    size = 10.sp,
+                    color = OverlayTokens.panelPrimaryText,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AiConfigTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    singleLine: Boolean,
+    modifier: Modifier = Modifier,
+    minLines: Int = 1,
+    password: Boolean = false
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier.fillMaxWidth(),
+        label = {
+            TextLabel(
+                text = label,
+                size = 10.sp,
+                color = OverlayTokens.panelSecondaryText,
+                maxLines = 1
+            )
+        },
+        singleLine = singleLine,
+        minLines = minLines,
+        textStyle = TextStyle(fontSize = 12.sp, color = OverlayTokens.panelPrimaryText),
+        visualTransformation = if (password) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedTextColor = OverlayTokens.panelPrimaryText,
+            unfocusedTextColor = OverlayTokens.panelPrimaryText,
+            focusedBorderColor = OverlayTokens.panelBorder,
+            unfocusedBorderColor = OverlayTokens.panelBorder,
+            cursorColor = OverlayTokens.panelPrimaryText
+        )
+    )
 }
 
 @Composable
@@ -13232,6 +14552,47 @@ internal fun ChatThreadSelection.toLocalThreadId(): String {
     }
 }
 
+internal data class MessageListViewportKey(
+    val threadId: String,
+    val selectedAccountId: String,
+    val homeOverviewVisible: Boolean
+)
+
+private class MessageListViewportTracker(
+    var viewportKey: MessageListViewportKey,
+    var messageCount: Int
+)
+
+internal fun messageListViewportKey(
+    selection: ChatThreadSelection,
+    selectedAccountId: String,
+    homeOverviewVisible: Boolean
+): MessageListViewportKey {
+    return MessageListViewportKey(
+        threadId = selection.toLocalThreadId(),
+        selectedAccountId = selectedAccountId,
+        homeOverviewVisible = homeOverviewVisible
+    )
+}
+
+internal fun messageListInitialFirstVisibleItemIndex(messageCount: Int): Int {
+    return (messageCount - 1).coerceAtLeast(0)
+}
+
+internal fun shouldRetargetMessageList(
+    previous: MessageListViewportKey,
+    next: MessageListViewportKey
+): Boolean {
+    return previous != next
+}
+
+@Suppress("UNUSED_PARAMETER")
+internal fun messageListReusableContentType(messageType: FloatingChatMessageType): String {
+    return ReusableMessageRowContentType
+}
+
+private const val ReusableMessageRowContentType = "floating-chat-message-row"
+
 internal data class AppMomentPost(
     val id: String = "moment-${System.nanoTime()}",
     val author: String,
@@ -13755,22 +15116,94 @@ internal data class HomeUnreadThreadSummary(
 )
 
 internal fun defaultHomeUnreadThreadIds(conversation: FloatingChatConversation): Set<String> {
-    return buildList {
-        conversation.groupContacts.take(2).forEach { group ->
-            add(ChatThreadSelection.GroupChat(group.id).toLocalThreadId())
-        }
-        conversation.contacts.take(3).forEach { contact ->
-            add(ChatThreadSelection.Private(contact.id).toLocalThreadId())
-        }
-    }.toSet()
+    return defaultHomeUnreadTextSelections(conversation)
+        .take(DefaultHomeUnreadThreadLimit)
+        .map { selection -> selection.toLocalThreadId() }
+        .toSet()
 }
 
 internal fun defaultAllAccountHomeUnreadThreadIds(
     conversation: FloatingChatConversation
 ): Set<String> {
-    return accountScopedConversations(conversation)
-        .flatMap { scoped -> defaultHomeUnreadThreadIds(scoped.conversation) }
+    val scopedCandidates = accountScopedConversations(conversation).map { scoped ->
+        defaultHomeUnreadTextSelections(scoped.conversation)
+    }
+    val groupCandidates = scopedCandidates.map { selections ->
+        selections.filterIsInstance<ChatThreadSelection.GroupChat>()
+    }
+    val privateCandidates = scopedCandidates.map { selections ->
+        selections.filterIsInstance<ChatThreadSelection.Private>()
+    }
+    return buildList {
+        addRoundRobinUnreadSelections(
+            candidatesByAccount = groupCandidates,
+            limit = min(2, DefaultHomeUnreadThreadLimit)
+        )
+        addRoundRobinUnreadSelections(
+            candidatesByAccount = privateCandidates,
+            limit = DefaultHomeUnreadThreadLimit - size
+        )
+        addRoundRobinUnreadSelections(
+            candidatesByAccount = scopedCandidates,
+            limit = DefaultHomeUnreadThreadLimit - size
+        )
+    }
+        .distinctBy { selection -> selection.toLocalThreadId() }
+        .take(DefaultHomeUnreadThreadLimit)
+        .map { selection -> selection.toLocalThreadId() }
         .toSet()
+}
+
+private fun MutableList<ChatThreadSelection>.addRoundRobinUnreadSelections(
+    candidatesByAccount: List<List<ChatThreadSelection>>,
+    limit: Int
+) {
+    if (limit <= 0) return
+    val maxSize = (size + limit).coerceAtMost(DefaultHomeUnreadThreadLimit)
+    val maxCandidateCount = candidatesByAccount.maxOfOrNull { candidates -> candidates.size } ?: return
+    for (candidateIndex in 0 until maxCandidateCount) {
+        candidatesByAccount.forEach { candidates ->
+            val selection = candidates.getOrNull(candidateIndex) ?: return@forEach
+            if (none { existing -> existing.toLocalThreadId() == selection.toLocalThreadId() }) {
+                add(selection)
+                if (size >= maxSize) return
+            }
+        }
+        if (size >= maxSize) return
+    }
+}
+
+private fun defaultHomeUnreadTextSelections(
+    conversation: FloatingChatConversation
+): List<ChatThreadSelection> {
+    val selections = buildList {
+        conversation.groupContacts.forEach { group -> add(ChatThreadSelection.GroupChat(group.id)) }
+        conversation.contacts.forEach { contact -> add(ChatThreadSelection.Private(contact.id)) }
+    }
+    return selections.filter { selection ->
+        latestHomeUnreadTextMessageForSelection(conversation, selection) != null
+    }
+}
+
+private fun latestHomeUnreadTextMessageForSelection(
+    conversation: FloatingChatConversation,
+    selection: ChatThreadSelection
+): FloatingChatMessage? {
+    if (conversation.accountContacts.isEmpty()) return null
+    val selectedAccountId = selectedAccountForThread(conversation, selection).id
+    return visibleMessagesForThread(
+        conversation = conversation,
+        selection = selection,
+        selectedAccountId = selectedAccountId
+    ).lastOrNull { message -> message.isHomeUnreadTextMessage() }
+}
+
+private fun FloatingChatMessage.isHomeUnreadTextMessage(): Boolean {
+    return !fromMe &&
+        type == FloatingChatMessageType.Text &&
+        presentation == FloatingChatMessagePresentation.Bubble &&
+        connectionTarget == FloatingChatConnectionTarget.User &&
+        text.isNotBlank()
 }
 
 internal fun homeUnreadThreadSummaries(
@@ -13818,8 +15251,8 @@ private fun homeUnreadThreadSummariesForAccount(
             selection = selection,
             selectedAccountId = selectedAccountId
         )
-        val unreadMessages = threadMessages.filter { message -> !message.fromMe }
-        val latest = unreadMessages.lastOrNull() ?: threadMessages.lastOrNull() ?: return@mapNotNull null
+        val unreadMessages = threadMessages.filter { message -> message.isHomeUnreadTextMessage() }
+        val latest = unreadMessages.lastOrNull() ?: return@mapNotNull null
         val contact = contactForSelection(conversation, selection) ?: return@mapNotNull null
         val unreadCount = unreadMessages.size.coerceAtLeast(1)
         HomeUnreadThreadSummary(
@@ -13887,7 +15320,9 @@ internal fun homeUnreadOverviewKeepsConnectorLines(): Boolean = true
 
 internal fun homeUnreadAvatarGreenDotReflectsThreadState(): Boolean = true
 
-internal fun homeUnreadOverviewUsesMessageScopedConnectorLines(): Boolean = true
+internal fun homeUnreadOverviewUsesSourceScopedConnectorLines(): Boolean = true
+
+internal fun homeUnreadOverviewUsesMessageScopedConnectorLines(): Boolean = false
 
 internal fun homeUnreadOverviewShowsAllAccounts(): Boolean = true
 
@@ -14043,9 +15478,7 @@ internal fun FloatingChatPrototype.ToolThreadSelection.toChatThreadSelection(): 
 }
 
 internal fun simulatedMessageToolActions(): Set<FloatingChatToolAction> {
-    return setOf(
-        FloatingChatToolAction.Assistant
-    )
+    return emptySet()
 }
 
 internal fun documentToolRequestsSystemFilePicker(): Boolean = true
@@ -14477,6 +15910,29 @@ internal fun appOwnedWechatLikeToolsOpenWechat(): Boolean = false
 
 internal fun groupChatMemberAvatarScrollsWithMessageBubble(): Boolean = true
 
+internal fun scrmSendStatusTextFor(message: FloatingChatMessage): String? {
+    if (!message.fromMe) return null
+    return when (message.sendState) {
+        FloatingChatSendState.LocalOnly -> null
+        FloatingChatSendState.Queued -> "待提交"
+        FloatingChatSendState.Uploading -> "上传中"
+        FloatingChatSendState.Submitted -> "已提交"
+        FloatingChatSendState.Processing -> "处理中"
+        FloatingChatSendState.Succeeded -> "已发送"
+        FloatingChatSendState.FailedRetryable -> message.failureStatusText("发送失败，稍后重试")
+        FloatingChatSendState.FailedFinal -> message.failureStatusText("发送失败")
+        FloatingChatSendState.Unknown -> "结果待确认"
+        FloatingChatSendState.Cancelled -> "已取消"
+    }
+}
+
+private fun FloatingChatMessage.failureStatusText(prefix: String): String {
+    val detail = sendErrorMessage
+        ?.takeIf { it.isNotBlank() }
+        ?.take(24)
+    return if (detail == null) prefix else "$prefix：$detail"
+}
+
 internal fun groupMemberAvatarBubbleCenterOffsetDp(): Int = GroupMemberAvatarBubbleCenterOffsetDp
 
 internal fun groupChatConnectorUsesMessageScopedMemberAvatar(): Boolean = true
@@ -14788,6 +16244,7 @@ internal class FloatingChatOverlayRuntimeState {
     var pickedMediaEvent by mutableStateOf<FloatingChatPickedMediaEvent?>(null)
     var pickedDocumentEvent by mutableStateOf<FloatingChatPickedDocumentEvent?>(null)
     var blinkVoiceResultEvent by mutableStateOf<FloatingChatBlinkVoiceResultEvent?>(null)
+    var localMessagesUpdateEvent by mutableStateOf<FloatingChatLocalMessagesUpdateEvent?>(null)
     var previewSession by mutableStateOf<FloatingChatMediaPreviewSession?>(null)
     var documentPreviewMessage by mutableStateOf<FloatingChatMessage?>(null)
 
@@ -14842,20 +16299,40 @@ internal class FloatingChatOverlayRuntimeState {
     fun deliverBlinkVoiceResult(
         eventType: String,
         durationMs: Long,
-        confidence: Float
+        confidence: Float,
+        headless: Boolean = false
     ) {
         val nextToken = (blinkVoiceResultEvent?.token ?: 0L) + 1L
         blinkVoiceResultEvent = FloatingChatBlinkVoiceResultEvent(
             token = nextToken,
             eventType = eventType,
             durationMs = durationMs,
-            confidence = confidence
+            confidence = confidence,
+            headless = headless
         )
     }
 
     fun clearBlinkVoiceResultEvent(token: Long) {
         if (blinkVoiceResultEvent?.token == token) {
             blinkVoiceResultEvent = null
+        }
+    }
+
+    fun deliverLocalMessagesUpdate(
+        messages: List<FloatingChatMessage>,
+        messageSequence: Int
+    ) {
+        val nextToken = (localMessagesUpdateEvent?.token ?: 0L) + 1L
+        localMessagesUpdateEvent = FloatingChatLocalMessagesUpdateEvent(
+            token = nextToken,
+            messages = messages,
+            messageSequence = messageSequence
+        )
+    }
+
+    fun clearLocalMessagesUpdate(token: Long) {
+        if (localMessagesUpdateEvent?.token == token) {
+            localMessagesUpdateEvent = null
         }
     }
 
@@ -14908,7 +16385,14 @@ internal data class FloatingChatBlinkVoiceResultEvent(
     val token: Long,
     val eventType: String,
     val durationMs: Long,
-    val confidence: Float
+    val confidence: Float,
+    val headless: Boolean = false
+)
+
+internal data class FloatingChatLocalMessagesUpdateEvent(
+    val token: Long,
+    val messages: List<FloatingChatMessage>,
+    val messageSequence: Int
 )
 
 private enum class BottomPanelMode {
@@ -14929,7 +16413,8 @@ private enum class BottomPanelMode {
 }
 
 private fun BottomPanelMode.isCenteredToolFeaturePanel(): Boolean {
-    return this == BottomPanelMode.QuickPhrase ||
+    return this == BottomPanelMode.Assistant ||
+        this == BottomPanelMode.QuickPhrase ||
         this == BottomPanelMode.Card ||
         this == BottomPanelMode.Moments ||
         this == BottomPanelMode.Favorite ||
@@ -15001,6 +16486,12 @@ internal data class RightRailVisibleAccountItem(
     val size: Int
 )
 
+internal data class LeftRailVisibleSessionItem(
+    val index: Int,
+    val offset: Int,
+    val size: Int
+)
+
 private data class PanelTool(
     val icon: String,
     val label: String
@@ -15019,6 +16510,8 @@ private class ConnectorCoordinateState {
     var privateThreadAvatar: Rect? = null
         private set
     private var privateThreadAvatarId: String? = null
+    private val retainedUserAvatars = mutableMapOf<String, Rect>()
+    private var userViewport: Rect? = null
     private val retainedAccountAvatars = mutableMapOf<String, Rect>()
     private var accountViewport: Rect? = null
     var messageViewport: Rect? = null
@@ -15029,11 +16522,41 @@ private class ConnectorCoordinateState {
     }
 
     fun updateUserAvatar(id: String, bounds: Rect) {
-        if (userAvatars.updateIfChanged(id, bounds)) invalidate()
+        val changed = userAvatars.updateIfChanged(id, bounds) or
+            retainedUserAvatars.updateIfChanged(id, bounds)
+        if (changed) invalidate()
     }
 
     fun removeUserAvatar(id: String) {
         if (userAvatars.remove(id) != null) invalidate()
+    }
+
+    fun updateVirtualUserAvatars(
+        sessionIds: List<String>,
+        visibleItems: List<LeftRailVisibleSessionItem>,
+        viewport: Rect,
+        fallbackStepPx: Float
+    ) {
+        leftRailVirtualSessionAvatarBounds(
+            sessionIds = sessionIds,
+            visibleItems = visibleItems,
+            viewport = viewport,
+            fallbackStepPx = fallbackStepPx
+        ).forEach { (id, bounds) ->
+            if (retainedUserAvatars.updateIfChanged(id, bounds)) invalidate()
+        }
+    }
+
+    fun userAvatarFor(id: String): Rect? {
+        val bounds = userAvatars[id] ?: retainedUserAvatars[id]
+        return bounds?.pinnedVerticallyTo(userViewport)
+    }
+
+    fun updateUserViewport(bounds: Rect) {
+        if (userViewport != bounds) {
+            userViewport = bounds
+            invalidate()
+        }
     }
 
     fun updateGroupMemberAvatar(id: String, bounds: Rect) {
@@ -15195,6 +16718,50 @@ internal fun rightRailVirtualAccountAvatarBounds(
     val right = viewport.right
 
     return accountIds.mapIndexed { index, id ->
+        val centerY = anchorCenterY + stepPx * (index - anchor.index)
+        id to Rect(
+            left = left,
+            top = centerY - anchorSize / 2f,
+            right = right,
+            bottom = centerY + anchorSize / 2f
+        )
+    }.toMap()
+}
+
+internal fun leftRailVirtualSessionAvatarBounds(
+    sessionIds: List<String>,
+    visibleItems: List<LeftRailVisibleSessionItem>,
+    viewport: Rect,
+    fallbackStepPx: Float
+): Map<String, Rect> {
+    if (sessionIds.isEmpty() || visibleItems.isEmpty()) return emptyMap()
+    val sortedItems = visibleItems
+        .filter { item -> item.index in sessionIds.indices && item.size > 0 }
+        .sortedBy { item -> item.index }
+    if (sortedItems.isEmpty()) return emptyMap()
+
+    val anchor = sortedItems.first()
+    val anchorSize = anchor.size.toFloat()
+    val anchorCenterY = viewport.top + anchor.offset + anchorSize / 2f
+    val stepPx = sortedItems
+        .zipWithNext()
+        .firstNotNullOfOrNull { (first, second) ->
+            val indexDelta = second.index - first.index
+            if (indexDelta == 0) {
+                null
+            } else {
+                val firstCenterY = first.offset + first.size / 2f
+                val secondCenterY = second.offset + second.size / 2f
+                (secondCenterY - firstCenterY) / indexDelta
+            }
+        }
+        ?.takeIf { step -> step != 0f }
+        ?: fallbackStepPx.takeIf { step -> step != 0f }
+        ?: return emptyMap()
+    val left = viewport.left
+    val right = viewport.left + anchorSize
+
+    return sessionIds.mapIndexed { index, id ->
         val centerY = anchorCenterY + stepPx * (index - anchor.index)
         id to Rect(
             left = left,
@@ -15413,7 +16980,9 @@ internal fun createGroupMemberMessageConnectorBranch(
 ): ChatConnectorBranch {
     val avatarAnchor = avatarBounds.rightCenterIn(layerBounds)
     val bubbleAnchor = Offset(
-        x = bubbleBounds.left - layerBounds.left - imModuleConnectionLineBubbleGapPx(),
+        x = bubbleBounds.left - layerBounds.left -
+            imModuleConnectionLineBubbleGapPx() +
+            imModuleConnectionLineBubbleOverlapPx(),
         y = avatarAnchor.y
     )
     return ChatConnectorBranch(
@@ -15486,7 +17055,11 @@ internal fun createChatConnectorTree(
 
     val viewportTop = visibleRootBounds.top - layerBounds.top
     val viewportBottom = visibleRootBounds.bottom - layerBounds.top
-    val trunkX = connectorMidX(avatarAnchor, target)
+    val trunkX = connectorTreeTrunkX(
+        avatarAnchor = avatarAnchor,
+        visibleAnchors = visibleAnchors,
+        target = target
+    )
     val avatarEdgeY = avatarAnchor.pinnedToMessageViewport(layerBounds, visibleRootBounds).y
     val branchYs = visibleAnchors.map { anchor -> anchor.y } +
         listOfNotNull(
@@ -15547,10 +17120,11 @@ private fun Offset.pinnedToMessageViewport(
 
 private fun Offset.awayFromBubble(target: FloatingChatConnectionTarget): Offset {
     val gap = imModuleConnectionLineBubbleGapPx()
+    val overlap = imModuleConnectionLineBubbleOverlapPx()
     return if (target == FloatingChatConnectionTarget.Account) {
-        copy(x = x + gap)
+        copy(x = x + gap - overlap)
     } else {
-        copy(x = x - gap)
+        copy(x = x - gap + overlap)
     }
 }
 
@@ -15633,7 +17207,8 @@ private fun FloatingChatMessage.toHomeOverviewConnectorSourceKey(): ConnectorTar
 
 internal fun homeOverviewConnectorKeyDebugId(message: FloatingChatMessage): String? {
     if (message.connectionTarget != FloatingChatConnectionTarget.User) return null
-    return "home-message:${message.id}"
+    val sourceId = homeOverviewConnectorSourceKeyDebugId(message) ?: return null
+    return "home-source:$sourceId"
 }
 
 internal fun homeOverviewConnectorSourceKeyDebugId(message: FloatingChatMessage): String? {
@@ -15673,6 +17248,37 @@ private fun connectorMidX(
         avatarAnchor.x - offset
     } else {
         avatarAnchor.x + offset
+    }
+}
+
+private fun connectorTreeTrunkX(
+    avatarAnchor: Offset,
+    visibleAnchors: List<Offset>,
+    target: FloatingChatConnectionTarget
+): Float {
+    val defaultX = connectorMidX(avatarAnchor, target)
+    if (visibleAnchors.isEmpty()) return defaultX
+
+    val minimumBranch = imModuleConnectionLineMinimumBranchPx()
+    val minimumAvatarBranch = imModuleConnectionLineCornerRadiusPx()
+    return if (target == FloatingChatConnectionTarget.Account) {
+        val bubbleAnchorX = visibleAnchors.maxOf { anchor -> anchor.x }
+        val lower = bubbleAnchorX + minimumBranch
+        val upper = avatarAnchor.x - minimumAvatarBranch
+        if (lower <= upper) {
+            defaultX.coerceIn(lower, upper)
+        } else {
+            lower.coerceAtMost(upper).coerceAtLeast(bubbleAnchorX + 1f)
+        }
+    } else {
+        val bubbleAnchorX = visibleAnchors.minOf { anchor -> anchor.x }
+        val lower = avatarAnchor.x + minimumAvatarBranch
+        val upper = bubbleAnchorX - minimumBranch
+        if (lower <= upper) {
+            defaultX.coerceIn(lower, upper)
+        } else {
+            upper.coerceAtLeast(lower).coerceAtMost(bubbleAnchorX - 1f)
+        }
     }
 }
 
@@ -15846,6 +17452,7 @@ private val MessagePaneHorizontalPadding = 4.dp
 private const val AccountScopedThreadSeparator = "__"
 private const val AccountScopedContactCount = 5
 private const val AccountScopedGroupCount = 2
+private const val DefaultHomeUnreadThreadLimit = 5
 private val StandaloneImageMaxWidth = 228.dp
 private const val GroupMemberAvatarSizeDp = 28
 private const val GroupMemberAvatarBubbleCenterOffsetDp = 4
@@ -15878,8 +17485,8 @@ private const val BottomInputIconButtonSizeDp = 32
 private const val BottomInputIconSizeDp = 18
 private const val BottomInputFieldMinHeightDp = 36
 private const val BottomInputFieldMaxHeightDp = 118
-private const val BottomInputTextSizeSp = 15
-private const val BottomInputPlaceholderTextSizeSp = 13
+private const val BottomInputTextSizeSp = 11
+private const val BottomInputPlaceholderTextSizeSp = 11
 private const val BottomInputMinLines = 1
 private const val BottomInputMaxLines = 4
 private const val BottomEmojiPanelHeightDp = 300
@@ -15915,6 +17522,8 @@ private const val RightRailSectionResizeMs = 140
 private const val GroupThreadId = "floating-chat-group-thread"
 private const val AssistantContactId = "assistant"
 private const val REAL_MEDIA_DECODE_MAX_SIZE_PX = 720
+private const val MIN_BITMAP_MEMORY_CACHE_BYTES = 8 * 1024 * 1024
+private const val MAX_BITMAP_MEMORY_CACHE_BYTES = 32 * 1024 * 1024
 private val DefaultQuickPhrases = listOf(
     "收到，我先看一下，稍后同步进展。",
     "这个我确认后回复你。",
@@ -16013,6 +17622,8 @@ private object OverlayTokens {
     val miniProgramCard = Color(0xFFE7F2F3)
     val paymentCard = Color(0xFFFF9D2E)
     val paymentCardBorder = Color(0xFFE48621)
+    val paymentCardClaimed = Color(0xFFFFC98F)
+    val paymentCardClaimedBorder = Color(0xFFE7A967)
     val paymentCardText = Color(0xFFFFF8E8)
     val paymentCardFooterText = Color(0xEFFFF1D6)
     val fileCard = Color(0xFFEAEFF4)

@@ -14,6 +14,7 @@ import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import com.paifa.ubikitouch.core.model.FloatingChatMessageKind
 import com.paifa.ubikitouch.core.model.FloatingChatMessagePresentation
 import com.paifa.ubikitouch.core.model.FloatingChatMessageType
+import com.paifa.ubikitouch.core.model.FloatingChatSendState
 import com.paifa.ubikitouch.core.model.FloatingChatThumbnailOrientation
 import com.paifa.ubikitouch.core.model.FloatingChatVisibilityScope
 import java.util.concurrent.atomic.AtomicLong
@@ -21,9 +22,13 @@ import java.util.concurrent.atomic.AtomicLong
 internal class FloatingChatMessageStore(
     context: Context,
     private val clockMillis: () -> Long = System::currentTimeMillis
-) {
+) : AutoCloseable {
     private val database = FloatingChatDatabase(context)
     private val writeCounter = AtomicLong(0L)
+
+    override fun close() {
+        database.close()
+    }
 
     fun upsertThread(thread: LocalChatThread) {
         database.writableDatabase.insertWithOnConflict(
@@ -95,7 +100,13 @@ internal class FloatingChatMessageStore(
                 displayTime = "刚刚",
                 isFromMe = true,
                 connectionTarget = FloatingChatConnectionTarget.Account.name,
-                connectionTargetId = senderId
+                connectionTargetId = senderId,
+                remoteMessageServerId = null,
+                remoteTaskId = null,
+                sendState = FloatingChatSendState.LocalOnly.toStorageValue(),
+                sendErrorCode = null,
+                sendErrorMessage = null,
+                clientRequestId = null
             )
             insertWithOnConflict(
                 FloatingChatDatabaseContract.tableMessages,
@@ -417,7 +428,13 @@ internal fun FloatingChatMessage.toLocalChatMessage(
         thumbnailUrl = thumbnailUrl,
         mediaDurationMs = mediaDurationMs,
         mediaMimeType = mediaMimeType,
-        inlineTokens = inlineTokens.joinToString("\n") { token -> "${token.type.name}\t${token.text}" }
+        inlineTokens = inlineTokens.joinToString("\n") { token -> "${token.type.name}\t${token.text}" },
+        remoteMessageServerId = remoteMessageServerId,
+        remoteTaskId = remoteTaskId,
+        sendState = sendState.toStorageValue(),
+        sendErrorCode = sendErrorCode,
+        sendErrorMessage = sendErrorMessage,
+        clientRequestId = clientRequestId
     )
 }
 
@@ -457,7 +474,13 @@ internal fun LocalChatMessage.toFloatingChatMessage(): FloatingChatMessage {
         thumbnailUrl = thumbnailUrl,
         mediaDurationMs = mediaDurationMs,
         mediaMimeType = mediaMimeType,
-        inlineTokens = inlineTokens.toInlineTokens()
+        inlineTokens = inlineTokens.toInlineTokens(),
+        remoteMessageServerId = remoteMessageServerId,
+        remoteTaskId = remoteTaskId,
+        sendState = floatingChatSendStateFromStorage(sendState),
+        sendErrorCode = sendErrorCode,
+        sendErrorMessage = sendErrorMessage,
+        clientRequestId = clientRequestId
     )
 }
 
@@ -479,17 +502,52 @@ private inline fun <reified T : Enum<T>> enumValueOrDefault(value: String, defau
     return enumValueOrNull<T>(value) ?: default
 }
 
-private fun LocalChatThread.toContentValues(): ContentValues {
+private fun FloatingChatSendState.toStorageValue(): String {
+    return when (this) {
+        FloatingChatSendState.LocalOnly -> "LOCAL_ONLY"
+        FloatingChatSendState.Queued -> "QUEUED"
+        FloatingChatSendState.Uploading -> "UPLOADING"
+        FloatingChatSendState.Submitted -> "SUBMITTED"
+        FloatingChatSendState.Processing -> "PROCESSING"
+        FloatingChatSendState.Succeeded -> "SUCCEEDED"
+        FloatingChatSendState.FailedRetryable -> "FAILED_RETRYABLE"
+        FloatingChatSendState.FailedFinal -> "FAILED_FINAL"
+        FloatingChatSendState.Unknown -> "UNKNOWN"
+        FloatingChatSendState.Cancelled -> "CANCELLED"
+    }
+}
+
+private fun floatingChatSendStateFromStorage(value: String): FloatingChatSendState {
+    return when (value) {
+        "LOCAL_ONLY", FloatingChatSendState.LocalOnly.name -> FloatingChatSendState.LocalOnly
+        "QUEUED", FloatingChatSendState.Queued.name -> FloatingChatSendState.Queued
+        "UPLOADING", FloatingChatSendState.Uploading.name -> FloatingChatSendState.Uploading
+        "SUBMITTED", FloatingChatSendState.Submitted.name -> FloatingChatSendState.Submitted
+        "PROCESSING", FloatingChatSendState.Processing.name -> FloatingChatSendState.Processing
+        "SUCCEEDED", FloatingChatSendState.Succeeded.name -> FloatingChatSendState.Succeeded
+        "FAILED_RETRYABLE", FloatingChatSendState.FailedRetryable.name -> {
+            FloatingChatSendState.FailedRetryable
+        }
+        "FAILED_FINAL", FloatingChatSendState.FailedFinal.name -> FloatingChatSendState.FailedFinal
+        "UNKNOWN", FloatingChatSendState.Unknown.name -> FloatingChatSendState.Unknown
+        "CANCELLED", FloatingChatSendState.Cancelled.name -> FloatingChatSendState.Cancelled
+        else -> FloatingChatSendState.LocalOnly
+    }
+}
+
+internal fun LocalChatThread.toContentValues(): ContentValues {
     return ContentValues().apply {
         put("thread_id", threadId)
         put("kind", kind)
         put("title", title)
+        put("remote_conversation_id", remoteConversationId)
+        put("account_wechat_id", accountWeChatId)
         put("created_at", createdAt)
         put("updated_at", updatedAt)
     }
 }
 
-private fun LocalChatMessage.toContentValues(): ContentValues {
+internal fun LocalChatMessage.toContentValues(): ContentValues {
     return ContentValues().apply {
         put("message_id", messageId)
         put("thread_id", threadId)
@@ -527,6 +585,12 @@ private fun LocalChatMessage.toContentValues(): ContentValues {
         put("media_mime_type", mediaMimeType)
         put("inline_tokens", inlineTokens)
         put("metadata_json", metadataJson)
+        put("remote_msg_svr_id", remoteMessageServerId)
+        remoteTaskId?.let { put("remote_task_id", it) } ?: putNull("remote_task_id")
+        put("send_state", sendState)
+        put("send_error_code", sendErrorCode)
+        put("send_error_message", sendErrorMessage)
+        put("client_request_id", clientRequestId)
     }
 }
 
@@ -653,7 +717,13 @@ private fun Cursor.toLocalChatMessage(): LocalChatMessage {
         mediaDurationMs = getNullableInt("media_duration_ms"),
         mediaMimeType = getNullableString("media_mime_type"),
         inlineTokens = getNullableString("inline_tokens"),
-        metadataJson = getNullableString("metadata_json")
+        metadataJson = getNullableString("metadata_json"),
+        remoteMessageServerId = getNullableString("remote_msg_svr_id"),
+        remoteTaskId = getNullableLong("remote_task_id"),
+        sendState = getNullableString("send_state") ?: FloatingChatSendState.LocalOnly.toStorageValue(),
+        sendErrorCode = getNullableString("send_error_code"),
+        sendErrorMessage = getNullableString("send_error_message"),
+        clientRequestId = getNullableString("client_request_id")
     )
 }
 
