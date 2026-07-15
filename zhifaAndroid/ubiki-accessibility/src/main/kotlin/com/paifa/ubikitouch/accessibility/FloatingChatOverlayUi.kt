@@ -3514,200 +3514,6 @@ private fun DrawScope.drawGroupMemberConnectorTree(
 }
 
 @Composable
-@OptIn(ExperimentalFoundationApi::class)
-internal fun MessageBlock(
-    message: FloatingChatMessage,
-    index: Int,
-    onPreviewMedia: (FloatingChatMessage) -> Unit,
-    onOpenMediaActions: (FloatingChatMessage) -> Unit,
-    onLongPressMessage: (FloatingChatMessage, Rect?) -> Unit,
-    multiSelectMode: Boolean,
-    selected: Boolean,
-    reminded: Boolean,
-    favorite: Boolean,
-    claimed: Boolean,
-    onToggleSelection: () -> Unit,
-    onClick: () -> Unit,
-    onBubbleBoundsChanged: (Rect) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val bubbleClickSource = remember { MutableInteractionSource() }
-    var currentBounds by remember(message.id) { mutableStateOf<Rect?>(null) }
-    fun updateCurrentBounds(bounds: Rect) {
-        currentBounds = bounds
-        onBubbleBoundsChanged(bounds)
-    }
-    val isSystem = message.presentation == FloatingChatMessagePresentation.System
-    val isSpecialCard = message.presentation == FloatingChatMessagePresentation.SpecialCard
-    val isPaymentCard = message.isPaymentCardMessage()
-    val usesBubbleChrome = messageUsesBubbleChrome(message.presentation)
-    val bubbleShape = RoundedCornerShape(if (isSpecialCard) 7.dp else 8.dp)
-    val bubbleColor = messageBubbleColor(message, claimed)
-    val bubbleBorderColor = messageBubbleBorderColor(message, claimed)
-    val aiDraftDashedBubble = aiDraftMessageUsesGreenDashedBubble(message)
-    val usesDemoBubble = messageTypeUsesImModuleBubble(message.type) && !isSystem
-    Column(
-        modifier = modifier,
-        horizontalAlignment = when {
-            isSystem -> Alignment.CenterHorizontally
-            message.fromMe -> Alignment.End
-            else -> Alignment.Start
-        }
-    ) {
-        Column(horizontalAlignment = Alignment.Start) {
-            Box(
-                modifier = Modifier
-                    .padding(top = if (isSystem) 0.dp else 8.dp)
-            ) {
-                if (usesBubbleChrome) {
-                    Box(
-                        modifier = Modifier
-                            .shadow(
-                                elevation = if (usesDemoBubble && message.fromMe) {
-                                    imModuleSelfBubbleShadowBlurDp().dp
-                                } else {
-                                    3.dp
-                                },
-                                shape = bubbleShape,
-                                ambientColor = OverlayTokens.glassShadow,
-                                spotColor = OverlayTokens.glassShadow
-                            )
-                            .clip(bubbleShape)
-                            .background(bubbleColor)
-                            .then(
-                                if (aiDraftDashedBubble) {
-                                    Modifier.aiDraftDashedBorder(bubbleShape)
-                                } else {
-                                    Modifier.border(
-                                        width = 1.dp,
-                                        color = bubbleBorderColor,
-                                        shape = bubbleShape
-                                    )
-                                }
-                            )
-                            .onGloballyPositioned { coordinates ->
-                                updateCurrentBounds(
-                                    rootBoundsFromPosition(
-                                        positionInRoot = coordinates.positionInRoot(),
-                                        width = coordinates.size.width,
-                                        height = coordinates.size.height
-                                    )
-                                )
-                            }
-                            .combinedClickable(
-                                interactionSource = bubbleClickSource,
-                                indication = null,
-                                onClick = {
-                                    if (multiSelectMode) {
-                                        onToggleSelection()
-                                    } else {
-                                        onClick()
-                                    }
-                                },
-                                onLongClick = { onLongPressMessage(message, currentBounds) }
-                            )
-                            .padding(
-                                horizontal = when {
-                                    isSystem -> 10.dp
-                                    isSpecialCard -> 16.dp
-                                    else -> 12.dp
-                                },
-                                vertical = when {
-                                    isSystem -> 5.dp
-                                    isPaymentCard -> paymentCardOuterVerticalPaddingDp().dp
-                                    isSpecialCard -> 14.dp
-                                    else -> 10.dp
-                                }
-                            )
-                    ) {
-                        MessageContent(
-                            message = message,
-                            index = index,
-                            onPreviewMedia = onPreviewMedia,
-                            onOpenMediaActions = onOpenMediaActions,
-                            onLongPressMessage = onLongPressMessage,
-                            multiSelectMode = multiSelectMode,
-                            onToggleSelection = onToggleSelection,
-                            claimed = claimed
-                        )
-                    }
-                } else {
-                    Box(
-                        modifier = Modifier.combinedClickable(
-                            interactionSource = bubbleClickSource,
-                            indication = null,
-                            onClick = {
-                                if (multiSelectMode) {
-                                    onToggleSelection()
-                                } else {
-                                    onClick()
-                                }
-                            },
-                            onLongClick = { onLongPressMessage(message, currentBounds) }
-                        )
-                    ) {
-                        MessageContent(
-                            message = message,
-                            index = index,
-                            onPreviewMedia = onPreviewMedia,
-                            onOpenMediaActions = onOpenMediaActions,
-                            onLongPressMessage = onLongPressMessage,
-                            multiSelectMode = multiSelectMode,
-                            onToggleSelection = onToggleSelection,
-                            claimed = claimed,
-                            onContentBoundsChanged = ::updateCurrentBounds
-                        )
-                    }
-                }
-                if (favorite || reminded) {
-                    MessageStateBadges(
-                        favorite = favorite,
-                        reminded = reminded,
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .offset(x = (-2).dp, y = 4.dp)
-                    )
-                }
-                if (!isSystem) {
-                    TextLabel(
-                        text = message.senderName,
-                        size = 10.sp,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .offset(x = 16.dp, y = (-6).dp),
-                        weight = FontWeight.Bold,
-                        color = OverlayTokens.bubbleNameText,
-                        maxLines = 1,
-                        shadow = OverlayTokens.imModuleTextShadow
-                    )
-                }
-            }
-            scrmSendStatusTextFor(message)?.let { statusText ->
-                ScrmSendStatusLabel(
-                    text = statusText,
-                    modifier = Modifier.padding(start = 2.dp, top = 3.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ScrmSendStatusLabel(
-    text: String,
-    modifier: Modifier = Modifier
-) {
-    TextLabel(
-        text = text,
-        size = 10.sp,
-        modifier = modifier,
-        color = OverlayTokens.cardSecondaryText,
-        maxLines = 1,
-        shadow = OverlayTokens.imModuleTextShadow
-    )
-}
-
-@Composable
 internal fun VoiceMessageContent(message: FloatingChatMessage) {
     val context = LocalContext.current
     var playing by remember(message.id) { mutableStateOf(false) }
@@ -6644,7 +6450,7 @@ private fun MiniVideoControlButton(
     }
 }
 
-private fun messageBubbleColor(message: FloatingChatMessage, claimed: Boolean = false): Color {
+internal fun messageBubbleColor(message: FloatingChatMessage, claimed: Boolean = false): Color {
     if (message.isPaymentCardMessage()) {
         return if (claimed) OverlayTokens.paymentCardClaimed else OverlayTokens.paymentCard
     }
@@ -6658,7 +6464,7 @@ private fun messageBubbleColor(message: FloatingChatMessage, claimed: Boolean = 
     }
 }
 
-private fun messageBubbleBorderColor(message: FloatingChatMessage, claimed: Boolean = false): Color {
+internal fun messageBubbleBorderColor(message: FloatingChatMessage, claimed: Boolean = false): Color {
     if (aiDraftMessageUsesGreenDashedBubble(message)) {
         return OverlayTokens.aiDashedBorder
     }
@@ -6957,7 +6763,7 @@ private fun paymentCardKindFor(resourceUrl: String?, appName: String?, text: Str
     }
 }
 
-private fun FloatingChatMessage.isPaymentCardMessage(): Boolean {
+internal fun FloatingChatMessage.isPaymentCardMessage(): Boolean {
     return paymentCardKindFor(resourceUrl, appName, text) != null
 }
 
@@ -6965,7 +6771,7 @@ private fun FloatingChatMessage.isRedPacketMessage(): Boolean {
     return paymentCardKindFor(resourceUrl, appName, text) == PaymentCardKind.RedPacket
 }
 
-private fun Modifier.aiDraftDashedBorder(shape: RoundedCornerShape): Modifier {
+internal fun Modifier.aiDraftDashedBorder(shape: RoundedCornerShape): Modifier {
     return drawWithContent {
         drawContent()
         val strokePx = 1.4.dp.toPx()
@@ -10804,7 +10610,7 @@ internal fun MessageSelectionToggle(
 }
 
 @Composable
-private fun MessageStateBadges(
+internal fun MessageStateBadges(
     favorite: Boolean,
     reminded: Boolean,
     modifier: Modifier = Modifier
@@ -19994,7 +19800,7 @@ private fun SmallChoiceButton(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun TextLabel(
+internal fun TextLabel(
     text: String,
     size: TextUnit,
     modifier: Modifier = Modifier,
@@ -23090,7 +22896,7 @@ private val DefaultQuickPhrases = listOf(
     "可以，按这个方案推进。"
 )
 
-private object OverlayTokens {
+internal object OverlayTokens {
     val blankScrim = Color(0xFF000000)
     val shell = Color(0xF2D9E4E8)
     val shellBorder = Color(0xB8F8FCFF)

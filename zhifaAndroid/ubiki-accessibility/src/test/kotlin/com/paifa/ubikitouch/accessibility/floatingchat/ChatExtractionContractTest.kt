@@ -70,10 +70,12 @@ class ChatExtractionContractTest {
         }
         assertTrue(content.readText().contains("fun MessageContent("))
         assertTrue(row.readText().contains("fun MessageRow("))
+        assertTrue(row.readText().contains("fun MessageBlock("))
 
         val legacy = sourceFile("FloatingChatOverlayUi.kt").readText()
         assertFalse(legacy.contains("private fun MessageContent("))
         assertFalse(legacy.contains("private fun MessageRow("))
+        assertFalse(legacy.contains("internal fun MessageBlock("))
     }
 
     @Test
