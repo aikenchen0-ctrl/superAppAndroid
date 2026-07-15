@@ -73,6 +73,48 @@ class ScrmOperationProcessorTest {
                 taskResultUrl = "/openapi/v1/tasks/42"
             )
         }
+
+        override fun sendImage(request: ScrmSendImageMessageRequest): ScrmTaskSubmissionResult {
+            error("not used")
+        }
+
+        override fun sendVideo(request: ScrmSendVideoMessageRequest): ScrmTaskSubmissionResult {
+            error("not used")
+        }
+
+        override fun sendVoice(request: ScrmSendVoiceMessageRequest): ScrmTaskSubmissionResult {
+            error("not used")
+        }
+
+        override fun sendFile(request: ScrmSendFileMessageRequest): ScrmTaskSubmissionResult {
+            error("not used")
+        }
+
+        override fun sendLinkCard(request: ScrmSendLinkCardMessageRequest): ScrmTaskSubmissionResult {
+            error("not used")
+        }
+
+        override fun sendNoteCard(request: ScrmSendNoteCardMessageRequest): ScrmTaskSubmissionResult {
+            error("not used")
+        }
+
+        override fun sendOfficialArticleCard(
+            request: ScrmSendLinkCardMessageRequest
+        ): ScrmTaskSubmissionResult {
+            error("not used")
+        }
+
+        override fun sendQuote(request: ScrmSendQuoteMessageRequest): ScrmTaskSubmissionResult {
+            error("not used")
+        }
+
+        override fun uploadMedia(request: ScrmMediaUploadRequest): ScrmMediaUploadResponse {
+            error("not used")
+        }
+
+        override fun uploadVoice(request: ScrmMediaUploadRequest): ScrmVoiceUploadResponse {
+            error("not used")
+        }
     }
 
     private class SuccessfulTaskApi : ScrmTaskApi {

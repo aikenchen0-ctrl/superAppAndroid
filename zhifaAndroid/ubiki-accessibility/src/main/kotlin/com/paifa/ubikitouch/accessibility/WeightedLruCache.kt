@@ -19,12 +19,14 @@ internal class WeightedLruCache<K, V : Any>(
         putLocked(key, value)
     }
 
-    @Synchronized
     fun getOrPut(key: K, loader: () -> V?): V? {
-        entries[key]?.let { return it }
+        get(key)?.let { return it }
         val loaded = loader() ?: return null
-        putLocked(key, loaded)
-        return loaded
+        synchronized(this) {
+            entries[key]?.let { return it }
+            putLocked(key, loaded)
+            return loaded
+        }
     }
 
     private fun putLocked(key: K, value: V) {

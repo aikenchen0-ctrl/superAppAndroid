@@ -1,6 +1,7 @@
 package com.paifa.ubikitouch.accessibility.scrm
 
 import android.content.Context
+import com.paifa.ubikitouch.accessibility.BuildConfig
 
 data class ScrmSettingsSummary(
     val isConfigured: Boolean,
@@ -70,9 +71,40 @@ sealed interface ScrmConnectionTestResult {
     data class Failure(val message: String) : ScrmConnectionTestResult
 }
 
+sealed interface ScrmAdminBootstrapResult {
+    data class Success(
+        val summary: ScrmSettingsSummary,
+        val selectedAccount: ScrmAccountOption,
+        val deviceCount: Int,
+        val onlineDeviceCount: Int
+    ) : ScrmAdminBootstrapResult
+
+    data class Failure(
+        val message: String,
+        val summary: ScrmSettingsSummary? = null
+    ) : ScrmAdminBootstrapResult
+}
+
+internal data class ScrmAutoBootstrapCredentials(
+    val baseUrl: String,
+    val username: String,
+    val password: String
+) {
+    init {
+        require(baseUrl.isNotBlank()) { "自动配置缺少 SCRM 服务地址" }
+        require(username.isNotBlank()) { "自动配置缺少后台账号" }
+        require(password.isNotBlank()) { "自动配置缺少后台密码" }
+    }
+
+    override fun toString(): String {
+        return "ScrmAutoBootstrapCredentials(baseUrl=$baseUrl, username=****, password=****)"
+    }
+}
+
 class ScrmSettingsManager(context: Context) {
+    private val credentials = createAndroidScrmCredentialsStore(context)
     private val service = ScrmSettingsService(
-        credentials = createAndroidScrmCredentialsStore(context),
+        credentials = credentials,
         clientFactory = { config -> ScrmApiClient(config) }
     )
 
@@ -91,10 +123,102 @@ class ScrmSettingsManager(context: Context) {
     fun testConnection(baseUrl: String, apiKeyInput: String): ScrmConnectionTestResult {
         return service.testConnection(baseUrl, apiKeyInput)
     }
+
+    fun bootstrapWithAdminCredentials(
+        baseUrl: String,
+        username: String,
+        password: String
+    ): ScrmAdminBootstrapResult {
+        return service.bootstrapWithAdminCredentials(baseUrl, username, password)
+    }
+
+    fun bootstrapWithBundledAdminCredentialsIfNeeded(): ScrmAdminBootstrapResult? {
+        return try {
+            service.bootstrapWithAdminCredentialsIfNeeded(bundledAutoBootstrapCredentials())
+        } catch (error: IllegalArgumentException) {
+            ScrmAdminBootstrapResult.Failure(error.message ?: "SCRM 自动配置无效")
+        }
+    }
+
+    fun bootstrapWithBundledAdminCredentials(): ScrmAdminBootstrapResult? {
+        return try {
+            val autoCredentials = bundledAutoBootstrapCredentials() ?: return null
+            service.bootstrapWithAdminCredentials(
+                baseUrl = autoCredentials.baseUrl,
+                username = autoCredentials.username,
+                password = autoCredentials.password
+            )
+        } catch (error: IllegalArgumentException) {
+            ScrmAdminBootstrapResult.Failure(error.message ?: "SCRM 自动配置无效")
+        }
+    }
+
+    internal fun loadSelectedSession(): ScrmSelectedSession {
+        val stored = credentials.load()
+            ?: throw ScrmConfigurationException("请先保存 SCRM API 配置")
+        val deviceUuid = stored.selectedDeviceUuid?.takeIf { it.isNotBlank() }
+            ?: throw ScrmConfigurationException("请先在 SCRM 设置里选择在线设备")
+        val weChatId = stored.selectedWeChatId?.takeIf { it.isNotBlank() }
+            ?: throw ScrmConfigurationException("请先在 SCRM 设置里选择微信账号")
+        val client = ScrmApiClient(ScrmApiConfig(stored.baseUrl, stored.apiKey))
+        return ScrmSelectedSession(
+            deviceUuid = deviceUuid,
+            weChatId = weChatId,
+            readApi = client,
+            contactApi = client,
+            chatRoomApi = client,
+            messageApi = client,
+            momentApi = client,
+            taskApi = client
+        )
+    }
+
+    internal fun loadSelectedSessionOrBootstrap(): ScrmSelectedSession {
+        val existing = runCatching { loadSelectedSession() }
+        existing.getOrNull()?.let { return it }
+        val bootstrapResult = bootstrapWithBundledAdminCredentialsIfNeeded()
+        when (bootstrapResult) {
+            is ScrmAdminBootstrapResult.Success -> return loadSelectedSession()
+            is ScrmAdminBootstrapResult.Failure -> throw ScrmConfigurationException(bootstrapResult.message)
+            null -> throw existing.exceptionOrNull()
+                ?: ScrmConfigurationException("请先配置 SCRM API")
+        }
+    }
+
+    private fun bundledAutoBootstrapCredentials(): ScrmAutoBootstrapCredentials? {
+        val baseUrl = BuildConfig.SCRM_AUTO_BASE_URL.trim()
+        val username = BuildConfig.SCRM_AUTO_USERNAME.trim()
+        val password = BuildConfig.SCRM_AUTO_PASSWORD
+        if (baseUrl.isBlank() && username.isBlank() && password.isBlank()) {
+            return null
+        }
+        return ScrmAutoBootstrapCredentials(
+            baseUrl = baseUrl,
+            username = username,
+            password = password
+        )
+    }
+}
+
+internal data class ScrmSelectedSession(
+    val deviceUuid: String,
+    val weChatId: String,
+    val readApi: ScrmReadApi,
+    val contactApi: ScrmContactApi,
+    val chatRoomApi: ScrmChatRoomApi,
+    val messageApi: ScrmMessageApi,
+    val momentApi: ScrmMomentApi,
+    val taskApi: ScrmTaskApi
+) {
+    override fun toString(): String {
+        return "ScrmSelectedSession(deviceUuid=${deviceUuid.redacted()}, " +
+            "weChatId=${weChatId.redacted()})"
+    }
 }
 
 internal class ScrmSettingsService(
     private val credentials: ScrmCredentialRepository,
+    private val adminClientFactory: (String) -> ScrmAdminApi = { root -> ScrmAdminApiClient(root) },
     private val clientFactory: (ScrmApiConfig) -> ScrmReadApi
 ) {
     fun loadSummary(): ScrmSettingsSummary {
@@ -198,6 +322,77 @@ internal class ScrmSettingsService(
         }
     }
 
+    fun bootstrapWithAdminCredentials(
+        baseUrl: String,
+        username: String,
+        password: String
+    ): ScrmAdminBootstrapResult {
+        return try {
+            val normalizedRoot = normalizeScrmServerRoot(baseUrl)
+            val adminApi = adminClientFactory(normalizedRoot)
+            val session = adminApi.login(username, password)
+            val createdKey = adminApi.createOpenApiKey(
+                token = session.token,
+                request = ScrmCreateOpenApiKeyRequest(
+                    name = "只发 Android OpenAPI 联调",
+                    remark = "Android 悬浮联系人 API 联调"
+                )
+            )
+            val api = clientFactory(
+                ScrmApiConfig(normalizedRoot, ScrmApiKey.from(createdKey.plainKey))
+            )
+            val devices = api.getDevices()
+            val accounts = api.getWechatAccounts()
+            val selectedAccount = selectOnlineWechatAccount(
+                devices = devices,
+                accounts = accounts
+            )
+            if (selectedAccount == null) {
+                val summary = credentials.save(
+                    baseUrl = normalizedRoot,
+                    apiKeyInput = createdKey.plainKey
+                ).toSummary()
+                return ScrmAdminBootstrapResult.Failure(
+                    message = "已创建 OpenAPI Key，但未发现可用的在线微信账号；请确认 smLern 设备在线后重新自动配置",
+                    summary = summary
+                )
+            }
+
+            val summary = credentials.save(
+                baseUrl = normalizedRoot,
+                apiKeyInput = createdKey.plainKey,
+                selectedDeviceUuid = selectedAccount.deviceUuid,
+                selectedWeChatId = selectedAccount.weChatId
+            ).toSummary()
+            ScrmAdminBootstrapResult.Success(
+                summary = summary,
+                selectedAccount = selectedAccount,
+                deviceCount = devices.size,
+                onlineDeviceCount = devices.count { it.isOnline }
+            )
+        } catch (error: ScrmException) {
+            ScrmAdminBootstrapResult.Failure(error.toUserMessage())
+        } catch (error: IllegalArgumentException) {
+            ScrmAdminBootstrapResult.Failure(error.message ?: "SCRM 配置无效")
+        }
+    }
+
+    fun bootstrapWithAdminCredentialsIfNeeded(
+        autoCredentials: ScrmAutoBootstrapCredentials?
+    ): ScrmAdminBootstrapResult? {
+        if (autoCredentials == null) return null
+        val existing = runCatching { credentials.load() }.getOrNull()
+        val hasSelectedSession =
+            !existing?.selectedDeviceUuid.isNullOrBlank() &&
+                !existing?.selectedWeChatId.isNullOrBlank()
+        if (hasSelectedSession) return null
+        return bootstrapWithAdminCredentials(
+            baseUrl = autoCredentials.baseUrl,
+            username = autoCredentials.username,
+            password = autoCredentials.password
+        )
+    }
+
     private fun resolveConfig(baseUrl: String, apiKeyInput: String): ResolvedScrmConfig {
         val existing = credentials.load()
         val effectiveBaseUrl = baseUrl.trim().ifEmpty {
@@ -224,6 +419,45 @@ internal class ScrmSettingsService(
             selectedDeviceUuid = selectedDeviceUuid,
             selectedWeChatId = selectedWeChatId
         )
+    }
+
+    private fun selectOnlineWechatAccount(
+        devices: List<ScrmDevice>,
+        accounts: List<ScrmWechatAccount>
+    ): ScrmAccountOption? {
+        val onlineDeviceIds = devices.asSequence()
+            .filter { it.isOnline }
+            .mapNotNull { it.uuid?.takeIf { uuid -> uuid.isNotBlank() } }
+            .toSet()
+        val accountOptions = accounts.mapNotNull { account ->
+            val weChatId = account.wxid?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val deviceUuid = account.clientUuid?.takeIf { it.isNotBlank() }
+            ScrmAccountOption(
+                weChatId = weChatId,
+                nickname = account.nickname.orEmpty().ifBlank { "未命名账号" },
+                deviceUuid = deviceUuid,
+                isDeviceOnline = deviceUuid != null && onlineDeviceIds.contains(deviceUuid),
+                accountStatus = account.accountStatus
+            )
+        }
+        accountOptions.firstOrNull { it.deviceUuid != null && it.isDeviceOnline }?.let {
+            return it
+        }
+
+        return devices.firstOrNull { device ->
+            device.isOnline &&
+                !device.uuid.isNullOrBlank() &&
+                !device.weChatId.isNullOrBlank()
+        }?.let { device ->
+            val weChatId = requireNotNull(device.weChatId)
+            ScrmAccountOption(
+                weChatId = weChatId,
+                nickname = weChatId,
+                deviceUuid = requireNotNull(device.uuid),
+                isDeviceOnline = true,
+                accountStatus = null
+            )
+        }
     }
 
 }

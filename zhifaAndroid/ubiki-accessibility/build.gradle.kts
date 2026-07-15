@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
@@ -6,12 +8,56 @@ plugins {
     id("maven-publish")
 }
 
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.isFile) {
+        file.inputStream().use(::load)
+    }
+}
+
+fun localOrEnv(propertyName: String, envName: String): String {
+    return localProperties.getProperty(propertyName)
+        ?: System.getenv(envName)
+        ?: ""
+}
+
+fun buildConfigString(value: String): String {
+    return "\"" + value
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"") + "\""
+}
+
 android {
     namespace = "com.paifa.ubikitouch.accessibility"
     compileSdk = 36
 
     defaultConfig {
         minSdk = 26
+    }
+
+    buildTypes {
+        debug {
+            buildConfigField(
+                "String",
+                "SCRM_AUTO_BASE_URL",
+                buildConfigString(localOrEnv("scrm.auto.baseUrl", "SCRM_AUTO_BASE_URL"))
+            )
+            buildConfigField(
+                "String",
+                "SCRM_AUTO_USERNAME",
+                buildConfigString(localOrEnv("scrm.auto.username", "SCRM_AUTO_USERNAME"))
+            )
+            buildConfigField(
+                "String",
+                "SCRM_AUTO_PASSWORD",
+                buildConfigString(localOrEnv("scrm.auto.password", "SCRM_AUTO_PASSWORD"))
+            )
+        }
+        release {
+            buildConfigField("String", "SCRM_AUTO_BASE_URL", buildConfigString(""))
+            buildConfigField("String", "SCRM_AUTO_USERNAME", buildConfigString(""))
+            buildConfigField("String", "SCRM_AUTO_PASSWORD", buildConfigString(""))
+        }
     }
 
     publishing {
@@ -31,6 +77,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -49,6 +96,7 @@ dependencies {
     implementation("androidx.exifinterface:exifinterface:1.3.7")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.savedstate:savedstate:1.2.1")
+    implementation("com.google.zxing:core:3.5.3")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.16.1")

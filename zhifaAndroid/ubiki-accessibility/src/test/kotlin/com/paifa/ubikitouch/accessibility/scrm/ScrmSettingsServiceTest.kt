@@ -7,6 +7,126 @@ import org.junit.Test
 
 class ScrmSettingsServiceTest {
     @Test
+    fun adminBootstrapCreatesKeySelectsOnlineAccountAndPersistsRoutingContext() {
+        val repository = InMemoryCredentialRepository()
+        val adminApi = FakeAdminApi(
+            token = "jwt_secret_token",
+            plainKey = "scrm_bootstrap_secret_1234"
+        )
+        val readApi = FakeReadApi()
+        var resolvedApiKey: String? = null
+        var adminRoot: String? = null
+        val service = ScrmSettingsService(
+            credentials = repository,
+            clientFactory = { config ->
+                resolvedApiKey = config.apiKey?.headerValue()
+                readApi
+            },
+            adminClientFactory = { root ->
+                adminRoot = root
+                adminApi
+            }
+        )
+
+        val result = service.bootstrapWithAdminCredentials(
+            baseUrl = "https://api.example.com/openapi/v1",
+            username = "admin@example.com",
+            password = "admin-password"
+        )
+
+        assertTrue(result is ScrmAdminBootstrapResult.Success)
+        result as ScrmAdminBootstrapResult.Success
+        assertEquals("https://api.example.com", adminRoot)
+        assertEquals("admin@example.com", adminApi.loginUsername)
+        assertEquals("admin-password", adminApi.loginPassword)
+        assertEquals("jwt_secret_token", adminApi.createToken)
+        assertEquals("scrm_bootstrap_secret_1234", resolvedApiKey)
+        assertEquals("scrm_bootstrap_secret_1234", repository.savedKeyInput)
+        assertEquals("device-1", repository.savedDeviceUuid)
+        assertEquals("wxid_1", repository.savedWeChatId)
+        assertEquals("device-1", result.selectedAccount.deviceUuid)
+        assertEquals("wxid_1", result.selectedAccount.weChatId)
+        assertEquals("https://api.example.com/openapi/v1", result.summary.baseUrl)
+        assertFalse(result.toString().contains("admin-password"))
+        assertFalse(result.toString().contains("scrm_bootstrap_secret_1234"))
+    }
+
+    @Test
+    fun adminBootstrapFailsExplicitlyWhenNoOnlineWechatAccountIsAvailable() {
+        val repository = InMemoryCredentialRepository()
+        val service = ScrmSettingsService(
+            credentials = repository,
+            clientFactory = { NoAccountReadApi() },
+            adminClientFactory = {
+                FakeAdminApi(
+                    token = "jwt_secret_token",
+                    plainKey = "scrm_bootstrap_secret_1234"
+                )
+            }
+        )
+
+        val result = service.bootstrapWithAdminCredentials(
+            baseUrl = "https://api.example.com",
+            username = "admin@example.com",
+            password = "admin-password"
+        )
+
+        assertTrue(result is ScrmAdminBootstrapResult.Failure)
+        result as ScrmAdminBootstrapResult.Failure
+        assertTrue(result.message.contains("未发现可用的在线微信账号"))
+        assertEquals("scrm_bootstrap_secret_1234", repository.savedKeyInput)
+        assertEquals(null, repository.savedDeviceUuid)
+        assertEquals(null, repository.savedWeChatId)
+        assertFalse(result.toString().contains("admin-password"))
+        assertFalse(result.toString().contains("scrm_bootstrap_secret_1234"))
+    }
+
+    @Test
+    fun autoBootstrapRunsOnlyWhenSelectedSessionIsMissing() {
+        val repository = InMemoryCredentialRepository()
+        val adminApi = FakeAdminApi(
+            token = "jwt_secret_token",
+            plainKey = "scrm_bootstrap_secret_1234"
+        )
+        val service = ScrmSettingsService(
+            credentials = repository,
+            clientFactory = { FakeReadApi() },
+            adminClientFactory = { adminApi }
+        )
+
+        val first = service.bootstrapWithAdminCredentialsIfNeeded(
+            ScrmAutoBootstrapCredentials(
+                baseUrl = "https://api.example.com",
+                username = "admin@example.com",
+                password = "admin-password"
+            )
+        )
+        val second = service.bootstrapWithAdminCredentialsIfNeeded(
+            ScrmAutoBootstrapCredentials(
+                baseUrl = "https://api.example.com",
+                username = "admin@example.com",
+                password = "admin-password"
+            )
+        )
+
+        assertTrue(first is ScrmAdminBootstrapResult.Success)
+        assertEquals(null, second)
+        assertEquals(1, adminApi.loginCount)
+        assertEquals(1, adminApi.createKeyCount)
+        assertEquals("device-1", repository.savedDeviceUuid)
+        assertEquals("wxid_1", repository.savedWeChatId)
+    }
+
+    @Test
+    fun autoBootstrapSkipsWhenBundledCredentialsAreAbsent() {
+        val service = ScrmSettingsService(InMemoryCredentialRepository()) { FakeReadApi() }
+
+        val result = service.bootstrapWithAdminCredentialsIfNeeded(null)
+
+        assertEquals(null, result)
+    }
+
+    @Test
     fun savingBlankKeyReusesExistingEncryptedCredential() {
         val repository = InMemoryCredentialRepository(
             ScrmStoredCredentials(
@@ -263,6 +383,72 @@ class ScrmSettingsServiceTest {
                 androidApi = 35,
                 appVersionCode = 1,
                 updatedAt = "2026-07-12T10:00:00Z"
+            )
+        }
+    }
+
+    private class NoAccountReadApi : ScrmReadApi {
+        override fun getMe(): ScrmMe = ScrmMe(userName = "Tester")
+
+        override fun getDevices(): List<ScrmDevice> {
+            return listOf(
+                ScrmDevice(
+                    uuid = "device-offline",
+                    isOnline = false,
+                    status = 0,
+                    androidApi = 35,
+                    appVersionCode = 1,
+                    updatedAt = "2026-07-12T10:00:00Z"
+                )
+            )
+        }
+
+        override fun getWechatAccounts(): List<ScrmWechatAccount> = emptyList()
+
+        override fun getQuickStart(
+            deviceUuid: String?,
+            weChatId: String?,
+            scope: String,
+            includeBlocked: Boolean
+        ): ScrmQuickStart = error("not reached")
+
+        override fun getCapabilities(deviceUuid: String, weChatId: String): ScrmCapabilities =
+            error("not reached")
+    }
+
+    private class FakeAdminApi(
+        private val token: String,
+        private val plainKey: String
+    ) : ScrmAdminApi {
+        var loginUsername: String? = null
+            private set
+        var loginPassword: String? = null
+            private set
+        var createToken: String? = null
+            private set
+        var loginCount: Int = 0
+            private set
+        var createKeyCount: Int = 0
+            private set
+
+        override fun login(username: String, password: String): ScrmAdminSession {
+            loginCount += 1
+            loginUsername = username
+            loginPassword = password
+            return ScrmAdminSession(token)
+        }
+
+        override fun createOpenApiKey(
+            token: String,
+            request: ScrmCreateOpenApiKeyRequest
+        ): ScrmCreatedOpenApiKey {
+            createKeyCount += 1
+            createToken = token
+            assertTrue(request.name.contains("只发 Android"))
+            return ScrmCreatedOpenApiKey(
+                id = 10L,
+                keyPrefix = "scrm_boot****1234",
+                plainKey = plainKey
             )
         }
     }

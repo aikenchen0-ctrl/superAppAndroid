@@ -35,6 +35,7 @@ class UbikiAccessibilityService : AccessibilityService() {
     private lateinit var preferences: UbikiPreferences
     private lateinit var actionExecutor: UbikiActionExecutor
     private lateinit var backWaveOverlayController: BackWaveOverlayController
+    private lateinit var bottomGestureBarOverlayController: BottomGestureBarOverlayController
     private lateinit var floatingChatOverlayController: FloatingChatOverlayController
     private lateinit var nativeBackGestureTakeoverController: NativeBackGestureTakeoverController
     private val overlays = mutableMapOf<OverlayKey, EdgeOverlayView>()
@@ -71,6 +72,11 @@ class UbikiAccessibilityService : AccessibilityService() {
         applyServiceRuntimeConfig()
         if (isFloatingChatAppearancePreferenceKey(key)) {
             requestFloatingChatAppearanceRefresh()
+        } else if (isBottomGestureBarPreferenceKey(key)) {
+            if (::bottomGestureBarOverlayController.isInitialized) {
+                bottomGestureBarOverlayController.recreate()
+            }
+            requestOverlayRefresh()
         } else {
             requestOverlayRefresh()
         }
@@ -113,20 +119,29 @@ class UbikiAccessibilityService : AccessibilityService() {
             context = this,
             windowManager = windowManager,
             onEdgeGesture = ::handleFloatingChatEdgeGesture,
+            onBottomGesture = ::handleFloatingChatBottomGesture,
             onBackGestureProgress = ::handleFloatingChatBackGestureProgress,
             onBackGestureCommit = ::handleFloatingChatBackGestureCommit,
             onBackGestureEnd = ::handleFloatingChatBackGestureEnd,
             onBackGestureCancel = ::handleFloatingChatBackGestureCancel,
-            onExpandedChanged = ::handleFloatingChatExpandedChanged
+            onExpandedChanged = ::handleFloatingChatExpandedChanged,
+            onOverlayRecreated = ::scheduleBottomGestureBarZOrderRefresh
         )
         preferences = UbikiPreferences(this)
         actionExecutor = UbikiActionExecutor(this, preferences.hapticFeedback, floatingChatOverlayController)
+        bottomGestureBarOverlayController = BottomGestureBarOverlayController(
+            context = this,
+            windowManager = windowManager,
+            preferences = preferences,
+            onGesture = ::executeConfiguredGestureAction
+        )
         screenInteractiveState.updateFromSystem(isDeviceInteractive())
         preferences.registerChangeListener(preferenceListener)
         registerScreenReceiver()
         applyServiceRuntimeConfig()
         applyNativeBackGestureTakeover()
         createOverlays()
+        syncBottomGestureBar()
         showFloatingChatOverlayIfAllowed()
     }
 
@@ -156,6 +171,9 @@ class UbikiAccessibilityService : AccessibilityService() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        if (::bottomGestureBarOverlayController.isInitialized) {
+            bottomGestureBarOverlayController.recreate()
+        }
         recreateOverlays()
     }
 
@@ -171,6 +189,9 @@ class UbikiAccessibilityService : AccessibilityService() {
         mainHandler.removeCallbacks(overlayRefreshRunnable)
         mainHandler.removeCallbacks(floatingChatAppearanceRefreshRunnable)
         mainHandler.removeCallbacks(wakeResumeRunnable)
+        if (::bottomGestureBarOverlayController.isInitialized) {
+            bottomGestureBarOverlayController.remove()
+        }
         removeFloatingChatOverlay()
         removeAllOverlays()
         if (UbikiGesturePersistence.isAccessibilityServiceEnabled(this)) {
@@ -501,6 +522,7 @@ class UbikiAccessibilityService : AccessibilityService() {
             actionExecutor = UbikiActionExecutor(this, preferences.hapticFeedback, floatingChatOverlayController)
             applyNativeBackGestureTakeover()
             createOverlays()
+            syncBottomGestureBar()
             showFloatingChatOverlayIfAllowed()
         }.onFailure {
             Log.e(TAG, "failed to recreate overlays", it)
@@ -589,9 +611,18 @@ class UbikiAccessibilityService : AccessibilityService() {
             return
         }
 
-        if (floatingChatOwnsGestureSurface(floatingChatExpanded, floatingChatExternalActivityVisible)) {
+        if (!edgeGestureOverlayWindowsAllowed(floatingChatExpanded, floatingChatExternalActivityVisible)) {
+            removeEdgeGestureOverlays()
+            syncBottomGestureBar()
+            val (screenWidth, screenHeight) = currentDisplaySize()
+            if (resolvedGestureInputMode() == ResolvedGestureInputMode.NativeTouchInteraction &&
+                startNativeEdgeGestures(screenWidth, screenHeight)
+            ) {
+                Log.d(TAG, "native gesture input active while floating chat is expanded")
+                return
+            }
             stopNativeEdgeGestures()
-            Log.d(TAG, "skip gesture input while floating chat is expanded")
+            Log.d(TAG, "use floating chat internal edge input fallback while floating chat is expanded")
             return
         }
 
@@ -609,51 +640,61 @@ class UbikiAccessibilityService : AccessibilityService() {
         stopNativeEdgeGestures()
         EdgeSide.entries.forEach { side ->
             preferences.edgeConfigs(side).forEach { config ->
-                if (!config.enabled) return@forEach
-                val params = createLayoutParams(config, screenWidth, screenHeight)
-                val backWaveAnchor = BackWaveAnchor(
-                    side = side,
-                    y = params.y,
-                    height = params.height
-                )
-                val overlay = EdgeOverlayView(
-                    context = this,
-                    side = side,
-                    showIndicator = preferences.showIndicators,
-                    opacityPercent = preferences.overlayOpacity,
-                    visibleThicknessDp = gestureOverlayThicknessDp(config.thicknessDp),
-                    swipeThresholdDp = preferences.shortPullThresholdDp,
-                    longSwipeThresholdDp = preferences.longPullThresholdDp,
-                    onGesture = { type, data ->
-                        Log.d(TAG, "gesture side=${side.id} type=${type.id}")
-                        executeConfiguredGestureAction(preferences.actionFor(side, type), data)
-                    },
-                    onBackGestureProgress = { progress ->
-                        handleBackGestureProgress(side, backWaveAnchor, progress)
-                    },
-                    onBackGestureCommit = { progress, data ->
-                        handleBackGestureCommit(side, progress, data)
-                    },
-                    onBackGestureEnd = { progress ->
-                        handleBackGestureEnd(side, backWaveAnchor, progress)
-                    },
-                    onBackGestureCancel = {
-                        if (::backWaveOverlayController.isInitialized) {
-                            backWaveOverlayController.dismiss()
-                        }
-                    }
-                )
-                runCatching {
-                    windowManager.addView(overlay, params)
-                    overlays[OverlayKey(side, config.zoneId)] = overlay
-                    Log.d(
-                        TAG,
-                        "overlay added side=${side.id} zone=${config.zoneId} width=${params.width} height=${params.height} x=${params.x} y=${params.y}"
-                    )
-                }.onFailure {
-                    Log.e(TAG, "failed to add overlay side=${side.id} zone=${config.zoneId}", it)
+                addEdgeGestureOverlay(config, screenWidth, screenHeight)
+            }
+        }
+    }
+
+    private fun addEdgeGestureOverlay(
+        config: EdgeZoneConfig,
+        screenWidth: Int,
+        screenHeight: Int,
+        touchTargetDp: Int = gestureOverlayTouchTargetDp(config.thicknessDp)
+    ) {
+        if (!config.enabled) return
+        val side = config.side
+        val params = createLayoutParams(config, screenWidth, screenHeight, touchTargetDp)
+        val backWaveAnchor = BackWaveAnchor(
+            side = side,
+            y = params.y,
+            height = params.height
+        )
+        val overlay = EdgeOverlayView(
+            context = this,
+            side = side,
+            showIndicator = preferences.showIndicators,
+            opacityPercent = preferences.overlayOpacity,
+            visibleThicknessDp = gestureOverlayThicknessDp(config.thicknessDp),
+            swipeThresholdDp = preferences.shortPullThresholdDp,
+            longSwipeThresholdDp = preferences.longPullThresholdDp,
+            onGesture = { type, data ->
+                Log.d(TAG, "gesture side=${side.id} type=${type.id}")
+                executeConfiguredGestureAction(preferences.actionFor(side, type), data)
+            },
+            onBackGestureProgress = { progress ->
+                handleBackGestureProgress(side, backWaveAnchor, progress)
+            },
+            onBackGestureCommit = { progress, data ->
+                handleBackGestureCommit(side, progress, data)
+            },
+            onBackGestureEnd = { progress ->
+                handleBackGestureEnd(side, backWaveAnchor, progress)
+            },
+            onBackGestureCancel = {
+                if (::backWaveOverlayController.isInitialized) {
+                    backWaveOverlayController.dismiss()
                 }
             }
+        )
+        runCatching {
+            windowManager.addView(overlay, params)
+            overlays[OverlayKey(side, config.zoneId)] = overlay
+            Log.d(
+                TAG,
+                "overlay added side=${side.id} zone=${config.zoneId} width=${params.width} height=${params.height} x=${params.x} y=${params.y}"
+            )
+        }.onFailure {
+            Log.e(TAG, "failed to add overlay side=${side.id} zone=${config.zoneId}", it)
         }
     }
 
@@ -707,6 +748,15 @@ class UbikiAccessibilityService : AccessibilityService() {
         executeConfiguredGestureAction(preferences.actionFor(side, gestureType), data)
     }
 
+    private fun handleFloatingChatBottomGesture(
+        gestureType: BottomGestureBarGestureType,
+        data: GestureData
+    ) {
+        if (!::preferences.isInitialized || !::actionExecutor.isInitialized) return
+        Log.d(TAG, "floating chat internal bottom gesture type=${gestureType.id}")
+        executeConfiguredGestureAction(preferences.bottomGestureBarActionFor(gestureType), data)
+    }
+
     private fun executeConfiguredGestureAction(action: GestureAction, data: GestureData) {
         if (shouldRestoreFloatingChatFromExternalActivity(action, floatingChatExternalActivityVisible)) {
             Log.d(TAG, "restore floating chat from external activity gesture")
@@ -745,13 +795,27 @@ class UbikiAccessibilityService : AccessibilityService() {
 
     private fun handleFloatingChatExpandedChanged(expanded: Boolean) {
         floatingChatExpanded = expanded
+        scheduleBottomGestureBarZOrderRefresh()
         if (floatingChatOwnsGestureSurface(floatingChatExpanded, floatingChatExternalActivityVisible)) {
-            stopNativeEdgeGestures()
+            removeEdgeGestureOverlays()
+            syncBottomGestureBar()
             applyServiceRuntimeConfig()
-            Log.d(TAG, "native gesture input suspended for expanded floating chat")
+            if (resolvedGestureInputMode() == ResolvedGestureInputMode.NativeTouchInteraction) {
+                val (screenWidth, screenHeight) = currentDisplaySize()
+                if (startNativeEdgeGestures(screenWidth, screenHeight)) {
+                    Log.d(TAG, "native gesture input kept while floating chat is expanded")
+                    return
+                }
+                nativeTouchInteractionRuntimeFailed = true
+                applyServiceRuntimeConfig()
+            }
+            stopNativeEdgeGestures()
+            Log.d(TAG, "using floating chat internal edge input fallback")
             return
         }
 
+        removeEdgeGestureOverlays()
+        syncBottomGestureBar()
         applyServiceRuntimeConfig()
         if (resolvedGestureInputMode() != ResolvedGestureInputMode.NativeTouchInteraction) {
             requestOverlayRefresh()
@@ -777,6 +841,10 @@ class UbikiAccessibilityService : AccessibilityService() {
                 Log.d(TAG, "native gesture side=${side.id} type=${type.id}")
                 executeConfiguredGestureAction(preferences.actionFor(side, type), data)
             },
+            onBottomGesture = { type, data ->
+                Log.d(TAG, "native bottom gesture type=${type.id}")
+                executeConfiguredGestureAction(preferences.bottomGestureBarActionFor(type), data)
+            },
             onBackGestureProgress = ::handleFloatingChatBackGestureProgress,
             onBackGestureCommit = ::handleFloatingChatBackGestureCommit,
             onBackGestureEnd = ::handleFloatingChatBackGestureEnd,
@@ -793,7 +861,8 @@ class UbikiAccessibilityService : AccessibilityService() {
                 leftConfigs = preferences.edgeConfigs(EdgeSide.LEFT),
                 rightConfigs = preferences.edgeConfigs(EdgeSide.RIGHT),
                 shortThresholdPx = nativeGestureThresholdPx(preferences.shortPullThresholdDp, density),
-                longThresholdPx = nativeGestureThresholdPx(preferences.longPullThresholdDp, density)
+                longThresholdPx = nativeGestureThresholdPx(preferences.longPullThresholdDp, density),
+                bottomGestureWidthDp = preferences.bottomGestureBarWidthDp
             )
         )
     }
@@ -884,11 +953,12 @@ class UbikiAccessibilityService : AccessibilityService() {
     private fun createLayoutParams(
         config: EdgeZoneConfig,
         screenWidth: Int,
-        screenHeight: Int
+        screenHeight: Int,
+        touchTargetDp: Int = gestureOverlayTouchTargetDp(config.thicknessDp)
     ): WindowManager.LayoutParams {
         val density = resources.displayMetrics.density
         val sanitized = config.sanitized()
-        val width = (gestureOverlayTouchTargetDp(sanitized.thicknessDp) * density).toInt().coerceAtLeast(1)
+        val width = (touchTargetDp * density).toInt().coerceAtLeast(1)
         val heightPercent = 100 - sanitized.topInsetPercent - sanitized.bottomInsetPercent
         val height = (screenHeight * heightPercent.coerceIn(EdgeZoneConfig.MIN_LENGTH_PERCENT, 100) / 100).coerceAtLeast(1)
         val x = when (config.side) {
@@ -915,6 +985,10 @@ class UbikiAccessibilityService : AccessibilityService() {
 
     private fun removeAllOverlays() {
         stopNativeEdgeGestures()
+        removeEdgeGestureOverlays()
+    }
+
+    private fun removeEdgeGestureOverlays() {
         if (::backWaveOverlayController.isInitialized) {
             runCatching { backWaveOverlayController.dismiss() }
                 .onFailure { Log.w(TAG, "failed to dismiss back wave overlay", it) }
@@ -929,6 +1003,27 @@ class UbikiAccessibilityService : AccessibilityService() {
                 .onFailure { Log.w(TAG, "failed to remove gesture overlay", it) }
         }
         overlays.clear()
+    }
+
+    private fun syncBottomGestureBar() {
+        if (!::bottomGestureBarOverlayController.isInitialized) return
+        if (bottomGestureBarExternalOverlayVisibleForFloatingChat(floatingChatExpanded)) {
+            bottomGestureBarOverlayController.show()
+        } else {
+            bottomGestureBarOverlayController.remove()
+        }
+    }
+
+    private fun scheduleBottomGestureBarZOrderRefresh() {
+        mainHandler.post {
+            if (::bottomGestureBarOverlayController.isInitialized) {
+                if (bottomGestureBarExternalOverlayVisibleForFloatingChat(floatingChatExpanded)) {
+                    bottomGestureBarOverlayController.recreate()
+                } else {
+                    bottomGestureBarOverlayController.remove()
+                }
+            }
+        }
     }
 
     private fun showFloatingChatOverlayIfAllowed() {

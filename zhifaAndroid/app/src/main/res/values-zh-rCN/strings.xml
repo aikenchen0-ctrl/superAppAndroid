@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="bottom_gesture_bar_title">底部手势条</string>
+    <string name="bottom_gesture_bar_width">触摸宽度</string>
+    <string name="bottom_gesture_tap">点按</string>
+    <string name="bottom_gesture_swipe_up">普通上滑</string>
+    <string name="bottom_gesture_swipe_up_hold">上滑停顿</string>
+    <string name="bottom_gesture_swipe_horizontal">横滑</string>
+    <string name="bottom_gesture_long_press">长按</string>
     <string name="app_name">只发</string>
     <string name="tile_label">ubikiTouch</string>
     <string name="tile_active">运行中</string>
@@ -105,6 +112,13 @@
     <string name="scrm_api_key">API Key</string>
     <string name="scrm_show_api_key">显示 API Key</string>
     <string name="scrm_hide_api_key">隐藏 API Key</string>
+    <string name="scrm_admin_auto_config_title">后台账号自动配置</string>
+    <string name="scrm_admin_auto_config_hint">使用后台账号生成 OpenAPI Key，并自动选择在线微信账号；后台密码不会保存。</string>
+    <string name="scrm_admin_username">后台账号</string>
+    <string name="scrm_admin_password">后台密码</string>
+    <string name="scrm_show_admin_password">显示后台密码</string>
+    <string name="scrm_hide_admin_password">隐藏后台密码</string>
+    <string name="scrm_admin_bootstrap">自动配置 API</string>
     <string name="scrm_save">保存配置</string>
     <string name="scrm_test_connection">测试连接</string>
     <string name="scrm_account_selection">选择账号</string>

@@ -1,6 +1,7 @@
 package com.paifa.ubikitouch.app
 
 import com.paifa.ubikitouch.accessibility.scrm.ScrmAccountOption
+import com.paifa.ubikitouch.accessibility.scrm.ScrmAdminBootstrapResult
 import com.paifa.ubikitouch.accessibility.scrm.ScrmConnectionTestResult
 import com.paifa.ubikitouch.accessibility.scrm.ScrmCapabilityGroupOption
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSettingsSummary
@@ -89,6 +90,38 @@ class ScrmSettingsPresentationTest {
     }
 
     @Test
+    fun adminBootstrapStatusSummarizesAccountWithoutIdentifiers() {
+        val result = ScrmAdminBootstrapResult.Success(
+            summary = ScrmSettingsSummary(
+                isConfigured = true,
+                baseUrl = "https://api.example.com/openapi/v1",
+                maskedApiKey = "****1234",
+                selectedDeviceUuid = "device-sensitive",
+                selectedWeChatId = "wxid_sensitive"
+            ),
+            selectedAccount = ScrmAccountOption(
+                weChatId = "wxid_sensitive",
+                nickname = "测试账号",
+                deviceUuid = "device-sensitive",
+                isDeviceOnline = true,
+                accountStatus = 1
+            ),
+            deviceCount = 2,
+            onlineDeviceCount = 1
+        )
+
+        val text = scrmAdminBootstrapStatusText(result)
+
+        assertTrue(text.contains("自动配置成功"))
+        assertTrue(text.contains("测试账号"))
+        assertTrue(text.contains("2 台设备"))
+        assertTrue(text.contains("1 台在线"))
+        assertFalse(text.contains("wxid_sensitive"))
+        assertFalse(text.contains("device-sensitive"))
+        assertFalse(text.contains("scrm_"))
+    }
+
+    @Test
     fun apiKeyInputIsNotWrittenToSavedInstanceState() {
         val source = projectFile(
             "app/src/main/java/com/paifa/ubikitouch/app/ScrmSettingsPanel.kt"
@@ -96,6 +129,16 @@ class ScrmSettingsPresentationTest {
 
         assertFalse(source.contains("apiKeyInput by rememberSaveable"))
         assertTrue(source.contains("apiKeyInput by remember"))
+    }
+
+    @Test
+    fun adminPasswordInputIsNotWrittenToSavedInstanceState() {
+        val source = projectFile(
+            "app/src/main/java/com/paifa/ubikitouch/app/ScrmSettingsPanel.kt"
+        ).readText()
+
+        assertFalse(source.contains("adminPassword by rememberSaveable"))
+        assertTrue(source.contains("adminPassword by remember"))
     }
 
     private fun projectFile(path: String): File {

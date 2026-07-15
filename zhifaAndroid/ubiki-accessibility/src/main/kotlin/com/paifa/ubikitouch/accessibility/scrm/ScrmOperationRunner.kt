@@ -24,6 +24,8 @@ internal class ScrmOperationRunner(
         }
     }
 ) : AutoCloseable {
+    private val mediaContentResolver = AndroidScrmMediaContentResolver(context.applicationContext)
+
     private val runLoop = ScrmOperationRunLoop(
         processorFactory = ::createProcessor,
         scheduler = ScrmOperationRunScheduler { delayMillis, operation ->
@@ -55,6 +57,7 @@ internal class ScrmOperationRunner(
             dispatcher = ScrmOutboxDispatcher(
                 api = api,
                 persistence = operationStore,
+                mediaContentResolver = mediaContentResolver,
                 clockMillis = clockMillis
             ),
             taskTracker = ScrmTaskTracker(

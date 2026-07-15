@@ -27,6 +27,14 @@ class UbikiPreferences(context: Context) {
         get() = GestureInputMode.fromId(prefs.getString(KEY_GESTURE_INPUT_MODE, GestureInputMode.Auto.id))
         set(value) = prefs.edit().putString(KEY_GESTURE_INPUT_MODE, value.id).apply()
 
+    var bottomGestureBarWidthDp: Int
+        get() = sanitizeBottomGestureBarWidthDp(
+            prefs.getInt(KEY_BOTTOM_GESTURE_BAR_WIDTH_DP, defaultBottomGestureBarWidthDp())
+        )
+        set(value) = prefs.edit()
+            .putInt(KEY_BOTTOM_GESTURE_BAR_WIDTH_DP, sanitizeBottomGestureBarWidthDp(value))
+            .apply()
+
     var floatingChatFrostedBackgroundEnabled: Boolean
         get() = prefs.getBoolean(
             KEY_FLOATING_CHAT_FROSTED_BACKGROUND_ENABLED,
@@ -145,6 +153,15 @@ class UbikiPreferences(context: Context) {
         prefs.edit().putString(actionKey(side, gestureType), action.id).apply()
     }
 
+    fun bottomGestureBarActionFor(gestureType: BottomGestureBarGestureType): GestureAction {
+        val stored = prefs.getString(bottomGestureBarActionKey(gestureType), null)
+        return GestureAction.fromId(stored ?: defaultBottomGestureBarAction(gestureType).id)
+    }
+
+    fun setBottomGestureBarAction(gestureType: BottomGestureBarGestureType, action: GestureAction) {
+        prefs.edit().putString(bottomGestureBarActionKey(gestureType), action.id).apply()
+    }
+
     fun setEdgeConfig(config: EdgeZoneConfig) {
         val zoneId = config.zoneId.coerceIn(0, EdgeZoneConfig.MAX_ZONES_PER_SIDE - 1)
         val currentConfigs = edgeConfigs(config.side).toMutableList()
@@ -207,6 +224,10 @@ class UbikiPreferences(context: Context) {
 
     private fun actionKey(side: EdgeSide, gestureType: GestureType): String {
         return "action_${side.id}_${gestureType.id}"
+    }
+
+    private fun bottomGestureBarActionKey(gestureType: BottomGestureBarGestureType): String {
+        return "bottom_gesture_bar_action_${gestureType.id}"
     }
 
     private fun edgeZoneCount(side: EdgeSide): Int {
@@ -349,6 +370,10 @@ internal fun isFloatingChatAppearancePreferenceKey(key: String?): Boolean {
     return key in FloatingChatAppearancePreferenceKeys
 }
 
+internal fun isBottomGestureBarPreferenceKey(key: String?): Boolean {
+    return key == KEY_BOTTOM_GESTURE_BAR_WIDTH_DP || key?.startsWith("bottom_gesture_bar_action_") == true
+}
+
 internal fun sanitizeShortPullThresholdDp(value: Int): Int {
     return value.coerceIn(MIN_SHORT_PULL_THRESHOLD_DP, MAX_SHORT_PULL_THRESHOLD_DP)
 }
@@ -381,6 +406,7 @@ internal const val KEY_FLOATING_CHAT_FROSTED_BACKGROUND_ENABLED = "floating_chat
 internal const val KEY_FLOATING_CHAT_BACKGROUND_OPACITY_PERCENT = "floating_chat_background_opacity_percent"
 internal const val KEY_FLOATING_CHAT_BLUR_RADIUS_DP = "floating_chat_blur_radius_dp"
 internal const val KEY_FLOATING_CHAT_BACKGROUND_COLOR_RGB = "floating_chat_background_color_rgb"
+internal const val KEY_BOTTOM_GESTURE_BAR_WIDTH_DP = "bottom_gesture_bar_width_dp"
 private val FLOATING_CHAT_BACKGROUND_COLOR_PRESET_RGBS = listOf(
     0xEAF3F6,
     0xF1E9DC,

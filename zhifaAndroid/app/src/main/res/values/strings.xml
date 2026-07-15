@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="bottom_gesture_bar_title">Bottom gesture bar</string>
+    <string name="bottom_gesture_bar_width">Touch width</string>
+    <string name="bottom_gesture_tap">Tap</string>
+    <string name="bottom_gesture_swipe_up">Swipe up</string>
+    <string name="bottom_gesture_swipe_up_hold">Swipe up and hold</string>
+    <string name="bottom_gesture_swipe_horizontal">Horizontal swipe</string>
+    <string name="bottom_gesture_long_press">Long press</string>
     <string name="app_name">只发</string>
     <string name="tile_label">ubikiTouch</string>
     <string name="tile_active">Active</string>
@@ -105,6 +112,13 @@
     <string name="scrm_api_key">API Key</string>
     <string name="scrm_show_api_key">Show API Key</string>
     <string name="scrm_hide_api_key">Hide API Key</string>
+    <string name="scrm_admin_auto_config_title">Admin account auto setup</string>
+    <string name="scrm_admin_auto_config_hint">Use the admin account to create an OpenAPI Key and select an online WeChat account. The admin password is not saved.</string>
+    <string name="scrm_admin_username">Admin account</string>
+    <string name="scrm_admin_password">Admin password</string>
+    <string name="scrm_show_admin_password">Show admin password</string>
+    <string name="scrm_hide_admin_password">Hide admin password</string>
+    <string name="scrm_admin_bootstrap">Auto setup API</string>
     <string name="scrm_save">Save</string>
     <string name="scrm_test_connection">Test connection</string>
     <string name="scrm_account_selection">Account</string>

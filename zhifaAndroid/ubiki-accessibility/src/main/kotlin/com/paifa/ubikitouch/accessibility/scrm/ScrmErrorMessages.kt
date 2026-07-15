@@ -10,6 +10,7 @@ internal fun ScrmException.toUserMessage(): String {
         is ScrmTimeoutException -> "连接 SCRM 服务超时"
         is ScrmNetworkException -> "无法连接 SCRM 服务，请检查网络和地址"
         is ScrmInvalidResponseException -> "SCRM 返回的数据格式无效"
+        is ScrmLocalMediaException -> message ?: "本地媒体文件不可读取"
         is ScrmConfigurationException,
         is ScrmCredentialStorageException,
         is ScrmCredentialCorruptedException -> message ?: "SCRM 配置不可用"

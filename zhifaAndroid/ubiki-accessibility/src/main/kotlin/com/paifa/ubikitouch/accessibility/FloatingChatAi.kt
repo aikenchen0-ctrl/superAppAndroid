@@ -22,6 +22,11 @@ private const val AiPrefsModel = "model"
 private const val AiPrefsSystemPrompt = "system_prompt"
 private const val AiPrefsTemperature = "temperature"
 private const val AiPrefsMaxTokens = "max_tokens"
+private const val DefaultAiBaseUrl = "https://cc2.cx/v1"
+private const val DefaultAiApiKey = "sk-jwdArLBwIENRVm6itUAfMMqIVAdWN6J6CbGWstNknvtRmurk"
+private const val DefaultAiModel = "gpt-5.6-luna"
+private const val LegacyOpenAiBaseUrl = "https://api.openai.com/v1"
+private const val LegacyOpenAiModel = "gpt-4.1-mini"
 private const val DefaultAiConnectTimeoutMs = 15_000
 private const val DefaultAiReadTimeoutMs = 45_000
 private const val DefaultAiMaxPromptMessages = 10
@@ -68,12 +73,35 @@ internal fun floatingChatAiDraftActions(): List<FloatingChatAiDraftAction> {
     )
 }
 
+internal fun defaultFloatingChatAiConfig(): FloatingChatAiConfig {
+    return FloatingChatAiConfig(
+        baseUrl = DefaultAiBaseUrl,
+        apiKey = DefaultAiApiKey,
+        model = DefaultAiModel
+    )
+}
+
+internal fun floatingChatAiBaseUrlOrDefault(stored: String?): String {
+    return stored.trimmedCustomValue(legacyDefaults = setOf(LegacyOpenAiBaseUrl))
+        ?: DefaultAiBaseUrl
+}
+
+internal fun floatingChatAiApiKeyOrDefault(stored: String?): String {
+    return stored.trimmedCustomValue()
+        ?: DefaultAiApiKey
+}
+
+internal fun floatingChatAiModelOrDefault(stored: String?): String {
+    return stored.trimmedCustomValue(legacyDefaults = setOf(LegacyOpenAiModel))
+        ?: DefaultAiModel
+}
+
 internal fun loadFloatingChatAiConfig(context: Context): FloatingChatAiConfig {
     val prefs = context.getSharedPreferences(AiPrefsName, Context.MODE_PRIVATE)
     return FloatingChatAiConfig(
-        baseUrl = prefs.getString(AiPrefsBaseUrl, "") ?: "",
-        apiKey = prefs.getString(AiPrefsApiKey, "") ?: "",
-        model = prefs.getString(AiPrefsModel, "") ?: "",
+        baseUrl = floatingChatAiBaseUrlOrDefault(prefs.getString(AiPrefsBaseUrl, null)),
+        apiKey = floatingChatAiApiKeyOrDefault(prefs.getString(AiPrefsApiKey, null)),
+        model = floatingChatAiModelOrDefault(prefs.getString(AiPrefsModel, null)),
         systemPrompt = prefs.getString(AiPrefsSystemPrompt, defaultFloatingChatAiSystemPrompt())
             ?: defaultFloatingChatAiSystemPrompt(),
         temperature = prefs.getFloat(AiPrefsTemperature, 0.4f),
@@ -292,6 +320,22 @@ internal fun draftTextMessageFromAiDraft(
     )
 }
 
+internal fun preparedAiDraftTextMessageForSend(
+    draft: FloatingChatMessage,
+    messageId: String,
+    time: String,
+    threadId: String,
+    prepareOutgoingMessage: (FloatingChatMessage, String) -> FloatingChatMessage
+): FloatingChatMessage {
+    require(messageId.isNotBlank()) { "messageId cannot be blank" }
+    require(threadId.isNotBlank()) { "threadId cannot be blank" }
+    val message = draftTextMessageFromAiDraft(draft).copy(
+        id = messageId,
+        time = time
+    )
+    return prepareOutgoingMessage(message, threadId)
+}
+
 internal class FloatingChatAiClient(
     private val connectTimeoutMs: Int = DefaultAiConnectTimeoutMs,
     private val readTimeoutMs: Int = DefaultAiReadTimeoutMs
@@ -391,6 +435,15 @@ private fun FloatingChatAiConfig.normalized(): FloatingChatAiConfig {
         temperature = temperature.coerceIn(0f, 2f),
         maxTokens = maxTokens.coerceIn(32, 2048)
     )
+}
+
+private fun String?.trimmedCustomValue(
+    legacyDefaults: Set<String> = emptySet()
+): String? {
+    val trimmed = this?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    return trimmed.takeUnless { value ->
+        legacyDefaults.any { legacy -> value.equals(legacy, ignoreCase = true) }
+    }
 }
 
 private fun firstJsonStringValue(json: String, keys: List<String>): String? {

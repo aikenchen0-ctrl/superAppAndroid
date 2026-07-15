@@ -71,19 +71,23 @@ internal class ScrmApiConfig(
     }
 }
 
-private fun normalizeApiBaseUrl(value: String): String {
-    val input = value.trim()
-    require(input.isNotEmpty()) { "SCRM 服务地址不能为空" }
-    val uri = runCatching { URI(input) }
-        .getOrElse { throw IllegalArgumentException("SCRM 服务地址格式无效", it) }
-    require(uri.scheme == "http" || uri.scheme == "https") {
-        "SCRM 服务地址只支持 http 或 https"
-    }
-    require(!uri.host.isNullOrBlank()) { "SCRM 服务地址缺少主机名" }
-    require(uri.userInfo == null) { "SCRM 服务地址不能包含账号信息" }
-    require(uri.query == null) { "SCRM 服务地址不能包含查询参数" }
-    require(uri.fragment == null) { "SCRM 服务地址不能包含片段" }
+internal fun normalizeScrmServerRoot(value: String): String {
+    val uri = parseScrmBaseUri(value)
+    val inputPath = uri.path.orEmpty().trimEnd('/')
+    val rootPath = inputPath.removeSuffix(OpenApiBasePath).trimEnd('/')
+    return URI(
+        uri.scheme,
+        null,
+        uri.host,
+        uri.port,
+        rootPath,
+        null,
+        null
+    ).toASCIIString().trimEnd('/')
+}
 
+private fun normalizeApiBaseUrl(value: String): String {
+    val uri = parseScrmBaseUri(value)
     val inputPath = uri.path.orEmpty().trimEnd('/')
     val apiPath = if (inputPath.endsWith(OpenApiBasePath)) {
         inputPath
@@ -99,6 +103,21 @@ private fun normalizeApiBaseUrl(value: String): String {
         null,
         null
     ).toASCIIString()
+}
+
+private fun parseScrmBaseUri(value: String): URI {
+    val input = value.trim()
+    require(input.isNotEmpty()) { "SCRM 服务地址不能为空" }
+    val uri = runCatching { URI(input) }
+        .getOrElse { throw IllegalArgumentException("SCRM 服务地址格式无效", it) }
+    require(uri.scheme == "http" || uri.scheme == "https") {
+        "SCRM 服务地址只支持 http 或 https"
+    }
+    require(!uri.host.isNullOrBlank()) { "SCRM 服务地址缺少主机名" }
+    require(uri.userInfo == null) { "SCRM 服务地址不能包含账号信息" }
+    require(uri.query == null) { "SCRM 服务地址不能包含查询参数" }
+    require(uri.fragment == null) { "SCRM 服务地址不能包含片段" }
+    return uri
 }
 
 private fun percentEncode(value: String): String {

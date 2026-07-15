@@ -74,8 +74,7 @@ internal fun shouldRequestNativeTouchInteraction(
     floatingChatExpanded: Boolean,
     externalActivityVisible: Boolean = false
 ): Boolean {
-    return !floatingChatOwnsGestureSurface(floatingChatExpanded, externalActivityVisible) &&
-        eligibility.sdkInt >= NATIVE_TOUCH_INTERACTION_MIN_SDK &&
+    return eligibility.sdkInt >= NATIVE_TOUCH_INTERACTION_MIN_SDK &&
         eligibility.requestedMode != GestureInputMode.SlimOverlayFallback &&
         eligibility.requestedMode != GestureInputMode.SecureSlimOverlay &&
         !eligibility.runtimeFailed &&
@@ -92,8 +91,7 @@ internal fun nativeTouchRecoveryNeeded(
     controllerRunning: Boolean,
     externalActivityVisible: Boolean = false
 ): Boolean {
-    return !floatingChatOwnsGestureSurface(floatingChatExpanded, externalActivityVisible) &&
-        !controllerRunning
+    return !controllerRunning
 }
 
 internal fun floatingChatOwnsGestureSurface(
@@ -101,6 +99,13 @@ internal fun floatingChatOwnsGestureSurface(
     externalActivityVisible: Boolean
 ): Boolean {
     return floatingChatExpanded && !externalActivityVisible
+}
+
+internal fun edgeGestureOverlayWindowsAllowed(
+    floatingChatExpanded: Boolean,
+    externalActivityVisible: Boolean = false
+): Boolean {
+    return !floatingChatOwnsGestureSurface(floatingChatExpanded, externalActivityVisible)
 }
 
 internal fun shouldRestoreFloatingChatFromExternalActivity(

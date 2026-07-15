@@ -41,6 +41,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.paifa.ubikitouch.accessibility.scrm.ScrmAccountOption
+import com.paifa.ubikitouch.accessibility.scrm.ScrmAdminBootstrapResult
 import com.paifa.ubikitouch.accessibility.scrm.ScrmConnectionTestResult
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSettingsManager
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSettingsSummary
@@ -55,7 +56,8 @@ private enum class ScrmSettingsOperation {
     Saving,
     Testing,
     Clearing,
-    SelectingAccount
+    SelectingAccount,
+    AdminBootstrapping
 }
 
 @Composable
@@ -68,6 +70,9 @@ internal fun ScrmSettingsPanel(
     var baseUrl by rememberSaveable { mutableStateOf(DefaultScrmServerBaseUrl) }
     var apiKeyInput by remember { mutableStateOf("") }
     var revealApiKey by remember { mutableStateOf(false) }
+    var adminUsername by remember { mutableStateOf("") }
+    var adminPassword by remember { mutableStateOf("") }
+    var revealAdminPassword by remember { mutableStateOf(false) }
     var operation by remember { mutableStateOf<ScrmSettingsOperation?>(ScrmSettingsOperation.Loading) }
     var connectionResult by remember { mutableStateOf<ScrmConnectionTestResult?>(null) }
     var operationMessage by remember { mutableStateOf<String?>(null) }
@@ -113,6 +118,10 @@ internal fun ScrmSettingsPanel(
     val configured = summary?.isConfigured == true
     val canUseSavedKey = configured && apiKeyInput.isBlank()
     val canSubmit = baseUrl.isNotBlank() && (apiKeyInput.isNotBlank() || canUseSavedKey) && !busy
+    val canBootstrapWithAdmin = baseUrl.isNotBlank() &&
+        adminUsername.isNotBlank() &&
+        adminPassword.isNotBlank() &&
+        !busy
 
     Card(modifier = modifier.fillMaxWidth()) {
         Column(
@@ -176,6 +185,101 @@ internal fun ScrmSettingsPanel(
                     Text(text = scrmApiKeySupportingText(summary))
                 }
             )
+
+            HorizontalDivider()
+
+            Text(
+                text = stringResource(id = R.string.scrm_admin_auto_config_title),
+                style = MaterialTheme.typography.labelLarge
+            )
+            Text(
+                text = stringResource(id = R.string.scrm_admin_auto_config_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = adminUsername,
+                onValueChange = { adminUsername = it },
+                enabled = !busy,
+                singleLine = true,
+                label = { Text(text = stringResource(id = R.string.scrm_admin_username)) }
+            )
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = adminPassword,
+                onValueChange = { adminPassword = it },
+                enabled = !busy,
+                singleLine = true,
+                label = { Text(text = stringResource(id = R.string.scrm_admin_password)) },
+                visualTransformation = if (revealAdminPassword) {
+                    VisualTransformation.None
+                } else {
+                    PasswordVisualTransformation()
+                },
+                trailingIcon = {
+                    IconButton(
+                        onClick = { revealAdminPassword = !revealAdminPassword },
+                        enabled = adminPassword.isNotEmpty() && !busy
+                    ) {
+                        Icon(
+                            imageVector = if (revealAdminPassword) {
+                                Icons.Default.VisibilityOff
+                            } else {
+                                Icons.Default.Visibility
+                            },
+                            contentDescription = stringResource(
+                                id = if (revealAdminPassword) {
+                                    R.string.scrm_hide_admin_password
+                                } else {
+                                    R.string.scrm_show_admin_password
+                                }
+                            )
+                        )
+                    }
+                }
+            )
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                enabled = canBootstrapWithAdmin,
+                onClick = {
+                    runOperation(ScrmSettingsOperation.AdminBootstrapping) {
+                        val result = withContext(Dispatchers.IO) {
+                            manager.bootstrapWithAdminCredentials(
+                                baseUrl = baseUrl,
+                                username = adminUsername,
+                                password = adminPassword
+                            )
+                        }
+                        adminPassword = ""
+                        when (result) {
+                            is ScrmAdminBootstrapResult.Success -> {
+                                summary = result.summary
+                                baseUrl = result.summary.baseUrl
+                                apiKeyInput = ""
+                                connectionResult = null
+                                operationFailed = false
+                                operationMessage = scrmAdminBootstrapStatusText(result)
+                            }
+
+                            is ScrmAdminBootstrapResult.Failure -> {
+                                result.summary?.let { partial ->
+                                    summary = partial
+                                    baseUrl = partial.baseUrl
+                                    apiKeyInput = ""
+                                }
+                                operationFailed = true
+                                operationMessage = scrmAdminBootstrapStatusText(result)
+                            }
+                        }
+                    }
+                }
+            ) {
+                OperationProgress(
+                    visible = operation == ScrmSettingsOperation.AdminBootstrapping
+                )
+                Text(text = stringResource(id = R.string.scrm_admin_bootstrap))
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -469,6 +573,21 @@ internal fun scrmConnectionStatusText(result: ScrmConnectionTestResult): String 
                 append(unknown)
                 append(" 项运行时未知")
             }
+        }
+    }
+}
+
+internal fun scrmAdminBootstrapStatusText(result: ScrmAdminBootstrapResult): String {
+    return when (result) {
+        is ScrmAdminBootstrapResult.Failure -> result.message
+        is ScrmAdminBootstrapResult.Success -> buildString {
+            append("自动配置成功：")
+            append(result.selectedAccount.nickname)
+            append("，")
+            append(result.deviceCount)
+            append(" 台设备（")
+            append(result.onlineDeviceCount)
+            append(" 台在线）")
         }
     }
 }

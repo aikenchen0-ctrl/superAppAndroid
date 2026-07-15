@@ -5,6 +5,7 @@ import com.paifa.ubikitouch.core.model.FloatingChatInlineTokenType
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import com.paifa.ubikitouch.core.model.FloatingChatMessageKind
 import com.paifa.ubikitouch.core.model.FloatingChatMessagePresentation
+import com.paifa.ubikitouch.core.model.FloatingChatSendState
 import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 import com.paifa.ubikitouch.core.model.FloatingChatPrototype
 import org.junit.Assert.assertEquals
@@ -13,6 +14,30 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FloatingChatAiContractTest {
+    @Test
+    fun defaultAiConfigUsesBundledOpenAiCompatibleProvider() {
+        val config = defaultFloatingChatAiConfig()
+
+        assertEquals("https://cc2.cx/v1", config.baseUrl)
+        assertEquals("sk-jwdArLBwIENRVm6itUAfMMqIVAdWN6J6CbGWstNknvtRmurk", config.apiKey)
+        assertEquals("gpt-5.6-luna", config.model)
+        assertTrue(config.isConfigured)
+    }
+
+    @Test
+    fun defaultAiConfigReplacesBlankAndLegacyUiDefaultsButKeepsCustomValues() {
+        assertEquals("https://cc2.cx/v1", floatingChatAiBaseUrlOrDefault(""))
+        assertEquals("https://cc2.cx/v1", floatingChatAiBaseUrlOrDefault("https://api.openai.com/v1"))
+        assertEquals("https://custom.example.com/v1", floatingChatAiBaseUrlOrDefault(" https://custom.example.com/v1 "))
+
+        assertEquals("sk-jwdArLBwIENRVm6itUAfMMqIVAdWN6J6CbGWstNknvtRmurk", floatingChatAiApiKeyOrDefault(""))
+        assertEquals("sk-custom", floatingChatAiApiKeyOrDefault(" sk-custom "))
+
+        assertEquals("gpt-5.6-luna", floatingChatAiModelOrDefault(""))
+        assertEquals("gpt-5.6-luna", floatingChatAiModelOrDefault("gpt-4.1-mini"))
+        assertEquals("custom-model", floatingChatAiModelOrDefault(" custom-model "))
+    }
+
     @Test
     fun aiConfigRequiresBaseUrlApiKeyAndModel() {
         assertFalse(FloatingChatAiConfig().isConfigured)
@@ -335,6 +360,41 @@ class FloatingChatAiContractTest {
     fun aiDraftSendIsIdempotentForSameDraftId() {
         assertFalse(aiDraftSendAlreadyHandled("draft-1", emptyMap()))
         assertTrue(aiDraftSendAlreadyHandled("draft-1", mapOf("draft-1" to true)))
+    }
+
+    @Test
+    fun aiDraftSendPassesNormalTextThroughOutgoingPreparation() {
+        val draft = createFloatingChatAiDraftMessage(
+            conversation = FloatingChatPrototype.sampleConversation(),
+            selection = ChatThreadSelection.Private("li-si"),
+            accountId = "account-main",
+            text = "  reply ready  ",
+            sequence = 9
+        )
+        var preparedThreadId: String? = null
+
+        val prepared = preparedAiDraftTextMessageForSend(
+            draft = draft,
+            messageId = "sent-draft-1",
+            time = "now",
+            threadId = "private:li-si",
+            prepareOutgoingMessage = { message, threadId ->
+                preparedThreadId = threadId
+                message.copy(
+                    sendState = FloatingChatSendState.Queued,
+                    clientRequestId = "client-1"
+                )
+            }
+        )
+
+        assertEquals("private:li-si", preparedThreadId)
+        assertEquals("sent-draft-1", prepared.id)
+        assertEquals("reply ready", prepared.text)
+        assertEquals(FloatingChatMessageType.Text, prepared.type)
+        assertEquals(FloatingChatMessageKind.Normal, prepared.kind)
+        assertEquals(emptyList<com.paifa.ubikitouch.core.model.FloatingChatInlineToken>(), prepared.inlineTokens)
+        assertEquals(FloatingChatSendState.Queued, prepared.sendState)
+        assertEquals("client-1", prepared.clientRequestId)
     }
 
     @Test

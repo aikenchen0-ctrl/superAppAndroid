@@ -32,15 +32,35 @@ import com.paifa.ubikitouch.accessibility.data.LocalGroupProfile
 import com.paifa.ubikitouch.accessibility.data.ScrmOperationStore
 import com.paifa.ubikitouch.accessibility.data.localThreadIdForSelection
 import com.paifa.ubikitouch.accessibility.data.toLocalChatMessage
+import com.paifa.ubikitouch.accessibility.scrm.ScrmAdminBootstrapResult
+import com.paifa.ubikitouch.accessibility.scrm.ScrmAuthenticationException
+import com.paifa.ubikitouch.accessibility.scrm.ScrmChatRoomQuery
+import com.paifa.ubikitouch.accessibility.scrm.ScrmChatRoomMemberQuery
+import com.paifa.ubikitouch.accessibility.scrm.ScrmContactQuery
 import com.paifa.ubikitouch.accessibility.scrm.ScrmOperationProcessorResult
 import com.paifa.ubikitouch.accessibility.scrm.ScrmOperationRunner
+import com.paifa.ubikitouch.accessibility.scrm.ScrmSelectedSession
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSettingsManager
 import com.paifa.ubikitouch.accessibility.scrm.ScrmTextMessageRoute
-import com.paifa.ubikitouch.accessibility.scrm.scrmTextOutboxItemForMessage
-import com.paifa.ubikitouch.accessibility.scrm.scrmTextRouteForThread
+import com.paifa.ubikitouch.accessibility.scrm.ScrmFloatingAccountConversation
+import com.paifa.ubikitouch.accessibility.scrm.ScrmFloatingAccountRoute
+import com.paifa.ubikitouch.accessibility.scrm.ScrmContact
+import com.paifa.ubikitouch.accessibility.scrm.ScrmChatRoom
+import com.paifa.ubikitouch.accessibility.scrm.ScrmChatRoomMember
+import com.paifa.ubikitouch.accessibility.scrm.ScrmDevice
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMessagePreflightFailure
+import com.paifa.ubikitouch.accessibility.scrm.ScrmWechatAccount
+import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingChatConversation
+import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingAccountRouteForSelection
+import com.paifa.ubikitouch.accessibility.scrm.scrmMessagePreflightFailure
+import com.paifa.ubikitouch.accessibility.scrm.scrmMessageOperationType
+import com.paifa.ubikitouch.accessibility.scrm.scrmOutboxItemForMessage
+import com.paifa.ubikitouch.accessibility.scrm.scrmTextRouteForMessageThread
+import com.paifa.ubikitouch.accessibility.scrm.withScrmFailureState
 import com.paifa.ubikitouch.accessibility.scrm.withScrmQueueState
 import java.util.concurrent.Executors
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
 
@@ -48,6 +68,7 @@ internal class FloatingChatOverlayController(
     private val context: Context,
     private val windowManager: WindowManager,
     private val onEdgeGesture: (EdgeSide, GestureType, GestureData) -> Unit = { _, _, _ -> },
+    private val onBottomGesture: (BottomGestureBarGestureType, GestureData) -> Unit = { _, _ -> },
     private val onBackGestureProgress: (EdgeSide, BackGestureProgress) -> Unit = { _, _ -> },
     private val onBackGestureCommit: (EdgeSide, BackGestureProgress, GestureData) -> Boolean = { _, _, _ -> false },
     private val onBackGestureEnd: (EdgeSide, BackGestureProgress) -> Unit = { _, _ -> },
@@ -59,7 +80,7 @@ internal class FloatingChatOverlayController(
     private var composeOwner: AccessibilityOverlayComposeOwner? = null
     private val preferences = UbikiPreferences(context)
     private var state: FloatingChatOverlayState = FloatingChatOverlayState.Collapsed
-    private val conversation = FloatingChatPrototype.sampleConversation()
+    private var conversation = FloatingChatPrototype.sampleConversation()
     private val messageStore = FloatingChatMessageStore(context.applicationContext)
     private val scrmOperationStore = ScrmOperationStore(context.applicationContext)
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -69,8 +90,18 @@ internal class FloatingChatOverlayController(
         onProcessed = ::handleScrmOperationProcessed
     )
     private val scrmSettingsManager = ScrmSettingsManager(context.applicationContext)
+    private val scrmConversationRefreshInFlight = AtomicBoolean(false)
+    private val scrmConversationRefreshPending = AtomicBoolean(false)
+    private val cachedScrmAccountConversations = ConcurrentHashMap<String, ScrmFloatingAccountConversation>()
+    private var scheduledScrmConversationRefresh: Runnable? = null
+    private var scheduledScrmBackgroundPrefetch: Runnable? = null
     private val runtimeState = FloatingChatOverlayRuntimeState()
     private val pendingScrmTextRoutes = ConcurrentHashMap<String, ScrmTextMessageRoute>()
+    private var selectedThread: FloatingChatPrototype.ToolThreadSelection = defaultToolThreadSelection(conversation)
+    private var selectedAccountId: String = FloatingChatPrototype.pairedAccountFor(
+        conversation = conversation,
+        contactId = defaultToolThreadContactId(conversation)
+    ).id
     private val localMessages = mutableListOf<FloatingChatMessage>().apply {
         addAll(loadPersistedLocalMessages())
     }
@@ -84,11 +115,6 @@ internal class FloatingChatOverlayController(
         addAll(loadPersistedGroupProfiles())
     }
     private var localMessageSequence = nextLocalMessageSequence(localMessages)
-    private var selectedThread: FloatingChatPrototype.ToolThreadSelection = defaultToolThreadSelection(conversation)
-    private var selectedAccountId: String = FloatingChatPrototype.pairedAccountFor(
-        conversation = conversation,
-        contactId = defaultToolThreadContactId(conversation)
-    ).id
     private var previewChromeVisible = false
     private var voicePermissionRequestToken = 0
     private var locationPermissionRequestToken = 0
@@ -97,9 +123,15 @@ internal class FloatingChatOverlayController(
             isDaemon = true
         }
     }
+    private val scrmConversationExecutor = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "FloatingChatScrmConversation").apply {
+            isDaemon = true
+        }
+    }
 
     init {
         scrmOperationRunner.requestRun()
+        refreshScrmConversationFromApi()
     }
 
     fun show() {
@@ -120,6 +152,7 @@ internal class FloatingChatOverlayController(
             restoreAfterMediaPicker()
             return
         }
+        refreshScrmConversationFromApi()
         showState(FloatingChatOverlayState.Expanded)
     }
 
@@ -228,6 +261,8 @@ internal class FloatingChatOverlayController(
     ): FloatingChatPrototype.ToolThreadSelection {
         return conversation.groupContacts.firstOrNull()?.let { group ->
             FloatingChatPrototype.ToolThreadSelection.GroupChat(group.id)
+        } ?: conversation.contacts.firstOrNull()?.let { contact ->
+            FloatingChatPrototype.ToolThreadSelection.Private(contact.id)
         } ?: FloatingChatPrototype.ToolThreadSelection.Group
     }
 
@@ -295,7 +330,7 @@ internal class FloatingChatOverlayController(
             return
         }
         localMessageSequence += 1
-        val message = FloatingChatPrototype.pickedDocumentMessage(
+        val baseMessage = FloatingChatPrototype.pickedDocumentMessage(
             conversation = conversation,
             documentUri = document.uri,
             displayName = document.displayName,
@@ -307,8 +342,10 @@ internal class FloatingChatOverlayController(
             accountId = selectedAccountId,
             sequence = localMessageSequence
         )
+        val threadId = selectedThread.toLocalThreadId()
+        val message = prepareOutgoingMessageForScrm(baseMessage, threadId)
         localMessages += message
-        persistLocalMessage(message, selectedThread.toLocalThreadId())
+        persistLocalMessage(message, threadId)
         showState(FloatingChatOverlayState.Expanded, force = true)
     }
 
@@ -405,8 +442,8 @@ internal class FloatingChatOverlayController(
                             localMessages.addAll(messages)
                             localMessageSequence = sequence
                         },
-                        onPrepareOutgoingTextMessage = { message, threadId ->
-                            prepareOutgoingTextMessageForScrm(message, threadId)
+                        onPrepareOutgoingMessage = { message, threadId ->
+                            prepareOutgoingMessageForScrm(message, threadId)
                         },
                         onPersistLocalMessage = { message, threadId ->
                             persistLocalMessage(message, threadId)
@@ -429,14 +466,22 @@ internal class FloatingChatOverlayController(
                             persistGroupProfile(profile)
                         },
                         onThreadContextChanged = { threadSelection, accountId ->
+                            val previousAccountId = selectedAccountId
+                            val previousThread = selectedThread
                             selectedThread = threadSelection.toPrototypeToolSelection()
                             selectedAccountId = accountId
+                            if (previousAccountId != accountId) {
+                                scheduleScrmConversationRefreshAfterAccountSwitch()
+                            } else if (previousThread != selectedThread) {
+                                refreshLocalMessagesFromStore()
+                            }
                         },
                         onOpenExternalDocument = ::openExternalDocument,
                         onPreviewChromeChanged = ::setPreviewChromeVisible,
                         edgeGestureShortThresholdDp = preferences.shortPullThresholdDp,
                         edgeGestureLongThresholdDp = preferences.longPullThresholdDp,
                         onEdgeGesture = onEdgeGesture,
+                        onBottomGesture = onBottomGesture,
                         onBackGestureProgress = onBackGestureProgress,
                         onBackGestureCommit = onBackGestureCommit,
                         onBackGestureEnd = onBackGestureEnd,
@@ -481,30 +526,15 @@ internal class FloatingChatOverlayController(
     }
 
     private fun loadPersistedLocalMessages(): List<FloatingChatMessage> {
-        val threadIds = buildList {
-            add(localThreadIdForSelection())
-            conversation.groupContacts.forEach { group ->
-                add(localThreadIdForSelection(groupId = group.id))
-            }
-            conversation.contacts.forEach { contact ->
-                add(localThreadIdForSelection(privateContactId = contact.id))
-            }
-            conversation.accountContacts.forEach { account ->
-                val scopedConversation = accountScopedConversation(
-                    conversation = conversation,
-                    activeAccountId = account.id
-                )
-                scopedConversation.groupContacts.forEach { group ->
-                    add(localThreadIdForSelection(groupId = group.id))
-                }
-                scopedConversation.contacts.forEach { contact ->
-                    add(localThreadIdForSelection(privateContactId = contact.id))
-                }
-            }
-        }.distinct()
-
         val messagesById = linkedMapOf<String, FloatingChatMessage>()
-        threadIds.forEach { threadId ->
+        runCatching {
+            messageStore.recentFloatingMessages(limit = 500)
+        }.onSuccess { messages ->
+            messages.forEach { message -> messagesById[message.id] = message }
+        }.onFailure { error ->
+            Log.e(TAG, "failed to load recent floating chat messages", error)
+        }
+        floatingChatPersistedMessageThreadIdsForSelection(selectedThread).forEach { threadId ->
             runCatching {
                 messageStore.messagesForThread(threadId = threadId, limit = 500)
             }.onSuccess { messages ->
@@ -542,12 +572,38 @@ internal class FloatingChatOverlayController(
         }.getOrDefault(emptyList())
     }
 
-    private fun prepareOutgoingTextMessageForScrm(
+    private fun prepareOutgoingMessageForScrm(
         message: FloatingChatMessage,
         threadId: String
     ): FloatingChatMessage {
-        if (message.type != FloatingChatMessageType.Text || !message.fromMe) return message
-        val route = currentScrmTextRoute(threadId) ?: return message
+        if (!message.fromMe) return message
+        val supported = scrmMessageOperationType(message) != null
+        if (!supported) return message
+        scrmMessagePreflightFailure(message)?.let { failure ->
+            return message.withScrmFailureState(failure)
+        }
+        val summary = runCatching { scrmSettingsManager.loadSummary() }
+            .onFailure { error ->
+                Log.w(TAG, "failed to load SCRM routing context", error)
+            }
+            .getOrNull()
+            ?: return message.withScrmFailureState(
+                ScrmMessagePreflightFailure(
+                    code = "ScrmRoutingUnavailable",
+                    message = "无法读取 SCRM 配置，未调用真实发送接口"
+                )
+            )
+        if (!summary.isConfigured) return message
+        val route = scrmTextRouteForMessageThread(
+            summary = summary,
+            message = message,
+            threadId = threadId
+        ) ?: return message.withScrmFailureState(
+            ScrmMessagePreflightFailure(
+                code = "MissingScrmRoute",
+                message = "当前会话缺少 SCRM 账号或 conversationId，未调用真实发送接口"
+            )
+        )
         val clientRequestId = UUID.randomUUID().toString()
         pendingScrmTextRoutes[clientRequestId] = route
         return message.withScrmQueueState(clientRequestId)
@@ -556,23 +612,43 @@ internal class FloatingChatOverlayController(
     private fun persistLocalMessage(message: FloatingChatMessage, threadId: String) {
         messageDatabaseExecutor.execute {
             runCatching {
-                if (!enqueueScrmTextMessageIfNeeded(message, threadId)) {
+                if (!enqueueScrmMessageIfNeeded(message, threadId)) {
                     messageStore.insertFloatingMessage(message = message, threadId = threadId)
                 }
             }.onFailure { error ->
                 Log.e(TAG, "failed to persist floating chat message ${message.id}", error)
+                persistFailedOutgoingMessage(message, threadId, error)
             }
         }
     }
 
-    private fun enqueueScrmTextMessageIfNeeded(
+    private fun persistFailedOutgoingMessage(
+        message: FloatingChatMessage,
+        threadId: String,
+        error: Throwable
+    ) {
+        val failedMessage = message.copy(
+            sendState = FloatingChatSendState.FailedFinal,
+            sendErrorCode = error::class.simpleName ?: "ScrmEnqueueFailed",
+            sendErrorMessage = error.message ?: "SCRM 消息入队失败，未调用真实发送接口",
+            clientRequestId = null
+        )
+        runCatching {
+            messageStore.insertFloatingMessage(message = failedMessage, threadId = threadId)
+            refreshLocalMessagesFromStore()
+        }.onFailure { persistError ->
+            Log.e(TAG, "failed to persist failed floating chat message ${message.id}", persistError)
+        }
+    }
+
+    private fun enqueueScrmMessageIfNeeded(
         message: FloatingChatMessage,
         threadId: String
     ): Boolean {
         if (message.sendState != FloatingChatSendState.Queued && message.clientRequestId == null) {
             return false
         }
-        require(message.type == FloatingChatMessageType.Text && message.fromMe) {
+        require(message.fromMe && scrmMessageOperationType(message) != null) {
             "只有我方文本消息可以进入 SCRM Outbox"
         }
         require(message.sendState == FloatingChatSendState.Queued) {
@@ -582,12 +658,12 @@ internal class FloatingChatOverlayController(
             "SCRM 文本消息缺少 clientRequestId"
         }
         val route = pendingScrmTextRoutes.remove(clientRequestId)
-            ?: currentScrmTextRoute(threadId)
+            ?: currentScrmTextRoute(message, threadId)
             ?: error("SCRM 文本消息缺少远端路由")
         val now = System.currentTimeMillis()
         scrmOperationStore.enqueueMessage(
             message = message.toLocalChatMessage(threadId = threadId, createdAt = now),
-            item = scrmTextOutboxItemForMessage(
+            item = scrmOutboxItemForMessage(
                 message = message,
                 route = route,
                 now = now
@@ -618,12 +694,325 @@ internal class FloatingChatOverlayController(
         }
     }
 
-    private fun currentScrmTextRoute(threadId: String): ScrmTextMessageRoute? {
+    private fun currentScrmTextRoute(
+        message: FloatingChatMessage,
+        threadId: String
+    ): ScrmTextMessageRoute? {
         return runCatching {
-            scrmTextRouteForThread(scrmSettingsManager.loadSummary(), threadId)
+            scrmTextRouteForMessageThread(
+                summary = scrmSettingsManager.loadSummary(),
+                message = message,
+                threadId = threadId
+            )
         }.onFailure { error ->
             Log.w(TAG, "failed to load SCRM routing context", error)
         }.getOrNull()
+    }
+
+    private fun refreshScrmConversationFromApi() {
+        clearScheduledScrmConversationRefresh()
+        clearScheduledScrmBackgroundPrefetch()
+        if (
+            scrmConversationRefreshGateDecision(
+                inFlight = !scrmConversationRefreshInFlight.compareAndSet(false, true)
+            ) == ScrmConversationRefreshGate.QueuePending
+        ) {
+            scrmConversationRefreshPending.set(true)
+            return
+        }
+        scrmConversationExecutor.execute {
+            val result = runCatching { loadScrmConversationFromApi() }
+            mainHandler.post {
+                result.onSuccess { nextConversation ->
+                    applyScrmConversation(nextConversation)
+                    scheduleScrmConversationBackgroundPrefetch()
+                }.onFailure { error ->
+                    Log.w(TAG, "failed to refresh SCRM floating chat conversation", error)
+                }
+                scrmConversationRefreshInFlight.set(false)
+                if (scrmConversationRefreshPending.getAndSet(false)) {
+                    refreshScrmConversationFromApi()
+                }
+            }
+        }
+    }
+
+    private fun scheduleScrmConversationRefreshAfterAccountSwitch() {
+        clearScheduledScrmConversationRefresh()
+        val refresh = Runnable {
+            scheduledScrmConversationRefresh = null
+            refreshScrmConversationFromApi()
+        }
+        scheduledScrmConversationRefresh = refresh
+        mainHandler.postDelayed(refresh, scrmAccountSwitchRefreshDebounceMillis().toLong())
+    }
+
+    private fun clearScheduledScrmConversationRefresh() {
+        scheduledScrmConversationRefresh?.let { pendingRefresh ->
+            mainHandler.removeCallbacks(pendingRefresh)
+        }
+        scheduledScrmConversationRefresh = null
+    }
+
+    private fun scheduleScrmConversationBackgroundPrefetch() {
+        clearScheduledScrmBackgroundPrefetch()
+        val prefetch = Runnable {
+            scheduledScrmBackgroundPrefetch = null
+            prefetchNextScrmAccountConversationFromApi()
+        }
+        scheduledScrmBackgroundPrefetch = prefetch
+        mainHandler.postDelayed(prefetch, scrmBackgroundPrefetchDelayMillis().toLong())
+    }
+
+    private fun clearScheduledScrmBackgroundPrefetch() {
+        scheduledScrmBackgroundPrefetch?.let { pendingPrefetch ->
+            mainHandler.removeCallbacks(pendingPrefetch)
+        }
+        scheduledScrmBackgroundPrefetch = null
+    }
+
+    private fun prefetchNextScrmAccountConversationFromApi() {
+        if (!scrmConversationRefreshInFlight.compareAndSet(false, true)) return
+        scrmConversationExecutor.execute {
+            val result = runCatching { loadNextScrmPrefetchConversationFromApi() }
+            mainHandler.post {
+                result.onSuccess { nextConversation ->
+                    if (nextConversation != null) {
+                        applyScrmConversation(nextConversation)
+                        scheduleScrmConversationBackgroundPrefetch()
+                    }
+                }.onFailure { error ->
+                    Log.w(TAG, "failed to prefetch SCRM floating chat conversation", error)
+                }
+                scrmConversationRefreshInFlight.set(false)
+                if (scrmConversationRefreshPending.getAndSet(false)) {
+                    refreshScrmConversationFromApi()
+                }
+            }
+        }
+    }
+
+    private fun loadScrmConversationFromApi(): com.paifa.ubikitouch.core.model.FloatingChatConversation {
+        return try {
+            loadScrmConversationForSession(scrmSettingsManager.loadSelectedSessionOrBootstrap())
+        } catch (error: ScrmAuthenticationException) {
+            when (scrmSettingsManager.bootstrapWithBundledAdminCredentials()) {
+                is ScrmAdminBootstrapResult.Success -> {
+                    loadScrmConversationForSession(scrmSettingsManager.loadSelectedSessionOrBootstrap())
+                }
+                is ScrmAdminBootstrapResult.Failure,
+                null -> throw error
+            }
+        }
+    }
+
+    private fun loadNextScrmPrefetchConversationFromApi(): com.paifa.ubikitouch.core.model.FloatingChatConversation? {
+        val session = scrmSettingsManager.loadSelectedSessionOrBootstrap()
+        val devices = session.readApi.getDevices()
+        val accounts = session.readApi.getWechatAccounts()
+        val selectedRoute = scrmFloatingAccountRouteForSelection(
+            selectedAccountId = selectedAccountId,
+            fallbackDeviceUuid = session.deviceUuid,
+            fallbackWeChatId = session.weChatId
+        )
+        val route = scrmBackgroundPrefetchRoutesToLoad(
+            accounts = accounts,
+            devices = devices,
+            selectedRoute = selectedRoute,
+            cachedRouteKeys = cachedScrmAccountConversations.keys,
+            maxRoutes = scrmBackgroundPrefetchMaxRoutesPerPass()
+        ).firstOrNull() ?: return null
+        val accountConversation = loadScrmAccountConversation(
+            session = session,
+            route = route
+        )
+        cachedScrmAccountConversations[scrmAccountConversationCacheKey(accountConversation)] = accountConversation
+        val accountConversations = mergeScrmAccountConversationCache(
+            cachedConversations = cachedScrmAccountConversations.values,
+            loadedConversations = listOf(accountConversation)
+        )
+        return scrmFloatingChatConversation(
+            base = FloatingChatPrototype.sampleConversation(),
+            contacts = emptyList(),
+            accountConversations = accountConversations,
+            accounts = accounts,
+            devices = devices,
+            selectedDeviceUuid = selectedRoute.deviceUuid,
+            selectedWeChatId = selectedRoute.weChatId
+        )
+    }
+
+    private fun loadScrmConversationForSession(
+        session: ScrmSelectedSession
+    ): com.paifa.ubikitouch.core.model.FloatingChatConversation {
+        val devices = session.readApi.getDevices()
+        val accounts = session.readApi.getWechatAccounts()
+        val selectedRoute = scrmFloatingAccountRouteForSelection(
+            selectedAccountId = selectedAccountId,
+            fallbackDeviceUuid = session.deviceUuid,
+            fallbackWeChatId = session.weChatId
+        )
+        val loadedAccountConversations = scrmInitialConversationRoutesToLoad(
+            accounts = accounts,
+            devices = devices,
+            selectedRoute = selectedRoute,
+            cachedRouteKeys = cachedScrmAccountConversations.keys
+        ).map { route ->
+            loadScrmAccountConversation(
+                session = session,
+                route = route
+            )
+        }
+        loadedAccountConversations.forEach { accountConversation ->
+            cachedScrmAccountConversations[scrmAccountConversationCacheKey(accountConversation)] = accountConversation
+        }
+        val accountConversations = mergeScrmAccountConversationCache(
+            cachedConversations = cachedScrmAccountConversations.values,
+            loadedConversations = loadedAccountConversations
+        )
+        return scrmFloatingChatConversation(
+            base = FloatingChatPrototype.sampleConversation(),
+            contacts = emptyList(),
+            accountConversations = accountConversations,
+            accounts = accounts,
+            devices = devices,
+            selectedDeviceUuid = selectedRoute.deviceUuid,
+            selectedWeChatId = selectedRoute.weChatId
+        )
+    }
+
+    private fun loadScrmAccountConversation(
+        session: ScrmSelectedSession,
+        route: ScrmFloatingAccountRoute
+    ): ScrmFloatingAccountConversation {
+        val chatRooms = loadAllScrmChatRooms(session, route.weChatId)
+        return ScrmFloatingAccountConversation(
+            deviceUuid = route.deviceUuid,
+            weChatId = route.weChatId,
+            contacts = loadAllScrmContacts(session, route.weChatId),
+            chatRooms = chatRooms,
+            chatRoomMembers = loadScrmChatRoomMembersForAvatar(
+                session = session,
+                weChatId = route.weChatId,
+                chatRooms = chatRooms
+            )
+        )
+    }
+
+    private fun loadScrmChatRoomMembersForAvatar(
+        session: ScrmSelectedSession,
+        weChatId: String,
+        chatRooms: List<ScrmChatRoom>
+    ): Map<String, List<ScrmChatRoomMember>> {
+        val membersByRoomId = linkedMapOf<String, List<ScrmChatRoomMember>>()
+        chatRooms.forEach { chatRoom ->
+            val chatRoomId = chatRoom.chatRoomId?.takeIf { it.isNotBlank() } ?: return@forEach
+            val page = session.chatRoomApi.getChatRoomMembers(
+                chatRoomId = chatRoomId,
+                query = ScrmChatRoomMemberQuery(
+                    weChatId = weChatId,
+                    page = 1,
+                    pageSize = ScrmGroupAvatarMemberPageSize,
+                    includeDeleted = false
+                )
+            )
+            membersByRoomId[chatRoomId] = page.items
+        }
+        return membersByRoomId
+    }
+
+    private fun loadAllScrmContacts(
+        session: ScrmSelectedSession,
+        weChatId: String
+    ): List<ScrmContact> {
+        val allContacts = mutableListOf<ScrmContact>()
+        var pageNumber = 1
+        do {
+            val page = session.contactApi.getContacts(
+                scrmConversationContactQuery(
+                    weChatId = weChatId,
+                    pageNumber = pageNumber
+                )
+            )
+            allContacts += page.items
+            pageNumber += 1
+        } while (shouldRequestNextScrmConversationPage(
+                returnedItemCount = page.items.size,
+                loadedItemCount = allContacts.size,
+                totalCount = page.totalCount,
+                pageSize = ScrmConversationPageSize
+            )
+        )
+        return allContacts
+    }
+
+    private fun loadAllScrmChatRooms(
+        session: ScrmSelectedSession,
+        weChatId: String
+    ): List<ScrmChatRoom> {
+        val allChatRooms = mutableListOf<ScrmChatRoom>()
+        var pageNumber = 1
+        do {
+            val page = session.chatRoomApi.getChatRooms(
+                ScrmChatRoomQuery(
+                    weChatId = weChatId,
+                    page = pageNumber,
+                    pageSize = ScrmConversationPageSize,
+                    includeDeleted = false
+                )
+            )
+            allChatRooms += page.items
+            pageNumber += 1
+        } while (shouldRequestNextScrmConversationPage(
+                returnedItemCount = page.items.size,
+                loadedItemCount = allChatRooms.size,
+                totalCount = page.totalCount,
+                pageSize = ScrmConversationPageSize
+            )
+        )
+        return allChatRooms
+    }
+
+    private fun applyScrmConversation(
+        nextConversation: com.paifa.ubikitouch.core.model.FloatingChatConversation
+    ) {
+        conversation = nextConversation
+        selectedAccountId = nextConversation.accountContacts.firstOrNull { account -> account.selected }?.id
+            ?: nextConversation.accountContacts.firstOrNull()?.id
+            ?: selectedAccountId
+        if (!toolThreadSelectionExists(nextConversation, selectedThread)) {
+            selectedThread = defaultToolThreadSelection(nextConversation)
+        }
+        val nextThreadSelection = selectedThread.toChatThreadSelection()
+        runtimeState.deliverConversationUpdate(
+            conversation = nextConversation,
+            selectedAccountId = selectedAccountId,
+            selectedThread = nextThreadSelection
+        )
+        refreshLocalMessagesFromStore()
+        if (
+            state == FloatingChatOverlayState.Expanded &&
+            scrmConversationRefreshRecreatesExpandedFloatingChatOverlay()
+        ) {
+            showState(FloatingChatOverlayState.Expanded, force = true)
+        }
+    }
+
+    private fun toolThreadSelectionExists(
+        conversation: com.paifa.ubikitouch.core.model.FloatingChatConversation,
+        selection: FloatingChatPrototype.ToolThreadSelection
+    ): Boolean {
+        return when (selection) {
+            FloatingChatPrototype.ToolThreadSelection.Group -> {
+                conversation.groupContacts.isEmpty() && conversation.contacts.isEmpty()
+            }
+            is FloatingChatPrototype.ToolThreadSelection.GroupChat -> {
+                conversation.groupContacts.any { group -> group.id == selection.groupId }
+            }
+            is FloatingChatPrototype.ToolThreadSelection.Private -> {
+                conversation.contacts.any { contact -> contact.id == selection.contactId }
+            }
+        }
     }
 
     private fun persistMomentPost(post: AppMomentPost) {
@@ -965,6 +1354,8 @@ internal class FloatingChatOverlayController(
         const val TAG = "UbikiTouch"
         const val EXTRA_EXTERNAL_DOCUMENT_URI = "floating_chat_external_document_uri"
         const val EXTRA_EXTERNAL_DOCUMENT_MIME_TYPE = "floating_chat_external_document_mime_type"
+        const val ScrmConversationPageSize = 200
+        const val ScrmGroupAvatarMemberPageSize = 9
     }
 }
 
@@ -1007,4 +1398,142 @@ internal fun floatingChatShouldRefreshExpandedWindowZOrder(
     return false
 }
 
+internal fun scrmConversationRefreshRecreatesExpandedFloatingChatOverlay(): Boolean = false
+
 internal fun floatingChatOverlayHidesSemanticsFromItsOwningAccessibilityService(): Boolean = true
+
+internal fun scrmInitialConversationRoutesToLoad(
+    accounts: List<ScrmWechatAccount>,
+    devices: List<ScrmDevice>,
+    selectedRoute: ScrmFloatingAccountRoute,
+    cachedRouteKeys: Set<String> = emptySet()
+): List<ScrmFloatingAccountRoute> {
+    require(selectedRoute.deviceUuid.isNotBlank()) { "selected deviceUuid cannot be blank" }
+    require(selectedRoute.weChatId.isNotBlank()) { "selected weChatId cannot be blank" }
+    if (scrmAccountRouteCacheKey(selectedRoute) in cachedRouteKeys) return emptyList()
+    return listOf(selectedRoute)
+}
+
+internal fun floatingChatPersistedMessageThreadIdsForSelection(
+    selection: FloatingChatPrototype.ToolThreadSelection
+): Set<String> {
+    return when (selection) {
+        FloatingChatPrototype.ToolThreadSelection.Group -> setOf(localThreadIdForSelection())
+        is FloatingChatPrototype.ToolThreadSelection.GroupChat -> {
+            setOf(localThreadIdForSelection(groupId = selection.groupId))
+        }
+        is FloatingChatPrototype.ToolThreadSelection.Private -> {
+            setOf(localThreadIdForSelection(privateContactId = selection.contactId))
+        }
+    }
+}
+
+internal fun shouldRequestNextScrmConversationPage(
+    returnedItemCount: Int,
+    loadedItemCount: Int,
+    totalCount: Int,
+    pageSize: Int
+): Boolean {
+    if (returnedItemCount <= 0) return false
+    if (totalCount > 0) return loadedItemCount < totalCount
+    return returnedItemCount >= pageSize.coerceAtLeast(1)
+}
+
+internal fun scrmConversationContactQuery(
+    weChatId: String,
+    pageNumber: Int
+): ScrmContactQuery {
+    return ScrmContactQuery(
+        weChatId = weChatId,
+        page = pageNumber,
+        pageSize = scrmConversationPageSize(),
+        onlyFriends = true,
+        includeProfile = true
+    )
+}
+
+internal fun scrmConversationPageSize(): Int = 200
+
+internal enum class ScrmConversationRefreshGate {
+    StartNow,
+    QueuePending
+}
+
+internal fun scrmConversationRefreshGateDecision(inFlight: Boolean): ScrmConversationRefreshGate {
+    return if (inFlight) {
+        ScrmConversationRefreshGate.QueuePending
+    } else {
+        ScrmConversationRefreshGate.StartNow
+    }
+}
+
+internal fun scrmAccountSwitchRefreshDebounceMillis(): Int = 260
+
+internal fun scrmBackgroundPrefetchDelayMillis(): Int = 700
+
+internal fun scrmBackgroundPrefetchMaxRoutesPerPass(): Int = 1
+
+internal fun scrmBackgroundPrefetchRoutesToLoad(
+    accounts: List<ScrmWechatAccount>,
+    devices: List<ScrmDevice>,
+    selectedRoute: ScrmFloatingAccountRoute,
+    cachedRouteKeys: Set<String>,
+    maxRoutes: Int
+): List<ScrmFloatingAccountRoute> {
+    if (maxRoutes <= 0) return emptyList()
+    val devicesByWechatId = devices
+        .mapNotNull { device ->
+            val weChatId = device.weChatId?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            weChatId to device
+        }
+        .toMap()
+    val routesByKey = linkedMapOf<String, ScrmFloatingAccountRoute>()
+    accounts.forEach { account ->
+        val weChatId = account.wxid?.takeIf { it.isNotBlank() } ?: return@forEach
+        val deviceUuid = account.clientUuid?.takeIf { it.isNotBlank() }
+            ?: devicesByWechatId[weChatId]?.uuid?.takeIf { it.isNotBlank() }
+            ?: return@forEach
+        val route = ScrmFloatingAccountRoute(deviceUuid = deviceUuid, weChatId = weChatId)
+        routesByKey.putIfAbsent(scrmAccountRouteCacheKey(route), route)
+    }
+    devices.forEach { device ->
+        val deviceUuid = device.uuid?.takeIf { it.isNotBlank() } ?: return@forEach
+        val weChatId = device.weChatId?.takeIf { it.isNotBlank() } ?: return@forEach
+        val route = ScrmFloatingAccountRoute(deviceUuid = deviceUuid, weChatId = weChatId)
+        routesByKey.putIfAbsent(scrmAccountRouteCacheKey(route), route)
+    }
+    val selectedKey = scrmAccountRouteCacheKey(selectedRoute)
+    return routesByKey
+        .filterKeys { routeKey -> routeKey != selectedKey && routeKey !in cachedRouteKeys }
+        .values
+        .take(maxRoutes)
+}
+
+internal fun mergeScrmAccountConversationCache(
+    cachedConversations: Collection<ScrmFloatingAccountConversation>,
+    loadedConversations: Collection<ScrmFloatingAccountConversation>
+): List<ScrmFloatingAccountConversation> {
+    val conversationsByRoute = linkedMapOf<String, ScrmFloatingAccountConversation>()
+    cachedConversations.forEach { conversation ->
+        conversationsByRoute[scrmAccountConversationCacheKey(conversation)] = conversation
+    }
+    loadedConversations.forEach { conversation ->
+        conversationsByRoute[scrmAccountConversationCacheKey(conversation)] = conversation
+    }
+    return conversationsByRoute.values.toList()
+}
+
+private fun scrmAccountConversationCacheKey(
+    conversation: ScrmFloatingAccountConversation
+): String {
+    return scrmAccountRouteCacheKey(
+        ScrmFloatingAccountRoute(
+            deviceUuid = conversation.deviceUuid,
+            weChatId = conversation.weChatId
+        )
+    )
+}
+
+internal fun scrmAccountRouteCacheKey(route: ScrmFloatingAccountRoute): String {
+    return "${route.deviceUuid}\n${route.weChatId}"
+}

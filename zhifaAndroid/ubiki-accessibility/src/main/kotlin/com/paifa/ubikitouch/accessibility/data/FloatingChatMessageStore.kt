@@ -162,6 +162,26 @@ internal class FloatingChatMessageStore(
         }
     }
 
+    fun recentFloatingMessages(limit: Int = 500): List<FloatingChatMessage> {
+        val safeLimit = limit.coerceIn(1, 500)
+        return database.readableDatabase.query(
+            FloatingChatDatabaseContract.tableMessages,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "created_at DESC",
+            safeLimit.toString()
+        ).use { cursor ->
+            buildList {
+                while (cursor.moveToNext()) {
+                    add(cursor.toLocalChatMessage().toFloatingChatMessage())
+                }
+            }.asReversed()
+        }
+    }
+
     fun messageFileRefs(messageId: String): List<LocalChatMessageFileRef> {
         return database.readableDatabase.query(
             FloatingChatDatabaseContract.tableMessageFiles,

@@ -11,8 +11,13 @@ internal class ScrmHttpRequest(
     val url: String,
     val headers: Map<String, String>,
     val body: String? = null,
+    val bodyBytes: ByteArray? = null,
     private val safeRoute: String = "<redacted>"
 ) {
+    init {
+        require(body == null || bodyBytes == null) { "request cannot have both body and bodyBytes" }
+    }
+
     override fun toString(): String {
         val safeHeaders = headers.entries.joinToString(", ") { (name, value) ->
             val renderedValue = if (name.lowercase() in SensitiveHeaderNames) "****" else value
@@ -55,11 +60,11 @@ internal class HttpUrlConnectionScrmTransport(
             request.headers.forEach { (name, value) ->
                 connection.setRequestProperty(name, value)
             }
-            request.body?.let { body ->
+            val bytes = request.body?.toByteArray(StandardCharsets.UTF_8) ?: request.bodyBytes
+            bytes?.let { bodyBytes ->
                 connection.doOutput = true
-                val bytes = body.toByteArray(StandardCharsets.UTF_8)
-                connection.setRequestProperty("Content-Length", bytes.size.toString())
-                connection.outputStream.use { output -> output.write(bytes) }
+                connection.setRequestProperty("Content-Length", bodyBytes.size.toString())
+                connection.outputStream.use { output -> output.write(bodyBytes) }
             }
 
             val statusCode = connection.responseCode

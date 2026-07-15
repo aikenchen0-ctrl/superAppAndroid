@@ -5,6 +5,7 @@ import com.paifa.ubikitouch.core.model.FloatingChatToolAction
 import com.paifa.ubikitouch.core.model.FloatingChatPrototype
 import com.paifa.ubikitouch.core.model.FloatingChatConnectionTarget
 import com.paifa.ubikitouch.core.model.FloatingChatContact
+import com.paifa.ubikitouch.core.model.FloatingChatConversation
 import com.paifa.ubikitouch.core.model.FloatingChatFileFormat
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import com.paifa.ubikitouch.core.model.FloatingChatMessagePresentation
@@ -14,7 +15,15 @@ import com.paifa.ubikitouch.core.model.FloatingChatContactCardKind
 import com.paifa.ubikitouch.core.model.GestureAction
 import com.paifa.ubikitouch.core.model.gestureMappingOrder
 import com.paifa.ubikitouch.accessibility.data.LocalGroupProfile
+import com.paifa.ubikitouch.accessibility.scrm.ScrmRecentTaskResults
+import com.paifa.ubikitouch.accessibility.scrm.ScrmRequestException
+import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskApi
+import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskResult
+import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskSubmissionResult
+import com.paifa.ubikitouch.accessibility.scrm.ScrmFloatingAccountRoute
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class FloatingChatMessageUiContractTest {
@@ -48,6 +57,7 @@ class FloatingChatMessageUiContractTest {
         assertEquals("已发送", scrmSendStatusTextFor(succeeded))
         assertEquals("发送失败：无权限发送", scrmSendStatusTextFor(failed))
         assertEquals(null, scrmSendStatusTextFor(localOnly))
+        assertEquals(true, scrmSendStatusRendersOutsideMessageBubble())
     }
 
     @Test
@@ -68,6 +78,20 @@ class FloatingChatMessageUiContractTest {
         assertEquals(false, shouldRetargetMessageList(first, first))
         assertEquals(0, messageListInitialFirstVisibleItemIndex(messageCount = 0))
         assertEquals(4, messageListInitialFirstVisibleItemIndex(messageCount = 5))
+        assertEquals(
+            0,
+            messageListInitialFirstVisibleItemIndex(
+                messageCount = 5,
+                homeOverviewVisible = true
+            )
+        )
+        assertEquals(
+            4,
+            messageListInitialFirstVisibleItemIndex(
+                messageCount = 5,
+                homeOverviewVisible = false
+            )
+        )
         assertEquals(
             messageListReusableContentType(FloatingChatMessageType.Text),
             messageListReusableContentType(FloatingChatMessageType.FilePreview)
@@ -151,7 +175,7 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
-    fun nativeTouchExplorationRunsOnlyWhileFloatingChatIsCollapsed() {
+    fun nativeTouchExplorationKeepsSystemEdgeGesturesWhileFloatingChatIsExpanded() {
         val enabled = NativeTouchInteractionEligibility(
             sdkInt = 34,
             requestedMode = GestureInputMode.Auto,
@@ -165,8 +189,8 @@ class FloatingChatMessageUiContractTest {
         )
 
         assertEquals(true, shouldRequestNativeTouchInteraction(enabled, floatingChatExpanded = false))
-        assertEquals(false, shouldRequestNativeTouchInteraction(enabled, floatingChatExpanded = true))
-        assertEquals(false, nativeTouchRecoveryNeeded(floatingChatExpanded = true, controllerRunning = false))
+        assertEquals(true, shouldRequestNativeTouchInteraction(enabled, floatingChatExpanded = true))
+        assertEquals(true, nativeTouchRecoveryNeeded(floatingChatExpanded = true, controllerRunning = false))
         assertEquals(true, nativeTouchRecoveryNeeded(floatingChatExpanded = false, controllerRunning = false))
         assertEquals(false, nativeTouchRecoveryNeeded(floatingChatExpanded = false, controllerRunning = true))
         assertEquals(
@@ -208,7 +232,7 @@ class FloatingChatMessageUiContractTest {
             )
         )
         assertEquals(
-            false,
+            true,
             shouldRequestNativeTouchInteraction(
                 eligibility = enabled,
                 floatingChatExpanded = true,
@@ -367,7 +391,7 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
-    fun nativeTouchInterceptsOnlyConfiguredEdgesWhenCollapsedAndNothingWhenChatExpanded() {
+    fun nativeTouchLeavesExpandedChatEdgesToInternalGestureSurface() {
         val leftConfig = com.paifa.ubikitouch.core.model.EdgeZoneConfig(
             side = com.paifa.ubikitouch.core.model.EdgeSide.LEFT,
             zoneId = 0,
@@ -415,7 +439,7 @@ class FloatingChatMessageUiContractTest {
             nativeTouchInterceptRects(config, floatingChatExpanded = false)
         )
         assertEquals(
-            emptyList<NativeTouchInterceptRect>(),
+            nativeTouchInterceptRects(config, floatingChatExpanded = false),
             nativeTouchInterceptRects(config, floatingChatExpanded = true)
         )
     }
@@ -499,6 +523,110 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
+    fun groupChatAvatarUsesWechatStyleNineGridMemberImages() {
+        val group = FloatingChatContact(
+            id = "group",
+            name = "Group",
+            initials = "G",
+            description = "Group",
+            avatarColor = 0xFF5B7CFA,
+            avatarUrl = "https://cdn.example.com/group.png",
+            groupMemberAvatarUrls = (1..10).map { index -> "https://cdn.example.com/member-$index.png" }
+        )
+
+        assertEquals(9, groupChatAvatarGridMaxMembers())
+        assertEquals(
+            (1..9).map { index -> "https://cdn.example.com/member-$index.png" },
+            groupChatAvatarGridImageUris(group)
+        )
+        assertEquals(
+            (1..9).map { index -> "https://cdn.example.com/member-$index.png" },
+            groupChatAvatarDisplayImageUris(group)
+        )
+        assertEquals(true, groupChatAvatarUsesNineGridMemberImages())
+    }
+
+    @Test
+    fun groupChatAvatarFallsBackToRemoteRoomAvatarWhenMemberImagesAreMissing() {
+        val group = FloatingChatContact(
+            id = "group",
+            name = "Group",
+            initials = "G",
+            description = "Group",
+            avatarColor = 0xFF5B7CFA,
+            avatarUrl = "http://mmbiz.qpic.cn/room-avatar.png"
+        )
+
+        assertEquals(emptyList<String>(), groupChatAvatarGridImageUris(group))
+        assertEquals(
+            listOf("https://mmbiz.qpic.cn/room-avatar.png"),
+            groupChatAvatarDisplayImageUris(group)
+        )
+        assertEquals(true, groupChatAvatarSingleFallbackImageFillsTile())
+    }
+
+    @Test
+    fun blankLocalAvatarDoesNotMaskRemoteApiAvatar() {
+        assertEquals(
+            "https://cdn.example.com/account.png",
+            resolvedAvatarImageUri(
+                localImageUri = "",
+                remoteAvatarUrl = "https://cdn.example.com/account.png"
+            )
+        )
+        assertEquals(
+            "content://local/account.png",
+            resolvedAvatarImageUri(
+                localImageUri = "content://local/account.png",
+                remoteAvatarUrl = "https://cdn.example.com/account.png"
+            )
+        )
+    }
+
+    @Test
+    fun runtimeConversationUpdateCarriesRefreshedAccountAndThreadState() {
+        val state = FloatingChatOverlayRuntimeState()
+        val conversation = FloatingChatConversation(
+            peerName = "Account B",
+            accountName = "Account B",
+            contacts = listOf(
+                FloatingChatContact("account-b::contact-1", "Contact 1", "C1", "Account B", 0xFF1B9AAA)
+            ),
+            accountContacts = listOf(
+                FloatingChatContact("account-a", "Account A", "A", "Account", 0xFF3A86FF),
+                FloatingChatContact("account-b", "Account B", "B", "Account", 0xFF06D6A0, selected = true)
+            ),
+            messages = emptyList(),
+            toolActions = emptyList(),
+            groupContacts = listOf(
+                FloatingChatContact("account-b::group-1", "Group 1", "G1", "Account B", 0xFF5B7CFA)
+            )
+        )
+
+        state.deliverConversationUpdate(
+            conversation = conversation,
+            selectedAccountId = "account-b",
+            selectedThread = ChatThreadSelection.GroupChat("account-b::group-1")
+        )
+        val firstEvent = state.conversationUpdateEvent
+
+        assertEquals(conversation, firstEvent?.conversation)
+        assertEquals("account-b", firstEvent?.selectedAccountId)
+        assertEquals(ChatThreadSelection.GroupChat("account-b::group-1"), firstEvent?.selectedThread)
+        assertEquals(ChatThreadSelection.GroupChat("account-b::group-1"), state.selectedThread)
+
+        state.deliverConversationUpdate(
+            conversation = conversation,
+            selectedAccountId = "account-a",
+            selectedThread = ChatThreadSelection.Private("account-a::contact-1")
+        )
+
+        assertEquals((firstEvent?.token ?: 0L) + 1L, state.conversationUpdateEvent?.token)
+        state.clearConversationUpdate(state.conversationUpdateEvent?.token ?: -1L)
+        assertEquals(null, state.conversationUpdateEvent)
+    }
+
+    @Test
     fun groupChatUserConnectorsUseMemberRailInsteadOfSessionRail() {
         assertEquals(
             ConnectorAvatarLane.GroupMember,
@@ -537,6 +665,80 @@ class FloatingChatMessageUiContractTest {
         assertEquals(true, isLocalMediaUri("file:///data/user/0/com.paifa.ubikitouch/cache/floating-chat/image.jpg"))
         assertEquals(false, isLocalMediaUri("https://aiff.app/images/demo.jpg"))
         assertEquals(false, isLocalMediaUri(null))
+    }
+
+    @Test
+    fun remoteAvatarLoadingUsesBoundedNetworkAndMemoryLimits() {
+        assertEquals(true, isRemoteImageUri("https://example.com/avatar.jpg"))
+        assertEquals(true, isRemoteImageUri("http://112.74.164.233/avatar.jpg"))
+        assertEquals(
+            "https://mmbiz.qpic.cn/mmhead/avatar.jpg",
+            normalizedRemoteImageUri("http://mmbiz.qpic.cn/mmhead/avatar.jpg")
+        )
+        assertEquals(
+            "https://wx.qlogo.cn/mmhead/avatar.jpg",
+            normalizedRemoteImageUri("http://wx.qlogo.cn/mmhead/avatar.jpg")
+        )
+        assertEquals(
+            "http://112.74.164.233/avatar.jpg",
+            normalizedRemoteImageUri("http://112.74.164.233/avatar.jpg")
+        )
+        assertEquals(null, normalizedRemoteImageUri(null))
+        assertEquals(2_500, remoteImageConnectTimeoutMillis())
+        assertEquals(3_500, remoteImageReadTimeoutMillis())
+        assertEquals(2 * 1024 * 1024, remoteImageMaxBytes())
+        assertEquals(96, avatarImageDecodeMaxSizePx())
+        assertEquals(true, avatarImageLoadsUseDedicatedSmallDecodeSize())
+        assertEquals(2, remoteAvatarMaxConcurrentLoads())
+        assertEquals(10 * 60 * 1000, remoteImageFailureRetryDelayMillis())
+        assertEquals(
+            true,
+            remoteImageRetrySuppressedByRecentFailure(
+                lastFailureUptimeMillis = 10_000L,
+                nowUptimeMillis = 12_000L,
+                retryDelayMillis = remoteImageFailureRetryDelayMillis().toLong()
+            )
+        )
+        assertEquals(
+            false,
+            remoteImageRetrySuppressedByRecentFailure(
+                lastFailureUptimeMillis = 10_000L,
+                nowUptimeMillis = 10_000L + remoteImageFailureRetryDelayMillis() + 1L,
+                retryDelayMillis = remoteImageFailureRetryDelayMillis().toLong()
+            )
+        )
+    }
+
+    @Test
+    fun leftRailDropsDuplicateSessionItemsBeforeLazyColumnKeysAreBuilt() {
+        val duplicateContact = FloatingChatContact(
+            id = "contact-scrm-account:a8f5bb37d42cc17e:wxid_os5j5pjwy5so22__scrm-contact:qq-13462583081",
+            name = "Duplicate",
+            initials = "D",
+            description = "Friend",
+            avatarColor = 0xFF1B9AAA
+        )
+        val duplicateGroup = FloatingChatContact(
+            id = "account__scrm-group:room@chatroom",
+            name = "Room",
+            initials = "R",
+            description = "Group",
+            avatarColor = 0xFF5B7CFA
+        )
+
+        val keys = sessionRailItemKeys(
+            groups = listOf(duplicateGroup, duplicateGroup.copy(avatarUrl = "https://cdn.example.com/room.png")),
+            contacts = listOf(duplicateContact, duplicateContact.copy(avatarUrl = "https://cdn.example.com/contact.png"))
+        )
+
+        assertEquals(keys.distinct(), keys)
+        assertEquals(2, keys.size)
+    }
+
+    @Test
+    fun allAccountHomeOverviewAggregationIsDeferredUntilHomeIsVisible() {
+        assertEquals(false, shouldBuildAllAccountHomeOverview(homeOverviewVisible = false))
+        assertEquals(true, shouldBuildAllAccountHomeOverview(homeOverviewVisible = true))
     }
 
     @Test
@@ -627,6 +829,125 @@ class FloatingChatMessageUiContractTest {
         assertEquals(true, momentsTimelineMediaOpensFullscreenPreview())
         assertEquals(true, momentsTimelineKeepsCurrentPageForTextAndActions())
         assertEquals(true, momentsTimelineReusesChatMediaPreview())
+    }
+
+    @Test
+    fun momentsTimelineUsesScrmDataInsteadOfSimulatedDefaults() {
+        assertEquals(true, momentsTimelineUsesRemoteScrmSource())
+        assertEquals(false, momentsTimelineSeedsWechatSimulationPosts())
+
+        val data = Json.parseToJsonElement(
+            """
+            {
+              "moments": [{
+                "circleId": 123,
+                "nickname": "Alice",
+                "content": "real moment",
+                "publishTime": 1710000000,
+                "images": ["https://cdn.example.com/moment.jpg"],
+                "likedBy": ["Bob"],
+                "comments": [{"nickname":"Cindy","content":"nice"}]
+              }]
+            }
+            """.trimIndent()
+        )
+        val posts = scrmMomentPostsFromTaskData(data)
+
+        assertEquals(1, posts.size)
+        assertEquals("scrm-moment:123", posts.single().id)
+        assertEquals(123L, scrmCircleIdForMomentPostId(posts.single().id))
+        assertEquals("Alice", posts.single().author)
+        assertEquals("real moment", posts.single().content)
+        assertEquals(MomentMediaKind.Image, posts.single().media?.kind)
+        assertEquals("https://cdn.example.com/moment.jpg", posts.single().media?.uri)
+        assertEquals(listOf("Bob"), posts.single().likedBy)
+        assertEquals(AppMomentComment("Cindy", "nice"), posts.single().comments.single())
+    }
+
+    @Test
+    fun scrmMomentParserDropsSyntheticSnsSendOkComments() {
+        val data = Json.parseToJsonElement(
+            """
+            {
+              "moments": [{
+                "circleId": 124,
+                "nickname": "Alice",
+                "content": "real moment",
+                "comments": [
+                  {"nickname":"Alice","content":"sns_send_ok"},
+                  {"nickname":"Bob","content":"real reply"}
+                ]
+              }]
+            }
+            """.trimIndent()
+        )
+
+        val post = scrmMomentPostsFromTaskData(data).single()
+
+        assertEquals(listOf(AppMomentComment("Bob", "real reply")), post.comments)
+    }
+
+    @Test
+    fun submittedMomentLocalPostShowsDraftWithoutSyntheticComment() {
+        val media = AppMomentMedia(
+            kind = MomentMediaKind.Image,
+            uri = "content://local/moment.jpg",
+            previewUri = "content://local/moment-preview.jpg",
+            label = "moment.jpg"
+        )
+
+        val post = localScrmMomentPostForSubmittedDraft(
+            clientRequestId = "moment-request-1",
+            weChatId = "wxid_account",
+            content = " posted body ",
+            media = media,
+            createdAt = 123L
+        )
+
+        assertEquals("local-scrm-moment:moment-request-1", post.id)
+        assertEquals("\u6211", post.author)
+        assertEquals("posted body", post.content)
+        assertEquals(media, post.media)
+        assertEquals(123L, post.createdAt)
+        assertEquals(emptyList<AppMomentComment>(), post.comments)
+        assertFalse(post.comments.any { comment -> comment.text == "sns_send_ok" })
+    }
+
+    @Test
+    fun momentPublishCanTreatMissingRecentTaskResultAsAcceptedPending() {
+        val taskApi = object : ScrmTaskApi {
+            override fun getTask(taskId: Long): ScrmTaskResult {
+                throw ScrmRequestException(
+                    statusCode = 404,
+                    message = "未找到该 taskId 的近期结果，可能 Android 尚未回包"
+                )
+            }
+
+            override fun getRecentTasks(
+                deviceUuid: String?,
+                count: Int
+            ): ScrmRecentTaskResults {
+                return ScrmRecentTaskResults(count = count)
+            }
+        }
+
+        val outcome = submitScrmMomentTaskAndAwait(
+            taskApi = taskApi,
+            treatMissingRecentTaskAsAccepted = true,
+            maxPollAttempts = 1,
+            sleepMillis = {}
+        ) {
+            ScrmTaskSubmissionResult(
+                taskId = 301L,
+                success = true,
+                message = "accepted"
+            )
+        }
+
+        assertEquals(301L, outcome.taskId)
+        assertEquals(false, outcome.completed)
+        assertEquals(emptyList<Any>(), outcome.data)
+        assertEquals(true, outcome.message.contains("301"))
     }
 
     @Test
@@ -992,8 +1313,11 @@ class FloatingChatMessageUiContractTest {
         assertEquals(280, leftRailFollowTextWidthDp())
         assertEquals(322, leftRailFollowTextLayerWidthDp())
         assertEquals(56, leftRailTouchableWidthDp())
+        assertEquals(8, railScreenEdgeInsetPx())
+        assertEquals(8, leftRailAvatarScreenEdgeInsetPx())
         assertEquals(0, leftRailFollowTextInnerPaddingDp())
         assertEquals(true, leftRailFollowTextStartsAtAvatarRightEdge())
+        assertEquals(true, leftRailFollowTextIncludesScreenEdgeInset())
         assertEquals(true, leftRailFollowTextUsesAvatarTopAlignment())
         assertEquals(true, leftRailFollowTextUsesLiveAvatarBounds())
         assertEquals(true, leftRailFollowTextYMatchesAvatarBounds())
@@ -1282,7 +1606,7 @@ class FloatingChatMessageUiContractTest {
         )
         assertEquals(BottomInputAction.Home, bottomInputLeadingAction(inputFocused = false))
         assertEquals(BottomInputAction.Emoji, bottomInputLeadingAction(inputFocused = true))
-        assertEquals(true, bottomHomeButtonShowsUnreadOverview())
+        assertEquals(true, bottomHomeButtonShowsUnrepliedOverview())
         assertEquals(true, bottomHomeButtonSwapsToEmojiWhenInputFocused())
         assertEquals(false, bottomInputBarVisibleForCenteredToolPanel(centeredToolFeaturePanelVisible = true))
         assertEquals(true, bottomInputBarVisibleForCenteredToolPanel(centeredToolFeaturePanelVisible = false))
@@ -1292,11 +1616,10 @@ class FloatingChatMessageUiContractTest {
     fun homeUnreadOverviewShowsLatestUnreadPerThreadAndClearsOnOpen() {
         val conversation = FloatingChatPrototype.sampleConversation()
         val accountConversations = accountScopedConversations(conversation)
-        val unreadThreadIds = defaultAllAccountHomeUnreadThreadIds(conversation)
         val summaries = homeUnreadThreadSummaries(
-            accountConversations = accountConversations,
-            unreadThreadIds = unreadThreadIds
+            accountConversations = accountConversations
         )
+        val unreadThreadIds = defaultAllAccountHomeUnreadThreadIds(conversation)
         val first = summaries.first()
         val afterOpen = unreadThreadIdsAfterOpeningHomeUnreadBubble(
             unreadThreadIds = unreadThreadIds,
@@ -1309,20 +1632,96 @@ class FloatingChatMessageUiContractTest {
         assertEquals(true, homeUnreadOverviewKeepsConnectorLines())
         assertEquals(true, homeUnreadAvatarGreenDotReflectsThreadState())
         assertEquals(true, homeUnreadOverviewUsesSourceScopedConnectorLines())
-        assertEquals(5, unreadThreadIds.size)
-        assertEquals(5, summaries.size)
+        assertEquals(summaries.map { summary -> summary.threadId }.toSet(), unreadThreadIds)
         assertEquals(summaries.map { it.threadId }.distinct(), summaries.map { it.threadId })
         assertEquals(false, afterOpen.contains(first.threadId))
         assertEquals(true, summaries.all { it.message.type == FloatingChatMessageType.Text })
         assertEquals(true, summaries.all { it.message.presentation == FloatingChatMessagePresentation.Bubble })
         assertEquals(true, summaries.all { !it.message.fromMe })
         assertEquals(true, summaries.all { it.message.text.isNotBlank() })
+        assertEquals(true, summaries.all { it.message.senderName.contains("未回") })
+        assertEquals(true, summaries.any { it.unreadCount >= 3 })
         assertEquals(true, summaries.any { it.selection is ChatThreadSelection.GroupChat })
         assertEquals(true, summaries.any { it.selection is ChatThreadSelection.Private })
         assertEquals(true, summaries.map { it.accountId }.distinct().size > 1)
         assertEquals(first.accountId, accountIdForScopedThreadSelection(first.selection))
         assertEquals(true, homeUnreadOverviewShowsAllAccounts())
         assertEquals(true, homeUnreadBubbleSwitchesToOwningAccount())
+        assertEquals(true, homeUnreadOverviewTracksAllUnrepliedThreads())
+    }
+
+    @Test
+    fun homeOverviewShowsUnrepliedThreadsEvenWhenTheyAreNotUnread() {
+        val conversation = FloatingChatPrototype.sampleConversation()
+
+        val summaries = homeUnreadThreadSummaries(
+            accountConversations = accountScopedConversations(conversation)
+        )
+
+        assertEquals(true, summaries.size > 5)
+        assertEquals(true, summaries.all { it.message.senderName.contains("未回") })
+    }
+
+    @Test
+    fun homeOverviewShowsOnlyUnrepliedIncomingMessagesAfterLastSelfReply() {
+        val conversation = FloatingChatConversation(
+            peerName = "Test",
+            accountName = "Me",
+            contacts = listOf(FloatingChatContact("customer", "Customer", "C", "Customer", 0xFF1B9AAA)),
+            accountContacts = listOf(FloatingChatContact("account", "Me", "M", "Account", 0xFF3A86FF, selected = true)),
+            messages = listOf(
+                FloatingChatMessage(
+                    id = "old-incoming",
+                    type = FloatingChatMessageType.Text,
+                    text = "old incoming",
+                    fromMe = false,
+                    senderName = "Customer",
+                    time = "10:00",
+                    connectionTargetId = "customer",
+                    threadContactId = "customer"
+                ),
+                FloatingChatMessage(
+                    id = "my-reply",
+                    type = FloatingChatMessageType.Text,
+                    text = "my reply",
+                    fromMe = true,
+                    senderName = "Me",
+                    time = "10:01",
+                    connectionTargetId = "account",
+                    threadContactId = "customer"
+                ),
+                FloatingChatMessage(
+                    id = "needs-reply-1",
+                    type = FloatingChatMessageType.Text,
+                    text = "needs reply one",
+                    fromMe = false,
+                    senderName = "Customer",
+                    time = "10:02",
+                    connectionTargetId = "customer",
+                    threadContactId = "customer"
+                ),
+                FloatingChatMessage(
+                    id = "needs-reply-2",
+                    type = FloatingChatMessageType.Text,
+                    text = "needs reply two",
+                    fromMe = false,
+                    senderName = "Customer",
+                    time = "10:03",
+                    connectionTargetId = "customer",
+                    threadContactId = "customer"
+                )
+            ),
+            toolActions = emptyList()
+        )
+
+        val summary = homeUnreadThreadSummaries(
+            conversation = conversation
+        ).single()
+
+        assertEquals(true, homeUnreadOverviewUsesUnrepliedMessagesAfterLastSelfReply())
+        assertEquals(2, summary.unreadCount)
+        assertEquals("needs-reply-2", summary.message.id.removePrefix("home-unread-${summary.threadId}-"))
+        assertEquals("Customer - 2 条未回 - Me", summary.message.senderName)
     }
 
     @Test
@@ -1365,6 +1764,222 @@ class FloatingChatMessageUiContractTest {
             "home-source:${contact.id}",
             homeOverviewConnectorKeyDebugId(message)
         )
+    }
+
+    @Test
+    fun accountScopedConversationKeepsAllPreScopedRemoteContactsForSelectedAccount() {
+        val accountOne = FloatingChatContact("account-one", "One", "O", "Account", 0xFF3A86FF, selected = true)
+        val accountTwo = FloatingChatContact("account-two", "Two", "T", "Account", 0xFF06D6A0)
+        val accountOneContacts = (1..8).map { index ->
+            FloatingChatContact(
+                id = "${accountOne.id}__wxid_a_$index",
+                name = "A$index",
+                initials = "A$index",
+                description = "Friend",
+                avatarColor = 0xFF1B9AAA
+            )
+        }
+        val accountTwoContacts = (1..3).map { index ->
+            FloatingChatContact(
+                id = "${accountTwo.id}__wxid_b_$index",
+                name = "B$index",
+                initials = "B$index",
+                description = "Friend",
+                avatarColor = 0xFFE07A5F
+            )
+        }
+        val accountOneGroups = listOf(
+            FloatingChatContact(
+                id = "${accountOne.id}__room_a@chatroom",
+                name = "A Room",
+                initials = "AR",
+                description = "Group",
+                avatarColor = 0xFF8E7DBE
+            )
+        )
+        val conversation = FloatingChatConversation(
+            peerName = "SCRM",
+            accountName = "One",
+            contacts = accountOneContacts + accountTwoContacts,
+            groupContacts = accountOneGroups,
+            accountContacts = listOf(accountOne, accountTwo),
+            messages = emptyList(),
+            toolActions = FloatingChatToolAction.entries
+        )
+
+        val scoped = accountScopedConversation(conversation, accountOne.id)
+
+        assertEquals(accountOneContacts.map { it.id }, scoped.contacts.map { it.id })
+        assertEquals(accountOneGroups.map { it.id }, scoped.groupContacts.map { it.id })
+        assertEquals(true, scoped.contacts.size > 5)
+        assertEquals(false, scoped.contacts.any { contact -> contact.id.startsWith("${accountTwo.id}__") })
+    }
+
+    @Test
+    fun homeUnreadCandidatesAreDerivedFromMessageThreadsInsteadOfEveryContact() {
+        val account = FloatingChatContact("account-aiken", "aiken", "ai", "Account", 0xFF3A86FF)
+        val contacts = (1..4_600).map { index ->
+            FloatingChatContact(
+                id = "account-aiken__scrm-contact:friend-$index",
+                name = "Friend $index",
+                initials = "F$index",
+                description = "Friend",
+                avatarColor = 0xFF1B9AAA
+            )
+        }
+        val target = contacts[4_200]
+        val conversation = FloatingChatConversation(
+            peerName = "SCRM",
+            accountName = "aiken",
+            contacts = contacts,
+            groupContacts = emptyList(),
+            accountContacts = listOf(account),
+            messages = listOf(
+                FloatingChatMessage(
+                    id = "remote-message-1",
+                    type = FloatingChatMessageType.Text,
+                    text = "ping",
+                    fromMe = false,
+                    senderName = target.name,
+                    time = "now",
+                    connectionTarget = FloatingChatConnectionTarget.User,
+                    connectionTargetId = target.id,
+                    threadContactId = target.id
+                )
+            ),
+            toolActions = FloatingChatToolAction.entries
+        )
+
+        val candidates = homeUnreadCandidateSelections(conversation)
+
+        assertEquals(listOf(ChatThreadSelection.Private(target.id)), candidates)
+    }
+
+    @Test
+    fun contactsPanelRouteUsesCurrentScrmAccountInsteadOfStoredDefault() {
+        val selectedAccountId = com.paifa.ubikitouch.accessibility.scrm.scrmFloatingAccountId(
+            deviceUuid = "device-current",
+            weChatId = "wxid_current"
+        )
+
+        val route = scrmContactsPanelRouteForSelectedAccount(
+            selectedAccountId = selectedAccountId,
+            fallbackDeviceUuid = "device-default",
+            fallbackWeChatId = "wxid_default"
+        )
+
+        assertEquals("device-current", route?.deviceUuid)
+        assertEquals("wxid_current", route?.weChatId)
+    }
+
+    @Test
+    fun leftRailFollowInfosAreBuiltFromVisibleAvatarBoundsOnly() {
+        val account = FloatingChatContact("account-aiken", "aiken", "AI", "Account", 0xFF3A86FF)
+        val contacts = (1..4_600).map { index ->
+            FloatingChatContact(
+                id = "contact-$index",
+                name = "Friend $index",
+                initials = "F$index",
+                description = "Friend",
+                avatarColor = 0xFF1B9AAA
+            )
+        }
+        val visibleContact = contacts[4_200]
+        val conversation = FloatingChatConversation(
+            peerName = "SCRM",
+            accountName = "aiken",
+            contacts = contacts,
+            groupContacts = emptyList(),
+            accountContacts = listOf(account),
+            messages = listOf(
+                FloatingChatMessage(
+                    id = "message-visible",
+                    type = FloatingChatMessageType.Text,
+                    text = "visible latest",
+                    fromMe = false,
+                    senderName = visibleContact.name,
+                    time = "12:00",
+                    connectionTarget = FloatingChatConnectionTarget.User,
+                    connectionTargetId = visibleContact.id,
+                    threadContactId = visibleContact.id
+                )
+            ),
+            toolActions = FloatingChatToolAction.entries
+        )
+
+        val infos = leftRailVisibleFollowInfos(
+            conversation = conversation,
+            selectedAccountId = account.id,
+            contactsById = contacts.associateBy { it.id },
+            visibleAvatarBounds = mapOf(
+                visibleContact.id to androidx.compose.ui.geometry.Rect(0f, 120f, 28f, 148f)
+            ),
+            railRootTopPx = 20f
+        )
+
+        assertEquals(listOf(visibleContact.id), infos.map { it.contactId })
+        assertEquals("visible latest", infos.single().lastMessage)
+        assertEquals(100f, infos.single().topPx)
+        assertEquals(28f, infos.single().heightPx)
+    }
+
+    @Test
+    fun accountScopedConversationDoesNotInventFiveContactsForUnloadedRemoteAccount() {
+        val accountOne = FloatingChatContact("account-one", "One", "O", "Account", 0xFF3A86FF)
+        val accountTwo = FloatingChatContact("account-two", "Two", "T", "Account", 0xFF06D6A0)
+        val accountOneContacts = (1..8).map { index ->
+            FloatingChatContact(
+                id = "${accountOne.id}__wxid_a_$index",
+                name = "A$index",
+                initials = "A$index",
+                description = "Friend",
+                avatarColor = 0xFF1B9AAA
+            )
+        }
+        val conversation = FloatingChatConversation(
+            peerName = "SCRM",
+            accountName = "One",
+            contacts = accountOneContacts,
+            groupContacts = emptyList(),
+            accountContacts = listOf(accountOne, accountTwo),
+            messages = emptyList(),
+            toolActions = FloatingChatToolAction.entries
+        )
+
+        val scoped = accountScopedConversation(conversation, accountTwo.id)
+
+        assertEquals(emptyList<String>(), scoped.contacts.map { contact -> contact.id })
+        assertEquals(true, scoped.accountContacts.first { account -> account.id == accountTwo.id }.selected)
+    }
+
+    @Test
+    fun coordinateBodySelectedAccountUsesClickedAccountEvenBeforeDetailsLoad() {
+        val accountOne = FloatingChatContact("account-one", "One", "O", "Account", 0xFF3A86FF)
+        val accountTwo = FloatingChatContact("account-two", "Two", "T", "Account", 0xFF06D6A0, selected = true)
+        val conversation = FloatingChatConversation(
+            peerName = "SCRM",
+            accountName = "Two",
+            contacts = emptyList(),
+            groupContacts = emptyList(),
+            accountContacts = listOf(accountOne, accountTwo),
+            messages = emptyList(),
+            toolActions = FloatingChatToolAction.entries
+        )
+
+        assertEquals(
+            "account-two",
+            selectedAccountForCoordinateBody(
+                conversation = conversation,
+                selectedThread = ChatThreadSelection.Group,
+                activeAccountId = "account-two"
+            ).id
+        )
+    }
+
+    @Test
+    fun rightRailSelectedAccountAvatarHasVisibleHighlightRing() {
+        assertEquals(true, rightRailSelectedAccountAvatarUsesHighlightRing())
+        assertEquals(3, rightRailSelectedAccountAvatarHighlightStrokeDp())
     }
 
     @Test
@@ -1616,6 +2231,7 @@ class FloatingChatMessageUiContractTest {
         assertEquals(true, localMessageReplacementInvalidatesDisplayConversation())
         assertEquals(true, documentToolRequestsSystemFilePicker())
         assertEquals(true, pickedDocumentCreatesRealFileMessage())
+        assertEquals(true, pickedDocumentMessagesEnterScrmOutbox())
     }
 
     @Test
@@ -1623,6 +2239,7 @@ class FloatingChatMessageUiContractTest {
         assertEquals(
             listOf(
                 FloatingChatToolAction.Assistant,
+                FloatingChatToolAction.Contacts,
                 FloatingChatToolAction.Blink,
                 FloatingChatToolAction.Gallery,
                 FloatingChatToolAction.Camera,
@@ -1633,10 +2250,12 @@ class FloatingChatMessageUiContractTest {
                 FloatingChatToolAction.Files,
                 FloatingChatToolAction.Card,
                 FloatingChatToolAction.Moments,
+                FloatingChatToolAction.MomentMaterials,
                 FloatingChatToolAction.QuickPhrase
             ),
             referenceToolActionsFor(FloatingChatToolAction.entries)
         )
+        assertEquals("联系人", toolActionLabel(FloatingChatToolAction.Contacts))
         assertEquals("相册", toolActionLabel(FloatingChatToolAction.Gallery))
         assertEquals("摄影", toolActionLabel(FloatingChatToolAction.Camera))
         assertEquals("位置", toolActionLabel(FloatingChatToolAction.Location))
@@ -1646,7 +2265,10 @@ class FloatingChatMessageUiContractTest {
         assertEquals("文档", toolActionLabel(FloatingChatToolAction.Files))
         assertEquals("推名片", toolActionLabel(FloatingChatToolAction.Card))
         assertEquals("朋友圈", toolActionLabel(FloatingChatToolAction.Moments))
+        assertEquals("朋友圈素材", toolActionLabel(FloatingChatToolAction.MomentMaterials))
         assertEquals("快捷语", toolActionLabel(FloatingChatToolAction.QuickPhrase))
+        assertEquals(true, toolActionOpensBottomPanel(FloatingChatToolAction.MomentMaterials))
+        assertEquals("MomentMaterials", toolActionBottomPanelModeName(FloatingChatToolAction.MomentMaterials))
         assertEquals(true, rightRailToolButtonsUseMaterialIcons())
         assertEquals(true, rightRailToolButtonsShowTextLabels())
         assertEquals(true, rightRailToolButtonsSupportLongPressReorder())
@@ -1669,6 +2291,8 @@ class FloatingChatMessageUiContractTest {
         assertEquals(true, rightRailToolReorderPersistsOnDragEnd())
         assertEquals(true, rightRailToolSingleTapExitsReorder())
         assertEquals(false, rightRailToolReorderUsesClickToMove())
+        assertEquals(true, contactsToolOpensCenteredFloatingPanel())
+        assertEquals(true, contactPanelMatchesMomentsFloatingSheet())
         assertEquals(false, rightRailUsesDiscreteSnapExpansion())
         assertEquals(false, rightRailUsesContinuousDragExpansion())
         assertEquals(true, rightRailUsesAreaBasedExpansion())
@@ -1688,6 +2312,8 @@ class FloatingChatMessageUiContractTest {
         assertEquals(0.67f, rightRailAccountWeightForAccountAreaDrag())
         assertEquals(0.24f, rightRailAccountWeightForToolAreaDrag())
         assertEquals(58, rightRailWidthDp())
+        assertEquals(8, rightRailAvatarScreenEdgeInsetPx())
+        assertEquals(8, rightRailToolIconScreenEdgeInsetPx())
         assertEquals(42, rightRailToolButtonWidthDp())
         assertEquals(42, rightRailToolButtonHeightDp())
         assertEquals(
@@ -1807,6 +2433,63 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
+    fun accountProfileUsesRemoteAvatarAndShowsWechatQr() {
+        val account = FloatingChatContact(
+            id = "account-aiken",
+            name = "Aiken",
+            initials = "AI",
+            description = "scrm account",
+            avatarColor = 0xFF5E8FA3,
+            avatarUrl = "https://cdn.example.com/aiken.jpg"
+        )
+        val profile = defaultAccountProfileFor(account).copy(wechatId = "aiken_001")
+
+        assertEquals("https://cdn.example.com/aiken.jpg", profile.avatarImageUri)
+        assertEquals(true, accountProfileEditorSupportsWechatQrCode())
+        assertEquals("aiken_001", accountProfileQrPayload(profile))
+    }
+
+    @Test
+    fun momentMaterialsAreAccountScopedAndOpenDetailPage() {
+        val route = ScrmFloatingAccountRoute(
+            deviceUuid = "device-1",
+            weChatId = "wxid_aiken"
+        )
+
+        assertEquals("wxid_aiken", momentMaterialTenantIdForRoute(route))
+        assertEquals(null, momentMaterialTenantIdForRoute(null))
+        assertEquals(true, momentMaterialsPanelUsesAccountScopedTenant())
+        assertEquals(true, momentMaterialsPanelUsesQuickPhraseStyleList())
+        assertEquals(true, momentMaterialsPanelOpensIndependentDetailPage())
+    }
+
+    @Test
+    fun contactAddFriendSearchesAndPreviewsTargetBeforeApply() {
+        val data = Json.parseToJsonElement(
+            """
+            {
+              "data": {
+                "friendId": "wxid_found",
+                "nickname": "Alice",
+                "avatar": "https://cdn.example.com/alice.jpg",
+                "region": "Shenzhen",
+                "signature": "hello"
+              }
+            }
+            """.trimIndent()
+        )
+        val profile = requireNotNull(scrmFriendSearchProfileFromFindContactData(data))
+
+        assertEquals("wxid_found", profile.friendId)
+        assertEquals("Alice", profile.displayName)
+        assertEquals("https://cdn.example.com/alice.jpg", profile.avatarUrl)
+        assertEquals("Shenzhen", profile.region)
+        assertEquals("hello", profile.signature)
+        assertEquals(true, contactAddFriendUsesSearchBeforeApply())
+        assertEquals(true, contactAddFriendShowsIndependentProfileBeforeApply())
+    }
+
+    @Test
     fun accountAvatarClickSwitchesToIndependentAccountWorkspace() {
         val conversation = FloatingChatPrototype.sampleConversation()
         val mainConversation = accountScopedConversation(
@@ -1827,6 +2510,11 @@ class FloatingChatMessageUiContractTest {
             conversation = workConversation,
             preferredSelection = ChatThreadSelection.GroupChat(mainConversation.groupContacts.first().id)
         )
+        val clickResetThread = selectedThreadAfterAccountAvatarClick(
+            conversation = conversation,
+            clickedAccountId = "account-work",
+            currentThread = ChatThreadSelection.GroupChat(mainConversation.groupContacts.first().id)
+        )
 
         assertEquals(true, rightRailAccountAvatarClickSwitchesActiveAccountWorkspace())
         assertEquals("account-work", selectedAccountIdAfterAccountAvatarClick("account-main", "account-work"))
@@ -1840,8 +2528,26 @@ class FloatingChatMessageUiContractTest {
         assertEquals(true, workMessages.isNotEmpty())
         assertEquals(true, workMessages.filter { it.fromMe }.all { it.connectionTargetId == "account-work" })
         assertEquals(workConversation.groupContacts.first().id, (resetThread as ChatThreadSelection.GroupChat).groupId)
+        assertEquals(workConversation.groupContacts.first().id, (clickResetThread as ChatThreadSelection.GroupChat).groupId)
         assertEquals(true, accountScopedFriendsAndGroupsAreIndependent())
         assertEquals(true, accountSwitchResetsThreadToScopedDefault())
+    }
+
+    @Test
+    fun storeServiceAccountShowsThreeTimesAsManyLeftRailContactsWithoutAvatarTextTags() {
+        val conversation = FloatingChatPrototype.sampleConversation()
+        val storeConversation = accountScopedConversation(
+            conversation = conversation,
+            activeAccountId = "account-store"
+        )
+        val mainConversation = accountScopedConversation(
+            conversation = conversation,
+            activeAccountId = "account-main"
+        )
+
+        assertEquals(15, storeConversation.contacts.size)
+        assertEquals(5, mainConversation.contacts.size)
+        assertEquals(false, avatarTextTagsVisible())
     }
 
     @Test
@@ -1930,6 +2636,7 @@ class FloatingChatMessageUiContractTest {
         assertEquals(true, leftRailAvatarsSupportLongPressEditPanel())
         assertEquals(true, contactEditPanelSupportsRemarkAndTags())
         assertEquals(true, contactEditPanelUsesWechatFriendProfileLayout())
+        assertEquals(true, contactEditPanelHasDeleteFriendAction())
         assertEquals(listOf("备注", "朋友权限", "更多信息"), contactEditPanelWechatSectionTitles())
         assertEquals(
             listOf("备注名", "电话", "标签", "备注", "照片", "朋友圈和状态", "仅聊天", "我和他的共同群聊", "来源", "添加时间"),
@@ -2111,6 +2818,13 @@ class FloatingChatMessageUiContractTest {
         )
         assertEquals(true, floatingChatOverlayHandlesOwnEdgeGestures())
         assertEquals(false, floatingChatOverlayEdgeGestureConsumesPlainTaps())
+        assertEquals(true, floatingChatInternalEdgeGestureObservesInitialPointerPass())
+        assertEquals(24, floatingChatInternalEdgeGestureTouchTargetDp())
+        assertEquals(nativeTouchInteractionEdgeStartTargetDp(1), floatingChatInternalEdgeGestureTouchTargetDp())
+        assertEquals(false, floatingChatInternalEdgeGestureCoversSideRails())
+        assertEquals(false, floatingChatInternalEdgeGestureUsesEarlyHorizontalLock())
+        assertEquals(true, floatingChatExpandedBottomGestureHandledInsideOverlay())
+        assertEquals(false, scrmConversationRefreshRecreatesExpandedFloatingChatOverlay())
         assertEquals(true, floatingChatOverlayHidesSemanticsFromItsOwningAccessibilityService())
         assertEquals(false, messageBlockUsesNegativePadding())
     }
@@ -2156,7 +2870,8 @@ class FloatingChatMessageUiContractTest {
             text = "原始消息内容",
             fromMe = false,
             senderName = "何苗",
-            time = "14:21"
+            time = "14:21",
+            remoteMessageServerId = "88990011"
         )
 
         val quotedMessage = outgoingTextMessageWithOptionalQuote(baseMessage, quotedSource)
@@ -2165,8 +2880,61 @@ class FloatingChatMessageUiContractTest {
         assertEquals("这条我引用回复", quotedMessage.text)
         assertEquals("何苗", quotedMessage.quoteAuthor)
         assertEquals("原始消息内容", quotedMessage.quoteText)
+        assertEquals("88990011", quotedMessage.remoteMessageServerId)
         assertEquals(baseMessage.connectionTarget, quotedMessage.connectionTarget)
         assertEquals(baseMessage.connectionTargetId, quotedMessage.connectionTargetId)
+    }
+
+    @Test
+    fun forwardedMessageIsPreparedForRealOutgoingSend() {
+        val conversation = FloatingChatConversation(
+            peerName = "Friend",
+            accountName = "Main",
+            contacts = emptyList(),
+            accountContacts = listOf(
+                FloatingChatContact(
+                    id = "account-1",
+                    name = "Main",
+                    initials = "M",
+                    description = "account",
+                    avatarColor = 0xFF123456
+                )
+            ),
+            messages = emptyList(),
+            toolActions = emptyList()
+        )
+        val source = FloatingChatMessage(
+            id = "source",
+            type = FloatingChatMessageType.Text,
+            text = "forward me",
+            fromMe = false,
+            senderName = "Friend",
+            time = "14:21"
+        )
+        var capturedThreadId: String? = null
+
+        val forwarded = preparedForwardedMessageForSend(
+            source = source,
+            conversation = conversation,
+            target = ChatThreadSelection.Private("wxid_friend"),
+            accountId = "account-1",
+            sequence = 7,
+            prepareOutgoingMessage = { message, threadId ->
+                capturedThreadId = threadId
+                message.copy(
+                    sendState = FloatingChatSendState.Queued,
+                    clientRequestId = "request-forward"
+                )
+            }
+        )
+
+        assertEquals("private:wxid_friend", capturedThreadId)
+        assertEquals("local-forward-wxid_friend-account-1-7", forwarded.id)
+        assertEquals(true, forwarded.fromMe)
+        assertEquals("account-1", forwarded.connectionTargetId)
+        assertEquals("wxid_friend", forwarded.threadContactId)
+        assertEquals(FloatingChatSendState.Queued, forwarded.sendState)
+        assertEquals("request-forward", forwarded.clientRequestId)
     }
 
     @Test
@@ -2205,5 +2973,182 @@ class FloatingChatMessageUiContractTest {
         assertEquals(true, floatingChatAppearanceRefreshUsesDebouncedSingleRunnable())
         assertEquals(false, floatingChatCollapseRemovesOverlayInsteadOfShowingButton())
         assertEquals(false, floatingChatCollapsedStateShowsFloatingButton())
+    }
+
+    @Test
+    fun bottomGestureBarClassifiesEachSupportedGesture() {
+        assertEquals(
+            BottomGestureBarGestureType.Tap,
+            resolveBottomGestureBarGestureType(
+                deltaX = 0f,
+                deltaY = 0f,
+                gestureDurationMillis = 120L,
+                upwardStationaryMillis = 0L
+            )
+        )
+        assertEquals(
+            BottomGestureBarGestureType.SwipeUp,
+            resolveBottomGestureBarGestureType(
+                deltaX = 0f,
+                deltaY = -120f,
+                gestureDurationMillis = 180L,
+                upwardStationaryMillis = 0L
+            )
+        )
+        assertEquals(
+            BottomGestureBarGestureType.SwipeUp,
+            resolveBottomGestureBarGestureType(
+                deltaX = 0f,
+                deltaY = -120f,
+                gestureDurationMillis = 520L,
+                upwardStationaryMillis = 499L
+            )
+        )
+        assertEquals(
+            BottomGestureBarGestureType.SwipeUpHold,
+            resolveBottomGestureBarGestureType(
+                deltaX = 0f,
+                deltaY = -120f,
+                gestureDurationMillis = 680L,
+                upwardStationaryMillis = 500L
+            )
+        )
+        assertEquals(
+            BottomGestureBarGestureType.SwipeHorizontal,
+            resolveBottomGestureBarGestureType(
+                deltaX = 120f,
+                deltaY = -8f,
+                gestureDurationMillis = 180L,
+                upwardStationaryMillis = 0L
+            )
+        )
+        assertEquals(
+            BottomGestureBarGestureType.LongPress,
+            resolveBottomGestureBarGestureType(
+                deltaX = 0f,
+                deltaY = 0f,
+                gestureDurationMillis = 600L,
+                upwardStationaryMillis = 0L
+            )
+        )
+    }
+
+    @Test
+    fun bottomGestureBarUsesExistingDefaultsAndAllowsWidthConfiguration() {
+        assertEquals(156, defaultBottomGestureBarWidthDp())
+        assertEquals(96, sanitizeBottomGestureBarWidthDp(20))
+        assertEquals(188, sanitizeBottomGestureBarWidthDp(188))
+        assertEquals(260, sanitizeBottomGestureBarWidthDp(600))
+        assertEquals(GestureAction.Back, defaultBottomGestureBarAction(BottomGestureBarGestureType.Tap))
+        assertEquals(GestureAction.Home, defaultBottomGestureBarAction(BottomGestureBarGestureType.SwipeUp))
+        assertEquals(GestureAction.Recents, defaultBottomGestureBarAction(BottomGestureBarGestureType.SwipeUpHold))
+        assertEquals(GestureAction.Back, defaultBottomGestureBarAction(BottomGestureBarGestureType.SwipeHorizontal))
+        assertEquals(GestureAction.Back, defaultBottomGestureBarAction(BottomGestureBarGestureType.LongPress))
+        assertEquals(true, bottomGestureBarDispatchesGestureActionAfterTouchEvent())
+    }
+
+    @Test
+    fun expandedFloatingChatRemovesEdgeGestureWindowsButKeepsBottomBar() {
+        assertEquals(false, edgeGestureOverlayWindowsAllowed(floatingChatExpanded = true))
+        assertEquals(true, edgeGestureOverlayWindowsAllowed(floatingChatExpanded = false))
+        assertEquals(true, bottomGestureBarVisibleForFloatingChat(floatingChatExpanded = true))
+        assertEquals(true, bottomGestureBarVisibleForFloatingChat(floatingChatExpanded = false))
+        assertEquals(true, bottomGestureBarRecreatesAfterFloatingChatWindowUpdate())
+    }
+
+    @Test
+    fun bottomGestureBarKeepsVisibleOverlayAndNativeTouchRegion() {
+        val config = NativeEdgeGestureConfig(
+            screenWidthPx = 1080,
+            screenHeightPx = 2400,
+            density = 3f,
+            leftConfigs = emptyList(),
+            rightConfigs = emptyList(),
+            shortThresholdPx = 24f,
+            longThresholdPx = 72f,
+            bottomGestureWidthDp = 156
+        )
+
+        assertEquals(true, bottomGestureBarExternalOverlayVisibleForFloatingChat(floatingChatExpanded = false))
+        assertEquals(true, bottomGestureBarUsesNativeTouchInteractionSurface())
+        assertEquals(
+            NativeBottomGestureInterceptRect(
+                left = 306,
+                top = 2310,
+                right = 774,
+                bottom = 2400
+            ),
+            nativeBottomGestureInterceptRect(config, floatingChatExpanded = false)
+        )
+        assertEquals(true, nativeBottomGestureHitTest(540f, 2380f, config, floatingChatExpanded = false))
+        assertEquals(false, nativeBottomGestureHitTest(120f, 2380f, config, floatingChatExpanded = false))
+    }
+
+    @Test
+    fun scrmConversationPaginationStopsAtKnownTotalOrShortUnknownPage() {
+        assertEquals(
+            true,
+            shouldRequestNextScrmConversationPage(
+                returnedItemCount = 200,
+                loadedItemCount = 200,
+                totalCount = 401,
+                pageSize = 200
+            )
+        )
+        assertEquals(
+            false,
+            shouldRequestNextScrmConversationPage(
+                returnedItemCount = 1,
+                loadedItemCount = 401,
+                totalCount = 401,
+                pageSize = 200
+            )
+        )
+        assertEquals(
+            false,
+            shouldRequestNextScrmConversationPage(
+                returnedItemCount = 37,
+                loadedItemCount = 37,
+                totalCount = 0,
+                pageSize = 200
+            )
+        )
+    }
+
+    @Test
+    fun bottomGestureBarMapsTapSwipeAndUpwardPauseToSystemActions() {
+        assertEquals(
+            BottomGestureBarAction.Back,
+            resolveBottomGestureBarAction(
+                deltaX = 0f,
+                deltaY = 0f,
+                upwardStationaryMillis = 0L
+            )
+        )
+        assertEquals(
+            BottomGestureBarAction.Home,
+            resolveBottomGestureBarAction(
+                deltaX = 0f,
+                deltaY = -120f,
+                upwardStationaryMillis = 0L
+            )
+        )
+        assertEquals(
+            BottomGestureBarAction.Recents,
+            resolveBottomGestureBarAction(
+                deltaX = 0f,
+                deltaY = -120f,
+                upwardStationaryMillis = 500L
+            )
+        )
+        assertEquals(
+            BottomGestureBarAction.Back,
+            resolveBottomGestureBarAction(
+                deltaX = 100f,
+                deltaY = -8f,
+                upwardStationaryMillis = 0L
+            )
+        )
+        assertEquals(0, bottomGestureBarBottomInsetDp())
     }
 }

@@ -20,7 +20,9 @@ data class FloatingChatContact(
     val description: String,
     val avatarColor: Long,
     val selected: Boolean = false,
-    val online: Boolean = true
+    val online: Boolean = true,
+    val avatarUrl: String? = null,
+    val groupMemberAvatarUrls: List<String> = emptyList()
 )
 
 data class FloatingChatMessage(
@@ -167,6 +169,7 @@ enum class FloatingChatConnectionTarget {
 
 enum class FloatingChatToolAction {
     Assistant,
+    Contacts,
     Blink,
     Gallery,
     Camera,
@@ -181,6 +184,7 @@ enum class FloatingChatToolAction {
     RedPacket,
     Transfer,
     Moments,
+    MomentMaterials,
     QuickPhrase,
     Search,
     Pin,
@@ -435,6 +439,7 @@ object FloatingChatPrototype {
             FloatingChatToolAction.Files,
             FloatingChatToolAction.Card,
             FloatingChatToolAction.Moments,
+            FloatingChatToolAction.MomentMaterials,
             FloatingChatToolAction.QuickPhrase -> simulatedToolFeatureMessage(
                 idPrefix = idPrefix,
                 action = action,
@@ -591,7 +596,7 @@ object FloatingChatPrototype {
             accountName = "林舟",
             contacts = contacts(),
             accountContacts = accountContacts(),
-            messages = sharedConversationMessages() + additionalGroupThreadMessages() + privateThreadMessages(),
+            messages = sharedConversationMessages() + additionalGroupThreadMessages() + privateThreadMessages() + unrepliedDemoMessages(),
             toolActions = FloatingChatToolAction.entries,
             groupContacts = groupContacts()
         )
@@ -617,7 +622,12 @@ object FloatingChatPrototype {
             FloatingChatContact("qian-yue", "钱越", "钱越", "财务专员 · 对账转账", 0xFFFFB703),
             FloatingChatContact("gu-yan", "顾言", "顾言", "品牌设计 · 朋友圈素材", 0xFF457B9D),
             FloatingChatContact("luo-bei", "罗北", "罗北", "摄影剪辑 · 活动视频", 0xFF118AB2, online = false),
-            FloatingChatContact("assistant", "灵犀助手", "灵犀", "AI 助手 · 会话摘要", 0xFF6C757D)
+            FloatingChatContact("assistant", "灵犀助手", "灵犀", "AI 助手 · 会话摘要", 0xFF6C757D),
+            FloatingChatContact("zhou-yuqing", "周雨晴", "雨晴", "门店督导 · 华东巡店", 0xFF4E79A7),
+            FloatingChatContact("liang-chen", "梁晨", "梁晨", "收银培训 · 新店开业", 0xFFF28E2B),
+            FloatingChatContact("gao-rui", "高蕊", "高蕊", "会员运营 · 到店转化", 0xFFE15759),
+            FloatingChatContact("cheng-ye", "程野", "程野", "区域经理 · 门店排班", 0xFF76B7B2),
+            FloatingChatContact("song-ke", "宋可", "宋可", "客户支持 · 核销异常", 0xFF59A14F)
         )
     }
 
@@ -740,7 +750,12 @@ object FloatingChatPrototype {
             ThreadPair("qian-yue", "钱越", "account-private", "私域顾问"),
             ThreadPair("gu-yan", "顾言", "account-main", "林舟"),
             ThreadPair("luo-bei", "罗北", "account-live", "直播客服"),
-            ThreadPair("assistant", "灵犀助手", "account-work", "企业微信号")
+            ThreadPair("assistant", "灵犀助手", "account-work", "企业微信号"),
+            ThreadPair("zhou-yuqing", "周雨晴", "account-store", "门店服务"),
+            ThreadPair("liang-chen", "梁晨", "account-market", "运营助手"),
+            ThreadPair("gao-rui", "高蕊", "account-service", "售后专员"),
+            ThreadPair("cheng-ye", "程野", "account-main", "林舟"),
+            ThreadPair("song-ke", "宋可", "account-work", "企业微信号")
         )
         val fileFormats = FloatingChatFileFormat.entries
         val visibilityScopes = FloatingChatVisibilityScope.entries
@@ -786,6 +801,33 @@ object FloatingChatPrototype {
                 message(baseIndex + 5, FloatingChatMessageType.Quote, "${pair.accountName}：这条我已经标记，晚上给你最终确认。", true, pair.accountName, connectionTargetId = pair.accountId, threadContactId = pair.contactId, quoteAuthor = pair.contactName, quoteText = "如果今天来不及，明早 10 点前给我也可以。")
             )
         }
+    }
+
+    private fun unrepliedDemoMessages(): List<FloatingChatMessage> {
+        return listOf(
+            message(1001, FloatingChatMessageType.Text, "沈嘉木：刚才首页入口我又补了两处异常态，你空了帮我确认一下。", false, "沈嘉木", connectionTargetId = "li-si", threadContactId = "li-si"),
+            message(1002, FloatingChatMessageType.Text, "沈嘉木：还有按钮点进去后展示的是待回复列表，不再按未读算。", false, "沈嘉木", connectionTargetId = "li-si", threadContactId = "li-si"),
+            message(1003, FloatingChatMessageType.Text, "沈嘉木：如果你现在方便，我把最终入口态也发你看一下。", false, "沈嘉木", connectionTargetId = "li-si", threadContactId = "li-si"),
+            message(1004, FloatingChatMessageType.Text, "许知南：产品小组这边的空状态文案我改好了，等你回一句我再同步设计稿。", false, "许知南", connectionTargetId = "wang-wu"),
+            message(1005, FloatingChatMessageType.Text, "许知南：主页未回列表的标题我建议用“待回复”，你确认一下。", false, "许知南", connectionTargetId = "wang-wu"),
+            message(1006, FloatingChatMessageType.Text, "唐一澈：我这边测到一个边界，用户连续发三条时首页要显示 3 条未回。", false, "唐一澈", connectionTargetId = "zhao-liu"),
+            message(1007, FloatingChatMessageType.Text, "灵犀助手：AI 内测群里刚进来几条待确认消息，你还没有回复。", false, "灵犀助手", connectionTargetId = "assistant", threadContactId = "group-ai"),
+            message(1008, FloatingChatMessageType.Text, "陈若川：召回配置今晚要不要切到新版本？等你拍板。", false, "陈若川", connectionTargetId = "xiao-chen", threadContactId = "group-ai"),
+            message(1009, FloatingChatMessageType.Text, "沈嘉木：如果先不上线，我就把入口灰掉并保留提示。", false, "沈嘉木", connectionTargetId = "li-si", threadContactId = "group-ai"),
+            message(1010, FloatingChatMessageType.Text, "何苗：客户问续费报价今天能不能给最终版，我这边还差你确认折扣。", false, "何苗", connectionTargetId = "he-miao", threadContactId = "he-miao"),
+            message(1011, FloatingChatMessageType.Text, "何苗：如果你同意，我就按 9.2 折发给客户。", false, "何苗", connectionTargetId = "he-miao", threadContactId = "he-miao"),
+            message(1012, FloatingChatMessageType.Text, "何苗：客户五点前在线，最好现在回我一下。", false, "何苗", connectionTargetId = "he-miao", threadContactId = "he-miao"),
+            message(1013, FloatingChatMessageType.Text, "孙临：门店运营群的红包入口要不要今晚一起上线？等你确认。", false, "孙临", connectionTargetId = "sun-lin", threadContactId = "group-ops"),
+            message(1014, FloatingChatMessageType.Text, "孙临：如果可以，我就通知两家门店按新版流程培训。", false, "孙临", connectionTargetId = "sun-lin", threadContactId = "group-ops"),
+            message(1015, FloatingChatMessageType.Text, "陈若川：接口日志我看完了，失败重试策略要不要先按 3 次？", false, "陈若川", connectionTargetId = "xiao-chen", threadContactId = "xiao-chen"),
+            message(1016, FloatingChatMessageType.Text, "陈若川：你确认后我就把配置发到测试环境。", false, "陈若川", connectionTargetId = "xiao-chen", threadContactId = "xiao-chen"),
+            message(1017, FloatingChatMessageType.Text, "钱越：露营群账单我已经整理好，回我一下我就发群里。", false, "钱越", connectionTargetId = "qian-yue", threadContactId = "group-camping"),
+            message(1018, FloatingChatMessageType.Text, "钱越：费用按人均 AA 没问题吧？", false, "钱越", connectionTargetId = "qian-yue", threadContactId = "group-camping"),
+            message(1019, FloatingChatMessageType.Text, "顾言：朋友圈素材我出了两版，你帮我选一个方向。", false, "顾言", connectionTargetId = "gu-yan", threadContactId = "gu-yan"),
+            message(1020, FloatingChatMessageType.Text, "顾言：第一版更稳，第二版更适合活动预热。", false, "顾言", connectionTargetId = "gu-yan", threadContactId = "gu-yan"),
+            message(1021, FloatingChatMessageType.Text, "罗北：直播间咨询有人问售后政策，我等你确认口径。", false, "罗北", connectionTargetId = "luo-bei", threadContactId = "luo-bei"),
+            message(1022, FloatingChatMessageType.Text, "灵犀助手：我整理了 5 条未回摘要，你打开主页就能看到。", false, "灵犀助手", connectionTargetId = "assistant", threadContactId = "assistant")
+        )
     }
 
     private fun latestIncomingPrivateThreadMessage(
@@ -1139,6 +1181,21 @@ object FloatingChatPrototype {
                 appName = "浮窗朋友圈",
                 detail = "在 App 内发表了 1 条动态",
                 resourceUrl = "https://aiff.app/app/moments/local-$sequence"
+            )
+            FloatingChatToolAction.MomentMaterials -> FloatingChatMessage(
+                id = commonId,
+                type = FloatingChatMessageType.MiniProgramLink,
+                text = "朋友圈素材",
+                fromMe = true,
+                senderName = accountName,
+                time = "刚刚",
+                presentation = FloatingChatMessagePresentation.SpecialCard,
+                connectionTarget = FloatingChatConnectionTarget.Account,
+                connectionTargetId = accountId,
+                threadContactId = threadContactId,
+                appName = "朋友圈素材",
+                detail = "已打开素材库",
+                resourceUrl = "https://aiff.app/app/moments/materials/local-$sequence"
             )
             FloatingChatToolAction.QuickPhrase -> FloatingChatMessage(
                 id = commonId,

@@ -52,6 +52,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.paifa.ubikitouch.accessibility.UbikiAccessibilityService
 import com.paifa.ubikitouch.accessibility.UbikiPreferences
+import com.paifa.ubikitouch.accessibility.BottomGestureBarGestureType
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSettingsManager
 import com.paifa.ubikitouch.accessibility.defaultFloatingChatBackgroundColorRgb
 import com.paifa.ubikitouch.accessibility.floatingChatBackgroundColorPresetRgbs
@@ -157,6 +158,8 @@ private fun MainScreen(
     var foregroundPackage by remember { mutableStateOf(UbikiAccessibilityService.currentForegroundPackage) }
     var actionRevision by remember { mutableIntStateOf(0) }
     var pickerTarget by remember { mutableStateOf<Pair<EdgeSide, GestureType>?>(null) }
+    var bottomGestureBarWidth by remember { mutableIntStateOf(preferences.bottomGestureBarWidthDp) }
+    var bottomGesturePickerTarget by remember { mutableStateOf<BottomGestureBarGestureType?>(null) }
 
     fun refreshOverlays() {
         UbikiAccessibilityService.instance?.requestOverlayRefresh()
@@ -330,6 +333,18 @@ private fun MainScreen(
             )
         }
         item {
+            BottomGestureBarPanel(
+                widthDp = bottomGestureBarWidth,
+                onWidthChange = { width ->
+                    preferences.bottomGestureBarWidthDp = width
+                    bottomGestureBarWidth = preferences.bottomGestureBarWidthDp
+                },
+                preferences = preferences,
+                revision = actionRevision,
+                onPickAction = { bottomGesturePickerTarget = it }
+            )
+        }
+        item {
             GestureMappingPanel(
                 side = EdgeSide.LEFT,
                 title = stringResource(id = R.string.left_edge_gestures),
@@ -359,6 +374,19 @@ private fun MainScreen(
                 actionRevision += 1
                 refreshOverlays()
                 pickerTarget = null
+            }
+        )
+    }
+
+    bottomGesturePickerTarget?.let { gestureType ->
+        ActionPickerDialog(
+            current = preferences.bottomGestureBarActionFor(gestureType),
+            launchableApps = launchableApps,
+            onDismiss = { bottomGesturePickerTarget = null },
+            onSelect = { action ->
+                preferences.setBottomGestureBarAction(gestureType, action)
+                actionRevision += 1
+                bottomGesturePickerTarget = null
             }
         )
     }
@@ -753,7 +781,7 @@ private fun GestureMappingPanel(
                     preferences.actionFor(side, gestureType)
                 }
                 GestureActionRow(
-                    gestureType = gestureType,
+                    label = gestureLabel(gestureType),
                     action = action,
                     onClick = { onPickAction(gestureType) }
                 )
@@ -767,7 +795,7 @@ private fun GestureMappingPanel(
 
 @Composable
 private fun GestureActionRow(
-    gestureType: GestureType,
+    label: String,
     action: GestureAction,
     onClick: () -> Unit
 ) {
@@ -781,7 +809,7 @@ private fun GestureActionRow(
                 .weight(1f)
                 .padding(end = 12.dp)
         ) {
-            Text(text = gestureLabel(gestureType), style = MaterialTheme.typography.bodyLarge)
+            Text(text = label, style = MaterialTheme.typography.bodyLarge)
             Text(
                 text = stringResource(id = R.string.action_value, actionLabel(action)),
                 style = MaterialTheme.typography.bodySmall
@@ -999,6 +1027,60 @@ private fun gestureLabel(type: GestureType): String {
         GestureType.PULL_DIAGONAL_UP_LONG -> stringResource(id = R.string.gesture_diagonal_up_long)
         GestureType.PULL_DIAGONAL_DOWN_SHORT -> stringResource(id = R.string.gesture_diagonal_down_short)
         GestureType.PULL_DIAGONAL_DOWN_LONG -> stringResource(id = R.string.gesture_diagonal_down_long)
+    }
+}
+
+@Composable
+private fun bottomGestureLabel(type: BottomGestureBarGestureType): String {
+    return when (type) {
+        BottomGestureBarGestureType.Tap -> stringResource(id = R.string.bottom_gesture_tap)
+        BottomGestureBarGestureType.SwipeUp -> stringResource(id = R.string.bottom_gesture_swipe_up)
+        BottomGestureBarGestureType.SwipeUpHold -> stringResource(id = R.string.bottom_gesture_swipe_up_hold)
+        BottomGestureBarGestureType.SwipeHorizontal -> stringResource(id = R.string.bottom_gesture_swipe_horizontal)
+        BottomGestureBarGestureType.LongPress -> stringResource(id = R.string.bottom_gesture_long_press)
+    }
+}
+
+@Composable
+private fun BottomGestureBarPanel(
+    widthDp: Int,
+    onWidthChange: (Int) -> Unit,
+    preferences: UbikiPreferences,
+    revision: Int,
+    onPickAction: (BottomGestureBarGestureType) -> Unit
+) {
+    val gestures = remember { BottomGestureBarGestureType.entries }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = stringResource(id = R.string.bottom_gesture_bar_title),
+                style = MaterialTheme.typography.titleMedium
+            )
+            SliderRow(
+                title = stringResource(id = R.string.bottom_gesture_bar_width),
+                value = widthDp,
+                range = 96f..260f,
+                suffix = stringResource(id = R.string.dp_suffix),
+                onValueChange = onWidthChange
+            )
+            gestures.forEachIndexed { index, gestureType ->
+                val action = remember(revision, gestureType) {
+                    preferences.bottomGestureBarActionFor(gestureType)
+                }
+                GestureActionRow(
+                    label = bottomGestureLabel(gestureType),
+                    action = action,
+                    onClick = { onPickAction(gestureType) }
+                )
+                if (index != gestures.lastIndex) {
+                    HorizontalDivider()
+                }
+            }
+        }
     }
 }
 

@@ -23,6 +23,7 @@ internal class NativeEdgeGestureController(
     private val service: AccessibilityService,
     private val mainHandler: Handler,
     private val onGesture: (EdgeSide, GestureType, GestureData) -> Unit,
+    private val onBottomGesture: (BottomGestureBarGestureType, GestureData) -> Unit,
     private val onBackGestureProgress: (EdgeSide, BackGestureProgress) -> Unit,
     private val onBackGestureCommit: (EdgeSide, BackGestureProgress, GestureData) -> Boolean,
     private val onBackGestureEnd: (EdgeSide, BackGestureProgress) -> Unit,
@@ -84,7 +85,11 @@ internal class NativeEdgeGestureController(
         val touchController = controller
         val registeredCallback = callback
         config?.let { currentConfig ->
-            applyNativeTouchPassthrough(currentConfig, floatingChatExpanded = true)
+            applyNativeTouchPassthrough(
+                config = currentConfig,
+                floatingChatExpanded = true,
+                edgeGesturesEnabled = false
+            )
         }
         if (touchController != null && registeredCallback != null) {
             runCatching { touchController.unregisterCallback(registeredCallback) }
@@ -108,10 +113,19 @@ internal class NativeEdgeGestureController(
 
     private fun applyNativeTouchPassthrough(
         config: NativeEdgeGestureConfig,
-        floatingChatExpanded: Boolean
+        floatingChatExpanded: Boolean,
+        edgeGesturesEnabled: Boolean = true
     ): Boolean {
         val passthroughRegion = Region(0, 0, config.screenWidthPx, config.screenHeightPx)
-        nativeTouchInterceptRects(config, floatingChatExpanded).forEach { intercept ->
+        if (edgeGesturesEnabled) {
+            nativeTouchInterceptRects(config, floatingChatExpanded).forEach { intercept ->
+                passthroughRegion.op(
+                    Rect(intercept.left, intercept.top, intercept.right, intercept.bottom),
+                    Region.Op.DIFFERENCE
+                )
+            }
+        }
+        nativeBottomGestureInterceptRect(config, floatingChatExpanded)?.let { intercept ->
             passthroughRegion.op(
                 Rect(intercept.left, intercept.top, intercept.right, intercept.bottom),
                 Region.Op.DIFFERENCE
@@ -168,6 +182,23 @@ internal class NativeEdgeGestureController(
             leftConfigs = config.leftConfigs,
             rightConfigs = config.rightConfigs
         )
+        if (hit == null && nativeBottomGestureHitTest(event.x, event.y, config, floatingChatExpanded)) {
+            activeBottomGesture = true
+            activeSide = null
+            startX = event.x
+            startY = event.y
+            latestX = event.x
+            latestY = event.y
+            bottomLastMotionX = event.x
+            bottomLastMotionY = event.y
+            bottomLastMovementAtMillis = event.eventTime
+            bottomDownAtMillis = event.eventTime
+            bottomGestureDispatched = false
+            consumingGesture = true
+            latestBackProgress = null
+            sentBackCancel = false
+            return
+        }
         if (hit == null) {
             requestDelegatingOnce(touchController)
             clearGestureTracking()
@@ -188,6 +219,10 @@ internal class NativeEdgeGestureController(
         config: NativeEdgeGestureConfig,
         event: MotionEvent
     ) {
+        if (activeBottomGesture) {
+            handleBottomMove(event)
+            return
+        }
         val side = activeSide ?: run {
             requestDelegatingOnce(touchController)
             return
@@ -236,6 +271,11 @@ internal class NativeEdgeGestureController(
         config: NativeEdgeGestureConfig,
         event: MotionEvent
     ) {
+        if (activeBottomGesture) {
+            handleBottomUp(event)
+            resetGesture()
+            return
+        }
         val side = activeSide ?: run {
             requestDelegatingOnce(touchController)
             resetGesture()
@@ -262,6 +302,48 @@ internal class NativeEdgeGestureController(
             requestDelegatingOnce(touchController)
         }
         resetGesture()
+    }
+
+    private fun handleBottomMove(event: MotionEvent) {
+        latestX = event.x
+        latestY = event.y
+        val movedSinceLastMotion = kotlin.math.abs(latestX - bottomLastMotionX) >= BottomGestureBarNativeMotionSlopPx ||
+            kotlin.math.abs(latestY - bottomLastMotionY) >= BottomGestureBarNativeMotionSlopPx
+        if (movedSinceLastMotion) {
+            bottomLastMotionX = latestX
+            bottomLastMotionY = latestY
+            bottomLastMovementAtMillis = event.eventTime
+        }
+        if (bottomGestureDispatched) return
+        val gestureType = resolveBottomGestureBarGestureType(
+            deltaX = latestX - startX,
+            deltaY = latestY - startY,
+            gestureDurationMillis = event.eventTime - bottomDownAtMillis,
+            upwardStationaryMillis = event.eventTime - bottomLastMovementAtMillis
+        )
+        if (gestureType == BottomGestureBarGestureType.SwipeUpHold) {
+            bottomGestureDispatched = true
+            onBottomGesture(gestureType, GestureData(startX, startY, latestX, latestY))
+        }
+    }
+
+    private fun handleBottomUp(event: MotionEvent) {
+        latestX = event.x
+        latestY = event.y
+        if (bottomGestureDispatched) return
+        if (
+            kotlin.math.abs(latestX - bottomLastMotionX) >= BottomGestureBarNativeMotionSlopPx ||
+            kotlin.math.abs(latestY - bottomLastMotionY) >= BottomGestureBarNativeMotionSlopPx
+        ) {
+            bottomLastMovementAtMillis = event.eventTime
+        }
+        val gestureType = resolveBottomGestureBarGestureType(
+            deltaX = latestX - startX,
+            deltaY = latestY - startY,
+            gestureDurationMillis = event.eventTime - bottomDownAtMillis,
+            upwardStationaryMillis = event.eventTime - bottomLastMovementAtMillis
+        )
+        onBottomGesture(gestureType, GestureData(startX, startY, latestX, latestY))
     }
 
     private fun requestDelegatingOnce(touchController: TouchInteractionController) {
@@ -297,6 +379,12 @@ internal class NativeEdgeGestureController(
         latestX = 0f
         latestY = 0f
         consumingGesture = false
+        activeBottomGesture = false
+        bottomLastMotionX = 0f
+        bottomLastMotionY = 0f
+        bottomLastMovementAtMillis = 0L
+        bottomDownAtMillis = 0L
+        bottomGestureDispatched = false
         latestBackProgress = null
         sentBackCancel = false
     }
@@ -307,6 +395,12 @@ internal class NativeEdgeGestureController(
     private var latestX = 0f
     private var latestY = 0f
     private var consumingGesture = false
+    private var activeBottomGesture = false
+    private var bottomLastMotionX = 0f
+    private var bottomLastMotionY = 0f
+    private var bottomLastMovementAtMillis = 0L
+    private var bottomDownAtMillis = 0L
+    private var bottomGestureDispatched = false
     private var latestBackProgress: BackGestureProgress? = null
     private var sentBackCancel = false
     private var gestureDelegated = false
@@ -330,7 +424,8 @@ internal data class NativeEdgeGestureConfig(
     val leftConfigs: List<EdgeZoneConfig>,
     val rightConfigs: List<EdgeZoneConfig>,
     val shortThresholdPx: Float,
-    val longThresholdPx: Float
+    val longThresholdPx: Float,
+    val bottomGestureWidthDp: Int = defaultBottomGestureBarWidthDp()
 )
 
 internal data class NativeEdgeGestureHit(
@@ -351,7 +446,6 @@ internal fun nativeTouchInterceptRects(
     config: NativeEdgeGestureConfig,
     floatingChatExpanded: Boolean
 ): List<NativeTouchInterceptRect> {
-    if (floatingChatExpanded) return emptyList()
     return nativeTouchInterceptRects(
         screenWidthPx = config.screenWidthPx,
         screenHeightPx = config.screenHeightPx,
@@ -421,3 +515,4 @@ internal fun nativeGestureThresholdPx(thresholdDp: Int, density: Float): Float {
 }
 
 private const val NATIVE_GESTURE_THRESHOLD_RESPONSE_RATIO = 0.70f
+private const val BottomGestureBarNativeMotionSlopPx = 6f

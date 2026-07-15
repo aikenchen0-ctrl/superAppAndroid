@@ -33,11 +33,16 @@ import android.widget.Toast
 import android.view.Surface
 import android.view.TextureView
 import androidx.emoji2.emojipicker.EmojiPickerView
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.qrcode.QRCodeWriter
+import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import java.io.StringReader
 import java.io.StringWriter
 import java.nio.ByteBuffer
 import java.nio.charset.Charset
 import java.nio.charset.CodingErrorAction
+import java.util.EnumMap
 import java.util.Properties
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
@@ -109,6 +114,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.AttachMoney
@@ -199,6 +205,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -249,14 +256,76 @@ import com.paifa.ubikitouch.accessibility.data.LocalMomentPost
 import com.paifa.ubikitouch.accessibility.data.LocalContactProfile
 import com.paifa.ubikitouch.accessibility.data.LocalGroupProfile
 import com.paifa.ubikitouch.accessibility.data.localThreadIdForSelection
+import com.paifa.ubikitouch.accessibility.scrm.ScrmAddFriendRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmAddFriendsByPhoneRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmAdminBootstrapResult
+import com.paifa.ubikitouch.accessibility.scrm.ScrmAuthenticationException
+import com.paifa.ubikitouch.accessibility.scrm.ScrmContact
+import com.paifa.ubikitouch.accessibility.scrm.ScrmContactQuery
+import com.paifa.ubikitouch.accessibility.scrm.ScrmContactTaskRunner
+import com.paifa.ubikitouch.accessibility.scrm.ScrmException
+import com.paifa.ubikitouch.accessibility.scrm.ScrmFindContactRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmFriendRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmFriendRequestOperation
+import com.paifa.ubikitouch.accessibility.scrm.ScrmHandleFriendRequestRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmFloatingAccountRoute
+import com.paifa.ubikitouch.accessibility.scrm.AndroidScrmMediaContentResolver
+import com.paifa.ubikitouch.accessibility.scrm.ScrmInvalidResponseException
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMediaUploadRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMessageApi
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterial
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterialControlRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterialCopyRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterialCreateRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterialDetail
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterialQuery
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentAttachmentType
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentCommentRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentLikeRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentPostAttachment
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentPostPayload
+import com.paifa.ubikitouch.accessibility.scrm.ScrmPostMomentRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmQueuedMediaPayload
+import com.paifa.ubikitouch.accessibility.scrm.ScrmRequestException
+import com.paifa.ubikitouch.accessibility.scrm.ScrmSendFriendVerifyRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmSendTextMessageRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmSettingsManager
+import com.paifa.ubikitouch.accessibility.scrm.ScrmSyncMomentMessagesRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmSyncContactsRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmSyncMomentsRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskApi
+import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskPollState
+import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskResult
+import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskSubmissionResult
+import com.paifa.ubikitouch.accessibility.scrm.resolveScrmTaskResult
+import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingAccountRouteForContactId
+import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingContactConversationId
+import com.paifa.ubikitouch.accessibility.scrm.scrmMediaOperationType
+import com.paifa.ubikitouch.accessibility.scrm.scrmMessageOperationType
+import com.paifa.ubikitouch.accessibility.scrm.toUserMessage
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.InputStream
+import java.net.URL
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
+import java.util.concurrent.Semaphore
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.min
@@ -277,7 +346,7 @@ internal fun FloatingChatOverlay(
     initialGroupProfiles: List<LocalGroupProfile> = emptyList(),
     initialSelectedAccountId: String? = null,
     onLocalMessagesChanged: (List<FloatingChatMessage>, Int) -> Unit = { _, _ -> },
-    onPrepareOutgoingTextMessage: (FloatingChatMessage, String) -> FloatingChatMessage = { message, _ -> message },
+    onPrepareOutgoingMessage: (FloatingChatMessage, String) -> FloatingChatMessage = { message, _ -> message },
     onPersistLocalMessage: (FloatingChatMessage, String) -> Unit = { _, _ -> },
     onPersistForwardedMessage: (FloatingChatMessage, FloatingChatMessage, String, String?) -> Unit = { _, _, _, _ -> },
     onPersistMomentPost: (AppMomentPost) -> Unit = {},
@@ -289,6 +358,7 @@ internal fun FloatingChatOverlay(
     edgeGestureShortThresholdDp: Int = FloatingChatInternalEdgeGestureDefaults.ShortThresholdDp,
     edgeGestureLongThresholdDp: Int = FloatingChatInternalEdgeGestureDefaults.LongThresholdDp,
     onEdgeGesture: (EdgeSide, GestureType, GestureData) -> Unit = { _, _, _ -> },
+    onBottomGesture: (BottomGestureBarGestureType, GestureData) -> Unit = { _, _ -> },
     onBackGestureProgress: (EdgeSide, BackGestureProgress) -> Unit = { _, _ -> },
     onBackGestureCommit: (EdgeSide, BackGestureProgress, GestureData) -> Boolean = { _, _, _ -> false },
     onBackGestureEnd: (EdgeSide, BackGestureProgress) -> Unit = { _, _ -> },
@@ -303,6 +373,7 @@ internal fun FloatingChatOverlay(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val coroutineScope = rememberCoroutineScope()
+    var liveConversation by remember { mutableStateOf(conversation) }
     var inputText by remember { mutableStateOf("") }
     var inputFocused by remember { mutableStateOf(false) }
     var bottomPanelMode by remember { mutableStateOf(BottomPanelMode.None) }
@@ -354,9 +425,9 @@ internal fun FloatingChatOverlay(
             }
         }
     }
-    val accountProfiles = remember(context, conversation.accountContacts) {
+    val accountProfiles = remember(context, liveConversation.accountContacts) {
         mutableStateMapOf<String, FloatingChatAccountProfile>().apply {
-            conversation.accountContacts.forEach { account ->
+            liveConversation.accountContacts.forEach { account ->
                 this[account.id] = loadAccountProfile(context, account)
             }
         }
@@ -369,11 +440,7 @@ internal fun FloatingChatOverlay(
     var quickPhrases by remember(context) { mutableStateOf(loadQuickPhrases(context)) }
     val momentPosts = remember(initialMomentPosts) {
         mutableStateListOf<AppMomentPost>().apply {
-            addAll(
-                initialMomentPosts + wechatMomentPosts().filterNot { defaultPost ->
-                    initialMomentPosts.any { savedPost -> savedPost.id == defaultPost.id }
-                }
-            )
+            addAll(initialMomentPosts)
         }
     }
     fun upsertMomentPost(post: AppMomentPost) {
@@ -386,12 +453,12 @@ internal fun FloatingChatOverlay(
         onPersistMomentPost(post)
     }
     var pendingMomentMedia by remember { mutableStateOf<AppMomentMedia?>(null) }
-    val effectiveAccountContacts = conversation.accountContacts.map { account ->
+    val effectiveAccountContacts = liveConversation.accountContacts.map { account ->
         (accountProfiles[account.id] ?: defaultAccountProfileFor(account)).toContact(account)
     }
-    val profiledConversation = conversation.copy(accountContacts = effectiveAccountContacts)
-    val accountIds = remember(conversation.accountContacts) {
-        conversation.accountContacts.map { account -> account.id }
+    val profiledConversation = liveConversation.copy(accountContacts = effectiveAccountContacts)
+    val accountIds = remember(liveConversation.accountContacts) {
+        liveConversation.accountContacts.map { account -> account.id }
     }
     var activeAccountId by remember(accountIds) {
         mutableStateOf(
@@ -442,15 +509,15 @@ internal fun FloatingChatOverlay(
         homeOverviewVisible = false
         unreadThreadIds.remove(summary.threadId)
     }
-    val localMessages = remember(conversation, initialLocalMessages) {
+    val localMessages = remember(liveConversation, initialLocalMessages) {
         mutableStateListOf<FloatingChatMessage>().apply {
             addAll(initialLocalMessages)
         }
     }
-    var localMessageSequence by remember(conversation, initialMessageSequence) {
+    var localMessageSequence by remember(liveConversation, initialMessageSequence) {
         mutableStateOf(initialMessageSequence)
     }
-    var localMessageVersion by remember(conversation) {
+    var localMessageVersion by remember(liveConversation) {
         mutableIntStateOf(0)
     }
     val selectedAccount = remember(contactProfiledConversation, selectedThread, activeAccountId) {
@@ -460,6 +527,7 @@ internal fun FloatingChatOverlay(
             overrideAccountId = activeAccountId
         )
     }
+    val scrmProfileManager = remember(context) { ScrmSettingsManager(context.applicationContext) }
     val displayConversation = remember(contactProfiledConversation, localMessages.size, localMessageVersion, hiddenMessageIds.size) {
         applyContactProfilesToConversation(
             conversation = contactProfiledConversation.copy(
@@ -471,6 +539,7 @@ internal fun FloatingChatOverlay(
         )
     }
     val accountScopedDisplayConversations = remember(
+        homeOverviewVisible,
         profiledConversation,
         contactProfileList,
         groupProfileList,
@@ -478,6 +547,9 @@ internal fun FloatingChatOverlay(
         localMessageVersion,
         hiddenMessageIds.size
     ) {
+        if (!shouldBuildAllAccountHomeOverview(homeOverviewVisible)) {
+            return@remember emptyList<AccountScopedConversation>()
+        }
         val visibleLocalMessages = localMessages.filter { message -> hiddenMessageIds[message.id] != true }
         accountScopedConversations(profiledConversation).map { scoped ->
             val groupAppliedConversation = applyGroupProfilesToConversation(
@@ -502,10 +574,14 @@ internal fun FloatingChatOverlay(
         }
     }
     val homeDisplayConversation = remember(profiledConversation, accountScopedDisplayConversations) {
-        allAccountHomeConversation(
-            baseConversation = profiledConversation,
-            accountConversations = accountScopedDisplayConversations
-        )
+        if (accountScopedDisplayConversations.isEmpty()) {
+            profiledConversation
+        } else {
+            allAccountHomeConversation(
+                baseConversation = profiledConversation,
+                accountConversations = accountScopedDisplayConversations
+            )
+        }
     }
     val activeGroupProfilesById = remember(groupProfileList, activeAccountId) {
         groupProfileList
@@ -592,6 +668,23 @@ internal fun FloatingChatOverlay(
         localMessageVersion += 1
         onLocalMessagesChanged(localMessages.toList(), localMessageSequence)
     }
+    LaunchedEffect(conversation) {
+        liveConversation = conversation
+    }
+    LaunchedEffect(runtimeState.conversationUpdateEvent) {
+        val event = runtimeState.conversationUpdateEvent ?: return@LaunchedEffect
+        liveConversation = event.conversation
+        activeAccountId = event.selectedAccountId
+        selectedThread = initialChatThreadSelection(
+            conversation = accountScopedConversation(
+                conversation = event.conversation,
+                activeAccountId = event.selectedAccountId
+            ),
+            preferredSelection = event.selectedThread
+        )
+        homeOverviewVisible = false
+        runtimeState.clearConversationUpdate(event.token)
+    }
     LaunchedEffect(runtimeState.localMessagesUpdateEvent) {
         val event = runtimeState.localMessagesUpdateEvent ?: return@LaunchedEffect
         localMessages.clear()
@@ -631,7 +724,7 @@ internal fun FloatingChatOverlay(
             }
         }
         val threadId = selectedThread.toLocalThreadId()
-        val message = onPrepareOutgoingTextMessage(
+        val message = onPrepareOutgoingMessage(
             outgoingTextMessageWithOptionalQuote(baseMessage, quotedMessage),
             threadId
         )
@@ -651,6 +744,45 @@ internal fun FloatingChatOverlay(
     fun updateGroupProfile(profile: LocalGroupProfile) {
         groupProfiles[groupProfileKey(profile.accountId, profile.groupId)] = profile
         onPersistGroupProfile(profile)
+    }
+    fun deleteFriendFromProfile(contact: FloatingChatContact) {
+        val friendId = scrmFloatingContactConversationId(contact.id)
+        if (friendId == null) {
+            Toast.makeText(context, "当前联系人缺少可删除的 wxid", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val accountId = accountIdForScopedThreadId(contact.id) ?: selectedAccount.id
+        val route = scrmContactsPanelRouteForSelectedAccount(
+            selectedAccountId = accountId,
+            fallbackDeviceUuid = null,
+            fallbackWeChatId = null
+        )
+        if (route == null) {
+            Toast.makeText(context, "当前账号缺少 SCRM 路由，无法删除好友", Toast.LENGTH_SHORT).show()
+            return
+        }
+        coroutineScope.launch {
+            Toast.makeText(context, "正在提交删除好友", Toast.LENGTH_SHORT).show()
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val session = scrmProfileManager.loadSelectedSessionOrBootstrap()
+                    ScrmContactTaskRunner(session.taskApi).submitAndAwait(
+                        reloadContactsOnSuccess = true
+                    ) {
+                        session.contactApi.deleteFriend(
+                            friendId = friendId,
+                            deviceUuid = route.deviceUuid,
+                            weChatId = route.weChatId
+                        )
+                    }
+                }
+            }.onSuccess { outcome ->
+                Toast.makeText(context, outcome.message, Toast.LENGTH_SHORT).show()
+                contactEditorTarget = null
+            }.onFailure { error ->
+                Toast.makeText(context, error.toScrmContactsPanelMessage(), Toast.LENGTH_LONG).show()
+            }
+        }
     }
     fun pickAccountAvatar(accountId: String) {
         pendingAvatarAccountId = accountId
@@ -741,10 +873,12 @@ internal fun FloatingChatOverlay(
         if (aiDraftSendAlreadyHandled(message.id, sentAiDraftMessageIds)) return
         sentAiDraftMessageIds[message.id] = true
         localMessageSequence += 1
-        val sentMessage = draftTextMessageFromAiDraft(
-            editedAiDraftMessage(message, text)
-        ).copy(
-            id = "local-ai-send-${selectedThread.toLocalThreadId()}-${selectedAccount.id}-$localMessageSequence",
+        val threadId = selectedThread.toLocalThreadId()
+        val sentMessage = preparedAiDraftTextMessageForSend(
+            draft = editedAiDraftMessage(message, text),
+            messageId = "local-ai-send-${threadId}-${selectedAccount.id}-$localMessageSequence",
+            threadId = threadId,
+            prepareOutgoingMessage = onPrepareOutgoingMessage,
             time = "刚刚"
         )
         val localIndex = localMessages.indexOfFirst { draft -> draft.id == message.id }
@@ -755,7 +889,7 @@ internal fun FloatingChatOverlay(
             localMessages += sentMessage
         }
         syncLocalMessageState()
-        onPersistLocalMessage(sentMessage, selectedThread.toLocalThreadId())
+        onPersistLocalMessage(sentMessage, threadId)
         aiDraftActionMessage = null
         aiDraftEditMessage = null
     }
@@ -955,7 +1089,7 @@ internal fun FloatingChatOverlay(
     }
     fun sendAccountCard(accountId: String) {
         val account = effectiveConversation.accountContacts.firstOrNull { it.id == accountId }
-            ?: conversation.accountContacts.firstOrNull { it.id == accountId }
+            ?: liveConversation.accountContacts.firstOrNull { it.id == accountId }
             ?: return
         val profile = accountProfiles[account.id] ?: defaultAccountProfileFor(account)
         localMessageSequence += 1
@@ -996,6 +1130,9 @@ internal fun FloatingChatOverlay(
             FloatingChatToolAction.Moments -> {
                 bottomPanelMode = BottomPanelMode.Moments
             }
+            FloatingChatToolAction.MomentMaterials -> {
+                bottomPanelMode = BottomPanelMode.MomentMaterials
+            }
             FloatingChatToolAction.RedPacket -> {
                 bottomPanelMode = BottomPanelMode.RedPacket
             }
@@ -1018,6 +1155,9 @@ internal fun FloatingChatOverlay(
             FloatingChatToolAction.Assistant -> {
                 aiConfigStatus = null
                 bottomPanelMode = BottomPanelMode.Assistant
+            }
+            FloatingChatToolAction.Contacts -> {
+                bottomPanelMode = BottomPanelMode.Contacts
             }
             in simulatedMessageToolActions() -> {
                 addToolMessage(action)
@@ -1044,7 +1184,7 @@ internal fun FloatingChatOverlay(
     }
     val sendVoiceMessage: (String, Int) -> Unit = { audioUri, durationMs ->
         localMessageSequence += 1
-        val message = when (val thread = selectedThread) {
+        val baseMessage = when (val thread = selectedThread) {
             ChatThreadSelection.Group -> {
                 FloatingChatPrototype.simulatedOutgoingGroupVoiceMessage(
                     conversation = effectiveConversation,
@@ -1075,23 +1215,28 @@ internal fun FloatingChatOverlay(
                 )
             }
         }
+        val threadId = selectedThread.toLocalThreadId()
+        val message = onPrepareOutgoingMessage(baseMessage, threadId)
         localMessages += message
         syncLocalMessageState()
-        onPersistLocalMessage(message, selectedThread.toLocalThreadId())
+        onPersistLocalMessage(message, threadId)
         bottomPanelMode = BottomPanelMode.None
     }
     fun addForwardedMessage(source: FloatingChatMessage, target: ChatThreadSelection) {
         val account = selectedAccountForThread(effectiveConversation, target)
         localMessageSequence += 1
-        val message = source.forwardedCopyFor(
+        val threadId = target.toLocalThreadId()
+        val message = preparedForwardedMessageForSend(
+            source = source,
             conversation = effectiveConversation,
             target = target,
             accountId = account.id,
-            sequence = localMessageSequence
+            sequence = localMessageSequence,
+            prepareOutgoingMessage = onPrepareOutgoingMessage
         )
         localMessages += message
         syncLocalMessageState()
-        onPersistForwardedMessage(source, message, target.toLocalThreadId(), account.id)
+        onPersistLocalMessage(message, threadId)
     }
     fun selectedMessagesForAction(): List<FloatingChatMessage> {
         val messagesById = displayConversation.messages.associateBy { message -> message.id }
@@ -1158,7 +1303,7 @@ internal fun FloatingChatOverlay(
             val accountId = pendingAvatarAccountId
             if (accountId != null) {
                 val account = effectiveConversation.accountContacts.firstOrNull { it.id == accountId }
-                    ?: conversation.accountContacts.firstOrNull { it.id == accountId }
+                    ?: liveConversation.accountContacts.firstOrNull { it.id == accountId }
                 if (account != null) {
                     val currentProfile = accountProfiles[accountId] ?: defaultAccountProfileFor(account)
                     updateAccountProfile(
@@ -1178,7 +1323,7 @@ internal fun FloatingChatOverlay(
             return@LaunchedEffect
         }
         localMessageSequence += 1
-        val message = FloatingChatPrototype.simulatedPickedMediaMessage(
+        val baseMessage = FloatingChatPrototype.simulatedPickedMediaMessage(
             conversation = effectiveConversation,
             mediaKind = event.mediaKind,
             mediaUri = event.mediaUri,
@@ -1189,15 +1334,17 @@ internal fun FloatingChatOverlay(
             accountId = selectedAccount.id,
             sequence = localMessageSequence
         )
+        val threadId = selectedThread.toLocalThreadId()
+        val message = onPrepareOutgoingMessage(baseMessage, threadId)
         localMessages += message
         syncLocalMessageState()
-        onPersistLocalMessage(message, selectedThread.toLocalThreadId())
+        onPersistLocalMessage(message, threadId)
         runtimeState.clearPickedMediaEvent(event.token)
     }
     LaunchedEffect(runtimeState.pickedDocumentEvent) {
         val event = runtimeState.pickedDocumentEvent ?: return@LaunchedEffect
         localMessageSequence += 1
-        val message = FloatingChatPrototype.pickedDocumentMessage(
+        val baseMessage = FloatingChatPrototype.pickedDocumentMessage(
             conversation = effectiveConversation,
             documentUri = event.document.uri,
             displayName = event.document.displayName,
@@ -1209,9 +1356,11 @@ internal fun FloatingChatOverlay(
             accountId = selectedAccount.id,
             sequence = localMessageSequence
         )
+        val threadId = selectedThread.toLocalThreadId()
+        val message = onPrepareOutgoingMessage(baseMessage, threadId)
         localMessages += message
         syncLocalMessageState()
-        onPersistLocalMessage(message, selectedThread.toLocalThreadId())
+        onPersistLocalMessage(message, threadId)
         runtimeState.clearPickedDocumentEvent(event.token)
     }
     LaunchedEffect(runtimeState.blinkVoiceResultEvent) {
@@ -1289,7 +1438,7 @@ internal fun FloatingChatOverlay(
     }
     LaunchedEffect(effectiveConversation.groupContacts, effectiveConversation.contacts) {
         selectedThread = initialChatThreadSelection(effectiveConversation, selectedThread)
-        val defaultUnreadThreadIds = defaultAllAccountHomeUnreadThreadIds(profiledConversation)
+        val defaultUnreadThreadIds = defaultHomeUnreadThreadIds(effectiveConversation)
         unreadThreadIds.keys
             .filterNot { threadId -> threadId in defaultUnreadThreadIds }
             .forEach { threadId -> unreadThreadIds.remove(threadId) }
@@ -1351,6 +1500,7 @@ internal fun FloatingChatOverlay(
             .toPx() * FloatingChatInternalEdgeGestureDefaults.ThresholdResponseRatio
     }
     val currentOnEdgeGesture by rememberUpdatedState(onEdgeGesture)
+    val currentOnBottomGesture by rememberUpdatedState(onBottomGesture)
     val currentOnBackGestureProgress by rememberUpdatedState(onBackGestureProgress)
     val currentOnBackGestureCommit by rememberUpdatedState(onBackGestureCommit)
     val currentOnBackGestureEnd by rememberUpdatedState(onBackGestureEnd)
@@ -1381,6 +1531,7 @@ internal fun FloatingChatOverlay(
             conversation = if (homeOverviewVisible) homeDisplayConversation else displayConversation,
             homeOverviewConversations = accountScopedDisplayConversations,
             accountProfiles = accountProfiles,
+            activeAccountId = selectedAccount.id,
             selectedThread = selectedThread,
             homeOverviewVisible = homeOverviewVisible,
             unreadThreadIds = unreadThreadIds.filterValues { unread -> unread }.keys.toSet(),
@@ -1397,10 +1548,16 @@ internal fun FloatingChatOverlay(
                 contactEditorTarget = ContactEditorTarget.User(contact)
             },
             onAccountAvatarClick = { account ->
-                activeAccountId = selectedAccountIdAfterAccountAvatarClick(
+                val nextAccountId = selectedAccountIdAfterAccountAvatarClick(
                     currentAccountId = activeAccountId,
                     clickedAccountId = account.id
                 )
+                selectedThread = selectedThreadAfterAccountAvatarClick(
+                    conversation = profiledConversation,
+                    clickedAccountId = nextAccountId,
+                    currentThread = selectedThread
+                )
+                activeAccountId = nextAccountId
                 homeOverviewVisible = false
                 bottomPanelMode = BottomPanelMode.None
             },
@@ -1466,6 +1623,16 @@ internal fun FloatingChatOverlay(
             }
             FloatingBottomPanel(
                 mode = bottomPanelMode,
+                scrmContactsRoute = scrmContactsPanelRouteForSelectedAccount(
+                    selectedAccountId = selectedAccount.id,
+                    fallbackDeviceUuid = null,
+                    fallbackWeChatId = null
+                ),
+                scrmMomentsRoute = scrmContactsPanelRouteForSelectedAccount(
+                    selectedAccountId = selectedAccount.id,
+                    fallbackDeviceUuid = null,
+                    fallbackWeChatId = null
+                ),
                 voicePermissionRequestToken = voicePermissionRequestToken,
                 locationPermissionRequestToken = locationPermissionRequestToken,
                 onClose = { bottomPanelMode = BottomPanelMode.None },
@@ -1531,23 +1698,6 @@ internal fun FloatingChatOverlay(
                         initialIndex = 0,
                         runtimeState = runtimeState
                     )
-                },
-                onPostMoment = { content ->
-                    val trimmed = content.trim()
-                    val media = pendingMomentMedia
-                    if (trimmed.isNotEmpty() || media != null) {
-                        val post = AppMomentPost(
-                            author = selectedAccount.name,
-                            content = trimmed,
-                            time = "刚刚",
-                            avatarText = selectedAccount.initials.take(2),
-                            avatarColor = Color(selectedAccount.avatarColor),
-                            media = media,
-                            createdAt = System.currentTimeMillis()
-                        )
-                        upsertMomentPost(post)
-                        pendingMomentMedia = null
-                    }
                 },
                 onUpdateMomentPost = { post ->
                     upsertMomentPost(post)
@@ -1675,6 +1825,13 @@ internal fun FloatingChatOverlay(
         }
         },
         overlayContent = {
+        FloatingChatExpandedBottomGestureBar(
+            onGesture = currentOnBottomGesture,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .zIndex(48f)
+        )
         favoritePreviewItem?.let { item ->
             FavoriteCollectionPreviewOverlay(
                 item = item,
@@ -1782,7 +1939,7 @@ internal fun FloatingChatOverlay(
                 onTargetSelected = { target ->
                     addForwardedMessage(message, target)
                     forwardMessage = null
-                    Toast.makeText(context, "已转发", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "已提交转发，发送结果以消息状态为准", Toast.LENGTH_SHORT).show()
                 },
                 modifier = Modifier.fillMaxSize()
             )
@@ -1820,6 +1977,7 @@ internal fun FloatingChatOverlay(
                 onGroupProfileChange = { profile -> updateGroupProfile(profile) },
                 contactProfiles = contactProfiles,
                 onContactProfileChange = { profile -> updateContactProfile(profile) },
+                onDeleteFriend = { contact -> deleteFriendFromProfile(contact) },
                 onDismiss = { contactEditorTarget = null },
                 modifier = Modifier.fillMaxSize()
             )
@@ -1878,6 +2036,130 @@ internal fun FloatingChatOverlay(
         }
     )
 }
+
+@Composable
+private fun FloatingChatExpandedBottomGestureBar(
+    onGesture: (BottomGestureBarGestureType, GestureData) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var pressed by remember { mutableStateOf(false) }
+    Box(
+        modifier = modifier
+            .width(defaultBottomGestureBarWidthDp().dp)
+            .height(FloatingChatBottomGestureBarHeightDp.dp)
+            .floatingChatBottomGestureBarInput(
+                onPressedChange = { nextPressed -> pressed = nextPressed },
+                onGesture = onGesture
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .width(FloatingChatBottomGestureBarVisualWidthDp.dp)
+                .height(FloatingChatBottomGestureBarVisualHeightDp.dp)
+                .clip(RoundedCornerShape(50))
+                .background(
+                    if (pressed) {
+                        OverlayTokens.primaryText.copy(alpha = 0.82f)
+                    } else {
+                        OverlayTokens.primaryText.copy(alpha = 0.58f)
+                    }
+                )
+        )
+    }
+}
+
+private fun Modifier.floatingChatBottomGestureBarInput(
+    onPressedChange: (Boolean) -> Unit,
+    onGesture: (BottomGestureBarGestureType, GestureData) -> Unit
+): Modifier {
+    return pointerInput(onGesture) {
+        awaitEachGesture {
+            val down = awaitFirstDown(
+                requireUnconsumed = false,
+                pass = PointerEventPass.Initial
+            )
+            val startX = down.position.x
+            val startY = down.position.y
+            var latestX = startX
+            var latestY = startY
+            var lastMotionX = startX
+            var lastMotionY = startY
+            var lastMovementAtMillis = down.uptimeMillis
+            var gestureDispatched = false
+            onPressedChange(true)
+            down.consume()
+
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                latestX = change.position.x
+                latestY = change.position.y
+                if (
+                    abs(latestX - lastMotionX) >= FloatingChatBottomGestureBarMotionSlopPx ||
+                    abs(latestY - lastMotionY) >= FloatingChatBottomGestureBarMotionSlopPx
+                ) {
+                    lastMotionX = latestX
+                    lastMotionY = latestY
+                    lastMovementAtMillis = change.uptimeMillis
+                }
+                if (!gestureDispatched) {
+                    val gestureType = resolveBottomGestureBarGestureType(
+                        deltaX = latestX - startX,
+                        deltaY = latestY - startY,
+                        gestureDurationMillis = change.uptimeMillis - down.uptimeMillis,
+                        upwardStationaryMillis = change.uptimeMillis - lastMovementAtMillis
+                    )
+                    if (gestureType == BottomGestureBarGestureType.SwipeUpHold) {
+                        gestureDispatched = true
+                        onGesture(
+                            gestureType,
+                            GestureData(
+                                startX = startX,
+                                startY = startY,
+                                endX = latestX,
+                                endY = latestY
+                            )
+                        )
+                    }
+                }
+                change.consume()
+                if (!change.pressed) {
+                    onPressedChange(false)
+                    if (!gestureDispatched) {
+                        if (
+                            abs(latestX - lastMotionX) >= FloatingChatBottomGestureBarMotionSlopPx ||
+                            abs(latestY - lastMotionY) >= FloatingChatBottomGestureBarMotionSlopPx
+                        ) {
+                            lastMovementAtMillis = change.uptimeMillis
+                        }
+                        onGesture(
+                            resolveBottomGestureBarGestureType(
+                                deltaX = latestX - startX,
+                                deltaY = latestY - startY,
+                                gestureDurationMillis = change.uptimeMillis - down.uptimeMillis,
+                                upwardStationaryMillis = change.uptimeMillis - lastMovementAtMillis
+                            ),
+                            GestureData(
+                                startX = startX,
+                                startY = startY,
+                                endX = latestX,
+                                endY = latestY
+                            )
+                        )
+                    }
+                    break
+                }
+            }
+            onPressedChange(false)
+        }
+    }
+}
+
+private const val FloatingChatBottomGestureBarHeightDp = 30
+private const val FloatingChatBottomGestureBarVisualWidthDp = 92
+private const val FloatingChatBottomGestureBarVisualHeightDp = 5
+private const val FloatingChatBottomGestureBarMotionSlopPx = 6f
 
 @Composable
 private fun FloatingChatOverlayRuntimeSections(
@@ -1984,6 +2266,7 @@ private fun CoordinateChatBody(
     conversation: FloatingChatConversation,
     homeOverviewConversations: List<AccountScopedConversation>,
     accountProfiles: Map<String, FloatingChatAccountProfile>,
+    activeAccountId: String,
     selectedThread: ChatThreadSelection,
     homeOverviewVisible: Boolean,
     unreadThreadIds: Set<String>,
@@ -2015,17 +2298,21 @@ private fun CoordinateChatBody(
     val connectorState = remember { ConnectorCoordinateState() }
     val density = LocalDensity.current
     val imeBottomPx = WindowInsets.ime.getBottom(density)
-    val selectedAccount = remember(conversation, selectedThread) {
-        selectedAccountForThread(
+    val selectedAccount = remember(conversation, selectedThread, activeAccountId) {
+        selectedAccountForCoordinateBody(
             conversation = conversation,
-            selection = selectedThread
+            selectedThread = selectedThread,
+            activeAccountId = activeAccountId
         )
     }
-    val homeUnreadSummaries = remember(homeOverviewConversations, unreadThreadIds) {
-        homeUnreadThreadSummaries(
-            accountConversations = homeOverviewConversations,
-            unreadThreadIds = unreadThreadIds
-        )
+    val homeUnreadSummaries = remember(homeOverviewConversations) {
+        if (shouldBuildAllAccountHomeOverview(homeOverviewVisible)) {
+            homeUnreadThreadSummaries(
+                accountConversations = homeOverviewConversations
+            )
+        } else {
+            emptyList()
+        }
     }
     val homeUnreadSummaryByMessageId = remember(homeUnreadSummaries) {
         homeUnreadSummaries.associateBy { summary -> summary.message.id }
@@ -2052,14 +2339,20 @@ private fun CoordinateChatBody(
         )
     }
     val messageListState = rememberLazyListState(
-        initialFirstVisibleItemIndex = messageListInitialFirstVisibleItemIndex(visibleMessages.size)
+        initialFirstVisibleItemIndex = messageListInitialFirstVisibleItemIndex(
+            messageCount = visibleMessages.size,
+            homeOverviewVisible = homeOverviewVisible
+        )
     )
     val viewportTracker = remember {
         MessageListViewportTracker(viewportKey, visibleMessages.size)
     }
     if (shouldRetargetMessageList(viewportTracker.viewportKey, viewportKey)) {
         messageListState.requestScrollToItem(
-            index = messageListInitialFirstVisibleItemIndex(visibleMessages.size)
+            index = messageListInitialFirstVisibleItemIndex(
+                messageCount = visibleMessages.size,
+                homeOverviewVisible = homeOverviewVisible
+            )
         )
         viewportTracker.viewportKey = viewportKey
         viewportTracker.messageCount = visibleMessages.size
@@ -2089,7 +2382,7 @@ private fun CoordinateChatBody(
         connectorState.retainMessageBounds(visibleMessageIds)
     }
     LaunchedEffect(viewportKey, visibleMessages.size) {
-        if (visibleMessages.size > viewportTracker.messageCount && visibleMessages.isNotEmpty()) {
+        if (!homeOverviewVisible && visibleMessages.size > viewportTracker.messageCount && visibleMessages.isNotEmpty()) {
             messageListState.animateScrollToItem(visibleMessages.lastIndex)
         }
         viewportTracker.messageCount = visibleMessages.size
@@ -2235,10 +2528,13 @@ private fun ScrollableSessionRail(
         }
     }
     val railItems = remember(visibleGroups, contacts) {
-        buildList {
-            visibleGroups.forEach { group -> add(SessionRailItem.Group(group)) }
-            contacts.forEach { contact -> add(SessionRailItem.Contact(contact)) }
-        }
+        sessionRailItems(
+            groups = visibleGroups,
+            contacts = contacts
+        )
+    }
+    val contactsById = remember(railItems) {
+        railItems.associate { item -> item.contact.id to item.contact }
     }
     val sessionConnectorIds = remember(railItems) {
         railItems.map { item ->
@@ -2265,6 +2561,7 @@ private fun ScrollableSessionRail(
         }
     }
     val density = LocalDensity.current
+    val railScreenEdgeInsetDp = with(density) { RailScreenEdgeInsetPx.toDp() }
     var topOverscrollPx by remember { mutableStateOf(0f) }
     val maxTopOverscrollPx = remember(density) {
         with(density) { LeftRailTopOverscrollMaxDp.dp.toPx() }
@@ -2275,19 +2572,15 @@ private fun ScrollableSessionRail(
     val sessionVirtualFallbackStepPx = remember(density) {
         with(density) { (RailAvatarSize + LeftRailItemGapDp.dp).toPx() }
     }
-    val followInfos by remember(conversation, selectedAccountId, railItems, avatarBoundsVersion) {
+    val followInfos by remember(conversation, selectedAccountId, contactsById, avatarBoundsVersion) {
         derivedStateOf {
-            railItems.mapNotNull { item ->
-                val bounds = avatarBoundsByContactId[item.contact.id] ?: return@mapNotNull null
-                leftRailFollowInfoForContact(
-                    conversation = conversation,
-                    contact = item.contact,
-                    selectedAccountId = selectedAccountId
-                ).copy(
-                    topPx = bounds.top - railRootTopPx,
-                    heightPx = bounds.height
-                )
-            }
+            leftRailVisibleFollowInfos(
+                conversation = conversation,
+                selectedAccountId = selectedAccountId,
+                contactsById = contactsById,
+                visibleAvatarBounds = avatarBoundsByContactId,
+                railRootTopPx = railRootTopPx
+            )
         }
     }
     val selectedPrivateContactId = (selectedThread as? ChatThreadSelection.Private)?.contactId
@@ -2451,60 +2744,65 @@ private fun ScrollableSessionRail(
                     is SessionRailItem.Group -> {
                         val group = item.contact
                         val selection = group.toGroupThreadSelection()
-                        GroupChatAvatar(
-                            selected = selectedThread == selection,
-                            unread = unreadThreadIds.contains(selection.toLocalThreadId()),
-                            memberCount = contacts.size,
-                            label = group.initials,
-                            color = Color(group.avatarColor),
-                            onClick = { onThreadSelected(selection) },
-                            onLongClick = { onGroupAvatarLongClick(group) },
-                            onBoundsChanged = { bounds ->
-                                updateAvatarBounds(group.id, bounds)
-                                val connectorId = group.groupConnectorId()
-                                if (selectedThread == selection) {
-                                    connectorState.updateGroupThreadAvatar(connectorId, bounds)
+                        Box(modifier = Modifier.padding(start = railScreenEdgeInsetDp)) {
+                            GroupChatAvatar(
+                                selected = selectedThread == selection,
+                                unread = unreadThreadIds.contains(selection.toLocalThreadId()),
+                                memberCount = contacts.size,
+                                label = group.initials,
+                                color = Color(group.avatarColor),
+                                memberAvatarUris = groupChatAvatarDisplayImageUris(group),
+                                onClick = { onThreadSelected(selection) },
+                                onLongClick = { onGroupAvatarLongClick(group) },
+                                onBoundsChanged = { bounds ->
+                                    updateAvatarBounds(group.id, bounds)
+                                    val connectorId = group.groupConnectorId()
+                                    if (selectedThread == selection) {
+                                        connectorState.updateGroupThreadAvatar(connectorId, bounds)
+                                    }
+                                    connectorState.updateUserAvatar(connectorId, bounds)
+                                },
+                                onRemoved = {
+                                    removeAvatarBounds(group.id)
+                                    val connectorId = group.groupConnectorId()
+                                    connectorState.removeUserAvatar(connectorId)
+                                    connectorState.removeGroupThreadAvatar(connectorId)
                                 }
-                                connectorState.updateUserAvatar(connectorId, bounds)
-                            },
-                            onRemoved = {
-                                removeAvatarBounds(group.id)
-                                val connectorId = group.groupConnectorId()
-                                connectorState.removeUserAvatar(connectorId)
-                                connectorState.removeGroupThreadAvatar(connectorId)
-                            }
-                        )
+                            )
+                        }
                     }
                     is SessionRailItem.Contact -> {
                         val contact = item.contact
                         var currentAvatarBounds by remember(contact.id) { mutableStateOf<Rect?>(null) }
-                        CompactAvatar(
-                            contact = contact.copy(
-                                selected = selectedThread is ChatThreadSelection.Private &&
-                                    selectedThread.contactId == contact.id,
-                                online = unreadThreadIds.contains(ChatThreadSelection.Private(contact.id).toLocalThreadId())
-                            ),
-                            role = AvatarRole.Session,
-                            onClick = {
-                                (currentAvatarBounds ?: avatarBoundsByContactId[contact.id])?.let { bounds ->
-                                    connectorState.updatePrivateThreadAvatar(contact.id, bounds)
+                        Box(modifier = Modifier.padding(start = railScreenEdgeInsetDp)) {
+                            CompactAvatar(
+                                contact = contact.copy(
+                                    selected = selectedThread is ChatThreadSelection.Private &&
+                                        selectedThread.contactId == contact.id,
+                                    online = unreadThreadIds.contains(ChatThreadSelection.Private(contact.id).toLocalThreadId())
+                                ),
+                                role = AvatarRole.Session,
+                                onClick = {
+                                    (currentAvatarBounds ?: avatarBoundsByContactId[contact.id])?.let { bounds ->
+                                        connectorState.updatePrivateThreadAvatar(contact.id, bounds)
+                                    }
+                                    onThreadSelected(ChatThreadSelection.Private(contact.id))
+                                },
+                                onLongClick = { onContactAvatarLongClick(contact) },
+                                onBoundsChanged = { bounds ->
+                                    currentAvatarBounds = bounds
+                                    updateAvatarBounds(contact.id, bounds)
+                                    connectorState.updateUserAvatar(contact.id, bounds)
+                                    if (selectedPrivateContactId == contact.id) {
+                                        connectorState.updatePrivateThreadAvatar(contact.id, bounds)
+                                    }
+                                },
+                                onRemoved = {
+                                    removeAvatarBounds(contact.id)
+                                    connectorState.removeUserAvatar(contact.id)
                                 }
-                                onThreadSelected(ChatThreadSelection.Private(contact.id))
-                            },
-                            onLongClick = { onContactAvatarLongClick(contact) },
-                            onBoundsChanged = { bounds ->
-                                currentAvatarBounds = bounds
-                                updateAvatarBounds(contact.id, bounds)
-                                connectorState.updateUserAvatar(contact.id, bounds)
-                                if (selectedPrivateContactId == contact.id) {
-                                    connectorState.updatePrivateThreadAvatar(contact.id, bounds)
-                                }
-                            },
-                            onRemoved = {
-                                removeAvatarBounds(contact.id)
-                                connectorState.removeUserAvatar(contact.id)
-                            }
-                        )
+                            )
+                        }
                     }
                 }
             }
@@ -2513,7 +2811,7 @@ private fun ScrollableSessionRail(
             infos = followInfos,
             visible = showFollowText && followInfos.isNotEmpty(),
             modifier = Modifier
-                .offset(x = leftRailFollowTextStartOffsetDp().dp)
+                .offset(x = leftRailFollowTextStartOffsetDp().dp + railScreenEdgeInsetDp)
                 .fillMaxHeight()
                 .requiredWidth(LeftRailFollowTextWidth)
                 .zIndex(12f)
@@ -2828,6 +3126,54 @@ private fun ChatConnectorLayer(
     }
 }
 
+internal fun sessionRailItemKeys(
+    groups: List<FloatingChatContact>,
+    contacts: List<FloatingChatContact>
+): List<String> {
+    return sessionRailItems(
+        groups = groups,
+        contacts = contacts
+    ).map { item -> item.key }
+}
+
+private fun sessionRailItems(
+    groups: List<FloatingChatContact>,
+    contacts: List<FloatingChatContact>
+): List<SessionRailItem> {
+    return buildList {
+        dedupeSessionRailContacts(groups).forEach { group -> add(SessionRailItem.Group(group)) }
+        dedupeSessionRailContacts(contacts).forEach { contact -> add(SessionRailItem.Contact(contact)) }
+    }
+}
+
+private fun dedupeSessionRailContacts(contacts: List<FloatingChatContact>): List<FloatingChatContact> {
+    val mergedById = linkedMapOf<String, FloatingChatContact>()
+    contacts.forEach { contact ->
+        val existing = mergedById[contact.id]
+        mergedById[contact.id] = if (existing == null) {
+            contact
+        } else {
+            mergeRailContact(existing, contact)
+        }
+    }
+    return mergedById.values.toList()
+}
+
+private fun mergeRailContact(
+    existing: FloatingChatContact,
+    candidate: FloatingChatContact
+): FloatingChatContact {
+    return existing.copy(
+        name = existing.name.ifBlank { candidate.name },
+        initials = existing.initials.ifBlank { candidate.initials },
+        description = existing.description.ifBlank { candidate.description },
+        selected = existing.selected || candidate.selected,
+        online = existing.online || candidate.online,
+        avatarUrl = existing.avatarUrl ?: candidate.avatarUrl,
+        groupMemberAvatarUrls = existing.groupMemberAvatarUrls.ifEmpty { candidate.groupMemberAvatarUrls }
+    )
+}
+
 private fun Paint.configureConnectorPaint() {
     style = Paint.Style.STROKE
     strokeWidth = imModuleConnectionLineStrokeWidthPx()
@@ -3050,46 +3396,86 @@ private fun MessageBlock(
             else -> Alignment.Start
         }
     ) {
-        Box(
-            modifier = Modifier
-                .padding(top = if (isSystem) 0.dp else 8.dp)
-        ) {
-            if (usesBubbleChrome) {
-                Box(
-                    modifier = Modifier
-                        .shadow(
-                            elevation = if (usesDemoBubble && message.fromMe) {
-                                imModuleSelfBubbleShadowBlurDp().dp
-                            } else {
-                                3.dp
-                            },
-                            shape = bubbleShape,
-                            ambientColor = OverlayTokens.glassShadow,
-                            spotColor = OverlayTokens.glassShadow
-                        )
-                        .clip(bubbleShape)
-                        .background(bubbleColor)
-                        .then(
-                            if (aiDraftDashedBubble) {
-                                Modifier.aiDraftDashedBorder(bubbleShape)
-                            } else {
-                                Modifier.border(
-                                    width = 1.dp,
-                                    color = bubbleBorderColor,
-                                    shape = bubbleShape
+        Column(horizontalAlignment = Alignment.Start) {
+            Box(
+                modifier = Modifier
+                    .padding(top = if (isSystem) 0.dp else 8.dp)
+            ) {
+                if (usesBubbleChrome) {
+                    Box(
+                        modifier = Modifier
+                            .shadow(
+                                elevation = if (usesDemoBubble && message.fromMe) {
+                                    imModuleSelfBubbleShadowBlurDp().dp
+                                } else {
+                                    3.dp
+                                },
+                                shape = bubbleShape,
+                                ambientColor = OverlayTokens.glassShadow,
+                                spotColor = OverlayTokens.glassShadow
+                            )
+                            .clip(bubbleShape)
+                            .background(bubbleColor)
+                            .then(
+                                if (aiDraftDashedBubble) {
+                                    Modifier.aiDraftDashedBorder(bubbleShape)
+                                } else {
+                                    Modifier.border(
+                                        width = 1.dp,
+                                        color = bubbleBorderColor,
+                                        shape = bubbleShape
+                                    )
+                                }
+                            )
+                            .onGloballyPositioned { coordinates ->
+                                updateCurrentBounds(
+                                    rootBoundsFromPosition(
+                                        positionInRoot = coordinates.positionInRoot(),
+                                        width = coordinates.size.width,
+                                        height = coordinates.size.height
+                                    )
                                 )
                             }
-                        )
-                        .onGloballyPositioned { coordinates ->
-                            updateCurrentBounds(
-                                rootBoundsFromPosition(
-                                    positionInRoot = coordinates.positionInRoot(),
-                                    width = coordinates.size.width,
-                                    height = coordinates.size.height
-                                )
+                            .combinedClickable(
+                                interactionSource = bubbleClickSource,
+                                indication = null,
+                                onClick = {
+                                    if (multiSelectMode) {
+                                        onToggleSelection()
+                                    } else {
+                                        onClick()
+                                    }
+                                },
+                                onLongClick = { onLongPressMessage(message, currentBounds) }
                             )
-                        }
-                        .combinedClickable(
+                            .padding(
+                                horizontal = when {
+                                    isSystem -> 10.dp
+                                    isSpecialCard -> 16.dp
+                                    else -> 12.dp
+                                },
+                                vertical = when {
+                                    isSystem -> 5.dp
+                                    isPaymentCard -> paymentCardOuterVerticalPaddingDp().dp
+                                    isSpecialCard -> 14.dp
+                                    else -> 10.dp
+                                }
+                            )
+                    ) {
+                        MessageContent(
+                            message = message,
+                            index = index,
+                            onPreviewMedia = onPreviewMedia,
+                            onOpenMediaActions = onOpenMediaActions,
+                            onLongPressMessage = onLongPressMessage,
+                            multiSelectMode = multiSelectMode,
+                            onToggleSelection = onToggleSelection,
+                            claimed = claimed
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier.combinedClickable(
                             interactionSource = bubbleClickSource,
                             indication = null,
                             onClick = {
@@ -3101,79 +3487,47 @@ private fun MessageBlock(
                             },
                             onLongClick = { onLongPressMessage(message, currentBounds) }
                         )
-                        .padding(
-                            horizontal = when {
-                                isSystem -> 10.dp
-                                isSpecialCard -> 16.dp
-                                else -> 12.dp
-                            },
-                            vertical = when {
-                                isSystem -> 5.dp
-                                isPaymentCard -> paymentCardOuterVerticalPaddingDp().dp
-                                isSpecialCard -> 14.dp
-                                else -> 10.dp
-                            }
+                    ) {
+                        MessageContent(
+                            message = message,
+                            index = index,
+                            onPreviewMedia = onPreviewMedia,
+                            onOpenMediaActions = onOpenMediaActions,
+                            onLongPressMessage = onLongPressMessage,
+                            multiSelectMode = multiSelectMode,
+                            onToggleSelection = onToggleSelection,
+                            claimed = claimed,
+                            onContentBoundsChanged = ::updateCurrentBounds
                         )
-                ) {
-                    MessageContent(
-                        message = message,
-                        index = index,
-                        onPreviewMedia = onPreviewMedia,
-                        onOpenMediaActions = onOpenMediaActions,
-                        onLongPressMessage = onLongPressMessage,
-                        multiSelectMode = multiSelectMode,
-                        onToggleSelection = onToggleSelection,
-                        claimed = claimed
+                    }
+                }
+                if (favorite || reminded) {
+                    MessageStateBadges(
+                        favorite = favorite,
+                        reminded = reminded,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .offset(x = (-2).dp, y = 4.dp)
                     )
                 }
-            } else {
-                Box(
-                    modifier = Modifier.combinedClickable(
-                        interactionSource = bubbleClickSource,
-                        indication = null,
-                        onClick = {
-                            if (multiSelectMode) {
-                                onToggleSelection()
-                            } else {
-                                onClick()
-                            }
-                        },
-                        onLongClick = { onLongPressMessage(message, currentBounds) }
-                    )
-                ) {
-                    MessageContent(
-                        message = message,
-                        index = index,
-                        onPreviewMedia = onPreviewMedia,
-                        onOpenMediaActions = onOpenMediaActions,
-                        onLongPressMessage = onLongPressMessage,
-                        multiSelectMode = multiSelectMode,
-                        onToggleSelection = onToggleSelection,
-                        claimed = claimed,
-                        onContentBoundsChanged = ::updateCurrentBounds
+                if (!isSystem) {
+                    TextLabel(
+                        text = message.senderName,
+                        size = 10.sp,
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .offset(x = 16.dp, y = (-6).dp),
+                        weight = FontWeight.Bold,
+                        color = OverlayTokens.bubbleNameText,
+                        maxLines = 1,
+                        shadow = OverlayTokens.imModuleTextShadow
                     )
                 }
             }
-            if (favorite || reminded) {
-                MessageStateBadges(
-                    favorite = favorite,
-                    reminded = reminded,
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .offset(x = (-2).dp, y = 4.dp)
-                )
-            }
-            if (!isSystem) {
-                TextLabel(
-                    text = message.senderName,
-                    size = 10.sp,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .offset(x = 16.dp, y = (-6).dp),
-                    weight = FontWeight.Bold,
-                    color = OverlayTokens.bubbleNameText,
-                    maxLines = 1,
-                    shadow = OverlayTokens.imModuleTextShadow
+            scrmSendStatusTextFor(message)?.let { statusText ->
+                ScrmSendStatusLabel(
+                    text = statusText,
+                    modifier = Modifier.padding(start = 2.dp, top = 3.dp)
                 )
             }
         }
@@ -3226,17 +3580,18 @@ private fun MessageContent(
         if (message.kind == FloatingChatMessageKind.AiDraft && !isSystem) {
             DraftBadge()
         }
-        scrmSendStatusTextFor(message)?.let { statusText ->
-            ScrmSendStatusLabel(statusText)
-        }
     }
 }
 
 @Composable
-private fun ScrmSendStatusLabel(text: String) {
+private fun ScrmSendStatusLabel(
+    text: String,
+    modifier: Modifier = Modifier
+) {
     TextLabel(
         text = text,
         size = 10.sp,
+        modifier = modifier,
         color = OverlayTokens.cardSecondaryText,
         maxLines = 1,
         shadow = OverlayTokens.imModuleTextShadow
@@ -4123,17 +4478,23 @@ private fun rememberAsyncImageThumbnailBitmap(message: FloatingChatMessage): Bit
 @Composable
 private fun rememberAsyncImageThumbnailBitmap(
     context: Context,
-    uriText: String?
+    uriText: String?,
+    maxSizePx: Int = REAL_MEDIA_DECODE_MAX_SIZE_PX,
+    cacheNamespace: String = ImageThumbnailCacheNamespace
 ): Bitmap? {
     return produceState(
-        initialValue = cachedImageThumbnailBitmap(uriText),
+        initialValue = cachedImageThumbnailBitmap(uriText, cacheNamespace),
         context,
-        uriText
+        uriText,
+        maxSizePx,
+        cacheNamespace
     ) {
         value = withContext(Dispatchers.IO) {
             loadImageThumbnailBitmap(
                 context = context.applicationContext,
-                uriText = uriText
+                uriText = uriText,
+                maxSizePx = maxSizePx,
+                cacheNamespace = cacheNamespace
             )
         }
     }.value
@@ -6489,6 +6850,27 @@ internal fun isLocalMediaUri(uriText: String?): Boolean {
     return isLocalContentUri(uriText) || uriText?.startsWith("file://") == true
 }
 
+internal fun isRemoteImageUri(uriText: String?): Boolean {
+    return uriText?.startsWith("https://") == true || uriText?.startsWith("http://") == true
+}
+
+internal fun normalizedRemoteImageUri(uriText: String?): String? {
+    val raw = uriText?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    if (!raw.startsWith("http://", ignoreCase = true)) return raw
+    val host = runCatching { URL(raw).host.lowercase() }.getOrNull() ?: return raw
+    return if (host in WeChatAvatarHttpsHosts) {
+        raw.replaceFirst("http://", "https://", ignoreCase = true)
+    } else {
+        raw
+    }
+}
+
+private val WeChatAvatarHttpsHosts = setOf(
+    "mmbiz.qpic.cn",
+    "wx.qlogo.cn",
+    "thirdwx.qlogo.cn"
+)
+
 internal fun mediaWatermarkText(
     resourceUrl: String?,
     thumbnailUrl: String?
@@ -6648,20 +7030,29 @@ private fun mediaMimeType(message: FloatingChatMessage): String {
 
 private fun loadImageThumbnailBitmap(
     context: Context,
-    uriText: String?
+    uriText: String?,
+    maxSizePx: Int = REAL_MEDIA_DECODE_MAX_SIZE_PX,
+    cacheNamespace: String = ImageThumbnailCacheNamespace
 ): Bitmap? {
-    val cacheKey = imageThumbnailCacheKey(uriText) ?: return null
+    val cacheKey = imageThumbnailCacheKey(uriText, cacheNamespace) ?: return null
+    val resolvedUriText = normalizedRemoteImageUri(uriText) ?: return null
+    val remoteImage = isRemoteImageUri(resolvedUriText)
+    if (remoteImage && remoteImageRetrySuppressed(cacheKey)) return null
     return SharedBitmapMemoryCache.getOrPut(cacheKey) {
-        val uri = Uri.parse(uriText)
-        runCatching {
+        val uri = Uri.parse(resolvedUriText)
+        val bitmap = runCatching {
             when {
-                uri.scheme == "file" -> decodeFileBitmapRespectingExif(uri.path)
+                remoteImage -> decodeRemoteImageBitmap(resolvedUriText, maxSizePx)
+                uri.scheme == "file" -> decodeFileBitmapRespectingExif(
+                    path = uri.path,
+                    maxSizePx = maxSizePx
+                )
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.P -> {
                     val source = ImageDecoder.createSource(context.contentResolver, uri)
                     ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
                         val width = info.size.width.coerceAtLeast(1)
                         val height = info.size.height.coerceAtLeast(1)
-                        val scale = (width.coerceAtLeast(height).toFloat() / REAL_MEDIA_DECODE_MAX_SIZE_PX)
+                        val scale = (width.coerceAtLeast(height).toFloat() / maxSizePx.coerceAtLeast(1))
                             .coerceAtLeast(1f)
                         decoder.setTargetSize(
                             (width / scale).toInt().coerceAtLeast(1),
@@ -6674,11 +7065,152 @@ private fun loadImageThumbnailBitmap(
                     MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
                 }
             }
+        }.onFailure { error ->
+            if (remoteImage) {
+                Log.w(TAG, "failed to load remote image thumbnail host=${uri.host.orEmpty()}", error)
+            }
         }.getOrNull()
+        if (remoteImage) {
+            if (bitmap == null) {
+                FailedRemoteImageLoads[cacheKey] = System.currentTimeMillis()
+            } else {
+                FailedRemoteImageLoads.remove(cacheKey)
+            }
+        }
+        bitmap
     }
 }
 
-private fun decodeFileBitmapRespectingExif(path: String?): Bitmap? {
+private fun decodeRemoteImageBitmap(uriText: String, maxSizePx: Int): Bitmap? {
+    return RemoteImageLoadSemaphore.withPermit {
+        val connection = URL(uriText).openConnection().apply {
+            connectTimeout = REMOTE_IMAGE_CONNECT_TIMEOUT_MS
+            readTimeout = REMOTE_IMAGE_READ_TIMEOUT_MS
+            useCaches = true
+        }
+        connection.getInputStream().use { input ->
+            val bytes = input.readAtMostBytes(REMOTE_IMAGE_MAX_BYTES) ?: return@withPermit null
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+            BitmapFactory.decodeByteArray(
+                bytes,
+                0,
+                bytes.size,
+                BitmapFactory.Options().apply {
+                    inSampleSize = imageDecodeSampleSize(
+                        width = bounds.outWidth,
+                        height = bounds.outHeight,
+                        maxSize = maxSizePx
+                    )
+                    inPreferredConfig = Bitmap.Config.RGB_565
+                    inDither = true
+                }
+            )
+        }
+    }
+}
+
+private inline fun <T> Semaphore.withPermit(block: () -> T): T {
+    acquire()
+    return try {
+        block()
+    } finally {
+        release()
+    }
+}
+
+private fun imageThumbnailCacheKey(
+    uriText: String?,
+    cacheNamespace: String = ImageThumbnailCacheNamespace
+): String? {
+    return normalizedRemoteImageUri(uriText)
+        ?.takeIf { uri -> isLocalMediaUri(uri) || isRemoteImageUri(uri) }
+        ?.let { uri -> "$cacheNamespace:$uri" }
+}
+
+private fun videoThumbnailCacheKey(uriText: String?): String? {
+    return uriText
+        ?.takeIf(::isLocalMediaUri)
+        ?.let { uri -> "video:$uri" }
+}
+
+private fun cachedImageThumbnailBitmap(
+    uriText: String?,
+    cacheNamespace: String = ImageThumbnailCacheNamespace
+): Bitmap? {
+    return imageThumbnailCacheKey(uriText, cacheNamespace)?.let(SharedBitmapMemoryCache::get)
+}
+
+private fun cachedMediaThumbnailBitmap(message: FloatingChatMessage): Bitmap? {
+    return if (message.type == FloatingChatMessageType.VideoPreview) {
+        cachedImageThumbnailBitmap(message.thumbnailUrl)
+            ?: videoThumbnailCacheKey(message.resourceUrl ?: message.thumbnailUrl)
+                ?.let(SharedBitmapMemoryCache::get)
+    } else {
+        cachedImageThumbnailBitmap(message.thumbnailUrl)
+    }
+}
+
+private val SharedBitmapMemoryCache = WeightedLruCache<String, Bitmap>(
+    maxWeight = sharedBitmapMemoryCacheBytes(Runtime.getRuntime().maxMemory()),
+    weightOf = { bitmap -> bitmap.allocationByteCount }
+)
+
+private val FailedRemoteImageLoads = ConcurrentHashMap<String, Long>()
+
+private val RemoteImageLoadSemaphore = Semaphore(REMOTE_IMAGE_MAX_CONCURRENT_LOADS, true)
+
+private fun sharedBitmapMemoryCacheBytes(runtimeMaxMemoryBytes: Long): Int {
+    val targetBytes = (runtimeMaxMemoryBytes / 16L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+    return targetBytes.coerceIn(MIN_BITMAP_MEMORY_CACHE_BYTES, MAX_BITMAP_MEMORY_CACHE_BYTES)
+}
+
+internal fun avatarImageDecodeMaxSizePx(): Int = AVATAR_IMAGE_DECODE_MAX_SIZE_PX
+
+internal fun avatarImageLoadsUseDedicatedSmallDecodeSize(): Boolean {
+    return AVATAR_IMAGE_DECODE_MAX_SIZE_PX < REAL_MEDIA_DECODE_MAX_SIZE_PX
+}
+
+internal fun remoteAvatarMaxConcurrentLoads(): Int = REMOTE_IMAGE_MAX_CONCURRENT_LOADS
+
+internal fun remoteImageFailureRetryDelayMillis(): Int = REMOTE_IMAGE_FAILURE_RETRY_DELAY_MS
+
+internal fun remoteImageRetrySuppressedByRecentFailure(
+    lastFailureUptimeMillis: Long?,
+    nowUptimeMillis: Long,
+    retryDelayMillis: Long
+): Boolean {
+    val lastFailure = lastFailureUptimeMillis ?: return false
+    return nowUptimeMillis - lastFailure in 0 until retryDelayMillis
+}
+
+private fun remoteImageRetrySuppressed(cacheKey: String): Boolean {
+    return remoteImageRetrySuppressedByRecentFailure(
+        lastFailureUptimeMillis = FailedRemoteImageLoads[cacheKey],
+        nowUptimeMillis = System.currentTimeMillis(),
+        retryDelayMillis = REMOTE_IMAGE_FAILURE_RETRY_DELAY_MS.toLong()
+    )
+}
+
+private fun InputStream.readAtMostBytes(maxBytes: Int): ByteArray? {
+    val safeMaxBytes = maxBytes.coerceAtLeast(1)
+    val buffer = ByteArray(DEFAULT_REMOTE_IMAGE_BUFFER_BYTES)
+    val output = ByteArrayOutputStream()
+    var totalBytes = 0
+    while (true) {
+        val read = read(buffer)
+        if (read < 0) break
+        totalBytes += read
+        if (totalBytes > safeMaxBytes) return null
+        output.write(buffer, 0, read)
+    }
+    return output.toByteArray()
+}
+
+private fun decodeFileBitmapRespectingExif(
+    path: String?,
+    maxSizePx: Int = REAL_MEDIA_DECODE_MAX_SIZE_PX
+): Bitmap? {
     if (path.isNullOrBlank()) return null
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeFile(path, bounds)
@@ -6688,7 +7220,7 @@ private fun decodeFileBitmapRespectingExif(path: String?): Bitmap? {
             inSampleSize = imageDecodeSampleSize(
                 width = bounds.outWidth,
                 height = bounds.outHeight,
-                maxSize = REAL_MEDIA_DECODE_MAX_SIZE_PX
+                maxSize = maxSizePx
             )
         }
     ) ?: return null
@@ -6748,42 +7280,6 @@ internal fun imageDecodeSampleSize(width: Int, height: Int, maxSize: Int): Int {
         sampleSize *= 2
     }
     return sampleSize
-}
-
-private fun imageThumbnailCacheKey(uriText: String?): String? {
-    return uriText
-        ?.takeIf(::isLocalMediaUri)
-        ?.let { uri -> "image:$uri" }
-}
-
-private fun videoThumbnailCacheKey(uriText: String?): String? {
-    return uriText
-        ?.takeIf(::isLocalMediaUri)
-        ?.let { uri -> "video:$uri" }
-}
-
-private fun cachedImageThumbnailBitmap(uriText: String?): Bitmap? {
-    return imageThumbnailCacheKey(uriText)?.let(SharedBitmapMemoryCache::get)
-}
-
-private fun cachedMediaThumbnailBitmap(message: FloatingChatMessage): Bitmap? {
-    return if (message.type == FloatingChatMessageType.VideoPreview) {
-        cachedImageThumbnailBitmap(message.thumbnailUrl)
-            ?: videoThumbnailCacheKey(message.resourceUrl ?: message.thumbnailUrl)
-                ?.let(SharedBitmapMemoryCache::get)
-    } else {
-        cachedImageThumbnailBitmap(message.thumbnailUrl)
-    }
-}
-
-private val SharedBitmapMemoryCache = WeightedLruCache<String, Bitmap>(
-    maxWeight = sharedBitmapMemoryCacheBytes(Runtime.getRuntime().maxMemory()),
-    weightOf = { bitmap -> bitmap.allocationByteCount }
-)
-
-private fun sharedBitmapMemoryCacheBytes(runtimeMaxMemoryBytes: Long): Int {
-    val targetBytes = (runtimeMaxMemoryBytes / 16L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-    return targetBytes.coerceIn(MIN_BITMAP_MEMORY_CACHE_BYTES, MAX_BITMAP_MEMORY_CACHE_BYTES)
 }
 
 internal fun fixedThumbnailHeightDp(orientation: FloatingChatThumbnailOrientation?): Int {
@@ -7207,11 +7703,17 @@ internal fun leftRailFollowTextLayerWidthDp(): Int = LeftRailFollowTextLayerWidt
 
 internal fun leftRailTouchableWidthDp(): Int = SessionRailWidthDp
 
+internal fun railScreenEdgeInsetPx(): Int = RailScreenEdgeInsetPx
+
+internal fun leftRailAvatarScreenEdgeInsetPx(): Int = RailScreenEdgeInsetPx
+
 internal fun leftRailFollowTextInnerPaddingDp(): Int = LeftRailFollowTextInnerPaddingDp
 
 internal fun leftRailFollowTextStartsAtAvatarRightEdge(): Boolean {
     return LeftRailFollowTextStartOffsetDp + LeftRailFollowTextInnerPaddingDp == RailAvatarSizeDp
 }
+
+internal fun leftRailFollowTextIncludesScreenEdgeInset(): Boolean = true
 
 internal fun leftRailScrollableBottomPaddingDp(
     itemCount: Int,
@@ -7269,6 +7771,21 @@ internal fun leftRailFollowTextUsesDarkTextShadow(): Boolean {
     return OverlayTokens.leftRailFollowTextShadow.color.toArgb() == 0xE6000000.toInt()
 }
 
+internal fun scrmContactsPanelRouteForSelectedAccount(
+    selectedAccountId: String?,
+    fallbackDeviceUuid: String?,
+    fallbackWeChatId: String?
+): ScrmFloatingAccountRoute? {
+    selectedAccountId
+        ?.takeIf { it.isNotBlank() }
+        ?.let(::scrmFloatingAccountRouteForContactId)
+        ?.let { return it }
+
+    val deviceUuid = fallbackDeviceUuid?.takeIf { it.isNotBlank() } ?: return null
+    val weChatId = fallbackWeChatId?.takeIf { it.isNotBlank() } ?: return null
+    return ScrmFloatingAccountRoute(deviceUuid = deviceUuid, weChatId = weChatId)
+}
+
 internal data class LeftRailFollowInfo(
     val contactId: String,
     val name: String,
@@ -7277,6 +7794,26 @@ internal data class LeftRailFollowInfo(
     val topPx: Float = 0f,
     val heightPx: Float = 0f
 )
+
+internal fun leftRailVisibleFollowInfos(
+    conversation: FloatingChatConversation,
+    selectedAccountId: String,
+    contactsById: Map<String, FloatingChatContact>,
+    visibleAvatarBounds: Map<String, Rect>,
+    railRootTopPx: Float
+): List<LeftRailFollowInfo> {
+    return visibleAvatarBounds.mapNotNull { (contactId, bounds) ->
+        val contact = contactsById[contactId] ?: return@mapNotNull null
+        leftRailFollowInfoForContact(
+            conversation = conversation,
+            contact = contact,
+            selectedAccountId = selectedAccountId
+        ).copy(
+            topPx = bounds.top - railRootTopPx,
+            heightPx = bounds.height
+        )
+    }
+}
 
 internal fun leftRailFollowInfoForContact(
     conversation: FloatingChatConversation,
@@ -7640,6 +8177,8 @@ internal fun bottomInputLeadingAction(inputFocused: Boolean): BottomInputAction 
 
 internal fun bottomHomeButtonShowsUnreadOverview(): Boolean = true
 
+internal fun bottomHomeButtonShowsUnrepliedOverview(): Boolean = true
+
 internal fun bottomHomeButtonSwapsToEmojiWhenInputFocused(): Boolean = true
 
 internal fun bottomInputAssistantActionSendsPredictedMessage(): Boolean = true
@@ -7778,6 +8317,7 @@ private fun RightCoordinateRail(
     var toolDragCurrentIndex by remember { mutableStateOf(-1) }
     var toolDragOffsetY by remember { mutableStateOf(0f) }
     val density = LocalDensity.current
+    val railScreenEdgeInsetDp = with(density) { RailScreenEdgeInsetPx.toDp() }
     val toolSlotHeightPx = remember(density) {
         with(density) { (RailToolButtonHeight + RightRailItemGapDp.dp).toPx() }
     }
@@ -7946,30 +8486,32 @@ private fun RightCoordinateRail(
                 val profile = accountProfiles[account.id]
                 val displayAccount = profile?.toContact(account) ?: account
                 var currentAccountBounds by remember(account.id) { mutableStateOf<Rect?>(null) }
-                CompactAvatar(
-                    contact = displayAccount.copy(
-                        selected = account.id == selectedAccountId
-                    ),
-                    role = AvatarRole.Account,
-                    imageUri = profile?.avatarImageUri,
-                    onClick = {
-                        currentAccountBounds?.let { bounds ->
-                            connectorState.updateSelectedAccountAvatar(account.id, bounds)
+                Box(modifier = Modifier.padding(end = railScreenEdgeInsetDp)) {
+                    CompactAvatar(
+                        contact = displayAccount.copy(
+                            selected = account.id == selectedAccountId
+                        ),
+                        role = AvatarRole.Account,
+                        imageUri = profile?.avatarImageUri,
+                        onClick = {
+                            currentAccountBounds?.let { bounds ->
+                                connectorState.updateSelectedAccountAvatar(account.id, bounds)
+                            }
+                            onAccountAvatarClick(account)
+                        },
+                        onLongClick = { onAccountAvatarLongClick(account) },
+                        onBoundsChanged = { bounds ->
+                            currentAccountBounds = bounds
+                            connectorState.updateAccountAvatar(account.id, bounds)
+                            if (account.id == selectedAccountId) {
+                                connectorState.updateSelectedAccountAvatar(account.id, bounds)
+                            }
+                        },
+                        onRemoved = {
+                            connectorState.removeAccountAvatar(account.id)
                         }
-                        onAccountAvatarClick(account)
-                    },
-                    onLongClick = { onAccountAvatarLongClick(account) },
-                    onBoundsChanged = { bounds ->
-                        currentAccountBounds = bounds
-                        connectorState.updateAccountAvatar(account.id, bounds)
-                        if (account.id == selectedAccountId) {
-                            connectorState.updateSelectedAccountAvatar(account.id, bounds)
-                        }
-                    },
-                    onRemoved = {
-                        connectorState.removeAccountAvatar(account.id)
-                    }
-                )
+                    )
+                }
             }
         }
         RightRailDivider()
@@ -7989,52 +8531,54 @@ private fun RightCoordinateRail(
                 key = { _, action -> action.name }
             ) { _, action ->
                 val isDraggingTool = draggedTool == action
-                ToolButton(
-                    modifier = if (isDraggingTool) {
-                        Modifier
-                    } else {
-                        Modifier.animateItem(
-                            placementSpec = spring(
-                                dampingRatio = Spring.DampingRatioNoBouncy,
-                                stiffness = Spring.StiffnessMediumLow
-                            )
-                        )
-                    },
-                    action = action,
-                    selected = action == selectedTool,
-                    reorderMode = reorderMode,
-                    dragging = isDraggingTool,
-                    dragTranslationY = if (isDraggingTool) {
-                        toolReorderDraggedTranslationY(
-                            dragOffsetY = toolDragOffsetY,
-                            startIndex = toolDragStartIndex,
-                            currentIndex = toolDragCurrentIndex,
-                            itemSlotHeightPx = toolSlotHeightPx
-                        )
-                    } else {
-                        0f
-                    },
-                    onClick = {
-                        if (reorderMode) {
-                            exitReorderMode()
+                Box(modifier = Modifier.padding(end = railScreenEdgeInsetDp)) {
+                    ToolButton(
+                        modifier = if (isDraggingTool) {
+                            Modifier
                         } else {
-                            selectedTool = action
-                            onToolAction(action)
+                            Modifier.animateItem(
+                                placementSpec = spring(
+                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                    stiffness = Spring.StiffnessMediumLow
+                                )
+                            )
+                        },
+                        action = action,
+                        selected = action == selectedTool,
+                        reorderMode = reorderMode,
+                        dragging = isDraggingTool,
+                        dragTranslationY = if (isDraggingTool) {
+                            toolReorderDraggedTranslationY(
+                                dragOffsetY = toolDragOffsetY,
+                                startIndex = toolDragStartIndex,
+                                currentIndex = toolDragCurrentIndex,
+                                itemSlotHeightPx = toolSlotHeightPx
+                            )
+                        } else {
+                            0f
+                        },
+                        onClick = {
+                            if (reorderMode) {
+                                exitReorderMode()
+                            } else {
+                                selectedTool = action
+                                onToolAction(action)
+                            }
+                        },
+                        onLongClick = {
+                            enterReorderMode()
+                        },
+                        onDragStart = {
+                            beginToolDrag(action)
+                        },
+                        onDrag = { dragAmountY ->
+                            reorderDraggedTool(action, dragAmountY)
+                        },
+                        onDragEnd = {
+                            finishToolDrag(action)
                         }
-                    },
-                    onLongClick = {
-                        enterReorderMode()
-                    },
-                    onDragStart = {
-                        beginToolDrag(action)
-                    },
-                    onDrag = { dragAmountY ->
-                        reorderDraggedTool(action, dragAmountY)
-                    },
-                    onDragEnd = {
-                        finishToolDrag(action)
-                    }
-                )
+                    )
+                }
             }
         }
     }
@@ -8048,6 +8592,7 @@ private fun GroupChatAvatar(
     memberCount: Int,
     label: String = "群",
     color: Color = OverlayTokens.groupAvatar,
+    memberAvatarUris: List<String> = emptyList(),
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onBoundsChanged: (Rect) -> Unit,
@@ -8079,7 +8624,14 @@ private fun GroupChatAvatar(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
+            if (memberAvatarUris.isNotEmpty()) {
+                GroupChatAvatarGrid(
+                    memberAvatarUris = memberAvatarUris,
+                    fallbackColor = color,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Canvas(modifier = Modifier.fillMaxSize()) {
                 val faceColor = Color(0xFFF5D3BD)
                 val rearFaceColor = Color(0xFFEBC6AF)
                 val bodyColor = Color(0xCCF8FCFF)
@@ -8122,8 +8674,10 @@ private fun GroupChatAvatar(
                     center = Offset(size.width * 0.50f, size.height * 0.34f),
                     style = Stroke(width = 1.2f)
                 )
+                }
             }
-            Box(
+            if (avatarTextTagsVisible()) {
+                Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(horizontal = 3.dp, vertical = 2.dp)
@@ -8139,6 +8693,7 @@ private fun GroupChatAvatar(
                     maxLines = 1,
                     textAlign = TextAlign.Center
                 )
+                }
             }
             if (unread) {
                 Box(
@@ -8152,6 +8707,108 @@ private fun GroupChatAvatar(
             }
         }
     }
+}
+
+@Composable
+private fun GroupChatAvatarGrid(
+    memberAvatarUris: List<String>,
+    fallbackColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val displayUris = memberAvatarUris.take(groupChatAvatarGridMaxMembers())
+    if (displayUris.size == 1) {
+        val avatarBitmap = rememberAsyncAvatarBitmap(displayUris.single())
+        Box(
+            modifier = modifier
+                .padding(2.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(fallbackColor.copy(alpha = 0.42f)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (avatarBitmap != null) {
+                Image(
+                    bitmap = avatarBitmap.asImageBitmap(),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            }
+        }
+    } else {
+        val rows = displayUris.chunked(3)
+        Column(
+            modifier = modifier.padding(3.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            rows.forEach { row ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    row.forEach { uri ->
+                        val avatarBitmap = rememberAsyncAvatarBitmap(uri)
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(fallbackColor.copy(alpha = 0.42f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (avatarBitmap != null) {
+                                Image(
+                                    bitmap = avatarBitmap.asImageBitmap(),
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        }
+                    }
+                    repeat(3 - row.size) {
+                        Spacer(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                        )
+                    }
+                }
+            }
+            repeat(3 - rows.size) {
+                Spacer(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                )
+            }
+        }
+    }
+}
+
+internal fun groupChatAvatarGridMaxMembers(): Int = 9
+
+internal fun groupChatAvatarGridImageUris(group: FloatingChatContact): List<String> {
+    return group.groupMemberAvatarUrls
+        .mapNotNull(::normalizedRemoteImageUri)
+        .take(groupChatAvatarGridMaxMembers())
+}
+
+internal fun groupChatAvatarDisplayImageUris(group: FloatingChatContact): List<String> {
+    return groupChatAvatarGridImageUris(group)
+        .ifEmpty { listOfNotNull(normalizedRemoteImageUri(group.avatarUrl)) }
+}
+
+internal fun groupChatAvatarUsesNineGridMemberImages(): Boolean = true
+
+internal fun groupChatAvatarSingleFallbackImageFillsTile(): Boolean = true
+
+internal fun resolvedAvatarImageUri(
+    localImageUri: String?,
+    remoteAvatarUrl: String?
+): String? {
+    return localImageUri?.takeIf { uri -> uri.isNotBlank() } ?: remoteAvatarUrl
 }
 
 @Composable
@@ -8170,7 +8827,17 @@ private fun CompactAvatar(
     val shape = RoundedCornerShape(10.dp)
     val avatarColor = Color(contact.avatarColor)
     val border = if (contact.selected) OverlayTokens.accent else OverlayTokens.hairline
-    val avatarBitmap = rememberAsyncAvatarBitmap(imageUri)
+    val borderWidth = if (role == AvatarRole.Account && contact.selected) {
+        rightRailSelectedAccountAvatarHighlightStrokeDp().dp
+    } else {
+        1.dp
+    }
+    val avatarBitmap = rememberAsyncAvatarBitmap(
+        resolvedAvatarImageUri(
+            localImageUri = imageUri,
+            remoteAvatarUrl = contact.avatarUrl
+        )
+    )
     DisposableEffect(Unit) {
         onDispose { onRemoved() }
     }
@@ -8190,8 +8857,8 @@ private fun CompactAvatar(
             },
         shape = shape,
         color = avatarColor,
-        shadowElevation = 3.dp,
-        border = BorderStroke(1.dp, border)
+        shadowElevation = if (role == AvatarRole.Account && contact.selected) 7.dp else 3.dp,
+        border = BorderStroke(borderWidth, border)
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -8226,8 +8893,9 @@ private fun CompactAvatar(
                 style = Stroke(width = 1.2f)
             )
         }
-        val nameTagShape = RoundedCornerShape(4.dp)
-        Box(
+        if (avatarTextTagsVisible()) {
+            val nameTagShape = RoundedCornerShape(4.dp)
+            Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(horizontal = 3.dp, vertical = 2.dp)
@@ -8243,15 +8911,18 @@ private fun CompactAvatar(
                 maxLines = 1,
                 textAlign = TextAlign.Center
             )
+            }
         }
         }
-        TextLabel(
+        if (avatarTextTagsVisible()) {
+            TextLabel(
             text = if (role == AvatarRole.Account) "我" else "",
             size = 8.sp,
             weight = FontWeight.Bold,
             color = OverlayTokens.avatarBadgeText,
             textAlign = TextAlign.Center
-        )
+            )
+        }
         if (contact.online) {
             Box(
                 modifier = Modifier
@@ -8263,8 +8934,10 @@ private fun CompactAvatar(
             )
         }
     }
+    }
 }
-}
+
+internal fun avatarTextTagsVisible(): Boolean = false
 
 internal enum class AvatarPressResult {
     None,
@@ -8549,6 +9222,7 @@ private fun ToolButton(
 
 internal fun toolActionLabel(action: FloatingChatToolAction): String {
     return when (action) {
+        FloatingChatToolAction.Contacts -> "联系人"
         FloatingChatToolAction.Assistant -> "机器人"
         FloatingChatToolAction.Blink -> "眨眼"
         FloatingChatToolAction.Gallery -> "相册"
@@ -8560,6 +9234,7 @@ internal fun toolActionLabel(action: FloatingChatToolAction): String {
         FloatingChatToolAction.Files -> "文档"
         FloatingChatToolAction.Card -> "推名片"
         FloatingChatToolAction.Moments -> "朋友圈"
+        FloatingChatToolAction.MomentMaterials -> "朋友圈素材"
         FloatingChatToolAction.QuickPhrase -> "快捷语"
         FloatingChatToolAction.Voice -> "语音"
         FloatingChatToolAction.Device -> "设备"
@@ -8587,6 +9262,7 @@ internal fun blinkVoiceResultMessageText(eventType: String, durationMs: Long): S
 
 private fun toolActionIcon(action: FloatingChatToolAction): ImageVector {
     return when (action) {
+        FloatingChatToolAction.Contacts -> Icons.Filled.Contacts
         FloatingChatToolAction.Assistant -> Icons.Filled.SmartToy
         FloatingChatToolAction.Blink -> Icons.Filled.Visibility
         FloatingChatToolAction.Gallery -> Icons.Filled.Image
@@ -8598,6 +9274,7 @@ private fun toolActionIcon(action: FloatingChatToolAction): ImageVector {
         FloatingChatToolAction.Files -> Icons.Filled.Article
         FloatingChatToolAction.Card -> Icons.Filled.CreditCard
         FloatingChatToolAction.Moments -> Icons.Filled.VideoLibrary
+        FloatingChatToolAction.MomentMaterials -> Icons.Filled.Collections
         FloatingChatToolAction.QuickPhrase -> Icons.Filled.Textsms
         FloatingChatToolAction.Voice -> Icons.Filled.Mic
         FloatingChatToolAction.Device -> Icons.Filled.Checklist
@@ -9083,6 +9760,7 @@ internal fun referenceToolActionsFor(actions: List<FloatingChatToolAction>): Lis
     val availableActions = actions.toSet()
     val referenceOrder = listOf(
         FloatingChatToolAction.Assistant,
+        FloatingChatToolAction.Contacts,
         FloatingChatToolAction.Blink,
         FloatingChatToolAction.Gallery,
         FloatingChatToolAction.Camera,
@@ -9093,10 +9771,35 @@ internal fun referenceToolActionsFor(actions: List<FloatingChatToolAction>): Lis
         FloatingChatToolAction.Files,
         FloatingChatToolAction.Card,
         FloatingChatToolAction.Moments,
+        FloatingChatToolAction.MomentMaterials,
         FloatingChatToolAction.QuickPhrase
     ).filter { action -> action in availableActions }
 
     return referenceOrder.ifEmpty { actions }
+}
+
+internal fun toolActionOpensBottomPanel(action: FloatingChatToolAction): Boolean {
+    return toolActionBottomPanelMode(action) != BottomPanelMode.None
+}
+
+internal fun toolActionBottomPanelModeName(action: FloatingChatToolAction): String {
+    return toolActionBottomPanelMode(action).name
+}
+
+private fun toolActionBottomPanelMode(action: FloatingChatToolAction): BottomPanelMode {
+    return when (action) {
+        FloatingChatToolAction.Contacts -> BottomPanelMode.Contacts
+        FloatingChatToolAction.Assistant -> BottomPanelMode.Assistant
+        FloatingChatToolAction.QuickPhrase -> BottomPanelMode.QuickPhrase
+        FloatingChatToolAction.Moments -> BottomPanelMode.Moments
+        FloatingChatToolAction.MomentMaterials -> BottomPanelMode.MomentMaterials
+        FloatingChatToolAction.RedPacket -> BottomPanelMode.RedPacket
+        FloatingChatToolAction.Transfer -> BottomPanelMode.Transfer
+        FloatingChatToolAction.Location -> BottomPanelMode.Location
+        FloatingChatToolAction.Favorite -> BottomPanelMode.Favorite
+        FloatingChatToolAction.Card -> BottomPanelMode.Card
+        else -> BottomPanelMode.None
+    }
 }
 
 internal fun moveToolAction(
@@ -9204,7 +9907,7 @@ internal fun defaultAccountProfileFor(account: FloatingChatContact): FloatingCha
         tags = "",
         avatarInitials = account.initials,
         avatarColor = account.avatarColor,
-        avatarImageUri = ""
+        avatarImageUri = account.avatarUrl.orEmpty()
     )
 }
 
@@ -9213,7 +9916,8 @@ private fun FloatingChatAccountProfile.toContact(fallback: FloatingChatContact):
         name = name.ifBlank { fallback.name },
         initials = avatarInitials.ifBlank { name.take(2).ifBlank { fallback.initials } },
         description = accountProfileSubtitle(this).ifBlank { fallback.description },
-        avatarColor = avatarColor
+        avatarColor = avatarColor,
+        avatarUrl = avatarImageUri.takeIf { it.isNotBlank() } ?: fallback.avatarUrl
     )
 }
 
@@ -9235,6 +9939,10 @@ internal fun accountProfileEditorFieldKeys(): List<String> {
 
 internal fun rightRailAccountAvatarSupportsLongPressEdit(): Boolean = true
 
+internal fun rightRailSelectedAccountAvatarUsesHighlightRing(): Boolean = true
+
+internal fun rightRailSelectedAccountAvatarHighlightStrokeDp(): Int = 3
+
 internal fun rightRailAccountAvatarClickSelectsSendingAccount(): Boolean = true
 
 internal fun accountProfileEditorSupportsImageAvatarUpload(): Boolean = true
@@ -9242,6 +9950,12 @@ internal fun accountProfileEditorSupportsImageAvatarUpload(): Boolean = true
 internal fun accountProfileEditorHidesAvatarColorPalette(): Boolean = true
 
 internal fun accountProfileEditorPersistsChanges(): Boolean = true
+
+internal fun accountProfileEditorSupportsWechatQrCode(): Boolean = true
+
+internal fun accountProfileQrPayload(profile: FloatingChatAccountProfile): String {
+    return profile.wechatId.trim().ifBlank { profile.accountId }
+}
 
 internal fun cardToolSendsEditedAccountProfileCard(): Boolean = true
 
@@ -9332,6 +10046,7 @@ private fun loadAccountProfile(
             avatarColor = properties.getProperty("avatarColor", fallback.avatarColor.toString()).toLongOrNull()
                 ?: fallback.avatarColor,
             avatarImageUri = properties.getProperty("avatarImageUri", fallback.avatarImageUri)
+                .ifBlank { fallback.avatarImageUri }
         )
     }.getOrElse {
         fallback
@@ -9421,73 +10136,6 @@ private fun defaultMomentPosts(): List<AppMomentPost> {
             author = "林舟",
             content = "新的浮窗红包和转账先做成 App 内状态流，后面再接真实账户体系。",
             time = "1 小时前"
-        )
-    )
-}
-
-private fun wechatMomentPosts(): List<AppMomentPost> {
-    return listOf(
-        AppMomentPost(
-            id = "moment-cat-1",
-            author = "巷子里的猫",
-            content = "",
-            time = "34天前",
-            avatarText = "猫",
-            avatarColor = Color(0xFF6FA8D8),
-            media = AppMomentMedia(
-                kind = MomentMediaKind.Image,
-                widthDp = 82,
-                heightDp = 176,
-                color = Color(0xFF7E806B),
-                label = "图片"
-            ),
-            likedBy = listOf("若川", "林舟")
-        ),
-        AppMomentPost(
-            id = "moment-xueyin-1",
-            author = "血�?0006",
-            content = "",
-            time = "47天前",
-            avatarText = "血",
-            avatarColor = Color(0xFF2F3135),
-            media = AppMomentMedia(
-                kind = MomentMediaKind.Link,
-                color = Color(0xFFAC1B1B),
-                label = "图文"
-            ),
-            linkTitle = "不装了！百年毒龙宣战了！",
-            sourceLabel = "公众号 · 血饮",
-            comments = listOf(AppMomentComment("雨晴", "已转发给运营组。"))
-        ),
-        AppMomentPost(
-            id = "moment-xueyin-2",
-            author = "血饮助�?05",
-            content = "",
-            time = "47天前",
-            avatarText = "血",
-            avatarColor = Color(0xFF2F3135),
-            media = AppMomentMedia(
-                kind = MomentMediaKind.Link,
-                color = Color(0xFFAC1B1B),
-                label = "图文"
-            ),
-            linkTitle = "不装了！百年毒龙宣战了！",
-            sourceLabel = "公众号 · 血饮"
-        ),
-        AppMomentPost(
-            id = "moment-xueyin-3",
-            author = "血�?002",
-            content = "",
-            time = "47天前",
-            avatarText = "血",
-            avatarColor = Color(0xFF2F3135),
-            media = AppMomentMedia(
-                kind = MomentMediaKind.Link,
-                color = Color(0xFFAC1B1B),
-                label = "图文"
-            ),
-            linkTitle = "不装了！百年毒龙宣战了！",
-            sourceLabel = "公众号 · 血饮"
         )
     )
 }
@@ -10574,6 +11222,7 @@ private fun ContactEditOverlay(
     onGroupProfileChange: (LocalGroupProfile) -> Unit,
     contactProfiles: Map<String, LocalContactProfile>,
     onContactProfileChange: (LocalContactProfile) -> Unit,
+    onDeleteFriend: (FloatingChatContact) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -10618,6 +11267,7 @@ private fun ContactEditOverlay(
                             contact = target.contact
                         ),
                     onProfileChange = onContactProfileChange,
+                    onDeleteFriend = onDeleteFriend,
                     onDismiss = onDismiss
                 )
             }
@@ -11122,6 +11772,7 @@ private fun UserContactEditPanel(
     contact: FloatingChatContact,
     profile: LocalContactProfile,
     onProfileChange: (LocalContactProfile) -> Unit,
+    onDeleteFriend: (FloatingChatContact) -> Unit,
     onDismiss: () -> Unit
 ) {
     var draftRemark by remember(profile.accountId, profile.contactId, profile.remark) {
@@ -11259,8 +11910,9 @@ private fun UserContactEditPanel(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 14.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                SmallChoiceButton(label = "删除", onClick = { onDeleteFriend(contact) })
                 SmallChoiceButton(label = "完成", onClick = onDismiss)
             }
         }
@@ -11727,6 +12379,7 @@ private fun AccountEditPanel(
     var avatarInitials by remember(profile.accountId, profile.avatarInitials) { mutableStateOf(profile.avatarInitials) }
     val avatarColor = profile.avatarColor
     var avatarImageUri by remember(profile.accountId, profile.avatarImageUri) { mutableStateOf(profile.avatarImageUri) }
+    var showQr by remember(profile.accountId) { mutableStateOf(false) }
     val previewProfile = profile.copy(
         name = name.trim(),
         phone = phone.trim(),
@@ -11769,6 +12422,7 @@ private fun AccountEditPanel(
                     Spacer(modifier = Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                         SmallChoiceButton(label = "更换头像", onClick = onPickAvatar)
+                        SmallChoiceButton(label = "二维码", onClick = { showQr = true })
                         if (avatarImageUri.isNotBlank()) {
                             SmallChoiceButton(label = "移除图片", onClick = { avatarImageUri = "" })
                         }
@@ -11815,6 +12469,14 @@ private fun AccountEditPanel(
         item { AccountProfileTextField(value = tags, onValueChange = { tags = it }, label = "标签") }
         item {
             AccountCardPreview(profile = previewProfile)
+        }
+        if (showQr) {
+            item {
+                AccountProfileQrPreviewCard(
+                    profile = previewProfile,
+                    onDismiss = { showQr = false }
+                )
+            }
         }
         item {
             Row(
@@ -11874,6 +12536,101 @@ private fun AccountProfileAvatarPreview(profile: FloatingChatAccountProfile) {
             )
         }
     }
+}
+
+@Composable
+private fun AccountProfileQrPreviewCard(
+    profile: FloatingChatAccountProfile,
+    onDismiss: () -> Unit
+) {
+    val payload = accountProfileQrPayload(profile)
+    val qrBitmap = remember(payload) { createAccountQrBitmap(payload, 480) }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(OverlayTokens.resourcePanel)
+            .border(1.dp, OverlayTokens.resourcePanelBorder, RoundedCornerShape(10.dp))
+            .padding(10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            TextLabel(
+                text = "微信二维码",
+                size = 11.sp,
+                weight = FontWeight.Bold,
+                color = OverlayTokens.panelPrimaryText,
+                maxLines = 1,
+                modifier = Modifier.weight(1f)
+            )
+            SmallChoiceButton(label = "关闭", onClick = onDismiss)
+        }
+        Box(
+            modifier = Modifier
+                .size(190.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFFF8FAFB))
+                .border(1.dp, OverlayTokens.panelBorder, RoundedCornerShape(12.dp))
+                .padding(12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            if (qrBitmap != null) {
+                Image(
+                    bitmap = qrBitmap.asImageBitmap(),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
+            } else {
+                TextLabel(
+                    text = "二维码生成失败",
+                    size = 10.sp,
+                    color = OverlayTokens.panelSecondaryText,
+                    maxLines = 1
+                )
+            }
+        }
+        TextLabel(
+            text = payload,
+            size = 10.sp,
+            color = OverlayTokens.panelSecondaryText,
+            maxLines = 1
+        )
+    }
+}
+
+private fun createAccountQrBitmap(payload: String, sizePx: Int): Bitmap? {
+    val normalized = payload.trim().takeIf { it.isNotEmpty() } ?: return null
+    return runCatching {
+        val hints = EnumMap<EncodeHintType, Any>(EncodeHintType::class.java).apply {
+            put(EncodeHintType.CHARACTER_SET, "UTF-8")
+            put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M)
+            put(EncodeHintType.MARGIN, 1)
+        }
+        val matrix = QRCodeWriter().encode(
+            normalized,
+            BarcodeFormat.QR_CODE,
+            sizePx,
+            sizePx,
+            hints
+        )
+        val dark = 0xFF111820.toInt()
+        val light = 0xFFF8FAFB.toInt()
+        val pixels = IntArray(sizePx * sizePx)
+        for (y in 0 until sizePx) {
+            for (x in 0 until sizePx) {
+                pixels[y * sizePx + x] = if (matrix[x, y]) dark else light
+            }
+        }
+        Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888).apply {
+            setPixels(pixels, 0, sizePx, 0, 0, sizePx, sizePx)
+        }
+    }.getOrNull()
 }
 
 @Composable
@@ -12451,6 +13208,8 @@ private fun bottomInputActionDescription(action: BottomInputAction): String {
 @Composable
 private fun FloatingBottomPanel(
     mode: BottomPanelMode,
+    scrmContactsRoute: ScrmFloatingAccountRoute?,
+    scrmMomentsRoute: ScrmFloatingAccountRoute?,
     voicePermissionRequestToken: Int,
     locationPermissionRequestToken: Int,
     onClose: () -> Unit,
@@ -12476,7 +13235,6 @@ private fun FloatingBottomPanel(
     onPickMomentMedia: () -> Unit,
     onClearMomentMedia: () -> Unit,
     onPreviewMomentMedia: (AppMomentPost) -> Unit,
-    onPostMoment: (String) -> Unit,
     onUpdateMomentPost: (AppMomentPost) -> Unit,
     favoriteMultiSelectMode: Boolean,
     selectedFavoriteItemIds: Map<String, Boolean>,
@@ -12498,6 +13256,8 @@ private fun FloatingBottomPanel(
         BottomPanelMode.QuickPhrase -> 0.78f
         BottomPanelMode.Card -> 0.82f
         BottomPanelMode.Moments -> 0.92f
+        BottomPanelMode.MomentMaterials -> 0.92f
+        BottomPanelMode.Contacts -> 0.92f
         BottomPanelMode.Favorite -> 0.86f
         BottomPanelMode.Assistant -> 0.86f
         BottomPanelMode.RedPacket,
@@ -12510,6 +13270,8 @@ private fun FloatingBottomPanel(
         BottomPanelMode.QuickPhrase -> 310.dp
         BottomPanelMode.Card -> 360.dp
         BottomPanelMode.Moments -> 520.dp
+        BottomPanelMode.MomentMaterials -> 520.dp
+        BottomPanelMode.Contacts -> 520.dp
         BottomPanelMode.Favorite -> 380.dp
         BottomPanelMode.Assistant -> 430.dp
         BottomPanelMode.RedPacket,
@@ -12560,13 +13322,24 @@ private fun FloatingBottomPanel(
                     onSendAccountCard = onSendAccountCard
                 )
                 BottomPanelMode.Moments -> MomentsTimelinePanel(
+                    route = scrmMomentsRoute,
                     posts = momentPosts,
                     pendingMedia = pendingMomentMedia,
                     onPickMedia = onPickMomentMedia,
                     onClearMedia = onClearMomentMedia,
                     onPreviewMedia = onPreviewMomentMedia,
-                    onPostMoment = onPostMoment,
-                    onUpdatePost = onUpdateMomentPost
+                    onUpdatePost = onUpdateMomentPost,
+                    onRemotePostsLoaded = { remotePosts ->
+                        remotePosts.forEach(onUpdateMomentPost)
+                    }
+                )
+                BottomPanelMode.MomentMaterials -> MomentMaterialsPanel(
+                    route = scrmMomentsRoute,
+                    onClose = onClose
+                )
+                BottomPanelMode.Contacts -> ScrmContactsPanel(
+                    route = scrmContactsRoute,
+                    onClose = onClose
                 )
                 BottomPanelMode.Favorite -> FavoriteCollectionPanel(
                     items = favoriteItems,
@@ -12622,6 +13395,1040 @@ private fun FloatingBottomPanel(
 }
 
 @Composable
+private fun ScrmContactsPanel(route: ScrmFloatingAccountRoute?, onClose: () -> Unit) {
+    val context = LocalContext.current
+    val manager = remember(context) { ScrmSettingsManager(context.applicationContext) }
+    val scope = rememberCoroutineScope()
+    var searchText by remember { mutableStateOf("") }
+    var addWxidText by remember { mutableStateOf("") }
+    var addMessageText by remember { mutableStateOf("你好，我是通过只发添加你") }
+    var addRemarkText by remember { mutableStateOf("") }
+    var sendText by remember { mutableStateOf("") }
+    var state by remember { mutableStateOf(ScrmContactsPanelState()) }
+
+    if (route == null) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            TextLabel(
+                text = "当前账号缺少 SCRM 路由，无法加载联系人",
+                size = 12.sp,
+                color = Color(0xFFB65757),
+                maxLines = 2
+            )
+            ScrmPanelButton(label = "关闭", onClick = onClose)
+        }
+        return
+    }
+
+    fun loadContacts(nextSearch: String = searchText) {
+        scope.launch {
+            state = state.copy(
+                loading = true,
+                error = null,
+                status = "正在加载联系人"
+            )
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    fun fetchContacts(): ScrmContactsPanelLoadResult {
+                        val session = manager.loadSelectedSessionOrBootstrap()
+                        val page = session.contactApi.getContacts(
+                            ScrmContactQuery(
+                                weChatId = route.weChatId,
+                                search = nextSearch.trim().takeIf { it.isNotEmpty() },
+                                pageSize = 80,
+                                onlyFriends = true,
+                                includeProfile = false
+                            )
+                        )
+                        val requests = session.contactApi.getFriendRequests(
+                            weChatId = route.weChatId,
+                            count = 20,
+                            pendingOnly = true
+                        )
+                        return ScrmContactsPanelLoadResult(
+                            contacts = page.items,
+                            totalCount = page.totalCount,
+                            friendRequests = requests
+                        )
+                    }
+
+                    try {
+                        fetchContacts()
+                    } catch (error: ScrmAuthenticationException) {
+                        when (manager.bootstrapWithBundledAdminCredentials()) {
+                            is ScrmAdminBootstrapResult.Success -> fetchContacts()
+                            else -> throw error
+                        }
+                    }
+                }
+            }.onSuccess { result ->
+                val selected = state.selectedContact?.let { selected ->
+                    result.contacts.firstOrNull { contact ->
+                        contact.id == selected.id || contact.wxid == selected.wxid
+                    }
+                }
+                state = state.copy(
+                    loading = false,
+                    contacts = result.contacts,
+                    totalCount = result.totalCount,
+                    friendRequests = result.friendRequests,
+                    selectedContact = selected,
+                    status = "已加载 ${result.contacts.size}/${result.totalCount} 个联系人",
+                    error = null
+                )
+            }.onFailure { error ->
+                state = state.copy(
+                    loading = false,
+                    error = error.toScrmContactsPanelMessage(),
+                    status = null
+                )
+            }
+        }
+    }
+
+    fun submitTask(
+        status: String,
+        reloadContactsOnSuccess: Boolean = true,
+        block: suspend () -> ScrmTaskSubmissionResult
+    ) {
+        scope.launch {
+            state = state.copy(loading = true, error = null, status = status)
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val submitted = block()
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    ScrmContactTaskRunner(session.taskApi).submitAndAwait(
+                        reloadContactsOnSuccess = reloadContactsOnSuccess
+                    ) {
+                        submitted
+                    }
+                }
+            }
+                .onSuccess { outcome ->
+                    val taskId = outcome.taskId
+                    state = state.copy(
+                        loading = false,
+                        status = "已提交任务 #$taskId",
+                        error = null
+                    )
+                    state = state.copy(status = outcome.message)
+                    if (outcome.shouldReloadContacts) {
+                        loadContacts()
+                    }
+                }.onFailure { error ->
+                    state = state.copy(
+                        loading = false,
+                        error = error.toScrmContactsPanelMessage(),
+                        status = null
+                    )
+                }
+        }
+    }
+
+    fun selectedRemoteId(contact: ScrmContact): String? {
+        return contact.wxid?.takeIf { it.isNotBlank() }
+            ?: contact.friendNo?.takeIf { it.isNotBlank() }
+    }
+
+    fun syncContacts() {
+        submitTask("正在提交联系人同步") {
+            val session = manager.loadSelectedSessionOrBootstrap()
+            session.contactApi.syncContacts(
+                ScrmSyncContactsRequest(
+                    deviceUuid = route.deviceUuid,
+                    weChatId = route.weChatId
+                )
+            )
+        }
+    }
+
+    fun searchFriendForAdd() {
+        val query = addWxidText.trim()
+        if (query.isBlank()) {
+            state = state.copy(error = "请输入微信号、手机号或搜索关键词")
+            return
+        }
+        scope.launch {
+            state = state.copy(
+                loading = true,
+                error = null,
+                status = "正在搜索好友",
+                friendSearchProfile = null
+            )
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    val runner = ScrmContactTaskRunner(session.taskApi)
+                    val outcome = runner.submitAndAwait(reloadContactsOnSuccess = false) {
+                        session.contactApi.findFriend(
+                            ScrmFindContactRequest(
+                                deviceUuid = route.deviceUuid,
+                                weChatId = route.weChatId,
+                                content = query
+                            )
+                        )
+                    }
+                    scrmFriendSearchProfileFromFindContactData(outcome.data)
+                        ?: throw ScrmInvalidResponseException(
+                            "好友搜索已完成，但服务端没有返回目标用户资料"
+                        )
+                }
+            }.onSuccess { profile ->
+                state = state.copy(
+                    loading = false,
+                    friendSearchProfile = profile,
+                    status = "已找到 ${profile.displayName}",
+                    error = null
+                )
+            }.onFailure { error ->
+                state = state.copy(
+                    loading = false,
+                    friendSearchProfile = null,
+                    error = error.toScrmContactsPanelMessage(),
+                    status = null
+                )
+            }
+        }
+    }
+
+    fun sendFriendVerifyFromSearch(profile: ScrmFriendSearchProfile) {
+        scope.launch {
+            state = state.copy(loading = true, error = null, status = "正在发送好友申请")
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    ScrmContactTaskRunner(session.taskApi).submitAndAwait(
+                        reloadContactsOnSuccess = true
+                    ) {
+                        session.contactApi.sendFriendVerify(
+                            ScrmSendFriendVerifyRequest(
+                                deviceUuid = route.deviceUuid,
+                                weChatId = route.weChatId,
+                                friendId = profile.friendId,
+                                message = addMessageText.trim().takeIf { it.isNotEmpty() }
+                            )
+                        )
+                    }
+                }
+            }.onSuccess { outcome ->
+                state = state.copy(
+                    loading = false,
+                    friendSearchProfile = null,
+                    status = outcome.message,
+                    error = null
+                )
+                if (outcome.shouldReloadContacts) {
+                    loadContacts()
+                }
+            }.onFailure { error ->
+                state = state.copy(
+                    loading = false,
+                    error = error.toScrmContactsPanelMessage(),
+                    status = null
+                )
+            }
+        }
+    }
+
+    fun addFriend() {
+        searchFriendForAdd()
+        return
+        val wxid = addWxidText.trim()
+        if (wxid.isNotBlank() && scrmFriendAddInputKind(wxid) != ScrmFriendAddInputKind.Wxid) {
+            scope.launch {
+                state = state.copy(loading = true, error = null, status = "正在提交添加好友")
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        val session = manager.loadSelectedSessionOrBootstrap()
+                        val runner = ScrmContactTaskRunner(session.taskApi)
+                        val message = addMessageText.trim().takeIf { it.isNotEmpty() }
+                        val remark = addRemarkText.trim().takeIf { it.isNotEmpty() }
+                        when (scrmFriendAddInputKind(wxid)) {
+                            ScrmFriendAddInputKind.Phone -> {
+                                runner.submitAndAwait(reloadContactsOnSuccess = true) {
+                                    session.contactApi.addFriendsByPhone(
+                                        ScrmAddFriendsByPhoneRequest(
+                                            deviceUuid = route.deviceUuid,
+                                            weChatId = route.weChatId,
+                                            phones = listOf(wxid),
+                                            message = message,
+                                            remark = remark
+                                        )
+                                    )
+                                }
+                            }
+                            ScrmFriendAddInputKind.SearchContent -> {
+                                val searchOutcome = runner.submitAndAwait(reloadContactsOnSuccess = false) {
+                                    session.contactApi.findFriend(
+                                        ScrmFindContactRequest(
+                                            deviceUuid = route.deviceUuid,
+                                            weChatId = route.weChatId,
+                                            content = wxid
+                                        )
+                                    )
+                                }
+                                val friendId = scrmFriendIdFromFindContactData(searchOutcome.data)
+                                    ?: throw ScrmInvalidResponseException(
+                                        "好友搜索已完成，但服务端未返回 friendId/wxid，无法继续发送好友验证"
+                                    )
+                                runner.submitAndAwait(reloadContactsOnSuccess = true) {
+                                    session.contactApi.sendFriendVerify(
+                                        ScrmSendFriendVerifyRequest(
+                                            deviceUuid = route.deviceUuid,
+                                            weChatId = route.weChatId,
+                                            friendId = friendId,
+                                            message = message
+                                        )
+                                    )
+                                }
+                            }
+                            ScrmFriendAddInputKind.Wxid -> error("unreachable")
+                        }
+                    }
+                }.onSuccess { outcome ->
+                    state = state.copy(loading = false, status = outcome.message, error = null)
+                    if (outcome.shouldReloadContacts) {
+                        loadContacts()
+                    }
+                }.onFailure { error ->
+                    state = state.copy(
+                        loading = false,
+                        error = error.toScrmContactsPanelMessage(),
+                        status = null
+                    )
+                }
+            }
+            return
+        }
+        if (wxid.isBlank()) {
+            state = state.copy(error = "请输入好友 wxid、手机号或搜索结果 wxid")
+            return
+        }
+        submitTask("正在提交添加好友") {
+            val session = manager.loadSelectedSessionOrBootstrap()
+            session.contactApi.addFriend(
+                ScrmAddFriendRequest(
+                    deviceUuid = route.deviceUuid,
+                    weChatId = route.weChatId,
+                    friendWxid = wxid,
+                    message = addMessageText.trim().takeIf { it.isNotEmpty() },
+                    remark = addRemarkText.trim().takeIf { it.isNotEmpty() }
+                )
+            )
+        }
+    }
+
+    fun deleteSelectedFriend() {
+        val contact = state.selectedContact ?: return
+        val friendId = selectedRemoteId(contact)
+        if (friendId == null) {
+            state = state.copy(error = "当前联系人缺少可删除的 wxid")
+            return
+        }
+        submitTask("正在提交删除好友") {
+            val session = manager.loadSelectedSessionOrBootstrap()
+            session.contactApi.deleteFriend(
+                friendId = friendId,
+                deviceUuid = route.deviceUuid,
+                weChatId = route.weChatId
+            )
+        }
+    }
+
+    fun sendSelectedText() {
+        val contact = state.selectedContact ?: return
+        val conversationId = selectedRemoteId(contact)
+        val content = sendText.trim()
+        if (conversationId == null) {
+            state = state.copy(error = "当前联系人缺少可发送消息的 wxid")
+            return
+        }
+        if (content.isBlank()) {
+            state = state.copy(error = "请输入要发送的消息")
+            return
+        }
+        submitTask("正在发送文本消息") {
+            val session = manager.loadSelectedSessionOrBootstrap()
+            session.messageApi.sendText(
+                ScrmSendTextMessageRequest(
+                    deviceUuid = route.deviceUuid,
+                    weChatId = route.weChatId,
+                    conversationId = conversationId,
+                    content = content
+                )
+            )
+        }
+    }
+
+    fun handleFriendRequest(
+        request: ScrmFriendRequest,
+        operation: ScrmFriendRequestOperation
+    ) {
+        val friendId = request.requestWxid?.takeIf { it.isNotBlank() }
+            ?: request.id.toString()
+        submitTask(if (operation == ScrmFriendRequestOperation.Accept) "正在通过好友申请" else "正在拒绝好友申请") {
+            val session = manager.loadSelectedSessionOrBootstrap()
+            session.contactApi.handleFriendRequest(
+                ScrmHandleFriendRequestRequest(
+                    deviceUuid = route.deviceUuid,
+                    weChatId = route.weChatId,
+                    friendId = friendId,
+                    friendNick = request.displayName,
+                    remark = request.displayName,
+                    replyMsg = if (operation == ScrmFriendRequestOperation.Accept) "已通过" else "暂不添加",
+                    operation = operation
+                )
+            )
+        }
+    }
+
+    LaunchedEffect(route) {
+        loadContacts()
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            TextLabel(
+                text = "联系人",
+                size = 14.sp,
+                weight = FontWeight.Bold,
+                color = OverlayTokens.panelPrimaryText,
+                modifier = Modifier.weight(1f),
+                maxLines = 1
+            )
+            ScrmPanelButton(label = "刷新", enabled = !state.loading, onClick = { loadContacts() })
+            ScrmPanelButton(label = "关闭", onClick = onClose)
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            PanelTextInput(
+                value = searchText,
+                onValueChange = { searchText = it },
+                placeholder = "搜索昵称、备注、wxid",
+                modifier = Modifier.weight(1f)
+            )
+            ScrmPanelButton(
+                label = "搜索",
+                enabled = !state.loading,
+                accent = true,
+                onClick = { loadContacts(searchText) }
+            )
+            ScrmPanelButton(label = "同步", enabled = !state.loading, onClick = ::syncContacts)
+        }
+
+        state.status?.let { status ->
+            TextLabel(
+                text = status,
+                size = 10.sp,
+                color = OverlayTokens.panelSecondaryText,
+                maxLines = 1
+            )
+        }
+        state.error?.let { error ->
+            TextLabel(
+                text = error,
+                size = 10.sp,
+                color = Color(0xFFB65757),
+                maxLines = 2,
+                lineHeight = 13.sp
+            )
+        }
+
+        state.friendSearchProfile?.let { profile ->
+            ScrmFriendSearchProfilePanel(
+                profile = profile,
+                message = addMessageText,
+                onMessageChange = { addMessageText = it },
+                enabled = !state.loading,
+                onApply = { sendFriendVerifyFromSearch(profile) },
+                onClose = { state = state.copy(friendSearchProfile = null) }
+            )
+        }
+
+        ScrmSelectedContactPanel(
+            contact = state.selectedContact,
+            sendText = sendText,
+            onSendTextChange = { sendText = it },
+            onSendText = ::sendSelectedText,
+            onDelete = ::deleteSelectedFriend,
+            enabled = !state.loading
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            PanelTextInput(
+                value = addWxidText,
+                onValueChange = { addWxidText = it },
+                placeholder = "wxid/微信号/手机号",
+                modifier = Modifier.weight(0.9f)
+            )
+            PanelTextInput(
+                value = addRemarkText,
+                onValueChange = { addRemarkText = it },
+                placeholder = "备注",
+                modifier = Modifier.weight(0.7f)
+            )
+            ScrmPanelButton(label = "搜索", enabled = !state.loading, accent = true, onClick = ::searchFriendForAdd)
+        }
+        PanelTextInput(
+            value = addMessageText,
+            onValueChange = { addMessageText = it },
+            placeholder = "验证消息"
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            ScrmContactList(
+                contacts = state.contacts,
+                selectedContact = state.selectedContact,
+                loading = state.loading,
+                modifier = Modifier.weight(1.08f),
+                onSelectContact = { contact ->
+                    state = state.copy(selectedContact = contact, error = null)
+                    addWxidText = contact.wxid.orEmpty()
+                }
+            )
+            ScrmFriendRequestList(
+                requests = state.friendRequests,
+                enabled = !state.loading,
+                modifier = Modifier.weight(0.92f),
+                onAccept = { request ->
+                    handleFriendRequest(request, ScrmFriendRequestOperation.Accept)
+                },
+                onReject = { request ->
+                    handleFriendRequest(request, ScrmFriendRequestOperation.Reject)
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ScrmFriendSearchProfilePanel(
+    profile: ScrmFriendSearchProfile,
+    message: String,
+    onMessageChange: (String) -> Unit,
+    enabled: Boolean,
+    onApply: () -> Unit,
+    onClose: () -> Unit
+) {
+    val context = LocalContext.current
+    val avatarBitmap = rememberAsyncImageThumbnailBitmap(
+        context = context,
+        uriText = profile.avatarUrl?.takeIf { it.isNotBlank() }
+    )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(OverlayTokens.resourcePanel)
+            .border(1.dp, OverlayTokens.resourcePanelBorder, RoundedCornerShape(10.dp))
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(9.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF5674A8)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (avatarBitmap != null) {
+                    Image(
+                        bitmap = avatarBitmap.asImageBitmap(),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    TextLabel(
+                        text = profile.displayName.take(2),
+                        size = 12.sp,
+                        weight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 1
+                    )
+                }
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                TextLabel(
+                    text = profile.displayName,
+                    size = 13.sp,
+                    weight = FontWeight.Bold,
+                    color = OverlayTokens.panelPrimaryText,
+                    maxLines = 1
+                )
+                TextLabel(
+                    text = profile.wechatId ?: profile.friendId,
+                    size = 10.sp,
+                    color = OverlayTokens.panelSecondaryText,
+                    maxLines = 1
+                )
+            }
+            ScrmPanelButton(label = "取消", enabled = enabled, onClick = onClose)
+        }
+        listOfNotNull(
+            profile.phone?.takeIf { it.isNotBlank() }?.let { "电话 $it" },
+            profile.region?.takeIf { it.isNotBlank() }?.let { "地区 $it" },
+            profile.signature?.takeIf { it.isNotBlank() }?.let { "签名 $it" },
+            profile.source?.takeIf { it.isNotBlank() }?.let { "来源 $it" }
+        ).forEach { line ->
+            TextLabel(
+                text = line,
+                size = 10.sp,
+                color = OverlayTokens.panelSecondaryText,
+                maxLines = 1
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            PanelTextInput(
+                value = message,
+                onValueChange = onMessageChange,
+                placeholder = "验证消息",
+                modifier = Modifier.weight(1f)
+            )
+            ScrmPanelButton(label = "发送申请", enabled = enabled, accent = true, onClick = onApply)
+        }
+    }
+}
+
+@Composable
+private fun ScrmSelectedContactPanel(
+    contact: ScrmContact?,
+    sendText: String,
+    onSendTextChange: (String) -> Unit,
+    onSendText: () -> Unit,
+    onDelete: () -> Unit,
+    enabled: Boolean
+) {
+    if (contact == null) {
+        TextLabel(
+            text = "选择一个联系人后可发送消息或删除好友",
+            size = 10.sp,
+            color = OverlayTokens.panelSecondaryText,
+            maxLines = 1
+        )
+        return
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(9.dp))
+            .background(OverlayTokens.resourcePanel)
+            .border(1.dp, OverlayTokens.resourcePanelBorder, RoundedCornerShape(9.dp))
+            .padding(9.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                TextLabel(
+                    text = contact.displayName,
+                    size = 12.sp,
+                    weight = FontWeight.Bold,
+                    color = OverlayTokens.panelPrimaryText,
+                    maxLines = 1
+                )
+                TextLabel(
+                    text = contact.wxid.orEmpty().ifBlank { contact.friendNo.orEmpty().ifBlank { "无 wxid" } },
+                    size = 9.sp,
+                    color = OverlayTokens.panelSecondaryText,
+                    maxLines = 1
+                )
+            }
+            ScrmPanelButton(label = "删除", enabled = enabled, danger = true, onClick = onDelete)
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            PanelTextInput(
+                value = sendText,
+                onValueChange = onSendTextChange,
+                placeholder = "给该联系人发送文本",
+                modifier = Modifier.weight(1f)
+            )
+            ScrmPanelButton(label = "发送", enabled = enabled, accent = true, onClick = onSendText)
+        }
+    }
+}
+
+@Composable
+private fun ScrmContactList(
+    contacts: List<ScrmContact>,
+    selectedContact: ScrmContact?,
+    loading: Boolean,
+    modifier: Modifier,
+    onSelectContact: (ScrmContact) -> Unit
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        TextLabel(
+            text = "联系人",
+            size = 11.sp,
+            weight = FontWeight.Bold,
+            color = OverlayTokens.panelPrimaryText,
+            maxLines = 1
+        )
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 128.dp, max = 210.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            if (contacts.isEmpty()) {
+                item {
+                    TextLabel(
+                        text = if (loading) "正在加载..." else "暂无联系人",
+                        size = 10.sp,
+                        color = OverlayTokens.panelSecondaryText,
+                        modifier = Modifier.padding(vertical = 10.dp),
+                        maxLines = 1
+                    )
+                }
+            }
+            itemsIndexed(
+                items = contacts,
+                key = { _, contact -> contact.id }
+            ) { _, contact ->
+                val selected = selectedContact?.id == contact.id
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (selected) OverlayTokens.inputFocus.copy(alpha = 0.22f) else Color.Transparent)
+                        .border(
+                            1.dp,
+                            if (selected) OverlayTokens.accent else OverlayTokens.resourcePanelBorder,
+                            RoundedCornerShape(8.dp)
+                        )
+                        .clickable { onSelectContact(contact) }
+                        .padding(horizontal = 8.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(RoundedCornerShape(7.dp))
+                            .background(Color(0xFF5674A8)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        TextLabel(
+                            text = contact.displayName.take(2),
+                            size = 9.sp,
+                            weight = FontWeight.Bold,
+                            color = Color.White,
+                            maxLines = 1
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        TextLabel(
+                            text = contact.displayName,
+                            size = 11.sp,
+                            weight = FontWeight.SemiBold,
+                            color = OverlayTokens.panelPrimaryText,
+                            maxLines = 1
+                        )
+                        TextLabel(
+                            text = contact.wxid.orEmpty().ifBlank { contact.friendNo.orEmpty() },
+                            size = 8.sp,
+                            color = OverlayTokens.panelSecondaryText,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScrmFriendRequestList(
+    requests: List<ScrmFriendRequest>,
+    enabled: Boolean,
+    modifier: Modifier,
+    onAccept: (ScrmFriendRequest) -> Unit,
+    onReject: (ScrmFriendRequest) -> Unit
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        TextLabel(
+            text = "好友申请",
+            size = 11.sp,
+            weight = FontWeight.Bold,
+            color = OverlayTokens.panelPrimaryText,
+            maxLines = 1
+        )
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 128.dp, max = 210.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            if (requests.isEmpty()) {
+                item {
+                    TextLabel(
+                        text = "暂无待处理申请",
+                        size = 10.sp,
+                        color = OverlayTokens.panelSecondaryText,
+                        modifier = Modifier.padding(vertical = 10.dp),
+                        maxLines = 1
+                    )
+                }
+            }
+            itemsIndexed(
+                items = requests,
+                key = { _, request -> request.id }
+            ) { _, request ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .border(1.dp, OverlayTokens.resourcePanelBorder, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 7.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    TextLabel(
+                        text = request.displayName,
+                        size = 11.sp,
+                        weight = FontWeight.SemiBold,
+                        color = OverlayTokens.panelPrimaryText,
+                        maxLines = 1
+                    )
+                    TextLabel(
+                        text = request.requestMessage.orEmpty().ifBlank { request.requestWxid.orEmpty() },
+                        size = 9.sp,
+                        color = OverlayTokens.panelSecondaryText,
+                        maxLines = 2,
+                        lineHeight = 12.sp
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        ScrmPanelButton(label = "通过", enabled = enabled, accent = true, onClick = { onAccept(request) })
+                        ScrmPanelButton(label = "拒绝", enabled = enabled, onClick = { onReject(request) })
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScrmPanelButton(
+    label: String,
+    enabled: Boolean = true,
+    accent: Boolean = false,
+    danger: Boolean = false,
+    onClick: () -> Unit
+) {
+    val container = when {
+        danger -> Color(0xFFB65757)
+        accent -> OverlayTokens.accent
+        else -> OverlayTokens.resourcePanel
+    }
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.height(34.dp),
+        shape = RoundedCornerShape(8.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = container,
+            contentColor = if (accent || danger) Color.White else OverlayTokens.panelPrimaryText,
+            disabledContainerColor = OverlayTokens.resourcePanel.copy(alpha = 0.55f),
+            disabledContentColor = OverlayTokens.panelSecondaryText
+        ),
+        contentPadding = PaddingValues(horizontal = 9.dp, vertical = 0.dp)
+    ) {
+        TextLabel(
+            text = label,
+            size = 10.sp,
+            weight = FontWeight.SemiBold,
+            color = if (enabled && (accent || danger)) Color.White else OverlayTokens.panelPrimaryText,
+            maxLines = 1,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+private data class ScrmContactsPanelState(
+    val loading: Boolean = false,
+    val contacts: List<ScrmContact> = emptyList(),
+    val totalCount: Int = 0,
+    val friendRequests: List<ScrmFriendRequest> = emptyList(),
+    val selectedContact: ScrmContact? = null,
+    val friendSearchProfile: ScrmFriendSearchProfile? = null,
+    val status: String? = null,
+    val error: String? = null
+)
+
+private data class ScrmContactsPanelLoadResult(
+    val contacts: List<ScrmContact>,
+    val totalCount: Int,
+    val friendRequests: List<ScrmFriendRequest>
+)
+
+internal data class ScrmFriendSearchProfile(
+    val friendId: String,
+    val displayName: String,
+    val avatarUrl: String? = null,
+    val wechatId: String? = null,
+    val phone: String? = null,
+    val region: String? = null,
+    val signature: String? = null,
+    val source: String? = null
+)
+
+internal fun contactAddFriendUsesSearchBeforeApply(): Boolean = true
+
+internal fun contactAddFriendShowsIndependentProfileBeforeApply(): Boolean = true
+
+private enum class ScrmFriendAddInputKind {
+    Wxid,
+    Phone,
+    SearchContent
+}
+
+private fun scrmFriendAddInputKind(value: String): ScrmFriendAddInputKind {
+    val input = value.trim()
+    val phoneDigits = input.filter(Char::isDigit)
+    val phoneLike = phoneDigits.length >= 7 &&
+        input.all { char -> char.isDigit() || char in setOf('+', '-', ' ', '(', ')') }
+    return when {
+        input.startsWith("wxid_", ignoreCase = true) ||
+            input.startsWith("gh_", ignoreCase = true) ||
+            input.contains("@chatroom", ignoreCase = true) -> ScrmFriendAddInputKind.Wxid
+        phoneLike -> ScrmFriendAddInputKind.Phone
+        else -> ScrmFriendAddInputKind.SearchContent
+    }
+}
+
+private fun scrmFriendIdFromFindContactData(data: JsonElement?): String? {
+    return collectScrmFindContactObjects(data)
+        .firstNotNullOfOrNull { item ->
+            listOf(
+                "friendId",
+                "friendWxid",
+                "wxid",
+                "userName",
+                "username",
+                "encryptUsername",
+                "v1"
+            ).firstNotNullOfOrNull { key ->
+                item[key]?.let { element ->
+                    runCatching { element.jsonPrimitive.contentOrNull }.getOrNull()
+                }?.takeIf { it.isNotBlank() }
+            }
+        }
+}
+
+internal fun scrmFriendSearchProfileFromFindContactData(data: JsonElement?): ScrmFriendSearchProfile? {
+    return collectScrmFindContactObjects(data)
+        .firstNotNullOfOrNull { item ->
+            val friendId = item.stringValue(
+                "friendId",
+                "friendWxid",
+                "wxid",
+                "userName",
+                "username",
+                "encryptUsername",
+                "v1"
+            ) ?: return@firstNotNullOfOrNull null
+            val wechatId = item.stringValue(
+                "wxid",
+                "friendWxid",
+                "wechatId",
+                "weChatId",
+                "userName",
+                "username"
+            ) ?: friendId.takeIf { it.startsWith("wxid_", ignoreCase = true) }
+            val displayName = item.stringValue(
+                "remarks",
+                "remark",
+                "nickname",
+                "nickName",
+                "displayName",
+                "alias",
+                "friendNo",
+                "name"
+            ) ?: wechatId ?: friendId
+            ScrmFriendSearchProfile(
+                friendId = friendId,
+                displayName = displayName,
+                avatarUrl = item.stringValue(
+                    "avatar",
+                    "avatarUrl",
+                    "headImg",
+                    "headImgUrl",
+                    "bigHeadImgUrl",
+                    "smallHeadImgUrl"
+                ),
+                wechatId = wechatId,
+                phone = item.stringValue("phone", "mobile", "phoneNumber"),
+                region = item.stringValue("region", "area", "city", "province"),
+                signature = item.stringValue("signature", "sign", "description", "desc"),
+                source = item.stringValue("source", "from", "scene")
+            )
+        }
+}
+
+private fun collectScrmFindContactObjects(data: JsonElement?): List<JsonObject> {
+    return when (data) {
+        is JsonArray -> data.flatMap(::collectScrmFindContactObjects)
+        is JsonObject -> {
+            val children = listOf(
+                "data",
+                "contact",
+                "friend",
+                "result",
+                "item",
+                "items",
+                "list",
+                "contacts"
+            ).flatMap { key -> collectScrmFindContactObjects(data[key]) }
+            listOf(data) + children
+        }
+        else -> emptyList()
+    }
+}
+
+private fun Throwable.toScrmContactsPanelMessage(): String {
+    return when (this) {
+        is ScrmException -> toUserMessage()
+        is IllegalArgumentException -> message ?: "联系人操作参数无效"
+        else -> message ?: "联系人操作失败"
+    }
+}
+
+@Composable
 private fun AiConfigPanel(
     config: FloatingChatAiConfig,
     status: String?,
@@ -12631,9 +14438,10 @@ private fun AiConfigPanel(
     onTest: (FloatingChatAiConfig) -> Unit,
     onClose: () -> Unit
 ) {
-    var baseUrl by remember(config) { mutableStateOf(config.baseUrl.ifBlank { "https://api.openai.com/v1" }) }
-    var apiKey by remember(config) { mutableStateOf(config.apiKey) }
-    var model by remember(config) { mutableStateOf(config.model.ifBlank { "gpt-4.1-mini" }) }
+    val defaultConfig = remember { defaultFloatingChatAiConfig() }
+    var baseUrl by remember(config) { mutableStateOf(config.baseUrl.ifBlank { defaultConfig.baseUrl }) }
+    var apiKey by remember(config) { mutableStateOf(config.apiKey.ifBlank { defaultConfig.apiKey }) }
+    var model by remember(config) { mutableStateOf(config.model.ifBlank { defaultConfig.model }) }
     var systemPrompt by remember(config) { mutableStateOf(config.systemPrompt) }
     var temperatureText by remember(config) { mutableStateOf(config.temperature.toString()) }
     var maxTokensText by remember(config) { mutableStateOf(config.maxTokens.toString()) }
@@ -12964,18 +14772,257 @@ private fun QuickPhrasePanel(
 
 @Composable
 private fun MomentsTimelinePanel(
+    route: ScrmFloatingAccountRoute?,
     posts: List<AppMomentPost>,
     pendingMedia: AppMomentMedia?,
     onPickMedia: () -> Unit,
     onClearMedia: () -> Unit,
     onPreviewMedia: (AppMomentPost) -> Unit,
-    onPostMoment: (String) -> Unit,
-    onUpdatePost: (AppMomentPost) -> Unit
+    onUpdatePost: (AppMomentPost) -> Unit,
+    onRemotePostsLoaded: (List<AppMomentPost>) -> Unit
 ) {
+    val context = LocalContext.current
+    val manager = remember(context) { ScrmSettingsManager(context.applicationContext) }
+    val scope = rememberCoroutineScope()
     var draft by remember { mutableStateOf("") }
     var commentingPostId by remember { mutableStateOf<String?>(null) }
     var activeMomentMenuPostId by remember { mutableStateOf<String?>(null) }
     var commentDraft by remember { mutableStateOf("") }
+    var state by remember(route) { mutableStateOf(ScrmMomentsPanelState()) }
+
+    fun loadMoments() {
+        val currentRoute = route
+        if (currentRoute == null) {
+            state = state.copy(
+                loading = false,
+                status = null,
+                error = "当前账号缺少 SCRM 路由，无法同步真实朋友圈"
+            )
+            return
+        }
+        scope.launch {
+            state = state.copy(loading = true, status = "正在同步真实朋友圈", error = null)
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    val syncMoments = submitScrmMomentTaskAndAwait(session.taskApi) {
+                        session.momentApi.syncMoments(
+                            ScrmSyncMomentsRequest(
+                                deviceUuid = currentRoute.deviceUuid,
+                                weChatId = currentRoute.weChatId,
+                                startTime = 0L
+                            )
+                        )
+                    }
+                    val syncMessages = submitScrmMomentTaskAndAwait(session.taskApi) {
+                        session.momentApi.syncMomentMessages(
+                            ScrmSyncMomentMessagesRequest(
+                                deviceUuid = currentRoute.deviceUuid,
+                                weChatId = currentRoute.weChatId,
+                                onlyComment = false,
+                                getAll = true
+                            )
+                        )
+                    }
+                    val loadedPosts = (syncMoments.data + syncMessages.data)
+                        .flatMap { data -> scrmMomentPostsFromTaskData(data) }
+                        .distinctBy { post -> post.id }
+                        .sortedByDescending { post -> post.createdAt }
+                    ScrmMomentsLoadResult(
+                        posts = loadedPosts,
+                        message = if (loadedPosts.isEmpty()) {
+                            "已提交同步任务，服务端暂未返回可展示的朋友圈明细"
+                        } else {
+                            "已同步 ${loadedPosts.size} 条真实朋友圈"
+                        }
+                    )
+                }
+            }.onSuccess { result ->
+                if (result.posts.isNotEmpty()) {
+                    onRemotePostsLoaded(result.posts)
+                }
+                state = state.copy(loading = false, status = result.message, error = null)
+            }.onFailure { error ->
+                state = state.copy(
+                    loading = false,
+                    status = null,
+                    error = error.toScrmContactsPanelMessage()
+                )
+            }
+        }
+    }
+
+    fun submitMoment(content: String) {
+        val currentRoute = route
+        if (currentRoute == null) {
+            state = state.copy(error = "当前账号缺少 SCRM 路由，无法发表朋友圈")
+            return
+        }
+        val media = pendingMedia
+        val trimmedContent = content.trim()
+        val clientRequestId = "moment-${System.currentTimeMillis()}"
+        scope.launch {
+            state = state.copy(loading = true, status = "正在发表朋友圈", error = null)
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    val uploadedMedia = uploadScrmMomentMedia(
+                        context = context,
+                        api = session.messageApi,
+                        media = media
+                    )
+                    submitScrmMomentTaskAndAwait(
+                        taskApi = session.taskApi,
+                        treatMissingRecentTaskAsAccepted = true
+                    ) {
+                        session.momentApi.postMoment(
+                            ScrmPostMomentRequest(
+                                deviceUuid = currentRoute.deviceUuid,
+                                weChatId = currentRoute.weChatId,
+                                clientRequestId = clientRequestId,
+                                content = trimmedContent.takeIf { it.isNotBlank() },
+                                attachmentType = uploadedMedia?.attachmentType,
+                                attachments = uploadedMedia?.url?.let(::listOf),
+                                payload = ScrmMomentPostPayload(
+                                    clientRequestId = clientRequestId,
+                                    weChatId = currentRoute.weChatId,
+                                    content = trimmedContent.takeIf { it.isNotBlank() },
+                                    attachment = uploadedMedia?.let { mediaInfo ->
+                                        ScrmMomentPostAttachment(
+                                            type = mediaInfo.attachmentTypeCode,
+                                            content = listOf(mediaInfo.url)
+                                        )
+                                    }
+                                )
+                            )
+                        )
+                    }
+                }
+            }.onSuccess { outcome ->
+                state = state.copy(loading = false, status = outcome.message, error = null)
+                val submittedPosts = outcome.data
+                    .flatMap { data -> scrmMomentPostsFromTaskData(data) }
+                    .distinctBy { post -> post.id }
+                if (submittedPosts.isNotEmpty()) {
+                    onRemotePostsLoaded(submittedPosts)
+                } else {
+                    onUpdatePost(
+                        localScrmMomentPostForSubmittedDraft(
+                            clientRequestId = clientRequestId,
+                            weChatId = currentRoute.weChatId,
+                            content = trimmedContent,
+                            media = media
+                        )
+                    )
+                }
+                draft = ""
+                onClearMedia()
+                if (outcome.completed) {
+                    loadMoments()
+                }
+            }.onFailure { error ->
+                state = state.copy(
+                    loading = false,
+                    status = null,
+                    error = error.toScrmContactsPanelMessage()
+                )
+            }
+        }
+    }
+
+    fun submitLike(post: AppMomentPost) {
+        val currentRoute = route
+        val circleId = scrmCircleIdForMomentPostId(post.id)
+        if (currentRoute == null || circleId == null) {
+            state = state.copy(error = "当前朋友圈缺少 circleId，无法点赞")
+            return
+        }
+        val cancel = post.likedBy.contains(CurrentUserMomentLikeName)
+        scope.launch {
+            state = state.copy(loading = true, status = "正在提交朋友圈点赞", error = null)
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    submitScrmMomentTaskAndAwait(session.taskApi) {
+                        session.momentApi.likeMoment(
+                            ScrmMomentLikeRequest(
+                                deviceUuid = currentRoute.deviceUuid,
+                                weChatId = currentRoute.weChatId,
+                                circleId = circleId,
+                                isCancel = cancel
+                            )
+                        )
+                    }
+                }
+            }.onSuccess { outcome ->
+                state = state.copy(loading = false, status = outcome.message, error = null)
+                if (outcome.completed) {
+                    val nextLikedBy = if (cancel) {
+                        post.likedBy - CurrentUserMomentLikeName
+                    } else {
+                        (post.likedBy + CurrentUserMomentLikeName).distinct()
+                    }
+                    onUpdatePost(post.copy(likedBy = nextLikedBy))
+                }
+            }.onFailure { error ->
+                state = state.copy(
+                    loading = false,
+                    status = null,
+                    error = error.toScrmContactsPanelMessage()
+                )
+            }
+        }
+    }
+
+    fun submitComment(post: AppMomentPost, text: String) {
+        val currentRoute = route
+        val circleId = scrmCircleIdForMomentPostId(post.id)
+        if (currentRoute == null || circleId == null) {
+            state = state.copy(error = "当前朋友圈缺少 circleId，无法评论")
+            return
+        }
+        scope.launch {
+            state = state.copy(loading = true, status = "正在提交朋友圈评论", error = null)
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    submitScrmMomentTaskAndAwait(session.taskApi) {
+                        session.momentApi.commentMoment(
+                            ScrmMomentCommentRequest(
+                                deviceUuid = currentRoute.deviceUuid,
+                                weChatId = currentRoute.weChatId,
+                                circleId = circleId,
+                                content = text,
+                                replyCommentId = 0L,
+                                isResend = false
+                            )
+                        )
+                    }
+                }
+            }.onSuccess { outcome ->
+                state = state.copy(loading = false, status = outcome.message, error = null)
+                if (outcome.completed) {
+                    onUpdatePost(
+                        post.copy(
+                            comments = post.comments + AppMomentComment(CurrentUserMomentLikeName, text)
+                        )
+                    )
+                    commentDraft = ""
+                    commentingPostId = null
+                }
+            }.onFailure { error ->
+                state = state.copy(
+                    loading = false,
+                    status = null,
+                    error = error.toScrmContactsPanelMessage()
+                )
+            }
+        }
+    }
+
+    LaunchedEffect(route) {
+        loadMoments()
+    }
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -12991,6 +15038,8 @@ private fun MomentsTimelinePanel(
                 maxLines = 1,
                 modifier = Modifier.weight(1f)
             )
+            SmallChoiceButton(label = "刷新", onClick = ::loadMoments)
+            Spacer(modifier = Modifier.width(6.dp))
             SmallChoiceButton(label = "图片/视频", onClick = onPickMedia)
             Spacer(modifier = Modifier.width(6.dp))
             SmallChoiceButton(
@@ -12998,11 +15047,31 @@ private fun MomentsTimelinePanel(
                 onClick = {
                     val content = draft.trim()
                     if (content.isNotEmpty() || pendingMedia != null) {
-                        onPostMoment(content)
+                        submitMoment(content)
                         draft = ""
                     }
                 }
             )
+        }
+        state.status?.let { status ->
+            TextLabel(
+                text = status,
+                size = 10.sp,
+                color = OverlayTokens.panelSecondaryText,
+                maxLines = 2,
+                lineHeight = 13.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+        state.error?.let { error ->
+            TextLabel(
+                text = error,
+                size = 10.sp,
+                color = Color(0xFFB65757),
+                maxLines = 2,
+                lineHeight = 13.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
         }
         BasicTextField(
             value = draft,
@@ -13046,7 +15115,7 @@ private fun MomentsTimelinePanel(
                 .background(OverlayTokens.momentsBackground)
         ) {
             itemsIndexed(posts) { _, post ->
-                val liked = post.likedBy.isNotEmpty()
+                val liked = post.likedBy.contains(CurrentUserMomentLikeName)
                 val comments = post.comments
                 MomentPostRow(
                     post = post,
@@ -13059,12 +15128,7 @@ private fun MomentsTimelinePanel(
                         activeMomentMenuPostId = if (activeMomentMenuPostId == post.id) null else post.id
                     },
                     onLike = {
-                        val nextLikedBy = if (post.likedBy.contains("我")) {
-                            post.likedBy - "我"
-                        } else {
-                            post.likedBy + "我"
-                        }
-                        onUpdatePost(post.copy(likedBy = nextLikedBy))
+                        submitLike(post)
                         activeMomentMenuPostId = null
                     },
                     onComment = {
@@ -13077,15 +15141,453 @@ private fun MomentsTimelinePanel(
                     onSendComment = {
                         val text = commentDraft.trim()
                         if (text.isNotEmpty()) {
-                            onUpdatePost(post.copy(comments = post.comments + AppMomentComment("我", text)))
-                            commentDraft = ""
-                            commentingPostId = null
+                            submitComment(post, text)
                         }
                     }
                 )
             }
         }
     }
+}
+
+private const val CurrentUserMomentLikeName = "\u6211"
+private const val ScrmMomentPostIdPrefix = "scrm-moment:"
+private const val LocalScrmMomentPostIdPrefix = "local-scrm-moment:"
+private const val ScrmMomentTaskPollDelayMillis = 1_500L
+private const val ScrmMomentTaskMaxPollAttempts = 8
+
+private data class ScrmMomentsPanelState(
+    val loading: Boolean = false,
+    val status: String? = null,
+    val error: String? = null
+)
+
+private data class ScrmMomentsLoadResult(
+    val posts: List<AppMomentPost>,
+    val message: String
+)
+
+internal data class ScrmMomentTaskAwaitOutcome(
+    val taskId: Long,
+    val completed: Boolean,
+    val message: String,
+    val data: List<JsonElement>
+)
+
+private data class ScrmUploadedMomentMedia(
+    val url: String,
+    val attachmentType: String,
+    val attachmentTypeCode: Int
+)
+
+internal fun submitScrmMomentTaskAndAwait(
+    taskApi: ScrmTaskApi,
+    treatMissingRecentTaskAsAccepted: Boolean = false,
+    pollDelayMillis: Long = ScrmMomentTaskPollDelayMillis,
+    maxPollAttempts: Int = ScrmMomentTaskMaxPollAttempts,
+    sleepMillis: (Long) -> Unit = { delay -> Thread.sleep(delay) },
+    submit: () -> ScrmTaskSubmissionResult
+): ScrmMomentTaskAwaitOutcome {
+    require(pollDelayMillis > 0L) { "pollDelayMillis must be greater than 0" }
+    require(maxPollAttempts > 0) { "maxPollAttempts must be greater than 0" }
+    val submitted = submit()
+    if (!submitted.success) {
+        throw ScrmRequestException(
+            statusCode = 400,
+            message = submitted.message ?: "SCRM 未受理朋友圈任务"
+        )
+    }
+    val data = mutableListOf<JsonElement>()
+    submitted.data?.let(data::add)
+    var lastResult: ScrmTaskResult? = null
+    repeat(maxPollAttempts) { attempt ->
+        if (attempt > 0) sleepMillis(pollDelayMillis)
+        val result = try {
+            taskApi.getTask(submitted.taskId)
+        } catch (error: ScrmRequestException) {
+            if (treatMissingRecentTaskAsAccepted && error.isMissingRecentTaskResult()) {
+                return ScrmMomentTaskAwaitOutcome(
+                    taskId = submitted.taskId,
+                    completed = false,
+                    message = submitted.message?.takeIf { it.isNotBlank() }
+                        ?.let { message -> "$message #${submitted.taskId}" }
+                        ?: "朋友圈发布任务已提交 #${submitted.taskId}，等待 Android 回包",
+                    data = data
+                )
+            }
+            throw error
+        }
+        lastResult = result
+        result.data?.let(data::add)
+        when (resolveScrmTaskResult(result).pollState) {
+            ScrmTaskPollState.Completed -> {
+                return ScrmMomentTaskAwaitOutcome(
+                    taskId = submitted.taskId,
+                    completed = true,
+                    message = result.message?.takeIf { it.isNotBlank() }
+                        ?: submitted.message?.takeIf { it.isNotBlank() }
+                        ?: "朋友圈任务已完成 #${submitted.taskId}",
+                    data = data
+                )
+            }
+
+            ScrmTaskPollState.FailedFinal -> {
+                throw ScrmRequestException(
+                    statusCode = 400,
+                    message = result.message ?: "朋友圈任务执行失败 #${submitted.taskId}"
+                )
+            }
+
+            ScrmTaskPollState.ManualReview -> {
+                throw ScrmInvalidResponseException(
+                    result.message ?: "朋友圈任务结果未知 #${submitted.taskId}"
+                )
+            }
+
+            ScrmTaskPollState.Pending -> Unit
+        }
+    }
+    return ScrmMomentTaskAwaitOutcome(
+        taskId = submitted.taskId,
+        completed = false,
+        message = lastResult?.message?.takeIf { it.isNotBlank() }
+            ?: submitted.message?.takeIf { it.isNotBlank() }
+            ?: "朋友圈任务仍在处理中 #${submitted.taskId}，请稍后刷新",
+        data = data
+    )
+}
+
+private fun ScrmRequestException.isMissingRecentTaskResult(): Boolean {
+    val normalized = message.orEmpty().lowercase(Locale.ROOT)
+    return normalized.contains("taskid") &&
+        (
+            normalized.contains("\u672a\u627e\u5230") ||
+                normalized.contains("\u8fd1\u671f\u7ed3\u679c") ||
+                normalized.contains("not found") ||
+                normalized.contains("recent")
+            )
+}
+
+private fun uploadScrmMomentMedia(
+    context: Context,
+    api: ScrmMessageApi,
+    media: AppMomentMedia?
+): ScrmUploadedMomentMedia? {
+    media ?: return null
+    val mediaUrl = media.uri?.takeIf { it.isNotBlank() }
+        ?: media.previewUri?.takeIf { it.isNotBlank() }
+        ?: return null
+    val attachmentType = when (media.kind) {
+        MomentMediaKind.Image -> "image" to ScrmMomentAttachmentType.Image
+        MomentMediaKind.Video -> "video" to ScrmMomentAttachmentType.Video
+        MomentMediaKind.Link -> return null
+    }
+    if (mediaUrl.isScrmRemoteUrl()) {
+        return ScrmUploadedMomentMedia(
+            url = mediaUrl,
+            attachmentType = attachmentType.first,
+            attachmentTypeCode = attachmentType.second
+        )
+    }
+    val resolver = AndroidScrmMediaContentResolver(context)
+    val resolved = resolver.resolve(
+        ScrmQueuedMediaPayload(
+            mediaUrl = mediaUrl,
+            mimeType = media.scrmMomentMimeType(),
+            fileName = media.label?.takeIf { it.contains('.') }
+        )
+    )
+    val uploaded = api.uploadMedia(
+        ScrmMediaUploadRequest(
+            fileName = resolved.fileName,
+            contentType = resolved.contentType,
+            bytes = resolved.bytes
+        )
+    )
+    if (!uploaded.success || uploaded.fileUrl.isNullOrBlank()) {
+        throw ScrmInvalidResponseException(uploaded.message ?: "SCRM media upload did not return fileUrl")
+    }
+    return ScrmUploadedMomentMedia(
+        url = uploaded.fileUrl,
+        attachmentType = attachmentType.first,
+        attachmentTypeCode = attachmentType.second
+    )
+}
+
+private fun String.isScrmRemoteUrl(): Boolean {
+    return startsWith("http://", ignoreCase = true) ||
+        startsWith("https://", ignoreCase = true)
+}
+
+private fun AppMomentMedia.scrmMomentMimeType(): String {
+    return when (kind) {
+        MomentMediaKind.Image -> "image/jpeg"
+        MomentMediaKind.Video -> "video/mp4"
+        MomentMediaKind.Link -> "application/octet-stream"
+    }
+}
+
+internal fun momentsTimelineUsesRemoteScrmSource(): Boolean = true
+
+internal fun momentsTimelineSeedsWechatSimulationPosts(): Boolean = false
+
+internal fun scrmCircleIdForMomentPostId(postId: String): Long? {
+    return postId
+        .takeIf { it.startsWith(ScrmMomentPostIdPrefix) }
+        ?.removePrefix(ScrmMomentPostIdPrefix)
+        ?.toLongOrNull()
+}
+
+internal fun localScrmMomentPostForSubmittedDraft(
+    clientRequestId: String,
+    weChatId: String,
+    content: String,
+    media: AppMomentMedia?,
+    createdAt: Long = System.currentTimeMillis()
+): AppMomentPost {
+    val trimmedContent = content.trim()
+    require(clientRequestId.isNotBlank()) { "clientRequestId cannot be blank" }
+    require(weChatId.isNotBlank()) { "weChatId cannot be blank" }
+    require(trimmedContent.isNotBlank() || media != null) {
+        "moment content or media is required"
+    }
+    return AppMomentPost(
+        id = "$LocalScrmMomentPostIdPrefix$clientRequestId",
+        author = CurrentUserMomentLikeName,
+        content = trimmedContent,
+        time = "\u521a\u521a",
+        avatarText = CurrentUserMomentLikeName,
+        avatarColor = scrmMomentAvatarColor(weChatId),
+        media = media,
+        comments = emptyList(),
+        createdAt = createdAt
+    )
+}
+
+internal fun scrmMomentPostsFromTaskData(data: JsonElement?): List<AppMomentPost> {
+    return collectScrmMomentObjects(data)
+        .mapNotNull(::scrmMomentPostFromObject)
+        .distinctBy { post -> post.id }
+}
+
+private fun collectScrmMomentObjects(element: JsonElement?): List<JsonObject> {
+    return when (element) {
+        is JsonArray -> element.flatMap(::collectScrmMomentObjects)
+        is JsonObject -> {
+            if (element.isScrmMomentObject()) {
+                listOf(element)
+            } else {
+                val preferred = listOf(
+                    "moments",
+                    "items",
+                    "records",
+                    "list",
+                    "data",
+                    "circleList",
+                    "momentList",
+                    "feeds"
+                )
+                val preferredObjects = preferred
+                    .mapNotNull { key -> element[key] }
+                    .flatMap(::collectScrmMomentObjects)
+                if (preferredObjects.isNotEmpty()) {
+                    preferredObjects
+                } else {
+                    element.values.flatMap(::collectScrmMomentObjects)
+                }
+            }
+        }
+
+        else -> emptyList()
+    }
+}
+
+private fun JsonObject.isScrmMomentObject(): Boolean {
+    val hasCircleId = longValue("circleId", "circleID", "id", "snsId") != null
+    val hasMomentBody = stringValue(
+        "content",
+        "text",
+        "momentContent",
+        "contentText",
+        "desc",
+        "description"
+    ) != null ||
+        stringListValue("images", "imageUrls", "picUrls", "pictures", "attachments").isNotEmpty() ||
+        stringValue("videoUrl", "video", "videoPath") != null ||
+        this["comments"] != null
+    return hasCircleId && hasMomentBody
+}
+
+private fun scrmMomentPostFromObject(value: JsonObject): AppMomentPost? {
+    val circleId = value.longValue("circleId", "circleID", "id", "snsId") ?: return null
+    val author = value.stringValue(
+        "nickname",
+        "nickName",
+        "author",
+        "authorName",
+        "displayName",
+        "userName",
+        "name",
+        "wxName",
+        "wxid"
+    ) ?: "Unknown"
+    val content = value.stringValue(
+        "content",
+        "text",
+        "momentContent",
+        "contentText",
+        "desc",
+        "description"
+    ).orEmpty()
+    val publishTime = value.longValue("publishTime", "createTime", "createdTime", "timestamp")
+    val imageUrl = value.stringListValue(
+        "images",
+        "imageUrls",
+        "picUrls",
+        "pictures",
+        "attachments",
+        "mediaUrls"
+    ).firstOrNull()
+    val videoUrl = value.stringValue("videoUrl", "video", "videoPath")
+        ?: value.stringListValue("videos", "videoUrls").firstOrNull()
+    val media = when {
+        !videoUrl.isNullOrBlank() -> AppMomentMedia(
+            kind = MomentMediaKind.Video,
+            uri = videoUrl,
+            previewUri = value.stringValue("thumbUrl", "coverUrl", "previewUrl"),
+            widthDp = 168,
+            heightDp = 220,
+            label = "video"
+        )
+
+        !imageUrl.isNullOrBlank() -> AppMomentMedia(
+            kind = MomentMediaKind.Image,
+            uri = imageUrl,
+            previewUri = imageUrl,
+            widthDp = 168,
+            heightDp = 168,
+            label = "image"
+        )
+
+        else -> null
+    }
+    return AppMomentPost(
+        id = "$ScrmMomentPostIdPrefix$circleId",
+        author = author,
+        content = content,
+        time = value.stringValue("time", "displayTime", "publishTimeText", "createdAt")
+            ?: scrmMomentDisplayTime(publishTime),
+        avatarText = author.take(2),
+        avatarColor = scrmMomentAvatarColor(circleId.toString()),
+        media = media,
+        likedBy = value.stringListValue("likedBy", "likes", "likeUsers", "praiseUsers", "praiseList")
+            .distinct(),
+        comments = value.momentComments(),
+        createdAt = scrmMomentCreatedAt(publishTime)
+    )
+}
+
+private fun JsonObject.momentComments(): List<AppMomentComment> {
+    val comments = listOf("comments", "commentList", "replyList")
+        .firstNotNullOfOrNull { key -> this[key] as? JsonArray }
+        ?: return emptyList()
+    return comments.mapNotNull { element ->
+        when (element) {
+            is JsonObject -> {
+                val author = element.stringValue(
+                    "nickname",
+                    "nickName",
+                    "author",
+                    "authorName",
+                    "displayName",
+                    "fromNickname",
+                    "name",
+                    "wxid"
+                ) ?: "Comment"
+                val content = element.stringValue("content", "text", "comment", "commentText")
+                    ?: return@mapNotNull null
+                if (isScrmMomentSyntheticStatusComment(content)) return@mapNotNull null
+                AppMomentComment(author = author, text = content)
+            }
+
+            else -> element.primitiveText()?.let { text ->
+                if (isScrmMomentSyntheticStatusComment(text)) return@let null
+                AppMomentComment(author = "Comment", text = text)
+            }
+        }
+    }
+}
+
+private fun isScrmMomentSyntheticStatusComment(text: String): Boolean {
+    return text.trim().lowercase(Locale.ROOT) == "sns_send_ok"
+}
+
+private fun JsonObject.stringValue(vararg keys: String): String? {
+    return keys.firstNotNullOfOrNull { key ->
+        this[key]?.primitiveText()
+    }
+}
+
+private fun JsonObject.longValue(vararg keys: String): Long? {
+    return keys.firstNotNullOfOrNull { key ->
+        val element = this[key] ?: return@firstNotNullOfOrNull null
+        runCatching { element.jsonPrimitive.longOrNull }.getOrNull()
+            ?: element.primitiveText()?.toLongOrNull()
+    }
+}
+
+private fun JsonObject.stringListValue(vararg keys: String): List<String> {
+    return keys.firstNotNullOfOrNull { key ->
+        val values = this[key]?.toUsefulStringList().orEmpty()
+        values.takeIf { it.isNotEmpty() }
+    }.orEmpty()
+}
+
+private fun JsonElement.toUsefulStringList(): List<String> {
+    return when (this) {
+        is JsonArray -> mapNotNull { element -> element.usefulText() }
+        else -> usefulText()?.let(::listOf).orEmpty()
+    }
+}
+
+private fun JsonElement.usefulText(): String? {
+    primitiveText()?.let { return it }
+    val objectValue = this as? JsonObject ?: return null
+    return objectValue.stringValue(
+        "url",
+        "fileUrl",
+        "imageUrl",
+        "videoUrl",
+        "thumbUrl",
+        "previewUrl",
+        "content",
+        "nickname",
+        "nickName",
+        "displayName",
+        "name",
+        "wxid"
+    )
+}
+
+private fun JsonElement.primitiveText(): String? {
+    return runCatching { jsonPrimitive.contentOrNull }
+        .getOrNull()
+        ?.takeIf { it.isNotBlank() && it != "null" }
+}
+
+private fun scrmMomentDisplayTime(epochSecondsOrMillis: Long?): String {
+    val millis = scrmMomentCreatedAt(epochSecondsOrMillis)
+    return SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(millis))
+}
+
+private fun scrmMomentCreatedAt(epochSecondsOrMillis: Long?): Long {
+    val value = epochSecondsOrMillis ?: return System.currentTimeMillis()
+    return if (value in 1L..9_999_999_999L) value * 1_000L else value
+}
+
+private fun scrmMomentAvatarColor(key: String): Color {
+    val palette = listOf(0xFF607699, 0xFF597D66, 0xFF8A6A42, 0xFF7B627D, 0xFF4F7F8D)
+    return Color(palette[(key.hashCode() and Int.MAX_VALUE) % palette.size])
 }
 
 @Composable
@@ -13575,6 +16077,539 @@ private fun AccountCardPickerPanel(
 }
 
 @Composable
+private fun MomentMaterialsPanel(
+    route: ScrmFloatingAccountRoute?,
+    onClose: () -> Unit
+) {
+    val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
+    val manager = remember(context) { ScrmSettingsManager(context.applicationContext) }
+    val scope = rememberCoroutineScope()
+    var nameDraft by remember { mutableStateOf("") }
+    var categoryDraft by remember { mutableStateOf("") }
+    var contentDraft by remember { mutableStateOf("") }
+    var state by remember(route) { mutableStateOf(ScrmMomentMaterialsPanelState()) }
+
+    fun requireRoute(): ScrmFloatingAccountRoute? {
+        val currentRoute = route
+        if (currentRoute == null) {
+            state = state.copy(
+                loading = false,
+                status = null,
+                error = "当前账号缺少 SCRM 路由，无法加载朋友圈素材"
+            )
+        }
+        return currentRoute
+    }
+
+    fun loadMaterials() {
+        val currentRoute = requireRoute() ?: return
+        scope.launch {
+            state = state.copy(loading = true, status = "正在加载朋友圈素材", error = null)
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    session.momentApi.getMomentMaterials(
+                        ScrmMomentMaterialQuery(
+                            tenantId = momentMaterialTenantIdForRoute(currentRoute),
+                            take = 80
+                        )
+                    )
+                }
+            }.onSuccess { materials ->
+                val selected = state.selectedMaterial?.let { selected ->
+                    materials.firstOrNull { material -> material.id == selected.id }
+                }
+                state = state.copy(
+                    loading = false,
+                    materials = materials,
+                    selectedMaterial = selected,
+                    selectedDetail = if (selected == null) null else state.selectedDetail,
+                    detailOpen = selected != null && state.detailOpen,
+                    status = "已加载 ${materials.size} 条素材，当前账号 ${currentRoute.weChatId}",
+                    error = null
+                )
+            }.onFailure { error ->
+                state = state.copy(
+                    loading = false,
+                    status = null,
+                    error = error.toScrmContactsPanelMessage()
+                )
+            }
+        }
+    }
+
+    fun loadDetail(material: ScrmMomentMaterial) {
+        val currentRoute = requireRoute() ?: return
+        scope.launch {
+            state = state.copy(
+                loading = true,
+                selectedMaterial = material,
+                detailOpen = true,
+                status = "正在加载素材详情",
+                error = null
+            )
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    session.momentApi.getMomentMaterialDetail(
+                        material.id,
+                        material.tenantId ?: momentMaterialTenantIdForRoute(currentRoute)
+                    )
+                }
+            }.onSuccess { detail ->
+                state = state.copy(
+                    loading = false,
+                    selectedDetail = detail,
+                    detailOpen = true,
+                    status = "已加载素材详情 #${detail.id}",
+                    error = null
+                )
+            }.onFailure { error ->
+                state = state.copy(
+                    loading = false,
+                    status = null,
+                    error = error.toScrmContactsPanelMessage()
+                )
+            }
+        }
+    }
+
+    fun createMaterial() {
+        val currentRoute = requireRoute() ?: return
+        val content = contentDraft.trim()
+        val name = nameDraft.trim()
+        if (content.isBlank()) {
+            state = state.copy(error = "请输入朋友圈素材内容")
+            return
+        }
+        scope.launch {
+            state = state.copy(loading = true, status = "正在创建朋友圈素材", error = null)
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    session.momentApi.createMomentMaterial(
+                        ScrmMomentMaterialCreateRequest(
+                            payload = ScrmMomentPostPayload(
+                                weChatId = currentRoute.weChatId,
+                                content = content
+                            ),
+                            clientRequestId = "moment-material-${System.currentTimeMillis()}",
+                            content = content,
+                            name = name.takeIf { it.isNotEmpty() },
+                            category = categoryDraft.trim().takeIf { it.isNotEmpty() },
+                            tenantId = momentMaterialTenantIdForRoute(currentRoute),
+                            enableImmediately = true
+                        )
+                    )
+                }
+            }.onSuccess { material ->
+                nameDraft = ""
+                categoryDraft = ""
+                contentDraft = ""
+                state = state.copy(
+                    loading = false,
+                    materials = listOf(material) + state.materials.filterNot { it.id == material.id },
+                    selectedMaterial = material,
+                    selectedDetail = null,
+                    detailOpen = false,
+                    status = "已创建朋友圈素材 #${material.id}",
+                    error = null
+                )
+            }.onFailure { error ->
+                state = state.copy(
+                    loading = false,
+                    status = null,
+                    error = error.toScrmContactsPanelMessage()
+                )
+            }
+        }
+    }
+
+    fun copyMaterial(material: ScrmMomentMaterial) {
+        requireRoute() ?: return
+        scope.launch {
+            state = state.copy(loading = true, status = "正在复制朋友圈素材", error = null)
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    session.momentApi.copyMomentMaterial(
+                        materialId = material.id,
+                        request = ScrmMomentMaterialCopyRequest(
+                            name = "${material.displayName} 副本",
+                            enableImmediately = true
+                        )
+                    )
+                }
+            }.onSuccess { copied ->
+                state = state.copy(
+                    loading = false,
+                    materials = listOf(copied) + state.materials,
+                    selectedMaterial = copied,
+                    selectedDetail = null,
+                    detailOpen = false,
+                    status = "已复制素材为 #${copied.id}",
+                    error = null
+                )
+            }.onFailure { error ->
+                state = state.copy(
+                    loading = false,
+                    status = null,
+                    error = error.toScrmContactsPanelMessage()
+                )
+            }
+        }
+    }
+
+    fun archiveMaterial(material: ScrmMomentMaterial) {
+        requireRoute() ?: return
+        scope.launch {
+            state = state.copy(loading = true, status = "正在归档朋友圈素材", error = null)
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    session.momentApi.archiveMomentMaterial(
+                        materialId = material.id,
+                        request = ScrmMomentMaterialControlRequest(reason = "app archive")
+                    )
+                }
+            }.onSuccess { archived ->
+                state = state.copy(
+                    loading = false,
+                    materials = state.materials.map { existing ->
+                        if (existing.id == archived.id) archived else existing
+                    },
+                    selectedMaterial = archived,
+                    selectedDetail = null,
+                    detailOpen = false,
+                    status = "已归档素材 #${archived.id}",
+                    error = null
+                )
+            }.onFailure { error ->
+                state = state.copy(
+                    loading = false,
+                    status = null,
+                    error = error.toScrmContactsPanelMessage()
+                )
+            }
+        }
+    }
+
+    fun copyDetailText() {
+        val content = state.selectedDetail?.template?.content
+            ?.takeIf { it.isNotBlank() }
+            ?: run {
+                state = state.copy(error = "当前素材详情没有可复制文案")
+                return
+            }
+        clipboard.setText(AnnotatedString(content))
+        state = state.copy(status = "已复制素材文案", error = null)
+    }
+
+    LaunchedEffect(route) {
+        loadMaterials()
+    }
+
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            TextLabel(
+                text = "朋友圈素材",
+                size = 13.sp,
+                weight = FontWeight.SemiBold,
+                color = OverlayTokens.panelPrimaryText,
+                maxLines = 1,
+                modifier = Modifier.weight(1f)
+            )
+            ScrmPanelButton(label = "刷新", enabled = !state.loading, onClick = ::loadMaterials)
+            ScrmPanelButton(label = "关闭", onClick = onClose)
+        }
+
+        state.status?.let { status ->
+            TextLabel(
+                text = status,
+                size = 10.sp,
+                color = OverlayTokens.panelSecondaryText,
+                maxLines = 2,
+                lineHeight = 13.sp
+            )
+        }
+        state.error?.let { error ->
+            TextLabel(
+                text = error,
+                size = 10.sp,
+                color = Color(0xFFB65757),
+                maxLines = 2,
+                lineHeight = 13.sp
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(9.dp))
+                .background(OverlayTokens.resourcePanel)
+                .border(1.dp, OverlayTokens.resourcePanelBorder, RoundedCornerShape(9.dp))
+                .padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                PanelTextInput(
+                    value = nameDraft,
+                    onValueChange = { nameDraft = it },
+                    placeholder = "素材名称",
+                    modifier = Modifier.weight(0.9f)
+                )
+                PanelTextInput(
+                    value = categoryDraft,
+                    onValueChange = { categoryDraft = it },
+                    placeholder = "分类",
+                    modifier = Modifier.weight(0.65f)
+                )
+                ScrmPanelButton(
+                    label = "保存",
+                    enabled = !state.loading,
+                    accent = true,
+                    onClick = ::createMaterial
+                )
+            }
+            PanelTextInput(
+                value = contentDraft,
+                onValueChange = { contentDraft = it },
+                placeholder = "朋友圈素材文案"
+            )
+        }
+
+        Box(modifier = Modifier.fillMaxWidth()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 180.dp, max = 305.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                if (state.materials.isEmpty()) {
+                    item {
+                        TextLabel(
+                            text = if (state.loading) "正在加载..." else "暂无朋友圈素材",
+                            size = 10.sp,
+                            color = OverlayTokens.panelSecondaryText,
+                            modifier = Modifier.padding(vertical = 12.dp),
+                            maxLines = 1
+                        )
+                    }
+                }
+                itemsIndexed(
+                    items = state.materials,
+                    key = { _, item -> item.id }
+                ) { _, material ->
+                    MomentMaterialRow(
+                        material = material,
+                        selected = state.selectedMaterial?.id == material.id,
+                        enabled = !state.loading,
+                        onSelect = { loadDetail(material) },
+                        onCopy = { copyMaterial(material) },
+                        onArchive = { archiveMaterial(material) }
+                    )
+                }
+            }
+            if (state.detailOpen) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(OverlayTokens.centerPanelScrim)
+                        .clickable {
+                            state = state.copy(
+                                selectedMaterial = null,
+                                selectedDetail = null,
+                                detailOpen = false
+                            )
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    MaterialSurface(
+                        modifier = Modifier
+                            .fillMaxWidth(0.94f)
+                            .pointerInput(Unit) {
+                                detectTapGestures(onTap = {})
+                            },
+                        shape = RoundedCornerShape(10.dp),
+                        color = OverlayTokens.panel,
+                        border = BorderStroke(1.dp, OverlayTokens.panelBorder),
+                        shadowElevation = 8.dp
+                    ) {
+                        MomentMaterialDetailPanel(
+                            detail = state.selectedDetail,
+                            material = state.selectedMaterial,
+                            enabled = !state.loading,
+                            modifier = Modifier.padding(10.dp),
+                            onCopyText = ::copyDetailText,
+                            onClose = {
+                                state = state.copy(
+                                    selectedMaterial = null,
+                                    selectedDetail = null,
+                                    detailOpen = false
+                                )
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MomentMaterialRow(
+    material: ScrmMomentMaterial,
+    selected: Boolean,
+    enabled: Boolean,
+    onSelect: () -> Unit,
+    onCopy: () -> Unit,
+    onArchive: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (selected) OverlayTokens.inputFocus.copy(alpha = 0.22f) else OverlayTokens.resourcePanel)
+            .border(
+                1.dp,
+                if (selected) OverlayTokens.accent else OverlayTokens.resourcePanelBorder,
+                RoundedCornerShape(8.dp)
+            )
+            .clickable(enabled = enabled, onClick = onSelect)
+            .padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(Color(0xFF5A7CA5)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Collections,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(17.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                TextLabel(
+                    text = material.displayName,
+                    size = 11.sp,
+                    weight = FontWeight.SemiBold,
+                    color = OverlayTokens.panelPrimaryText,
+                    maxLines = 1
+                )
+                TextLabel(
+                    text = listOfNotNull(
+                        material.category?.takeIf { it.isNotBlank() },
+                        material.statusName?.takeIf { it.isNotBlank() } ?: "状态 ${material.status}",
+                        "${material.attachmentCount} 个附件"
+                    ).joinToString(" / "),
+                    size = 8.sp,
+                    color = OverlayTokens.panelSecondaryText,
+                    maxLines = 1
+                )
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ScrmPanelButton(label = "详情", enabled = enabled, onClick = onSelect)
+            ScrmPanelButton(label = "复制", enabled = enabled, accent = true, onClick = onCopy)
+            ScrmPanelButton(label = "归档", enabled = enabled, danger = true, onClick = onArchive)
+        }
+    }
+}
+
+@Composable
+private fun MomentMaterialDetailPanel(
+    detail: ScrmMomentMaterialDetail?,
+    material: ScrmMomentMaterial?,
+    enabled: Boolean,
+    modifier: Modifier,
+    onCopyText: () -> Unit,
+    onClose: () -> Unit
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        TextLabel(
+            text = "素材详情",
+            size = 11.sp,
+            weight = FontWeight.Bold,
+            color = OverlayTokens.panelPrimaryText,
+            maxLines = 1
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+        ) {
+            ScrmPanelButton(label = "关闭", enabled = enabled, onClick = onClose)
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 180.dp, max = 305.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(OverlayTokens.resourcePanel)
+                .border(1.dp, OverlayTokens.resourcePanelBorder, RoundedCornerShape(8.dp))
+                .padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            val title = detail?.displayName ?: material?.displayName ?: "未选择素材"
+            TextLabel(
+                text = title,
+                size = 11.sp,
+                weight = FontWeight.SemiBold,
+                color = OverlayTokens.panelPrimaryText,
+                maxLines = 2,
+                lineHeight = 14.sp
+            )
+            val content = detail?.template?.content?.takeIf { it.isNotBlank() }
+            TextLabel(
+                text = content ?: "点击左侧素材加载详情后显示文案",
+                size = 10.sp,
+                color = if (content == null) OverlayTokens.panelSecondaryText else OverlayTokens.panelPrimaryText,
+                maxLines = 6,
+                lineHeight = 14.sp
+            )
+            TextLabel(
+                text = detail?.let {
+                    "附件 ${it.attachmentCount} / 评论 ${it.extCommentCount} / 状态 ${it.statusName ?: it.status}"
+                } ?: "真实接口未返回详情前不展示模拟数据",
+                size = 9.sp,
+                color = OverlayTokens.panelSecondaryText,
+                maxLines = 2,
+                lineHeight = 12.sp
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                ScrmPanelButton(
+                    label = "复制文案",
+                    enabled = enabled && content != null,
+                    accent = true,
+                    onClick = onCopyText
+                )
+            }
+        }
+    }
+}
+
+private data class ScrmMomentMaterialsPanelState(
+    val loading: Boolean = false,
+    val materials: List<ScrmMomentMaterial> = emptyList(),
+    val selectedMaterial: ScrmMomentMaterial? = null,
+    val selectedDetail: ScrmMomentMaterialDetail? = null,
+    val detailOpen: Boolean = false,
+    val status: String? = null,
+    val error: String? = null
+)
+
+@Composable
 private fun FavoriteCollectionPanel(
     items: List<FavoriteCollectionItem>,
     multiSelectMode: Boolean,
@@ -13588,7 +16623,7 @@ private fun FavoriteCollectionPanel(
 ) {
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         TextLabel(
-            text = "收藏",
+            text = "本地收藏",
             size = 13.sp,
             weight = FontWeight.SemiBold,
             color = OverlayTokens.panelPrimaryText,
@@ -13605,7 +16640,7 @@ private fun FavoriteCollectionPanel(
         }
         if (items.isEmpty()) {
             TextLabel(
-                text = "暂无收藏。长按消息或在图片视频预览里点收藏后会显示在这里。",
+                text = "暂无本地收藏。当前 OpenAPI 未提供写入微信收藏接口，长按消息收藏后只保存在悬浮窗本地。",
                 size = 11.sp,
                 color = OverlayTokens.panelSecondaryText,
                 lineHeight = 16.sp,
@@ -14575,7 +17610,11 @@ internal fun messageListViewportKey(
     )
 }
 
-internal fun messageListInitialFirstVisibleItemIndex(messageCount: Int): Int {
+internal fun messageListInitialFirstVisibleItemIndex(
+    messageCount: Int,
+    homeOverviewVisible: Boolean = false
+): Int {
+    if (homeOverviewVisible) return 0
     return (messageCount - 1).coerceAtLeast(0)
 }
 
@@ -14749,7 +17788,7 @@ internal fun defaultChatThreadSelection(
     return if (conversation.groupContacts.isNotEmpty()) {
         ChatThreadSelection.GroupChat(conversation.groupContacts.first().id)
     } else if (conversation.contacts.isNotEmpty()) {
-        ChatThreadSelection.Group
+        ChatThreadSelection.Private(conversation.contacts.first().id)
     } else {
         ChatThreadSelection.Group
     }
@@ -14760,6 +17799,21 @@ internal fun selectedAccountIdAfterAccountAvatarClick(
     clickedAccountId: String
 ): String {
     return clickedAccountId.ifBlank { currentAccountId }
+}
+
+internal fun selectedThreadAfterAccountAvatarClick(
+    conversation: FloatingChatConversation,
+    clickedAccountId: String,
+    currentThread: ChatThreadSelection
+): ChatThreadSelection {
+    val scopedConversation = accountScopedConversation(
+        conversation = conversation,
+        activeAccountId = clickedAccountId
+    )
+    return initialChatThreadSelection(
+        conversation = scopedConversation,
+        preferredSelection = currentThread
+    )
 }
 
 internal fun accountScopedConversation(
@@ -14775,7 +17829,7 @@ internal fun accountScopedConversation(
         source = conversation.contacts,
         activeAccount = activeAccount,
         accountIndex = accountIndex,
-        count = AccountScopedContactCount,
+        count = accountScopedContactCount(activeAccount.id),
         selectedFirst = false
     )
     val scopedGroups = accountScopedContacts(
@@ -14959,6 +18013,8 @@ internal fun allAccountHomeConversation(
     )
 }
 
+internal fun shouldBuildAllAccountHomeOverview(homeOverviewVisible: Boolean): Boolean = homeOverviewVisible
+
 internal fun rightRailAccountAvatarClickSwitchesActiveAccountWorkspace(): Boolean = true
 
 internal fun accountScopedFriendsAndGroupsAreIndependent(): Boolean = true
@@ -14970,6 +18026,14 @@ private data class AccountScopedContact(
     val contact: FloatingChatContact
 )
 
+private fun accountScopedContactCount(accountId: String): Int {
+    return if (accountId == StoreServiceAccountId) {
+        AccountScopedContactCount * StoreServiceContactMultiplier
+    } else {
+        AccountScopedContactCount
+    }
+}
+
 private fun accountScopedContacts(
     source: List<FloatingChatContact>,
     activeAccount: FloatingChatContact,
@@ -14978,6 +18042,21 @@ private fun accountScopedContacts(
     selectedFirst: Boolean
 ): List<AccountScopedContact> {
     if (source.isEmpty()) return emptyList()
+    val preScoped = source.filter { contact -> accountIdForScopedThreadId(contact.id) == activeAccount.id }
+    if (preScoped.isNotEmpty()) {
+        return preScoped.mapIndexed { index, contact ->
+            AccountScopedContact(
+                base = contact,
+                contact = contact.copy(
+                    description = "${activeAccount.name} / ${contact.description}",
+                    selected = selectedFirst && index == 0
+                )
+            )
+        }
+    }
+    if (source.any { contact -> accountIdForScopedThreadId(contact.id) != null }) {
+        return emptyList()
+    }
     val safeCount = min(count, source.size).coerceAtLeast(1)
     val startIndex = (accountIndex * safeCount) % source.size
     return List(safeCount) { offset ->
@@ -15082,6 +18161,18 @@ internal fun selectedAccountForThread(
     )
 }
 
+internal fun selectedAccountForCoordinateBody(
+    conversation: FloatingChatConversation,
+    selectedThread: ChatThreadSelection,
+    activeAccountId: String
+): FloatingChatContact {
+    return selectedAccountForThread(
+        conversation = conversation,
+        selection = selectedThread,
+        overrideAccountId = activeAccountId
+    )
+}
+
 internal fun visibleMessagesForThread(
     conversation: FloatingChatConversation,
     selection: ChatThreadSelection,
@@ -15125,32 +18216,8 @@ internal fun defaultHomeUnreadThreadIds(conversation: FloatingChatConversation):
 internal fun defaultAllAccountHomeUnreadThreadIds(
     conversation: FloatingChatConversation
 ): Set<String> {
-    val scopedCandidates = accountScopedConversations(conversation).map { scoped ->
-        defaultHomeUnreadTextSelections(scoped.conversation)
-    }
-    val groupCandidates = scopedCandidates.map { selections ->
-        selections.filterIsInstance<ChatThreadSelection.GroupChat>()
-    }
-    val privateCandidates = scopedCandidates.map { selections ->
-        selections.filterIsInstance<ChatThreadSelection.Private>()
-    }
-    return buildList {
-        addRoundRobinUnreadSelections(
-            candidatesByAccount = groupCandidates,
-            limit = min(2, DefaultHomeUnreadThreadLimit)
-        )
-        addRoundRobinUnreadSelections(
-            candidatesByAccount = privateCandidates,
-            limit = DefaultHomeUnreadThreadLimit - size
-        )
-        addRoundRobinUnreadSelections(
-            candidatesByAccount = scopedCandidates,
-            limit = DefaultHomeUnreadThreadLimit - size
-        )
-    }
-        .distinctBy { selection -> selection.toLocalThreadId() }
-        .take(DefaultHomeUnreadThreadLimit)
-        .map { selection -> selection.toLocalThreadId() }
+    return homeUnreadThreadSummaries(accountScopedConversations(conversation))
+        .map { summary -> summary.threadId }
         .toSet()
 }
 
@@ -15176,13 +18243,45 @@ private fun MutableList<ChatThreadSelection>.addRoundRobinUnreadSelections(
 private fun defaultHomeUnreadTextSelections(
     conversation: FloatingChatConversation
 ): List<ChatThreadSelection> {
-    val selections = buildList {
-        conversation.groupContacts.forEach { group -> add(ChatThreadSelection.GroupChat(group.id)) }
-        conversation.contacts.forEach { contact -> add(ChatThreadSelection.Private(contact.id)) }
-    }
-    return selections.filter { selection ->
+    return homeUnreadCandidateSelections(conversation).filter { selection ->
         latestHomeUnreadTextMessageForSelection(conversation, selection) != null
     }
+}
+
+internal fun homeUnreadCandidateSelections(
+    conversation: FloatingChatConversation
+): List<ChatThreadSelection> {
+    val contactIds = conversation.contacts.asSequence()
+        .map { contact -> contact.id }
+        .toHashSet()
+    val groupIds = conversation.groupContacts.asSequence()
+        .map { group -> group.id }
+        .toHashSet()
+    val selectionsByThreadId = linkedMapOf<String, ChatThreadSelection>()
+
+    fun addSelection(selection: ChatThreadSelection) {
+        selectionsByThreadId.putIfAbsent(selection.toLocalThreadId(), selection)
+    }
+
+    conversation.messages.forEach { message ->
+        val explicitThreadId = message.threadContactId?.takeIf { threadId -> threadId.isNotBlank() }
+        when {
+            explicitThreadId != null && explicitThreadId in groupIds -> {
+                addSelection(ChatThreadSelection.GroupChat(explicitThreadId))
+            }
+            explicitThreadId != null && explicitThreadId in contactIds -> {
+                addSelection(ChatThreadSelection.Private(explicitThreadId))
+            }
+            message.connectionTarget == FloatingChatConnectionTarget.User -> {
+                val targetId = message.connectionTargetId?.takeIf { id -> id.isNotBlank() }
+                if (targetId != null && targetId in contactIds) {
+                    addSelection(ChatThreadSelection.Private(targetId))
+                }
+            }
+        }
+    }
+
+    return selectionsByThreadId.values.toList()
 }
 
 private fun latestHomeUnreadTextMessageForSelection(
@@ -15195,10 +18294,22 @@ private fun latestHomeUnreadTextMessageForSelection(
         conversation = conversation,
         selection = selection,
         selectedAccountId = selectedAccountId
-    ).lastOrNull { message -> message.isHomeUnreadTextMessage() }
+    ).homeUnrepliedTextMessages().lastOrNull()
 }
 
-private fun FloatingChatMessage.isHomeUnreadTextMessage(): Boolean {
+private fun List<FloatingChatMessage>.homeUnrepliedTextMessages(): List<FloatingChatMessage> {
+    val lastSelfReplyIndex = indexOfLast { message -> message.isHomeSelfReplyMessage() }
+    return drop(lastSelfReplyIndex + 1)
+        .filter { message -> message.isHomeUnrepliedTextMessage() }
+}
+
+private fun FloatingChatMessage.isHomeSelfReplyMessage(): Boolean {
+    return fromMe &&
+        kind != FloatingChatMessageKind.AiDraft &&
+        presentation != FloatingChatMessagePresentation.System
+}
+
+private fun FloatingChatMessage.isHomeUnrepliedTextMessage(): Boolean {
     return !fromMe &&
         type == FloatingChatMessageType.Text &&
         presentation == FloatingChatMessagePresentation.Bubble &&
@@ -15207,66 +18318,56 @@ private fun FloatingChatMessage.isHomeUnreadTextMessage(): Boolean {
 }
 
 internal fun homeUnreadThreadSummaries(
-    conversation: FloatingChatConversation,
-    unreadThreadIds: Set<String>
+    conversation: FloatingChatConversation
 ): List<HomeUnreadThreadSummary> {
     val accountId = conversation.accountContacts.firstOrNull { account -> account.selected }?.id
         ?: conversation.accountContacts.firstOrNull()?.id
         ?: ""
     return homeUnreadThreadSummariesForAccount(
         accountId = accountId,
-        conversation = conversation,
-        unreadThreadIds = unreadThreadIds
+        conversation = conversation
     )
 }
 
 internal fun homeUnreadThreadSummaries(
-    accountConversations: List<AccountScopedConversation>,
-    unreadThreadIds: Set<String>
+    accountConversations: List<AccountScopedConversation>
 ): List<HomeUnreadThreadSummary> {
     return accountConversations.flatMap { scoped ->
         homeUnreadThreadSummariesForAccount(
             accountId = scoped.accountId,
-            conversation = scoped.conversation,
-            unreadThreadIds = unreadThreadIds
+            conversation = scoped.conversation
         )
     }
 }
 
 private fun homeUnreadThreadSummariesForAccount(
     accountId: String,
-    conversation: FloatingChatConversation,
-    unreadThreadIds: Set<String>
+    conversation: FloatingChatConversation
 ): List<HomeUnreadThreadSummary> {
-    val selections = buildList {
-        conversation.groupContacts.forEach { group -> add(ChatThreadSelection.GroupChat(group.id)) }
-        conversation.contacts.forEach { contact -> add(ChatThreadSelection.Private(contact.id)) }
-    }
-    return selections.mapNotNull { selection ->
+    return homeUnreadCandidateSelections(conversation).mapNotNull { selection ->
         val threadId = selection.toLocalThreadId()
-        if (!unreadThreadIds.contains(threadId)) return@mapNotNull null
         val selectedAccountId = selectedAccountForThread(conversation, selection).id
         val threadMessages = visibleMessagesForThread(
             conversation = conversation,
             selection = selection,
             selectedAccountId = selectedAccountId
         )
-        val unreadMessages = threadMessages.filter { message -> message.isHomeUnreadTextMessage() }
-        val latest = unreadMessages.lastOrNull() ?: return@mapNotNull null
+        val unrepliedMessages = threadMessages.homeUnrepliedTextMessages()
+        val latest = unrepliedMessages.lastOrNull() ?: return@mapNotNull null
         val contact = contactForSelection(conversation, selection) ?: return@mapNotNull null
-        val unreadCount = unreadMessages.size.coerceAtLeast(1)
+        val unrepliedCount = unrepliedMessages.size.coerceAtLeast(1)
         HomeUnreadThreadSummary(
             accountId = accountId,
             threadId = threadId,
             selection = selection,
-            unreadCount = unreadCount,
+            unreadCount = unrepliedCount,
             message = latest.copy(
                 id = "home-unread-${threadId}-${latest.id}",
                 fromMe = false,
-                senderName = if (unreadCount > 1) {
-                    "${contact.name} - $unreadCount unread - ${conversation.accountName}"
+                senderName = if (unrepliedCount > 1) {
+                    "${contact.name} - $unrepliedCount 条未回 - ${conversation.accountName}"
                 } else {
-                    "${contact.name} - ${conversation.accountName}"
+                    "${contact.name} - 未回 - ${conversation.accountName}"
                 },
                 connectionTarget = FloatingChatConnectionTarget.User,
                 connectionTargetId = selection.homeConnectorTargetId(),
@@ -15312,6 +18413,8 @@ private fun ChatThreadSelection.threadContactIdForHome(): String? {
 
 internal fun homeUnreadOverviewUsesLatestMessagePerThread(): Boolean = true
 
+internal fun homeUnreadOverviewUsesUnrepliedMessagesAfterLastSelfReply(): Boolean = true
+
 internal fun homeUnreadOverviewBubblesJumpToThread(): Boolean = true
 
 internal fun homeUnreadOverviewClearsUnreadAfterOpen(): Boolean = true
@@ -15327,6 +18430,8 @@ internal fun homeUnreadOverviewUsesMessageScopedConnectorLines(): Boolean = fals
 internal fun homeUnreadOverviewShowsAllAccounts(): Boolean = true
 
 internal fun homeUnreadBubbleSwitchesToOwningAccount(): Boolean = true
+
+internal fun homeUnreadOverviewTracksAllUnrepliedThreads(): Boolean = true
 
 internal fun homeUnreadOverviewSuppressesGroupMemberAvatars(): Boolean = true
 
@@ -15355,7 +18460,8 @@ internal fun outgoingTextMessageWithOptionalQuote(
     return baseMessage.copy(
         type = FloatingChatMessageType.Quote,
         quoteAuthor = quotedMessage.senderName.ifBlank { "引用" },
-        quoteText = quotedMessage.longPressCopyText()
+        quoteText = quotedMessage.longPressCopyText(),
+        remoteMessageServerId = quotedMessage.remoteMessageServerId
     )
 }
 
@@ -15379,6 +18485,31 @@ private fun FloatingChatMessage.longPressCopyText(): String {
             else -> "[消息]"
         }
     }
+}
+
+internal fun preparedForwardedMessageForSend(
+    source: FloatingChatMessage,
+    conversation: FloatingChatConversation,
+    target: ChatThreadSelection,
+    accountId: String,
+    sequence: Int,
+    prepareOutgoingMessage: (FloatingChatMessage, String) -> FloatingChatMessage
+): FloatingChatMessage {
+    val threadId = target.toLocalThreadId()
+    val baseMessage = source.forwardedCopyFor(
+        conversation = conversation,
+        target = target,
+        accountId = accountId,
+        sequence = sequence
+    )
+    if (scrmMessageOperationType(baseMessage) == null) {
+        return baseMessage.copy(
+            sendState = FloatingChatSendState.FailedFinal,
+            sendErrorCode = "UnsupportedForwardMessageType",
+            sendErrorMessage = "当前消息类型暂不支持真实转发"
+        )
+    }
+    return prepareOutgoingMessage(baseMessage, threadId)
 }
 
 private fun FloatingChatMessage.forwardedCopyFor(
@@ -15405,7 +18536,13 @@ private fun FloatingChatMessage.forwardedCopyFor(
         time = "刚刚",
         connectionTarget = FloatingChatConnectionTarget.Account,
         connectionTargetId = accountId,
-        threadContactId = threadContactId
+        threadContactId = threadContactId,
+        remoteMessageServerId = null,
+        remoteTaskId = null,
+        sendState = FloatingChatSendState.LocalOnly,
+        sendErrorCode = null,
+        sendErrorMessage = null,
+        clientRequestId = null
     )
 }
 
@@ -15465,7 +18602,9 @@ private fun rememberAsyncAvatarBitmap(imageUri: String?): Bitmap? {
     val context = LocalContext.current
     return rememberAsyncImageThumbnailBitmap(
         context = context,
-        uriText = imageUri?.takeIf { it.isNotBlank() }
+        uriText = imageUri?.takeIf { it.isNotBlank() },
+        maxSizePx = AVATAR_IMAGE_DECODE_MAX_SIZE_PX,
+        cacheNamespace = AvatarImageCacheNamespace
     )
 }
 
@@ -15502,6 +18641,10 @@ internal fun pickedDocumentCreatesRealFileMessage(): Boolean {
         message.fileSizeLabel == "213.1 KB" &&
         message.mediaMimeType == "application/pdf" &&
         message.threadContactId == "li-si"
+}
+
+internal fun pickedDocumentMessagesEnterScrmOutbox(): Boolean {
+    return scrmMediaOperationType(FloatingChatMessageType.FilePreview) == "message.file"
 }
 
 internal fun rightRailToolButtonsUseMaterialIcons(): Boolean = true
@@ -15549,6 +18692,10 @@ internal fun rightRailToolSingleTapExitsReorder(): Boolean = true
 internal fun rightRailToolReorderUsesClickToMove(): Boolean = false
 
 internal fun rightRailWidthDp(): Int = RightRailWidthDp
+
+internal fun rightRailAvatarScreenEdgeInsetPx(): Int = RailScreenEdgeInsetPx
+
+internal fun rightRailToolIconScreenEdgeInsetPx(): Int = RailScreenEdgeInsetPx
 
 internal fun rightRailToolButtonWidthDp(): Int = RailToolButtonWidthDp
 
@@ -15860,6 +19007,20 @@ internal fun momentsTimelineMediaOpensFullscreenPreview(): Boolean = true
 
 internal fun momentsTimelineKeepsCurrentPageForTextAndActions(): Boolean = true
 
+internal fun momentMaterialTenantIdForRoute(route: ScrmFloatingAccountRoute?): String? {
+    return route?.weChatId?.takeIf { it.isNotBlank() }
+}
+
+internal fun momentMaterialsPanelUsesAccountScopedTenant(): Boolean = true
+
+internal fun momentMaterialsPanelUsesQuickPhraseStyleList(): Boolean = true
+
+internal fun momentMaterialsPanelOpensIndependentDetailPage(): Boolean = true
+
+internal fun contactsToolOpensCenteredFloatingPanel(): Boolean = true
+
+internal fun contactPanelMatchesMomentsFloatingSheet(): Boolean = true
+
 internal fun momentsTimelineReusesChatMediaPreview(): Boolean = true
 
 internal fun locationPermissionRequestHidesFloatingOverlayUntilResult(): Boolean = true
@@ -15926,6 +19087,8 @@ internal fun scrmSendStatusTextFor(message: FloatingChatMessage): String? {
     }
 }
 
+internal fun scrmSendStatusRendersOutsideMessageBubble(): Boolean = true
+
 private fun FloatingChatMessage.failureStatusText(prefix: String): String {
     val detail = sendErrorMessage
         ?.takeIf { it.isNotBlank() }
@@ -15950,6 +19113,8 @@ internal fun leftRailAvatarsSupportLongPressEditPanel(): Boolean = true
 internal fun contactEditPanelSupportsRemarkAndTags(): Boolean = true
 
 internal fun contactEditPanelUsesWechatFriendProfileLayout(): Boolean = true
+
+internal fun contactEditPanelHasDeleteFriendAction(): Boolean = true
 
 internal fun contactEditPanelWechatSectionTitles(): List<String> = listOf("备注", "朋友权限", "更多信息")
 
@@ -16187,7 +19352,7 @@ private fun edgeSideForPosition(
 }
 
 private object FloatingChatInternalEdgeGestureDefaults {
-    val TouchTargetDp: Dp = 24.dp
+    val TouchTargetDp: Dp = floatingChatInternalEdgeGestureTouchTargetDp().dp
     const val ShortThresholdDp: Int = 32
     const val LongThresholdDp: Int = 180
     const val ShortThresholdMinDp: Int = 8
@@ -16208,6 +19373,25 @@ internal fun gestureOverlayIsBroughtToFrontAfterFloatingChatRecreated(): Boolean
 internal fun floatingChatOverlayHandlesOwnEdgeGestures(): Boolean = true
 
 internal fun floatingChatOverlayEdgeGestureConsumesPlainTaps(): Boolean = false
+
+internal fun floatingChatInternalEdgeGestureObservesInitialPointerPass(): Boolean = true
+
+internal fun floatingChatInternalEdgeGestureTouchTargetDp(): Int = 24
+
+internal fun floatingChatInternalEdgeGestureCoversSideRails(): Boolean {
+    return floatingChatInternalEdgeGestureTouchTargetDp() >= SessionRailWidthDp &&
+        floatingChatInternalEdgeGestureTouchTargetDp() >= RightRailWidthDp
+}
+
+internal fun floatingChatInternalEdgeGestureUsesEarlyHorizontalLock(): Boolean = false
+
+internal fun floatingChatExpandedBottomGestureHandledInsideOverlay(): Boolean = true
+
+internal fun remoteImageConnectTimeoutMillis(): Int = REMOTE_IMAGE_CONNECT_TIMEOUT_MS
+
+internal fun remoteImageReadTimeoutMillis(): Int = REMOTE_IMAGE_READ_TIMEOUT_MS
+
+internal fun remoteImageMaxBytes(): Int = REMOTE_IMAGE_MAX_BYTES
 
 internal fun messageBlockUsesNegativePadding(): Boolean = false
 
@@ -16244,6 +19428,7 @@ internal class FloatingChatOverlayRuntimeState {
     var pickedMediaEvent by mutableStateOf<FloatingChatPickedMediaEvent?>(null)
     var pickedDocumentEvent by mutableStateOf<FloatingChatPickedDocumentEvent?>(null)
     var blinkVoiceResultEvent by mutableStateOf<FloatingChatBlinkVoiceResultEvent?>(null)
+    var conversationUpdateEvent by mutableStateOf<FloatingChatConversationUpdateEvent?>(null)
     var localMessagesUpdateEvent by mutableStateOf<FloatingChatLocalMessagesUpdateEvent?>(null)
     var previewSession by mutableStateOf<FloatingChatMediaPreviewSession?>(null)
     var documentPreviewMessage by mutableStateOf<FloatingChatMessage?>(null)
@@ -16318,6 +19503,27 @@ internal class FloatingChatOverlayRuntimeState {
         }
     }
 
+    fun deliverConversationUpdate(
+        conversation: FloatingChatConversation,
+        selectedAccountId: String,
+        selectedThread: ChatThreadSelection
+    ) {
+        val nextToken = (conversationUpdateEvent?.token ?: 0L) + 1L
+        this.selectedThread = selectedThread
+        conversationUpdateEvent = FloatingChatConversationUpdateEvent(
+            token = nextToken,
+            conversation = conversation,
+            selectedAccountId = selectedAccountId,
+            selectedThread = selectedThread
+        )
+    }
+
+    fun clearConversationUpdate(token: Long) {
+        if (conversationUpdateEvent?.token == token) {
+            conversationUpdateEvent = null
+        }
+    }
+
     fun deliverLocalMessagesUpdate(
         messages: List<FloatingChatMessage>,
         messageSequence: Int
@@ -16389,6 +19595,13 @@ internal data class FloatingChatBlinkVoiceResultEvent(
     val headless: Boolean = false
 )
 
+internal data class FloatingChatConversationUpdateEvent(
+    val token: Long,
+    val conversation: FloatingChatConversation,
+    val selectedAccountId: String,
+    val selectedThread: ChatThreadSelection
+)
+
 internal data class FloatingChatLocalMessagesUpdateEvent(
     val token: Long,
     val messages: List<FloatingChatMessage>,
@@ -16398,6 +19611,7 @@ internal data class FloatingChatLocalMessagesUpdateEvent(
 private enum class BottomPanelMode {
     None,
     Home,
+    Contacts,
     Assistant,
     Voice,
     Emoji,
@@ -16405,6 +19619,7 @@ private enum class BottomPanelMode {
     QuickPhrase,
     Card,
     Moments,
+    MomentMaterials,
     Favorite,
     RedPacket,
     Transfer,
@@ -16414,9 +19629,11 @@ private enum class BottomPanelMode {
 
 private fun BottomPanelMode.isCenteredToolFeaturePanel(): Boolean {
     return this == BottomPanelMode.Assistant ||
+        this == BottomPanelMode.Contacts ||
         this == BottomPanelMode.QuickPhrase ||
         this == BottomPanelMode.Card ||
         this == BottomPanelMode.Moments ||
+        this == BottomPanelMode.MomentMaterials ||
         this == BottomPanelMode.Favorite ||
         this == BottomPanelMode.RedPacket ||
         this == BottomPanelMode.Transfer ||
@@ -17434,6 +20651,7 @@ private const val SessionRailWidthDp = 56
 private val SessionRailWidth = SessionRailWidthDp.dp
 private const val RightRailWidthDp = 58
 private val RightRailWidth = RightRailWidthDp.dp
+private const val RailScreenEdgeInsetPx = 8
 private val RailAvatarSize = 42.dp
 private const val RailAvatarSizeDp = 42
 private const val RailToolButtonWidthDp = 42
@@ -17452,6 +20670,8 @@ private val MessagePaneHorizontalPadding = 4.dp
 private const val AccountScopedThreadSeparator = "__"
 private const val AccountScopedContactCount = 5
 private const val AccountScopedGroupCount = 2
+private const val StoreServiceAccountId = "account-store"
+private const val StoreServiceContactMultiplier = 3
 private const val DefaultHomeUnreadThreadLimit = 5
 private val StandaloneImageMaxWidth = 228.dp
 private const val GroupMemberAvatarSizeDp = 28
@@ -17522,8 +20742,17 @@ private const val RightRailSectionResizeMs = 140
 private const val GroupThreadId = "floating-chat-group-thread"
 private const val AssistantContactId = "assistant"
 private const val REAL_MEDIA_DECODE_MAX_SIZE_PX = 720
+private const val AVATAR_IMAGE_DECODE_MAX_SIZE_PX = 96
+private const val REMOTE_IMAGE_CONNECT_TIMEOUT_MS = 2_500
+private const val REMOTE_IMAGE_READ_TIMEOUT_MS = 3_500
+private const val REMOTE_IMAGE_MAX_BYTES = 2 * 1024 * 1024
+private const val REMOTE_IMAGE_MAX_CONCURRENT_LOADS = 2
+private const val REMOTE_IMAGE_FAILURE_RETRY_DELAY_MS = 10 * 60 * 1000
+private const val DEFAULT_REMOTE_IMAGE_BUFFER_BYTES = 8 * 1024
 private const val MIN_BITMAP_MEMORY_CACHE_BYTES = 8 * 1024 * 1024
 private const val MAX_BITMAP_MEMORY_CACHE_BYTES = 32 * 1024 * 1024
+private const val ImageThumbnailCacheNamespace = "image"
+private const val AvatarImageCacheNamespace = "avatar"
 private val DefaultQuickPhrases = listOf(
     "收到，我先看一下，稍后同步进展。",
     "这个我确认后回复你。",
