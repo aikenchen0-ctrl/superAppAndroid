@@ -4,7 +4,8 @@ data class FloatingChatShellState(
     val expanded: Boolean = false,
     val activeAccountId: String? = null,
     val activePanel: FloatingChatPanel = FloatingChatPanel.Chat,
-    val previewVisible: Boolean = false
+    val previewVisible: Boolean = false,
+    val chat: ChatUiState = ChatUiState.Empty
 )
 
 enum class FloatingChatPanel {
@@ -20,6 +21,7 @@ sealed interface FloatingChatShellEvent {
     data object CollapseRequested : FloatingChatShellEvent
     data class AccountSelected(val accountId: String) : FloatingChatShellEvent
     data class PanelSelected(val panel: FloatingChatPanel) : FloatingChatShellEvent
+    data class Chat(val event: ChatUiEvent) : FloatingChatShellEvent
     data object PreviewDismissed : FloatingChatShellEvent
 }
 

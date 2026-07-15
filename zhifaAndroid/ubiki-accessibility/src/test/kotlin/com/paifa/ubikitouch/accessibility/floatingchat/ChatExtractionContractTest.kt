@@ -1,0 +1,67 @@
+package com.paifa.ubikitouch.accessibility.floatingchat
+
+import java.io.File
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class ChatExtractionContractTest {
+    @Test
+    fun chatContractAndRenderEntryPointsAreSeparated() {
+        val contract = sourceFile("floatingchat/contract/ChatContract.kt")
+        val coordinator = sourceFile("floatingchat/shell/FloatingChatCoordinator.kt")
+        val shell = sourceFile("floatingchat/shell/FloatingChatShell.kt")
+        val screen = sourceFile("floatingchat/chat/ChatScreen.kt")
+
+        listOf(contract, coordinator, shell, screen).forEach { source ->
+            assertTrue("Missing extracted chat source: ${source.path}", source.isFile)
+        }
+        val contractText = contract.readText()
+        assertTrue(contractText.contains("data class ChatUiState"))
+        assertTrue(contractText.contains("sealed interface ChatUiEvent"))
+        assertFalse(contractText.contains("import android."))
+        assertFalse(contractText.contains("import androidx.compose."))
+
+        assertTrue(coordinator.readText().contains("class FloatingChatCoordinator"))
+        assertTrue(shell.readText().contains("fun FloatingChatShell("))
+        assertTrue(screen.readText().contains("fun ChatScreen("))
+    }
+
+    @Test
+    fun sessionRailModelAndOrderingLiveInChatPackage() {
+        val extracted = sourceFile(
+            "floatingchat/chat/ChatSessionRail.kt"
+        )
+        assertTrue("Missing extracted session rail source", extracted.isFile)
+
+        val text = extracted.readText()
+        assertTrue(text.contains("sealed class SessionRailItem"))
+        assertTrue(text.contains("fun sessionRailItemKeys("))
+        assertTrue(text.contains("fun sessionRailItemKeysByLatestChatTime("))
+        assertTrue(text.contains("fun sessionRailItemsByLatestChatTime("))
+    }
+
+    @Test
+    fun legacyOverlayNoLongerDefinesSessionRailOrdering() {
+        val legacy = sourceFile("FloatingChatOverlayUi.kt")
+        assertTrue("Missing legacy overlay source", legacy.isFile)
+
+        val text = legacy.readText()
+        assertFalse(text.contains("private sealed class SessionRailItem"))
+        assertFalse(text.contains("internal fun sessionRailItemKeys("))
+        assertFalse(text.contains("internal fun sessionRailItemKeysByLatestChatTime("))
+    }
+
+    private fun sourceFile(relativePath: String): File {
+        val moduleRelative = File(
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility",
+            relativePath
+        )
+        if (moduleRelative.exists()) return moduleRelative
+
+        return File(
+            "ubiki-accessibility/src/main/kotlin/com/paifa/ubikitouch/accessibility",
+            relativePath
+        )
+    }
+}
