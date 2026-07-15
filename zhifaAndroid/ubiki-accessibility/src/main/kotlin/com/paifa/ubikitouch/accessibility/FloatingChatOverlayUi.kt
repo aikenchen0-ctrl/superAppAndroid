@@ -2,6 +2,7 @@
 
 package com.paifa.ubikitouch.accessibility
 
+import com.paifa.ubikitouch.accessibility.floatingchat.theme.FloatingChatLightColors
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -23868,7 +23869,7 @@ private object OverlayTokens {
     val inputText = Color(0xF8F8FCFF)
     val inputPlaceholder = Color(0xDCF8FCFF)
     val inputFocus = Color(0xCC7DCC16)
-    val hairline = Color(0x82F8FCFF)
+    val hairline = FloatingChatLightColors.outline
     val panel = Color(0xE8EDF4F5)
     val panelBorder = Color(0xB8F8FCFF)
     val panelIcon = Color(0x88778D94)
@@ -23891,8 +23892,8 @@ private object OverlayTokens {
     val voiceButton = Color(0xFFE0EBEE)
     val voiceIcon = Color(0xFF173C48)
 
-    val primaryText = Color(0xF2F8FCFF)
-    val secondaryText = Color(0xD9F1F7FA)
+    val primaryText = FloatingChatLightColors.primaryText
+    val secondaryText = FloatingChatLightColors.secondaryText
     val tertiaryText = Color(0xAEEAF2F5)
     val messageText = Color(0xFF0D4354)
     val tertiaryMessageText = Color(0xBB1A5768)
@@ -23903,9 +23904,9 @@ private object OverlayTokens {
     val toolIcon = Color(0xFF173C48)
     val toolIconActive = Color(0xFF3F720C)
 
-    val accent = Color(0xFF7DCC16)
+    val accent = FloatingChatLightColors.accent
     val alertMuted = Color(0x50C96D68)
-    val alertCore = Color(0xFFE27E76)
+    val alertCore = FloatingChatLightColors.error
 
     val avatarFill = Color(0xFF7B97A4)
     val accountFill = Color(0xFF8AA9A7)
