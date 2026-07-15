@@ -42,6 +42,23 @@ class ChatExtractionContractTest {
     }
 
     @Test
+    fun connectorGeometryLivesInChatPackage() {
+        val extracted = sourceFile("floatingchat/chat/ChatConnectorGeometry.kt")
+        assertTrue("Missing extracted connector geometry", extracted.isFile)
+
+        val text = extracted.readText()
+        assertTrue(text.contains("data class ChatConnectorTree"))
+        assertTrue(text.contains("fun createChatConnectorLine("))
+        assertTrue(text.contains("fun createChatConnectorTree("))
+        assertTrue(text.contains("fun createChatConnectorBraceGeometry("))
+
+        val legacy = sourceFile("FloatingChatOverlayUi.kt").readText()
+        assertFalse(legacy.contains("internal data class ChatConnectorTree"))
+        assertFalse(legacy.contains("internal fun createChatConnectorLine("))
+        assertFalse(legacy.contains("internal fun createChatConnectorTree("))
+    }
+
+    @Test
     fun legacyOverlayNoLongerDefinesSessionRailOrdering() {
         val legacy = sourceFile("FloatingChatOverlayUi.kt")
         assertTrue("Missing legacy overlay source", legacy.isFile)

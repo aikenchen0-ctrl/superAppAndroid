@@ -5,6 +5,7 @@ package com.paifa.ubikitouch.accessibility
 import com.paifa.ubikitouch.accessibility.floatingchat.theme.FloatingChatLightColors
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.SessionRailItem
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.sessionRailItemsByLatestChatTime
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.*
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -22951,49 +22952,6 @@ private fun MutableMap<String, Rect>.updateIfChanged(id: String, bounds: Rect): 
     return true
 }
 
-internal data class ChatConnectorLine(
-    val start: Offset,
-    val cornerStart: Offset,
-    val cornerEnd: Offset,
-    val end: Offset
-)
-
-internal data class ChatConnectorBranch(
-    val start: Offset,
-    val end: Offset
-)
-
-internal data class ChatConnectorTree(
-    val trunkStart: Offset,
-    val trunkEnd: Offset,
-    val avatarBranch: ChatConnectorBranch?,
-    val messageBranches: List<ChatConnectorBranch>
-)
-
-internal data class ChatConnectorBraceHook(
-    val center: Offset,
-    val branchEnd: Offset,
-    val radius: Float,
-    val verticalDirection: Float
-)
-
-internal data class ChatConnectorBraceGeometry(
-    val trunkSegments: List<ChatConnectorBranch>,
-    val hooks: List<ChatConnectorBraceHook>
-)
-
-internal data class ChatConnectorRoundedHookGeometry(
-    val curveStart: Offset,
-    val curveControl: Offset,
-    val horizontalStart: Offset,
-    val branchEnd: Offset
-)
-
-internal enum class ChatConnectorViewportEdge {
-    Above,
-    Below
-}
-
 private data class ConnectorTargetKey(
     val target: FloatingChatConnectionTarget,
     val targetId: String,
@@ -23076,63 +23034,6 @@ private sealed interface ContactEditorTarget {
     data class User(val contact: FloatingChatContact) : ContactEditorTarget
 }
 
-internal fun createChatConnectorLine(
-    avatarBounds: Rect,
-    bubbleBounds: Rect,
-    layerBounds: Rect,
-    target: FloatingChatConnectionTarget
-): ChatConnectorLine {
-    val avatarAnchor = if (target == FloatingChatConnectionTarget.Account) {
-        avatarBounds.leftCenterIn(layerBounds)
-    } else {
-        avatarBounds.rightCenterIn(layerBounds)
-    }
-    val bubbleAnchor = if (target == FloatingChatConnectionTarget.Account) {
-        bubbleBounds.rightCenterIn(layerBounds).awayFromBubble(target)
-    } else {
-        bubbleBounds.leftCenterIn(layerBounds).awayFromBubble(target)
-    }
-    val elbowX = connectorMidX(avatarAnchor, target)
-    return ChatConnectorLine(
-        start = avatarAnchor,
-        cornerStart = Offset(elbowX, avatarAnchor.y),
-        cornerEnd = Offset(elbowX, bubbleAnchor.y),
-        end = bubbleAnchor
-    )
-}
-
-internal fun createOffscreenChatConnectorLine(
-    avatarBounds: Rect,
-    layerBounds: Rect,
-    visibleRootBounds: Rect,
-    target: FloatingChatConnectionTarget,
-    edge: ChatConnectorViewportEdge
-): ChatConnectorLine {
-    val avatarAnchor = if (target == FloatingChatConnectionTarget.Account) {
-        avatarBounds.leftCenterIn(layerBounds)
-    } else {
-        avatarBounds.rightCenterIn(layerBounds)
-    }
-    val endY = when (edge) {
-        ChatConnectorViewportEdge.Above -> visibleRootBounds.top - layerBounds.top
-        ChatConnectorViewportEdge.Below -> visibleRootBounds.bottom - layerBounds.top
-    }
-    val endX = if (target == FloatingChatConnectionTarget.Account) {
-        visibleRootBounds.right - layerBounds.left
-    } else {
-        visibleRootBounds.left - layerBounds.left
-    }
-    val edgeAnchor = Offset(endX, endY)
-    val elbowX = connectorMidX(avatarAnchor, target)
-
-    return ChatConnectorLine(
-        start = avatarAnchor,
-        cornerStart = Offset(elbowX, avatarAnchor.y),
-        cornerEnd = Offset(elbowX, edgeAnchor.y),
-        end = edgeAnchor
-    )
-}
-
 internal fun createGroupMemberMessageConnectorBranch(
     avatarBounds: Rect,
     bubbleBounds: Rect,
@@ -23180,111 +23081,6 @@ internal fun homeOverviewFallbackConnectorAvatarBounds(
             right = avatarRight,
             bottom = centerY + size / 2f
         )
-    }
-}
-
-internal fun createChatConnectorTree(
-    avatarBounds: Rect,
-    bubbleBounds: List<Rect>,
-    layerBounds: Rect,
-    visibleRootBounds: Rect,
-    target: FloatingChatConnectionTarget,
-    hasMessagesAbove: Boolean,
-    hasMessagesBelow: Boolean,
-    avatarOffscreenEdge: ChatConnectorViewportEdge? = null
-): ChatConnectorTree? {
-    val avatarAnchor = if (target == FloatingChatConnectionTarget.Account) {
-        avatarBounds.leftCenterIn(layerBounds)
-    } else {
-        avatarBounds.rightCenterIn(layerBounds)
-    }
-    val visibleAnchors = bubbleBounds
-        .map { bounds ->
-            val anchor = if (target == FloatingChatConnectionTarget.Account) {
-                bounds.rightCenterIn(layerBounds).awayFromBubble(target)
-            } else {
-                bounds.leftCenterIn(layerBounds).awayFromBubble(target)
-            }
-            anchor.pinnedToMessageViewport(layerBounds, visibleRootBounds)
-        }
-        .sortedBy { anchor -> anchor.y }
-
-    if (visibleAnchors.isEmpty() && !hasMessagesAbove && !hasMessagesBelow) {
-        return null
-    }
-
-    val viewportTop = visibleRootBounds.top - layerBounds.top
-    val viewportBottom = visibleRootBounds.bottom - layerBounds.top
-    val trunkX = connectorTreeTrunkX(
-        avatarAnchor = avatarAnchor,
-        visibleAnchors = visibleAnchors,
-        target = target
-    )
-    val avatarEdgeY = avatarAnchor.pinnedToMessageViewport(layerBounds, visibleRootBounds).y
-    val branchYs = visibleAnchors.map { anchor -> anchor.y } +
-        listOfNotNull(
-            viewportTop.takeIf { hasMessagesAbove },
-            viewportBottom.takeIf { hasMessagesBelow },
-            avatarEdgeY.takeIf { avatarOffscreenEdge != null },
-            avatarAnchor.y.takeIf { avatarOffscreenEdge == null }
-        )
-    val trunkStartY = branchYs.minOrNull() ?: avatarAnchor.y
-    val trunkEndY = branchYs.maxOrNull() ?: avatarAnchor.y
-    val trunkStart = Offset(trunkX, trunkStartY)
-    val trunkEnd = Offset(trunkX, trunkEndY)
-
-    return ChatConnectorTree(
-        trunkStart = trunkStart,
-        trunkEnd = trunkEnd,
-        avatarBranch = if (avatarOffscreenEdge == null) {
-            ChatConnectorBranch(
-                start = avatarAnchor,
-                end = Offset(trunkX, avatarAnchor.y)
-            )
-        } else {
-            null
-        },
-        messageBranches = visibleAnchors.map { anchor ->
-            ChatConnectorBranch(
-                start = Offset(trunkX, anchor.y),
-                end = anchor
-            )
-        }
-    )
-}
-
-internal fun ChatConnectorLine.pinnedToMessageViewport(
-    layerBounds: Rect,
-    visibleRootBounds: Rect
-): ChatConnectorLine {
-    val viewportTop = visibleRootBounds.top - layerBounds.top
-    val viewportBottom = visibleRootBounds.bottom - layerBounds.top
-    val pinnedEndY = end.y.coerceIn(viewportTop, viewportBottom)
-    if (pinnedEndY == end.y) {
-        return this
-    }
-    return copy(
-        cornerEnd = Offset(cornerEnd.x, pinnedEndY),
-        end = Offset(end.x, pinnedEndY)
-    )
-}
-
-private fun Offset.pinnedToMessageViewport(
-    layerBounds: Rect,
-    visibleRootBounds: Rect
-): Offset {
-    val viewportTop = visibleRootBounds.top - layerBounds.top
-    val viewportBottom = visibleRootBounds.bottom - layerBounds.top
-    return copy(y = y.coerceIn(viewportTop, viewportBottom))
-}
-
-private fun Offset.awayFromBubble(target: FloatingChatConnectionTarget): Offset {
-    val gap = imModuleConnectionLineBubbleGapPx()
-    val overlap = imModuleConnectionLineBubbleOverlapPx()
-    return if (target == FloatingChatConnectionTarget.Account) {
-        copy(x = x + gap - overlap)
-    } else {
-        copy(x = x - gap + overlap)
     }
 }
 
@@ -23365,17 +23161,6 @@ private fun FloatingChatMessage.toHomeOverviewConnectorSourceKey(): ConnectorTar
     )
 }
 
-internal fun homeOverviewConnectorKeyDebugId(message: FloatingChatMessage): String? {
-    if (message.connectionTarget != FloatingChatConnectionTarget.User) return null
-    val sourceId = homeOverviewConnectorSourceKeyDebugId(message) ?: return null
-    return "home-source:$sourceId"
-}
-
-internal fun homeOverviewConnectorSourceKeyDebugId(message: FloatingChatMessage): String? {
-    if (message.connectionTarget != FloatingChatConnectionTarget.User) return null
-    return message.connectionTargetId
-}
-
 private fun FloatingChatMessage.toOffscreenConnectorTargetKey(
     selection: ChatThreadSelection,
     selectedAccountId: String,
@@ -23397,85 +23182,6 @@ private fun FloatingChatMessage.toOffscreenConnectorTargetKey(
         )
     }
     return toConnectorTargetKey(selection, selectedAccountId, groupMemberAvatarsVisible)
-}
-
-private fun connectorMidX(
-    avatarAnchor: Offset,
-    target: FloatingChatConnectionTarget
-): Float {
-    val offset = imModuleConnectionLineHorizontalOffsetPx()
-    return if (target == FloatingChatConnectionTarget.Account) {
-        avatarAnchor.x - offset
-    } else {
-        avatarAnchor.x + offset
-    }
-}
-
-private fun connectorTreeTrunkX(
-    avatarAnchor: Offset,
-    visibleAnchors: List<Offset>,
-    target: FloatingChatConnectionTarget
-): Float {
-    val defaultX = connectorMidX(avatarAnchor, target)
-    if (visibleAnchors.isEmpty()) return defaultX
-
-    val minimumBranch = imModuleConnectionLineMinimumBranchPx()
-    val minimumAvatarBranch = imModuleConnectionLineCornerRadiusPx()
-    return if (target == FloatingChatConnectionTarget.Account) {
-        val bubbleAnchorX = visibleAnchors.maxOf { anchor -> anchor.x }
-        val lower = bubbleAnchorX + minimumBranch
-        val upper = avatarAnchor.x - minimumAvatarBranch
-        if (lower <= upper) {
-            defaultX.coerceIn(lower, upper)
-        } else {
-            lower.coerceAtMost(upper).coerceAtLeast(bubbleAnchorX + 1f)
-        }
-    } else {
-        val bubbleAnchorX = visibleAnchors.minOf { anchor -> anchor.x }
-        val lower = avatarAnchor.x + minimumAvatarBranch
-        val upper = bubbleAnchorX - minimumBranch
-        if (lower <= upper) {
-            defaultX.coerceIn(lower, upper)
-        } else {
-            upper.coerceAtLeast(lower).coerceAtMost(bubbleAnchorX - 1f)
-        }
-    }
-}
-
-internal fun Rect.leftCenterIn(containerBounds: Rect): Offset {
-    return Offset(
-        x = left - containerBounds.left,
-        y = center.y - containerBounds.top
-    )
-}
-
-internal fun Rect.rightCenterIn(containerBounds: Rect): Offset {
-    return Offset(
-        x = right - containerBounds.left,
-        y = center.y - containerBounds.top
-    )
-}
-
-internal fun rootBoundsFromPosition(
-    positionInRoot: Offset,
-    width: Int,
-    height: Int
-): Rect {
-    return Rect(
-        left = positionInRoot.x,
-        top = positionInRoot.y,
-        right = positionInRoot.x + width,
-        bottom = positionInRoot.y + height
-    )
-}
-
-internal fun isConnectorAnchorVisible(
-    anchorInLayer: Offset,
-    layerBounds: Rect,
-    visibleRootBounds: Rect
-): Boolean {
-    val anchorRootY = layerBounds.top + anchorInLayer.y
-    return anchorRootY >= visibleRootBounds.top && anchorRootY <= visibleRootBounds.bottom
 }
 
 private fun ChatConnectorLine.toPath(): Path {
@@ -23500,57 +23206,6 @@ private fun ChatConnectorTree.toPath(): Path {
     }
 }
 
-internal fun createChatConnectorBraceGeometry(tree: ChatConnectorTree): ChatConnectorBraceGeometry {
-    val requestedRadius = imModuleConnectionLineCornerRadiusPx()
-    val avatarHook = tree.avatarBranch?.let { branch -> branch.end to branch.start }
-    val pendingHooks = (listOfNotNull(avatarHook) +
-        tree.messageBranches.map { branch -> branch.start to branch.end })
-        .sortedBy { (center, _) -> center.y }
-    val hooks = pendingHooks.mapIndexed { index, (center, branchEnd) ->
-        val horizontalRoom = abs(branchEnd.x - center.x)
-        val requestedHookRadius = min(requestedRadius, connectorRoundedElbowRadiusPx(horizontalRoom))
-        val nextCenterY = pendingHooks.getOrNull(index + 1)?.first?.y
-        val previousCenterY = pendingHooks.getOrNull(index - 1)?.first?.y
-        val verticalRoom = when {
-            index == 0 && nextCenterY != null -> abs(nextCenterY - center.y) / 2f
-            index > 0 && previousCenterY != null -> abs(center.y - previousCenterY) / 2f
-            else -> requestedHookRadius
-        }
-        val radius = min(requestedHookRadius, verticalRoom).coerceAtLeast(1f)
-        val verticalDirection = if (index == 0) 1f else -1f
-        ChatConnectorBraceHook(
-            center = center,
-            branchEnd = branchEnd,
-            radius = radius,
-            verticalDirection = verticalDirection
-        )
-    }
-    return ChatConnectorBraceGeometry(
-        trunkSegments = connectorContinuousTrunkSegments(
-            trunkStart = tree.trunkStart,
-            trunkEnd = tree.trunkEnd
-        ),
-        hooks = hooks
-    )
-}
-
-private fun connectorContinuousTrunkSegments(
-    trunkStart: Offset,
-    trunkEnd: Offset
-): List<ChatConnectorBranch> {
-    if (trunkStart == trunkEnd) return emptyList()
-
-    val topY = min(trunkStart.y, trunkEnd.y)
-    val bottomY = kotlin.math.max(trunkStart.y, trunkEnd.y)
-    val trunkX = trunkStart.x
-    return listOf(
-        ChatConnectorBranch(
-            start = Offset(trunkX, topY),
-            end = Offset(trunkX, bottomY)
-        )
-    )
-}
-
 private fun Path.braceHookSegment(hook: ChatConnectorBraceHook) {
     val deltaX = hook.branchEnd.x - hook.center.x
     if (abs(deltaX) <= 0.5f) return
@@ -23564,31 +23219,6 @@ private fun Path.braceHookSegment(hook: ChatConnectorBraceHook) {
         geometry.horizontalStart.y
     )
     lineTo(geometry.branchEnd.x, geometry.branchEnd.y)
-}
-
-internal fun ChatConnectorBraceHook.branchStartAvoidingJointOverlap(): Offset {
-    return roundedElbowGeometry().horizontalStart
-}
-
-internal fun ChatConnectorBraceHook.roundedElbowGeometry(): ChatConnectorRoundedHookGeometry {
-    val deltaX = branchEnd.x - center.x
-    if (abs(deltaX) <= 0.5f) {
-        return ChatConnectorRoundedHookGeometry(
-            curveStart = center,
-            curveControl = center,
-            horizontalStart = center,
-            branchEnd = branchEnd
-        )
-    }
-    val horizontalDirection = if (deltaX >= 0f) 1f else -1f
-    val safeRadius = min(radius, abs(deltaX)).coerceAtLeast(1f)
-    val trunkOverlap = chatConnectorHookTrunkOverlapPx()
-    return ChatConnectorRoundedHookGeometry(
-        curveStart = center.copy(y = center.y + verticalDirection * (safeRadius + trunkOverlap)),
-        curveControl = center,
-        horizontalStart = center.copy(x = center.x + horizontalDirection * safeRadius),
-        branchEnd = branchEnd
-    )
 }
 
 private const val SessionRailWidthDp = 56
