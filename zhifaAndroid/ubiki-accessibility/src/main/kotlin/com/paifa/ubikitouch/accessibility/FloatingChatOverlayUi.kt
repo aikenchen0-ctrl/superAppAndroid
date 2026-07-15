@@ -6,6 +6,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.theme.FloatingChatLightCo
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.SessionRailItem
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.sessionRailItemsByLatestChatTime
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.*
+import com.paifa.ubikitouch.accessibility.floatingchat.message.*
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -7593,14 +7594,6 @@ internal fun imageDecodeSampleSize(width: Int, height: Int, maxSize: Int): Int {
     return sampleSize
 }
 
-internal fun fixedThumbnailHeightDp(orientation: FloatingChatThumbnailOrientation?): Int {
-    return when (orientation) {
-        FloatingChatThumbnailOrientation.Vertical -> 120
-        FloatingChatThumbnailOrientation.Horizontal,
-        null -> 56
-    }
-}
-
 internal fun standaloneMediaHeightDp(
     orientation: FloatingChatThumbnailOrientation?,
     mediaAspectRatio: Float? = null
@@ -7613,11 +7606,6 @@ internal fun standaloneMediaHeightDp(
     }
     val height = (widthDp / aspectRatio).toInt()
     return height.coerceIn(104, 236)
-}
-
-internal fun messageUsesBubbleChrome(presentation: FloatingChatMessagePresentation): Boolean {
-    return presentation != FloatingChatMessagePresentation.MediaStandalone &&
-        presentation != FloatingChatMessagePresentation.System
 }
 
 internal fun standaloneMediaShowsInlineActions(): Boolean = false
@@ -8283,28 +8271,6 @@ private fun mediaPreviewFrameSize(
         width = height * aspectRatio
     }
     return MediaPreviewFrame(width = width, height = height)
-}
-
-internal enum class MessageHorizontalPlacement {
-    Start,
-    Center,
-    End
-}
-
-internal fun messageHorizontalPlacement(
-    presentation: FloatingChatMessagePresentation,
-    fromMe: Boolean
-): MessageHorizontalPlacement {
-    return when (presentation) {
-        FloatingChatMessagePresentation.System -> MessageHorizontalPlacement.Center
-        FloatingChatMessagePresentation.Bubble,
-        FloatingChatMessagePresentation.SpecialCard,
-        FloatingChatMessagePresentation.MediaStandalone -> if (fromMe) {
-            MessageHorizontalPlacement.End
-        } else {
-            MessageHorizontalPlacement.Start
-        }
-    }
 }
 
 internal fun standaloneMessageTypeUsesCleanMediaSurface(type: FloatingChatMessageType): Boolean {
@@ -20304,50 +20270,10 @@ internal fun ChatThreadSelection.toLocalThreadId(): String {
     }
 }
 
-internal data class MessageListViewportKey(
-    val threadId: String,
-    val selectedAccountId: String,
-    val homeOverviewVisible: Boolean
-)
-
 private class MessageListViewportTracker(
     var viewportKey: MessageListViewportKey,
     var messageCount: Int
 )
-
-internal fun messageListViewportKey(
-    selection: ChatThreadSelection,
-    selectedAccountId: String,
-    homeOverviewVisible: Boolean
-): MessageListViewportKey {
-    return MessageListViewportKey(
-        threadId = selection.toLocalThreadId(),
-        selectedAccountId = selectedAccountId,
-        homeOverviewVisible = homeOverviewVisible
-    )
-}
-
-internal fun messageListInitialFirstVisibleItemIndex(
-    messageCount: Int,
-    homeOverviewVisible: Boolean = false
-): Int {
-    if (homeOverviewVisible) return 0
-    return (messageCount - 1).coerceAtLeast(0)
-}
-
-internal fun shouldRetargetMessageList(
-    previous: MessageListViewportKey,
-    next: MessageListViewportKey
-): Boolean {
-    return previous != next
-}
-
-@Suppress("UNUSED_PARAMETER")
-internal fun messageListReusableContentType(messageType: FloatingChatMessageType): String {
-    return ReusableMessageRowContentType
-}
-
-private const val ReusableMessageRowContentType = "floating-chat-message-row"
 
 internal data class AppMomentPost(
     val id: String = "moment-${System.nanoTime()}",
@@ -21853,30 +21779,7 @@ internal fun appOwnedWechatLikeToolsOpenWechat(): Boolean = false
 
 internal fun groupChatMemberAvatarScrollsWithMessageBubble(): Boolean = true
 
-internal fun scrmSendStatusTextFor(message: FloatingChatMessage): String? {
-    if (!message.fromMe) return null
-    return when (message.sendState) {
-        FloatingChatSendState.LocalOnly -> null
-        FloatingChatSendState.Queued -> "待提交"
-        FloatingChatSendState.Uploading -> "上传中"
-        FloatingChatSendState.Submitted -> "已提交"
-        FloatingChatSendState.Processing -> "处理中"
-        FloatingChatSendState.Succeeded -> "已发送"
-        FloatingChatSendState.FailedRetryable -> message.failureStatusText("发送失败，稍后重试")
-        FloatingChatSendState.FailedFinal -> message.failureStatusText("发送失败")
-        FloatingChatSendState.Unknown -> "结果待确认"
-        FloatingChatSendState.Cancelled -> "已取消"
-    }
-}
-
 internal fun scrmSendStatusRendersOutsideMessageBubble(): Boolean = true
-
-private fun FloatingChatMessage.failureStatusText(prefix: String): String {
-    val detail = sendErrorMessage
-        ?.takeIf { it.isNotBlank() }
-        ?.take(24)
-    return if (detail == null) prefix else "$prefix：$detail"
-}
 
 internal fun groupMemberAvatarBubbleCenterOffsetDp(): Int = GroupMemberAvatarBubbleCenterOffsetDp
 
