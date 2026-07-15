@@ -63,14 +63,17 @@ class ChatExtractionContractTest {
         val presentation = sourceFile("floatingchat/message/MessagePresentation.kt")
         val listPresentation = sourceFile("floatingchat/message/MessageListPresentation.kt")
         val content = sourceFile("floatingchat/message/MessageContent.kt")
+        val row = sourceFile("floatingchat/message/MessageRow.kt")
 
-        listOf(presentation, listPresentation, content).forEach { source ->
+        listOf(presentation, listPresentation, content, row).forEach { source ->
             assertTrue("Missing extracted message source: ${source.path}", source.isFile)
         }
         assertTrue(content.readText().contains("fun MessageContent("))
+        assertTrue(row.readText().contains("fun MessageRow("))
 
         val legacy = sourceFile("FloatingChatOverlayUi.kt").readText()
         assertFalse(legacy.contains("private fun MessageContent("))
+        assertFalse(legacy.contains("private fun MessageRow("))
     }
 
     @Test

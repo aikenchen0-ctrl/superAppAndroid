@@ -3514,114 +3514,8 @@ private fun DrawScope.drawGroupMemberConnectorTree(
 }
 
 @Composable
-private fun MessageRow(
-    message: FloatingChatMessage,
-    index: Int,
-    selectedThread: ChatThreadSelection,
-    homeOverviewVisible: Boolean,
-    contactsById: Map<String, FloatingChatContact>,
-    groupMemberAvatarsVisible: Boolean,
-    onPreviewMedia: (FloatingChatMessage) -> Unit,
-    onOpenMediaActions: (FloatingChatMessage) -> Unit,
-    onLongPressMessage: (FloatingChatMessage, Rect?) -> Unit,
-    onGroupMemberAvatarLongClick: (FloatingChatContact) -> Unit,
-    multiSelectMode: Boolean,
-    selected: Boolean,
-    reminded: Boolean,
-    favorite: Boolean,
-    claimed: Boolean,
-    onToggleSelection: () -> Unit,
-    onClick: () -> Unit,
-    onBubbleBoundsChanged: (Rect) -> Unit,
-    onGroupMemberAvatarBoundsChanged: (Rect) -> Unit,
-    onGroupMemberAvatarRemoved: () -> Unit
-) {
-    val groupMemberContact = remember(
-        message,
-        selectedThread,
-        homeOverviewVisible,
-        contactsById,
-        groupMemberAvatarsVisible
-    ) {
-        groupMemberContactForMessage(
-            message = message,
-            selectedThread = selectedThread,
-            homeOverviewVisible = homeOverviewVisible,
-            contactsById = contactsById,
-            groupMemberAvatarsVisible = groupMemberAvatarsVisible
-        )
-    }
-    val placement = messageHorizontalPlacement(message.presentation, message.fromMe)
-    LaunchedEffect(groupMemberContact) {
-        if (groupMemberContact == null) {
-            onGroupMemberAvatarRemoved()
-        }
-    }
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = when (placement) {
-            MessageHorizontalPlacement.Start -> Arrangement.Start
-            MessageHorizontalPlacement.Center -> Arrangement.Center
-            MessageHorizontalPlacement.End -> Arrangement.End
-        },
-        verticalAlignment = if (groupMemberContact != null && placement == MessageHorizontalPlacement.Start) {
-            Alignment.CenterVertically
-        } else {
-            Alignment.Top
-        }
-    ) {
-        if (multiSelectMode) {
-            MessageSelectionToggle(
-                selected = selected,
-                onClick = onToggleSelection,
-                modifier = Modifier.padding(top = 20.dp, end = 4.dp)
-            )
-        }
-        if (groupMemberContact != null && placement == MessageHorizontalPlacement.Start) {
-            CompactAvatar(
-                contact = groupMemberContact,
-                role = AvatarRole.GroupMember,
-                sizeDp = groupMemberAvatarSizeDp(),
-                onClick = {},
-                onLongClick = { onGroupMemberAvatarLongClick(groupMemberContact) },
-                onBoundsChanged = onGroupMemberAvatarBoundsChanged,
-                modifier = Modifier.offset(y = groupMemberAvatarBubbleCenterOffsetDp().dp)
-            )
-            Spacer(modifier = Modifier.width(5.dp))
-        }
-        MessageBlock(
-            message = message,
-            index = index,
-            onPreviewMedia = onPreviewMedia,
-            onOpenMediaActions = onOpenMediaActions,
-            onLongPressMessage = onLongPressMessage,
-            multiSelectMode = multiSelectMode,
-            selected = selected,
-            reminded = reminded,
-            favorite = favorite,
-            claimed = claimed,
-            onToggleSelection = onToggleSelection,
-            onClick = onClick,
-            onBubbleBoundsChanged = onBubbleBoundsChanged,
-            modifier = if (groupMemberContact != null && placement == MessageHorizontalPlacement.Start) {
-                Modifier.weight(1f, fill = false)
-            } else {
-                Modifier.fillMaxWidth(
-                    when (message.presentation) {
-                        FloatingChatMessagePresentation.Bubble -> 0.99f
-                        FloatingChatMessagePresentation.SpecialCard -> 0.99f
-                        FloatingChatMessagePresentation.MediaStandalone -> 0.99f
-                        FloatingChatMessagePresentation.System -> 1f
-                    }
-                )
-            }
-        )
-    }
-}
-
-@Composable
 @OptIn(ExperimentalFoundationApi::class)
-private fun MessageBlock(
+internal fun MessageBlock(
     message: FloatingChatMessage,
     index: Int,
     onPreviewMedia: (FloatingChatMessage) -> Unit,
@@ -9130,7 +9024,7 @@ internal fun resolvedAvatarImageUri(
 
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
-private fun CompactAvatar(
+internal fun CompactAvatar(
     contact: FloatingChatContact,
     role: AvatarRole,
     sizeDp: Int = RailAvatarSizeDp,
@@ -10889,7 +10783,7 @@ private fun sanitizeMoneyInput(value: String): String {
 }
 
 @Composable
-private fun MessageSelectionToggle(
+internal fun MessageSelectionToggle(
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -20200,7 +20094,7 @@ private fun AnnotatedTextLabel(
     )
 }
 
-private enum class AvatarRole {
+internal enum class AvatarRole {
     Session,
     GroupMember,
     Account
