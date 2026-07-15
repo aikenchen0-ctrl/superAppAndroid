@@ -59,6 +59,21 @@ class ChatExtractionContractTest {
     }
 
     @Test
+    fun messagePresentationAndContentDispatchLiveInMessagePackage() {
+        val presentation = sourceFile("floatingchat/message/MessagePresentation.kt")
+        val listPresentation = sourceFile("floatingchat/message/MessageListPresentation.kt")
+        val content = sourceFile("floatingchat/message/MessageContent.kt")
+
+        listOf(presentation, listPresentation, content).forEach { source ->
+            assertTrue("Missing extracted message source: ${source.path}", source.isFile)
+        }
+        assertTrue(content.readText().contains("fun MessageContent("))
+
+        val legacy = sourceFile("FloatingChatOverlayUi.kt").readText()
+        assertFalse(legacy.contains("private fun MessageContent("))
+    }
+
+    @Test
     fun legacyOverlayNoLongerDefinesSessionRailOrdering() {
         val legacy = sourceFile("FloatingChatOverlayUi.kt")
         assertTrue("Missing legacy overlay source", legacy.isFile)

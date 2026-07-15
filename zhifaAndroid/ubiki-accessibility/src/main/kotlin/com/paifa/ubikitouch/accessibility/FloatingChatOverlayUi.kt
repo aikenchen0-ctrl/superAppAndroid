@@ -3799,56 +3799,6 @@ private fun MessageBlock(
 }
 
 @Composable
-private fun MessageContent(
-    message: FloatingChatMessage,
-    index: Int,
-    onPreviewMedia: (FloatingChatMessage) -> Unit,
-    onOpenMediaActions: (FloatingChatMessage) -> Unit,
-    onLongPressMessage: (FloatingChatMessage, Rect?) -> Unit,
-    multiSelectMode: Boolean,
-    onToggleSelection: () -> Unit,
-    claimed: Boolean = false,
-    onContentBoundsChanged: ((Rect) -> Unit)? = null
-) {
-    val isSystem = message.presentation == FloatingChatMessagePresentation.System
-    Column(verticalArrangement = Arrangement.spacedBy(if (isSystem) 0.dp else 7.dp)) {
-        when (message.type) {
-            FloatingChatMessageType.Location -> LocationMessageContent(message)
-            FloatingChatMessageType.ContactLink -> ContactLinkCardContent(message)
-            FloatingChatMessageType.MiniProgramLink -> MiniProgramLinkContent(message, claimed)
-            FloatingChatMessageType.Text -> SimpleTextMessageContent(message = message, index = index)
-            FloatingChatMessageType.MixedText -> MixedTextMessageContent(message)
-            FloatingChatMessageType.Quote -> QuoteMessageContent(message)
-            FloatingChatMessageType.ChatHistory -> ChatHistoryMessageContent(message)
-            FloatingChatMessageType.FilePreview -> FilePreviewContent(message = message)
-            FloatingChatMessageType.ImageThumbnail -> ImageThumbnailContent(
-                message = message,
-                onPreviewMedia = onPreviewMedia,
-                onOpenMediaActions = onOpenMediaActions,
-                onLongPressMessage = onLongPressMessage,
-                multiSelectMode = multiSelectMode,
-                onToggleSelection = onToggleSelection,
-                onContentBoundsChanged = onContentBoundsChanged
-            )
-            FloatingChatMessageType.VideoPreview -> VideoPreviewContent(
-                message = message,
-                onPreviewMedia = onPreviewMedia,
-                onLongPressMessage = onLongPressMessage,
-                multiSelectMode = multiSelectMode,
-                onToggleSelection = onToggleSelection,
-                onContentBoundsChanged = onContentBoundsChanged
-            )
-            FloatingChatMessageType.Voice -> VoiceMessageContent(message)
-            FloatingChatMessageType.InlineContact -> InlineContactContent(message)
-            FloatingChatMessageType.InlineLocation -> InlineLocationContent(message)
-        }
-        if (message.kind == FloatingChatMessageKind.AiDraft && !isSystem) {
-            DraftBadge()
-        }
-    }
-}
-
-@Composable
 private fun ScrmSendStatusLabel(
     text: String,
     modifier: Modifier = Modifier
@@ -3864,7 +3814,7 @@ private fun ScrmSendStatusLabel(
 }
 
 @Composable
-private fun VoiceMessageContent(message: FloatingChatMessage) {
+internal fun VoiceMessageContent(message: FloatingChatMessage) {
     val context = LocalContext.current
     var playing by remember(message.id) { mutableStateOf(false) }
     var failed by remember(message.id) { mutableStateOf(false) }
@@ -3965,7 +3915,7 @@ private fun VoiceMessageContent(message: FloatingChatMessage) {
 }
 
 @Composable
-private fun SimpleTextMessageContent(message: FloatingChatMessage, index: Int) {
+internal fun SimpleTextMessageContent(message: FloatingChatMessage, index: Int) {
     val isSystem = message.presentation == FloatingChatMessagePresentation.System
     TextLabel(
         text = message.text,
@@ -3991,7 +3941,7 @@ private fun SimpleTextMessageContent(message: FloatingChatMessage, index: Int) {
 }
 
 @Composable
-private fun MixedTextMessageContent(message: FloatingChatMessage) {
+internal fun MixedTextMessageContent(message: FloatingChatMessage) {
     val text = remember(message.inlineTokens, message.text) {
         if (message.inlineTokens.isEmpty()) {
             AnnotatedString(message.text)
@@ -4029,7 +3979,7 @@ private fun MixedTextMessageContent(message: FloatingChatMessage) {
 }
 
 @Composable
-private fun QuoteMessageContent(message: FloatingChatMessage) {
+internal fun QuoteMessageContent(message: FloatingChatMessage) {
     QuoteBlock(message)
     TextLabel(
         text = message.text,
@@ -4043,7 +3993,7 @@ private fun QuoteMessageContent(message: FloatingChatMessage) {
 }
 
 @Composable
-private fun ChatHistoryMessageContent(message: FloatingChatMessage) {
+internal fun ChatHistoryMessageContent(message: FloatingChatMessage) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -4089,7 +4039,7 @@ private fun ChatHistoryMessageContent(message: FloatingChatMessage) {
 }
 
 @Composable
-private fun LocationMessageContent(message: FloatingChatMessage) {
+internal fun LocationMessageContent(message: FloatingChatMessage) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -4123,7 +4073,7 @@ private fun LocationMessageContent(message: FloatingChatMessage) {
 }
 
 @Composable
-private fun ContactLinkCardContent(message: FloatingChatMessage) {
+internal fun ContactLinkCardContent(message: FloatingChatMessage) {
     val name = message.cardName ?: message.text
     AccountCardPreviewContent(
         name = name,
@@ -4136,7 +4086,7 @@ private fun ContactLinkCardContent(message: FloatingChatMessage) {
 }
 
 @Composable
-private fun MiniProgramLinkContent(
+internal fun MiniProgramLinkContent(
     message: FloatingChatMessage,
     claimed: Boolean = false
 ) {
@@ -4194,7 +4144,7 @@ private fun MiniProgramLinkContent(
 }
 
 @Composable
-private fun FilePreviewContent(message: FloatingChatMessage) {
+internal fun FilePreviewContent(message: FloatingChatMessage) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -4591,7 +4541,7 @@ private fun TransferPaymentGlyph(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun ImageThumbnailContent(
+internal fun ImageThumbnailContent(
     message: FloatingChatMessage,
     onPreviewMedia: (FloatingChatMessage) -> Unit,
     onOpenMediaActions: (FloatingChatMessage) -> Unit,
@@ -5894,7 +5844,7 @@ private fun MediaSheetActionItem(
 }
 
 @Composable
-private fun VideoPreviewContent(
+internal fun VideoPreviewContent(
     message: FloatingChatMessage,
     onPreviewMedia: (FloatingChatMessage) -> Unit,
     onLongPressMessage: (FloatingChatMessage, Rect?) -> Unit,
@@ -6039,7 +5989,7 @@ private fun VideoPlayGlyph(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun InlineContactContent(message: FloatingChatMessage) {
+internal fun InlineContactContent(message: FloatingChatMessage) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -6064,7 +6014,7 @@ private fun InlineContactContent(message: FloatingChatMessage) {
 }
 
 @Composable
-private fun InlineLocationContent(message: FloatingChatMessage) {
+internal fun InlineLocationContent(message: FloatingChatMessage) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -8561,7 +8511,7 @@ internal fun aiDraftMessageUsesSolidBubbleBorder(message: FloatingChatMessage): 
 internal fun aiDraftBubbleDashedBorderColorArgb(): Int = OverlayTokens.aiDashedBorder.toArgb()
 
 @Composable
-private fun DraftBadge() {
+internal fun DraftBadge() {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(5.dp))
