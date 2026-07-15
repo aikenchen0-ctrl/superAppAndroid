@@ -21,6 +21,9 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskApi
 import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskResult
 import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskSubmissionResult
 import com.paifa.ubikitouch.accessibility.scrm.ScrmFloatingAccountRoute
+import com.paifa.ubikitouch.accessibility.scrm.ScrmContact
+import com.paifa.ubikitouch.accessibility.scrm.ScrmDevice
+import androidx.compose.ui.geometry.Offset
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -1361,6 +1364,43 @@ class FloatingChatMessageUiContractTest {
         assertEquals(true, leftRailClearsDisposedAvatarConnectorBounds())
         assertEquals(true, leftRailKeepsAnySessionConnectorAnchorWhenScrolledOffscreen())
         assertEquals(0f, leftRailSessionConnectorAnchorFollowsVirtualOffscreenPosition())
+        assertEquals(true, leftRailPinsSelectedAvatarWhileScrolledOffscreen())
+        assertEquals(
+            RailPinnedAvatarEdge.Top,
+            leftRailPinnedSelectedAvatarEdge(
+                sessionIds = listOf("a", "b", "c"),
+                selectedSessionId = "a",
+                visibleItems = listOf(
+                    LeftRailVisibleSessionItem(index = 1, offset = 0, size = 42),
+                    LeftRailVisibleSessionItem(index = 2, offset = 48, size = 42)
+                ),
+                viewportHeightPx = 120f,
+                fallbackStepPx = 48f
+            )
+        )
+        assertEquals(
+            RailPinnedAvatarEdge.Bottom,
+            leftRailPinnedSelectedAvatarEdge(
+                sessionIds = listOf("a", "b", "c"),
+                selectedSessionId = "c",
+                visibleItems = listOf(
+                    LeftRailVisibleSessionItem(index = 0, offset = 0, size = 42),
+                    LeftRailVisibleSessionItem(index = 1, offset = 48, size = 42)
+                ),
+                viewportHeightPx = 120f,
+                fallbackStepPx = 48f
+            )
+        )
+        assertEquals(
+            null,
+            leftRailPinnedSelectedAvatarEdge(
+                sessionIds = listOf("a", "b", "c"),
+                selectedSessionId = "b",
+                visibleItems = listOf(LeftRailVisibleSessionItem(index = 1, offset = 48, size = 42)),
+                viewportHeightPx = 120f,
+                fallbackStepPx = 48f
+            )
+        )
         assertEquals(true, leftRailFollowTextIncludesNameLastMessageAndTime())
         assertEquals(true, leftRailFollowTextUsesDarkTextShadow())
         assertEquals(conversation.contacts.first { contact -> contact.id == "li-si" }.name, info.name)
@@ -1477,10 +1517,34 @@ class FloatingChatMessageUiContractTest {
         assertEquals(true, imModuleConnectionLineUsesRoundedElbows())
         assertEquals(12f, connectorRoundedElbowRadiusPx(48f))
         assertEquals(0f, imModuleConnectionLineBubbleGapPx())
-        assertEquals(4f, imModuleConnectionLineBubbleOverlapPx())
+        assertEquals(0f, imModuleConnectionLineBubbleOverlapPx())
         assertEquals(true, imModuleConnectionLineUsesBraceHooks())
+        assertEquals(true, imModuleConnectionLineHooksStartAtTrunkJoint())
         assertEquals(true, imModuleConnectionLineUsesNativeCanvasShadow())
         assertEquals(false, imModuleConnectionLineDrawsEndpointDots())
+
+        val userLine = createChatConnectorLine(
+            avatarBounds = androidx.compose.ui.geometry.Rect(0f, 90f, 42f, 132f),
+            bubbleBounds = androidx.compose.ui.geometry.Rect(120f, 80f, 220f, 140f),
+            layerBounds = androidx.compose.ui.geometry.Rect(0f, 0f, 360f, 720f),
+            target = FloatingChatConnectionTarget.User
+        )
+        val accountLine = createChatConnectorLine(
+            avatarBounds = androidx.compose.ui.geometry.Rect(318f, 90f, 360f, 132f),
+            bubbleBounds = androidx.compose.ui.geometry.Rect(120f, 80f, 220f, 140f),
+            layerBounds = androidx.compose.ui.geometry.Rect(0f, 0f, 360f, 720f),
+            target = FloatingChatConnectionTarget.Account
+        )
+        val hook = ChatConnectorBraceHook(
+            center = Offset(300f, 180f),
+            branchEnd = Offset(220f, 180f),
+            radius = 12f,
+            verticalDirection = -1f
+        )
+
+        assertEquals(120f, userLine.end.x)
+        assertEquals(220f, accountLine.end.x)
+        assertEquals(Offset(300f, 165f), hook.roundedElbowGeometry().curveStart)
     }
 
     @Test
@@ -1924,6 +1988,69 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
+    fun blinkVoiceRecognitionDoesNotAutoSendChatMessage() {
+        assertEquals(false, blinkVoiceRecognitionAutoSendsChatMessage())
+    }
+
+    @Test
+    fun leftRailOrdersSessionsByLatestChatMessage() {
+        val account = FloatingChatContact("account-a", "A", "A", "Account", 0xFF3A86FF, selected = true)
+        val older = FloatingChatContact("older", "Older", "O", "Friend", 0xFF1B9AAA)
+        val newest = FloatingChatContact("newest", "Newest", "N", "Friend", 0xFF06D6A0)
+        val group = FloatingChatContact("group-alpha", "Group", "G", "Group", 0xFF5B7CFA)
+        val silent = FloatingChatContact("silent", "Silent", "S", "Friend", 0xFF9B5DE5)
+        val conversation = FloatingChatConversation(
+            peerName = "SCRM",
+            accountName = "A",
+            contacts = listOf(older, newest, silent),
+            groupContacts = listOf(group),
+            accountContacts = listOf(account),
+            messages = listOf(
+                FloatingChatMessage(
+                    id = "older-message",
+                    type = FloatingChatMessageType.Text,
+                    text = "older",
+                    fromMe = false,
+                    senderName = older.name,
+                    time = "09:00",
+                    connectionTarget = FloatingChatConnectionTarget.User,
+                    connectionTargetId = older.id,
+                    threadContactId = older.id
+                ),
+                FloatingChatMessage(
+                    id = "group-message",
+                    type = FloatingChatMessageType.Text,
+                    text = "group",
+                    fromMe = false,
+                    senderName = group.name,
+                    time = "10:00",
+                    connectionTarget = FloatingChatConnectionTarget.User,
+                    connectionTargetId = group.id,
+                    threadContactId = group.id
+                ),
+                FloatingChatMessage(
+                    id = "newest-message",
+                    type = FloatingChatMessageType.Text,
+                    text = "newest",
+                    fromMe = false,
+                    senderName = newest.name,
+                    time = "11:00",
+                    connectionTarget = FloatingChatConnectionTarget.User,
+                    connectionTargetId = newest.id,
+                    threadContactId = newest.id
+                )
+            ),
+            toolActions = FloatingChatToolAction.entries
+        )
+
+        assertEquals(true, leftRailSortsSessionsByLatestChatTime())
+        assertEquals(
+            listOf("contact-newest", "group-group-alpha", "contact-older", "contact-silent"),
+            sessionRailItemKeysByLatestChatTime(conversation, selectedAccountId = account.id)
+        )
+    }
+
+    @Test
     fun accountScopedConversationDoesNotInventFiveContactsForUnloadedRemoteAccount() {
         val accountOne = FloatingChatContact("account-one", "One", "O", "Account", 0xFF3A86FF)
         val accountTwo = FloatingChatContact("account-two", "Two", "T", "Account", 0xFF06D6A0)
@@ -1980,6 +2107,8 @@ class FloatingChatMessageUiContractTest {
     fun rightRailSelectedAccountAvatarHasVisibleHighlightRing() {
         assertEquals(true, rightRailSelectedAccountAvatarUsesHighlightRing())
         assertEquals(3, rightRailSelectedAccountAvatarHighlightStrokeDp())
+        assertEquals(true, leftRailSelectedAvatarUsesAccountHighlightRing())
+        assertEquals(rightRailSelectedAccountAvatarHighlightStrokeDp(), leftRailSelectedAvatarHighlightStrokeDp())
     }
 
     @Test
@@ -2022,8 +2151,8 @@ class FloatingChatMessageUiContractTest {
         )
 
         assertEquals(42f, fallbackBounds.right)
-        assertEquals(90f, tree?.trunkStart?.x)
-        assertEquals(124f, tree?.messageBranches?.single()?.end?.x)
+        assertEquals(88f, tree?.trunkStart?.x)
+        assertEquals(120f, tree?.messageBranches?.single()?.end?.x)
         assertEquals(true, homeUnreadOverviewUsesFallbackConnectorSourceWhenRailAvatarIsOffscreen())
     }
 
@@ -2286,6 +2415,7 @@ class FloatingChatMessageUiContractTest {
         assertEquals(false, rightRailToolReorderParentConsumesTapGestures())
         assertEquals(true, rightRailToolGestureCancelsLongPressWhenMovedBeforeTimeout())
         assertEquals(true, rightRailToolGestureCancelsClickWhenMovedPastTouchSlop())
+        assertEquals(false, rightRailToolGestureConsumesDownBeforeClick())
         assertEquals(true, rightRailToolReorderMovesByDraggedCenterCrossingSlots())
         assertEquals(true, rightRailToolListScrollDisabledDuringReorderDrag())
         assertEquals(true, rightRailToolReorderPersistsOnDragEnd())
@@ -2305,6 +2435,43 @@ class FloatingChatMessageUiContractTest {
         assertEquals(0f, rightRailSingleVisibleAccountKeepsUpperOffscreenAnchorAbove())
         assertEquals(true, rightRailOffscreenAccountConnectorUsesEdgeIndicator())
         assertEquals(46f, rightRailPinnedSelectedAccountConnectorAnchorYWhenCompressed())
+        assertEquals(true, rightRailPinsSelectedAccountAvatarWhileScrolledOffscreen())
+        assertEquals(
+            RailPinnedAvatarEdge.Top,
+            rightRailPinnedSelectedAccountEdge(
+                accountIds = listOf("a", "b", "c"),
+                selectedAccountId = "a",
+                visibleItems = listOf(
+                    RightRailVisibleAccountItem(index = 1, offset = 0, size = 42),
+                    RightRailVisibleAccountItem(index = 2, offset = 48, size = 42)
+                ),
+                viewportHeightPx = 120f,
+                fallbackStepPx = 48f
+            )
+        )
+        assertEquals(
+            RailPinnedAvatarEdge.Bottom,
+            rightRailPinnedSelectedAccountEdge(
+                accountIds = listOf("a", "b", "c"),
+                selectedAccountId = "c",
+                visibleItems = listOf(
+                    RightRailVisibleAccountItem(index = 0, offset = 0, size = 42),
+                    RightRailVisibleAccountItem(index = 1, offset = 48, size = 42)
+                ),
+                viewportHeightPx = 120f,
+                fallbackStepPx = 48f
+            )
+        )
+        assertEquals(
+            null,
+            rightRailPinnedSelectedAccountEdge(
+                accountIds = listOf("a", "b", "c"),
+                selectedAccountId = "b",
+                visibleItems = listOf(RightRailVisibleAccountItem(index = 1, offset = 48, size = 42)),
+                viewportHeightPx = 120f,
+                fallbackStepPx = 48f
+            )
+        )
         assertEquals(0.42f, defaultRightRailAccountWeight())
         assertEquals(0.24f, minRightRailAccountWeight())
         assertEquals(0.70f, maxRightRailAccountWeight())
@@ -2464,7 +2631,7 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
-    fun contactAddFriendSearchesAndPreviewsTargetBeforeApply() {
+    fun contactAddFriendCanParseFindResultButEntrySubmitsDirectApply() {
         val data = Json.parseToJsonElement(
             """
             {
@@ -2485,8 +2652,21 @@ class FloatingChatMessageUiContractTest {
         assertEquals("https://cdn.example.com/alice.jpg", profile.avatarUrl)
         assertEquals("Shenzhen", profile.region)
         assertEquals("hello", profile.signature)
-        assertEquals(true, contactAddFriendUsesSearchBeforeApply())
-        assertEquals(true, contactAddFriendShowsIndependentProfileBeforeApply())
+        val request = scrmDirectAddFriendRequest(
+            deviceUuid = "device-1",
+            weChatId = "wxid_owner",
+            friendAccount = "  wxid_target  ",
+            message = "  我是白菜  "
+        )
+
+        assertEquals(false, contactAddFriendUsesSearchBeforeApply())
+        assertEquals(false, contactAddFriendShowsIndependentProfileBeforeApply())
+        assertEquals("device-1", request.deviceUuid)
+        assertEquals("wxid_owner", request.weChatId)
+        assertEquals("wxid_target", request.friendWxid)
+        assertEquals("我是白菜", request.message)
+        assertEquals("正在发送好友申请", wechatContactsStatusText(loading = true, status = "正在发送好友申请", error = null))
+        assertEquals("好友申请已发送：已提交任务 #42", friendApplySubmittedStatus("已提交任务 #42"))
     }
 
     @Test
@@ -2627,7 +2807,7 @@ class FloatingChatMessageUiContractTest {
 
         assertEquals(38f, branch.start.x)
         assertEquals(34f, branch.start.y)
-        assertEquals(52f, branch.end.x)
+        assertEquals(48f, branch.end.x)
         assertEquals(34f, branch.end.y)
     }
 
@@ -2637,6 +2817,7 @@ class FloatingChatMessageUiContractTest {
         assertEquals(true, contactEditPanelSupportsRemarkAndTags())
         assertEquals(true, contactEditPanelUsesWechatFriendProfileLayout())
         assertEquals(true, contactEditPanelHasDeleteFriendAction())
+        assertEquals(true, wechatContactIntroFriendProfileReusesLongPressPanel())
         assertEquals(listOf("备注", "朋友权限", "更多信息"), contactEditPanelWechatSectionTitles())
         assertEquals(
             listOf("备注名", "电话", "标签", "备注", "照片", "朋友圈和状态", "仅聊天", "我和他的共同群聊", "来源", "添加时间"),
@@ -2644,12 +2825,96 @@ class FloatingChatMessageUiContractTest {
         )
         assertEquals(true, groupAvatarLongPressOpensFloatingEditPanel())
         assertEquals(true, groupEditPanelUsesWechatChatInfoLayout())
+        assertEquals(true, groupEditPanelShowsAllLoadedMembers())
+        assertEquals(true, groupEditPanelMemberAvatarOpensContactIntro())
+        assertEquals(true, groupEditPanelInviteAndKickUseRealScrmApis())
+        assertEquals(listOf("添加成员"), groupInfoMemberManagementLabels(canManageMembers = false))
+        assertEquals(listOf("添加成员", "移出成员"), groupInfoMemberManagementLabels(canManageMembers = true))
+        assertEquals("添加到通讯录", groupInfoMemberPrimaryActionLabel(isFriend = false))
+        assertEquals("发消息", groupInfoMemberPrimaryActionLabel(isFriend = true))
+        assertEquals("正在发送好友申请", groupMemberAddFriendStatusText(loading = true, status = null, error = null))
+        assertEquals("好友申请已发送：等待对方确认", groupMemberAddFriendStatusText(loading = false, status = "好友申请已发送：等待对方确认", error = null))
         assertEquals(
             listOf("群聊名称", "群二维码", "群公告", "备注", "查找聊天记录", "消息免打扰", "置顶聊天", "保存到通讯录", "我在群里的昵称", "显示群成员昵称", "显示群成员头像", "设置当前聊天背景", "清空聊天记录", "投诉", "退出群聊"),
             groupEditPanelWechatFieldLabels()
         )
         assertEquals(true, groupEditPanelPersistsChangesInSqlite())
         assertEquals(true, groupEditPanelStoresMemberAvatarVisibilityPerGroup())
+
+        val group = FloatingChatContact(
+            id = "group-a",
+            name = "真的很爱上班了",
+            initials = "群",
+            description = "group",
+            avatarColor = 0xFF5B7CFA,
+            groupMemberContacts = (1..12).map { index ->
+                FloatingChatContact(
+                    id = "member-$index",
+                    name = "成员$index",
+                    initials = "成$index",
+                    description = "member",
+                    avatarColor = 0xFF3A86FF + index
+                )
+            }
+        )
+        val knownFriend = group.groupMemberContacts.first().copy(name = "已是好友")
+        val ownerMember = group.groupMemberContacts.first().copy(groupMemberIsOwner = true)
+        val knownOwnerFriend = ownerMember.copy(name = "已是好友群主", groupMemberIsOwner = false)
+
+        assertEquals(12, groupInfoMemberCount(group.groupMemberContacts))
+        assertEquals(12, groupInfoMembersForGroup(group, contacts = listOf(knownFriend), messages = emptyList()).size)
+        assertEquals("已是好友", groupInfoMembersForGroup(group, contacts = listOf(knownFriend), messages = emptyList()).first().name)
+        assertEquals(
+            true,
+            groupInfoMembersForGroup(
+                group.copy(groupMemberContacts = listOf(ownerMember)),
+                contacts = listOf(knownOwnerFriend),
+                messages = emptyList()
+            ).first().groupMemberIsOwner
+        )
+        assertEquals(4, groupInfoMemberGridRows(group.groupMemberContacts).size)
+        assertEquals(true, groupInfoMemberIsFriend(knownFriend, contacts = listOf(knownFriend)))
+        assertEquals(false, groupInfoMemberIsFriend(group.groupMemberContacts[1], contacts = listOf(knownFriend)))
+
+        assertEquals(false, groupInfoCanManageMembers(currentMember = null))
+        assertEquals(
+            true,
+            groupInfoCanManageMembers(
+                FloatingChatContact(
+                    id = "owner",
+                    name = "群主",
+                    initials = "主",
+                    description = "member",
+                    avatarColor = 0xFF111111,
+                    groupMemberIsOwner = true
+                )
+            )
+        )
+        assertEquals(
+            true,
+            groupInfoCanManageMembers(
+                FloatingChatContact(
+                    id = "admin",
+                    name = "管理员",
+                    initials = "管",
+                    description = "member",
+                    avatarColor = 0xFF222222,
+                    groupMemberIsAdmin = true
+                )
+            )
+        )
+        assertEquals(
+            false,
+            groupInfoCanManageMembers(
+                FloatingChatContact(
+                    id = "member",
+                    name = "普通成员",
+                    initials = "员",
+                    description = "member",
+                    avatarColor = 0xFF333333
+                )
+            )
+        )
     }
 
     @Test
@@ -2818,9 +3083,9 @@ class FloatingChatMessageUiContractTest {
         )
         assertEquals(true, floatingChatOverlayHandlesOwnEdgeGestures())
         assertEquals(false, floatingChatOverlayEdgeGestureConsumesPlainTaps())
-        assertEquals(true, floatingChatInternalEdgeGestureObservesInitialPointerPass())
-        assertEquals(24, floatingChatInternalEdgeGestureTouchTargetDp())
-        assertEquals(nativeTouchInteractionEdgeStartTargetDp(1), floatingChatInternalEdgeGestureTouchTargetDp())
+        assertEquals(false, floatingChatInternalEdgeGestureObservesInitialPointerPass())
+        assertEquals(8, floatingChatInternalEdgeGestureTouchTargetDp())
+        assertEquals(gestureOverlayTouchTargetDp(1), floatingChatInternalEdgeGestureTouchTargetDp())
         assertEquals(false, floatingChatInternalEdgeGestureCoversSideRails())
         assertEquals(false, floatingChatInternalEdgeGestureUsesEarlyHorizontalLock())
         assertEquals(true, floatingChatExpandedBottomGestureHandledInsideOverlay())
@@ -2852,6 +3117,136 @@ class FloatingChatMessageUiContractTest {
         assertEquals(true, messageLongPressQuoteShowsComposerPreview())
         assertEquals(true, messageLongPressMenuAnchorsToMessageBounds())
         assertEquals(false, messageLongPressMenuUsesFixedSidePosition())
+    }
+
+    @Test
+    fun multiSelectForwardOffersSeparateAndCombinedChatHistory() {
+        val messages = listOf(
+            FloatingChatMessage(
+                id = "m1",
+                type = FloatingChatMessageType.Text,
+                text = "运营😳",
+                fromMe = false,
+                senderName = "糯米惹仁汤",
+                time = "10:39"
+            ),
+            FloatingChatMessage(
+                id = "m2",
+                type = FloatingChatMessageType.Text,
+                text = "我说你晚上别睡过了",
+                fromMe = false,
+                senderName = "糖糖",
+                time = "10:39"
+            ),
+            FloatingChatMessage(
+                id = "m3",
+                type = FloatingChatMessageType.Text,
+                text = "打麻将",
+                fromMe = false,
+                senderName = "糖糖",
+                time = "10:39"
+            )
+        )
+
+        val history = combinedForwardChatHistoryMessage(
+            messages = messages,
+            conversation = FloatingChatConversation(
+                peerName = "群聊",
+                accountName = "我",
+                contacts = emptyList(),
+                accountContacts = listOf(
+                    FloatingChatContact("account-1", "我", "我", "account", 0xFF123456)
+                ),
+                messages = emptyList(),
+                toolActions = emptyList()
+            ),
+            target = ChatThreadSelection.GroupChat("room@chatroom"),
+            accountId = "account-1",
+            sequence = 9
+        )
+
+        assertEquals("已选 3", multiSelectSelectionCountLabel(3))
+        assertEquals(listOf("逐条转发", "合并转发"), multiForwardModeLabels())
+        assertEquals(FloatingChatMessageType.ChatHistory, history.type)
+        assertEquals("群聊的聊天记录", history.text)
+        assertEquals(listOf("糯米惹仁汤：运营😳", "糖糖：我说你晚上别睡过了", "糖糖：打麻将"), history.filePreviewLines)
+        assertEquals(true, combinedForwardChatHistoryOpensDetailPage())
+    }
+
+    @Test
+    fun wechatContactsPageContractsMatchRequestedEntryFlow() {
+        val contacts = listOf(
+            ScrmContact(id = 1, nickname = "Alice", wxid = "wxid_alice"),
+            ScrmContact(id = 2, remarks = "白菜豆腐", wxid = "wxid_bai"),
+            ScrmContact(id = 3, nickname = "Bob", wxid = "wxid_bob")
+        )
+
+        assertEquals("通讯录", wechatContactsTitle())
+        assertEquals(listOf("发起群聊", "添加朋友", "扫一扫", "收付款"), wechatContactsPlusMenuLabels())
+        assertEquals(listOf("发起群聊", "收付款"), wechatContactsPendingMenuLabels())
+        assertEquals(true, wechatContactsStartGroupUsesContactPicker())
+        assertEquals("发起群聊", wechatStartGroupTitle())
+        assertEquals("完成", wechatStartGroupDoneLabel(0))
+        assertEquals("完成(2)", wechatStartGroupDoneLabel(2))
+        assertEquals(listOf("选择一个群", "面对面建群", "企业微信联系人"), wechatStartGroupOptionLabels())
+        assertEquals(200, scrmContactsPanelContactQuery("wxid_account", pageNumber = 1, search = null).pageSize)
+        assertEquals(2, scrmContactsPanelContactQuery("wxid_account", pageNumber = 2, search = "Alice").page)
+        assertEquals("Alice", scrmContactsPanelContactQuery("wxid_account", pageNumber = 2, search = "Alice").search)
+        assertEquals(
+            "选择账号与设备当前微信账号不一致：当前设备 device-1 正在登录 wxid_current，不能使用 wxid_selected 执行该操作。请切换到对应微信账号后刷新。",
+            scrmRouteCurrentDeviceMismatchMessage(
+                route = ScrmFloatingAccountRoute("device-1", "wxid_selected"),
+                devices = listOf(
+                    ScrmDevice(
+                        uuid = "device-1",
+                        weChatId = "wxid_current",
+                        isOnline = true,
+                        status = 1,
+                        androidApi = 35,
+                        appVersionCode = 1,
+                        updatedAt = "2026-07-15T00:00:00Z"
+                    )
+                )
+            )
+        )
+        assertEquals(
+            null,
+            scrmRouteCurrentDeviceMismatchMessage(
+                route = ScrmFloatingAccountRoute("device-1", "wxid_current"),
+                devices = listOf(
+                    ScrmDevice(
+                        uuid = "device-1",
+                        weChatId = "wxid_current",
+                        isOnline = true,
+                        status = 1,
+                        androidApi = 35,
+                        appVersionCode = 1,
+                        updatedAt = "2026-07-15T00:00:00Z"
+                    )
+                )
+            )
+        )
+        assertEquals(
+            listOf("wxid_alice", "wxid_bai"),
+            scrmCreateChatRoomMemberWxids(
+                listOf(
+                    ScrmContact(id = 1, nickname = "Alice", wxid = "wxid_alice"),
+                    ScrmContact(id = 2, remarks = "白菜单腐", wxid = "wxid_bai"),
+                    ScrmContact(id = 4, nickname = "Alice duplicate", wxid = "wxid_alice"),
+                    ScrmContact(id = 5, nickname = "No remote id")
+                )
+            )
+        )
+        assertEquals(
+            listOf("扫一扫", "手机联系人", "雷达", "企业微信联系人", "面对面建群", "公众号", "服务号"),
+            wechatAddFriendPageEntryLabels()
+        )
+        assertEquals(listOf("Alice"), filterWechatContacts(contacts, "ali").map { it.displayName })
+        assertEquals(listOf("白菜豆腐"), filterWechatContacts(contacts, "wxid_bai").map { it.displayName })
+        assertEquals(listOf("A", "B"), groupedWechatContactSections(contacts).map { it.title })
+        assertEquals(listOf("☆", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "#"), wechatContactIndexLabels())
+        assertEquals(listOf("朋友资料", "朋友圈"), wechatContactIntroInfoRowLabels())
+        assertEquals(listOf("发消息", "音视频通话"), wechatContactIntroActionLabels())
     }
 
     @Test

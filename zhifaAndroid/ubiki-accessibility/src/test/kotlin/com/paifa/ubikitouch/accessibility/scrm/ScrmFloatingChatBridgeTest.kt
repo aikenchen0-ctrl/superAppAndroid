@@ -293,6 +293,53 @@ class ScrmFloatingChatBridgeTest {
     }
 
     @Test
+    fun chatRoomMemberRoleMarksOwnerAndAdminForGroupManagement() {
+        val conversation = scrmFloatingChatConversation(
+            base = FloatingChatPrototype.sampleConversation(),
+            contacts = emptyList(),
+            accountConversations = listOf(
+                ScrmFloatingAccountConversation(
+                    deviceUuid = "device-1",
+                    weChatId = "wxid_owner",
+                    contacts = emptyList(),
+                    chatRooms = listOf(
+                        ScrmChatRoom(
+                            id = 1,
+                            chatRoomId = "room_1@chatroom",
+                            name = "Room",
+                            memberCount = 3
+                        )
+                    ),
+                    chatRoomMembers = mapOf(
+                        "room_1@chatroom" to listOf(
+                            ScrmChatRoomMember(
+                                id = 1,
+                                chatRoomId = "room_1@chatroom",
+                                memberWxid = "wxid_owner",
+                                memberRole = 1
+                            ),
+                            ScrmChatRoomMember(
+                                id = 2,
+                                chatRoomId = "room_1@chatroom",
+                                memberWxid = "wxid_admin",
+                                memberRole = 2
+                            )
+                        )
+                    )
+                )
+            ),
+            accounts = listOf(ScrmWechatAccount("wxid_owner", "Owner", "device-1", accountStatus = 1)),
+            devices = listOf(device("device-1", "wxid_owner", online = true)),
+            selectedDeviceUuid = "device-1",
+            selectedWeChatId = "wxid_owner"
+        )
+
+        val members = conversation.groupContacts.single().groupMemberContacts
+        assertEquals(true, members.first { it.name == "wxid_owner" }.groupMemberIsOwner)
+        assertEquals(true, members.first { it.name == "wxid_admin" }.groupMemberIsAdmin)
+    }
+
+    @Test
     fun selectedFloatingAccountRouteOverridesSessionFallbackForRefresh() {
         val selectedAccountId = scrmFloatingAccountId(
             deviceUuid = "device-2",

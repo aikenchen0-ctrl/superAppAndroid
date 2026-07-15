@@ -580,7 +580,8 @@ private fun FloatingChatMessage.aiPromptContent(): String {
         FloatingChatMessageType.InlineLocation -> "[location] ${locationTitle ?: text}"
         FloatingChatMessageType.Text,
         FloatingChatMessageType.MixedText,
-        FloatingChatMessageType.Quote -> inlineTokens
+        FloatingChatMessageType.Quote,
+        FloatingChatMessageType.ChatHistory -> inlineTokens
             .takeIf { it.isNotEmpty() }
             ?.joinToString(separator = "") { token -> token.text }
             ?.ifBlank { text }

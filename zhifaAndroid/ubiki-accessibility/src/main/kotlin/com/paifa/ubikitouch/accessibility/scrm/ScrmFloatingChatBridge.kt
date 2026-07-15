@@ -11,6 +11,8 @@ private const val ScrmFloatingGroupIdPrefix = "scrm-group:"
 private const val ScrmFloatingAccountIdPrefix = "scrm-account:"
 private const val ScrmFloatingScopedThreadSeparator = "__"
 private const val ScrmGroupAvatarMemberLimit = 9
+private const val ScrmChatRoomMemberOwnerRole = 1
+private const val ScrmChatRoomMemberAdminRole = 2
 
 private val ScrmAvatarPalette = longArrayOf(
     0xFF1B9AAA,
@@ -238,7 +240,12 @@ private fun scrmMergeFloatingContact(
         selected = existing.selected || candidate.selected,
         online = existing.online || candidate.online,
         avatarUrl = existing.avatarUrl ?: candidate.avatarUrl,
-        groupMemberAvatarUrls = existing.groupMemberAvatarUrls.ifEmpty { candidate.groupMemberAvatarUrls }
+        groupMemberAvatarUrls = existing.groupMemberAvatarUrls.ifEmpty { candidate.groupMemberAvatarUrls },
+        groupMemberIsOwner = existing.groupMemberIsOwner || candidate.groupMemberIsOwner,
+        groupMemberIsAdmin = existing.groupMemberIsAdmin || candidate.groupMemberIsAdmin,
+        groupMemberContacts = scrmDistinctFloatingContactsById(
+            existing.groupMemberContacts + candidate.groupMemberContacts
+        )
     )
 }
 
@@ -262,7 +269,29 @@ private fun scrmFloatingChatRoom(
             .mapNotNull { member -> normalizedRemoteImageUri(member.avatar) }
             .take(ScrmGroupAvatarMemberLimit)
             .toList(),
+        groupMemberContacts = members.mapNotNull { member ->
+            scrmFloatingChatRoomMember(member = member, accountId = accountId)
+        },
         online = chatRoom.groupStatus >= 0
+    )
+}
+
+private fun scrmFloatingChatRoomMember(
+    member: ScrmChatRoomMember,
+    accountId: String
+): FloatingChatContact? {
+    val conversationId = member.memberWxid?.takeIf { it.isNotBlank() } ?: return null
+    val displayName = member.displayNameValue.trim().ifBlank { conversationId }
+    return FloatingChatContact(
+        id = scrmFloatingScopedThreadId(accountId, scrmFloatingContactId(conversationId)),
+        name = displayName,
+        initials = displayName.take(2).ifBlank { "群员" },
+        description = "WeChat group member / $conversationId",
+        avatarColor = scrmStableColor(conversationId),
+        avatarUrl = normalizedRemoteImageUri(member.avatar),
+        groupMemberIsOwner = member.isOwner || member.memberRole == ScrmChatRoomMemberOwnerRole,
+        groupMemberIsAdmin = member.isAdmin || member.memberRole == ScrmChatRoomMemberAdminRole,
+        online = true
     )
 }
 

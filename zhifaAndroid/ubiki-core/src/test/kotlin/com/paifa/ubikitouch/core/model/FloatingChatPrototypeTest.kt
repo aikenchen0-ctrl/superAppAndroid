@@ -91,6 +91,7 @@ class FloatingChatPrototypeTest {
                 FloatingChatMessageType.Text,
                 FloatingChatMessageType.MixedText,
                 FloatingChatMessageType.Quote,
+                FloatingChatMessageType.ChatHistory,
                 FloatingChatMessageType.FilePreview,
                 FloatingChatMessageType.ImageThumbnail,
                 FloatingChatMessageType.VideoPreview,
@@ -104,7 +105,7 @@ class FloatingChatPrototypeTest {
             FloatingChatMessageType.entries.toSet(),
             conversation.messages.map { it.type }.toSet()
         )
-        assertEquals(12, FloatingChatMessageType.entries.size)
+        assertEquals(13, FloatingChatMessageType.entries.size)
         assertTrue(conversation.messages.size >= FloatingChatMessageType.entries.size)
     }
 

@@ -790,6 +790,111 @@ class ScrmApiClientTest {
     }
 
     @Test
+    fun chatRoomManagementOperationsUseSwaggerTaskRoutes() {
+        val createTransport = RecordingTransport(ok("""{"taskId":201,"success":true,"message":"queued"}"""))
+        val createTask = ScrmApiClient(config, createTransport).createChatRoom(
+            ScrmCreateChatRoomRequest(
+                deviceUuid = "device-1",
+                weChatId = "wxid_account",
+                memberWxids = listOf("wxid_a", "wxid_b")
+            )
+        )
+        val createBody = Json.parseToJsonElement(requireNotNull(createTransport.lastRequest?.body)).jsonObject
+        assertEquals(201L, createTask.taskId)
+        assertEquals("POST", createTransport.lastRequest?.method)
+        assertEquals("https://api.example.com/openapi/v1/chatrooms", createTransport.lastRequest?.url)
+        assertEquals("wxid_a", createBody.getValue("memberWxids").jsonArray.first().jsonPrimitive.content)
+
+        val inviteTransport = RecordingTransport(ok("""{"taskId":202,"success":true,"message":"queued"}"""))
+        ScrmApiClient(config, inviteTransport).inviteChatRoomMembers(
+            ScrmChatRoomMemberMutationRequest(
+                deviceUuid = "device-1",
+                weChatId = "wxid_account",
+                chatRoomId = "room_1@chatroom",
+                memberWxids = listOf("wxid_c")
+            )
+        )
+        val inviteBody = Json.parseToJsonElement(requireNotNull(inviteTransport.lastRequest?.body)).jsonObject
+        assertEquals("https://api.example.com/openapi/v1/chatrooms/members/invite", inviteTransport.lastRequest?.url)
+        assertEquals("room_1@chatroom", inviteBody.getValue("chatRoomId").jsonPrimitive.content)
+        assertEquals("wxid_c", inviteBody.getValue("memberWxids").jsonArray.single().jsonPrimitive.content)
+
+        val kickTransport = RecordingTransport(ok("""{"taskId":203,"success":true,"message":"queued"}"""))
+        ScrmApiClient(config, kickTransport).kickChatRoomMembers(
+            ScrmChatRoomMemberMutationRequest(
+                deviceUuid = "device-1",
+                weChatId = "wxid_account",
+                chatRoomId = "room_1@chatroom",
+                memberWxids = listOf("wxid_d")
+            )
+        )
+        val kickBody = Json.parseToJsonElement(requireNotNull(kickTransport.lastRequest?.body)).jsonObject
+        assertEquals("https://api.example.com/openapi/v1/chatrooms/members/kick", kickTransport.lastRequest?.url)
+        assertEquals("wxid_d", kickBody.getValue("memberWxids").jsonArray.single().jsonPrimitive.content)
+    }
+
+    @Test
+    fun chatRoomInfoOperationsUseSwaggerTaskRoutes() {
+        val renameTransport = RecordingTransport(ok("""{"taskId":211,"success":true,"message":"queued"}"""))
+        ScrmApiClient(config, renameTransport).renameChatRoom(
+            ScrmRenameChatRoomRequest(
+                deviceUuid = "device-1",
+                weChatId = "wxid_account",
+                chatRoomId = "room_1@chatroom",
+                name = "新群名"
+            )
+        )
+        val renameBody = Json.parseToJsonElement(requireNotNull(renameTransport.lastRequest?.body)).jsonObject
+        assertEquals("https://api.example.com/openapi/v1/chatrooms/rename", renameTransport.lastRequest?.url)
+        assertEquals("新群名", renameBody.getValue("name").jsonPrimitive.content)
+
+        val noticeTransport = RecordingTransport(ok("""{"taskId":212,"success":true,"message":"queued"}"""))
+        ScrmApiClient(config, noticeTransport).setChatRoomNotice(
+            ScrmSetChatRoomNoticeRequest(
+                deviceUuid = "device-1",
+                weChatId = "wxid_account",
+                chatRoomId = "room_1@chatroom",
+                notice = "今晚 8 点同步"
+            )
+        )
+        val noticeBody = Json.parseToJsonElement(requireNotNull(noticeTransport.lastRequest?.body)).jsonObject
+        assertEquals("https://api.example.com/openapi/v1/chatrooms/notice", noticeTransport.lastRequest?.url)
+        assertEquals("今晚 8 点同步", noticeBody.getValue("notice").jsonPrimitive.content)
+
+        val qrcodeTransport = RecordingTransport(ok("""{"taskId":213,"success":true,"message":"queued"}"""))
+        ScrmApiClient(config, qrcodeTransport).pullChatRoomQrCode(
+            ScrmChatRoomActionRequest(
+                deviceUuid = "device-1",
+                weChatId = "wxid_account",
+                chatRoomId = "room_1@chatroom"
+            )
+        )
+        assertEquals("https://api.example.com/openapi/v1/chatrooms/qrcode", qrcodeTransport.lastRequest?.url)
+
+        val exitTransport = RecordingTransport(ok("""{"taskId":214,"success":true,"message":"queued"}"""))
+        ScrmApiClient(config, exitTransport).exitChatRoom(
+            ScrmChatRoomActionRequest(
+                deviceUuid = "device-1",
+                weChatId = "wxid_account",
+                chatRoomId = "room_1@chatroom"
+            )
+        )
+        assertEquals("https://api.example.com/openapi/v1/chatrooms/exit", exitTransport.lastRequest?.url)
+
+        val syncTransport = RecordingTransport(ok("""{"taskId":215,"success":true,"message":"queued"}"""))
+        ScrmApiClient(config, syncTransport).syncChatRooms(
+            ScrmSyncChatRoomsRequest(
+                deviceUuid = "device-1",
+                weChatId = "wxid_account",
+                flag = 1
+            )
+        )
+        val syncBody = Json.parseToJsonElement(requireNotNull(syncTransport.lastRequest?.body)).jsonObject
+        assertEquals("https://api.example.com/openapi/v1/chatrooms/sync", syncTransport.lastRequest?.url)
+        assertEquals("1", syncBody.getValue("flag").jsonPrimitive.content)
+    }
+
+    @Test
     fun friendOperationsPostAndDeleteTaskRequests() {
         val addTransport = RecordingTransport(ok("""{"taskId":101,"success":true,"message":"queued"}"""))
 

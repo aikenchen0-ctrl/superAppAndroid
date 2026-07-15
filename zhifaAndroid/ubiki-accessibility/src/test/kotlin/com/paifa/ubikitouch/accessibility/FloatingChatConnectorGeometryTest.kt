@@ -27,7 +27,7 @@ class FloatingChatConnectorGeometryTest {
         assertEquals(Offset(38f, 37f), line.start)
         assertEquals(Offset(86f, 37f), line.cornerStart)
         assertEquals(Offset(86f, 94f), line.cornerEnd)
-        assertEquals(Offset(106f, 94f), line.end)
+        assertEquals(Offset(102f, 94f), line.end)
     }
 
     @Test
@@ -46,7 +46,7 @@ class FloatingChatConnectorGeometryTest {
         assertEquals(Offset(254f, 37f), line.start)
         assertEquals(Offset(206f, 37f), line.cornerStart)
         assertEquals(Offset(206f, 94f), line.cornerEnd)
-        assertEquals(Offset(196f, 94f), line.end)
+        assertEquals(Offset(200f, 94f), line.end)
     }
 
     @Test
@@ -68,13 +68,13 @@ class FloatingChatConnectorGeometryTest {
             hasMessagesBelow = false
         ) ?: error("Expected connector tree")
 
-        assertEquals(Offset(90f, 49f), tree.trunkStart)
-        assertEquals(Offset(90f, 136f), tree.trunkEnd)
-        assertEquals(ChatConnectorBranch(Offset(42f, 49f), Offset(90f, 49f)), tree.avatarBranch)
+        assertEquals(Offset(88f, 49f), tree.trunkStart)
+        assertEquals(Offset(88f, 136f), tree.trunkEnd)
+        assertEquals(ChatConnectorBranch(Offset(42f, 49f), Offset(88f, 49f)), tree.avatarBranch)
         assertEquals(
             listOf(
-                ChatConnectorBranch(Offset(90f, 74f), Offset(124f, 74f)),
-                ChatConnectorBranch(Offset(90f, 136f), Offset(150f, 136f))
+                ChatConnectorBranch(Offset(88f, 74f), Offset(120f, 74f)),
+                ChatConnectorBranch(Offset(88f, 136f), Offset(146f, 136f))
             ),
             tree.messageBranches
         )
@@ -161,7 +161,7 @@ class FloatingChatConnectorGeometryTest {
         )
         assertEquals(
             ChatConnectorRoundedHookGeometry(
-                curveStart = Offset(90f, 61f),
+                curveStart = Offset(90f, 64f),
                 curveControl = Offset(90f, 49f),
                 horizontalStart = Offset(78f, 49f),
                 branchEnd = Offset(42f, 49f)
@@ -170,6 +170,36 @@ class FloatingChatConnectorGeometryTest {
         )
         assertEquals(Offset(97.25f, 74f), geometry.hooks[1].branchStartAvoidingJointOverlap())
         assertEquals(Offset(102f, 136f), geometry.hooks[2].branchStartAvoidingJointOverlap())
+        assertEquals(true, chatConnectorTreeUsesButtCapsToAvoidSubpathCaps())
+        assertEquals(3f, chatConnectorHookTrunkOverlapPx())
+    }
+
+    @Test
+    fun failedSendStatusGapKeepsOriginalContinuousConnectorTreeTrunk() {
+        val layerBounds = Rect(left = 0f, top = 0f, right = 320f, bottom = 520f)
+        val messageViewportBounds = Rect(left = 70f, top = 20f, right = 270f, bottom = 460f)
+        val avatarBounds = Rect(left = 278f, top = 32f, right = 312f, bottom = 66f)
+
+        val tree = createChatConnectorTree(
+            avatarBounds = avatarBounds,
+            bubbleBounds = listOf(
+                Rect(left = 132f, top = 54f, right = 220f, bottom = 94f),
+                Rect(left = 132f, top = 172f, right = 220f, bottom = 212f)
+            ),
+            layerBounds = layerBounds,
+            visibleRootBounds = messageViewportBounds,
+            target = FloatingChatConnectionTarget.Account,
+            hasMessagesAbove = false,
+            hasMessagesBelow = false
+        ) ?: error("Expected connector tree")
+
+        val geometry = createChatConnectorBraceGeometry(tree)
+
+        assertEquals(2, tree.messageBranches.size)
+        assertEquals(
+            listOf(ChatConnectorBranch(Offset(252f, 49f), Offset(252f, 192f))),
+            geometry.trunkSegments
+        )
     }
 
     @Test

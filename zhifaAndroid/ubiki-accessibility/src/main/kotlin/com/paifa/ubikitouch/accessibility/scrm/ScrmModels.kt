@@ -700,6 +700,105 @@ internal data class ScrmChatRoomMember(
 }
 
 @Serializable
+internal data class ScrmCreateChatRoomRequest(
+    val deviceUuid: String,
+    val weChatId: String,
+    val memberWxids: List<String>
+) {
+    init {
+        require(deviceUuid.isNotBlank()) { "deviceUuid cannot be blank" }
+        require(weChatId.isNotBlank()) { "weChatId cannot be blank" }
+        require(memberWxids.isNotEmpty()) { "memberWxids cannot be empty" }
+        require(memberWxids.all { it.isNotBlank() }) { "memberWxids cannot contain blank values" }
+    }
+}
+
+@Serializable
+internal data class ScrmChatRoomMemberMutationRequest(
+    val deviceUuid: String,
+    val weChatId: String,
+    val chatRoomId: String,
+    val memberWxids: List<String>
+) {
+    init {
+        require(deviceUuid.isNotBlank()) { "deviceUuid cannot be blank" }
+        require(weChatId.isNotBlank()) { "weChatId cannot be blank" }
+        require(chatRoomId.isNotBlank()) { "chatRoomId cannot be blank" }
+        require(memberWxids.isNotEmpty()) { "memberWxids cannot be empty" }
+        require(memberWxids.all { it.isNotBlank() }) { "memberWxids cannot contain blank values" }
+    }
+}
+
+@Serializable
+internal data class ScrmSyncChatRoomsRequest(
+    val deviceUuid: String,
+    val weChatId: String,
+    val flag: Int = 0
+) {
+    init {
+        require(deviceUuid.isNotBlank()) { "deviceUuid cannot be blank" }
+        require(weChatId.isNotBlank()) { "weChatId cannot be blank" }
+    }
+}
+
+@Serializable
+internal data class ScrmRefreshChatRoomRequest(
+    val deviceUuid: String,
+    val weChatId: String,
+    val chatRoomId: String,
+    val flag: Int = 0
+) {
+    init {
+        require(deviceUuid.isNotBlank()) { "deviceUuid cannot be blank" }
+        require(weChatId.isNotBlank()) { "weChatId cannot be blank" }
+        require(chatRoomId.isNotBlank()) { "chatRoomId cannot be blank" }
+    }
+}
+
+@Serializable
+internal data class ScrmRenameChatRoomRequest(
+    val deviceUuid: String,
+    val weChatId: String,
+    val chatRoomId: String,
+    val name: String
+) {
+    init {
+        require(deviceUuid.isNotBlank()) { "deviceUuid cannot be blank" }
+        require(weChatId.isNotBlank()) { "weChatId cannot be blank" }
+        require(chatRoomId.isNotBlank()) { "chatRoomId cannot be blank" }
+        require(name.isNotBlank()) { "name cannot be blank" }
+    }
+}
+
+@Serializable
+internal data class ScrmSetChatRoomNoticeRequest(
+    val deviceUuid: String,
+    val weChatId: String,
+    val chatRoomId: String,
+    val notice: String
+) {
+    init {
+        require(deviceUuid.isNotBlank()) { "deviceUuid cannot be blank" }
+        require(weChatId.isNotBlank()) { "weChatId cannot be blank" }
+        require(chatRoomId.isNotBlank()) { "chatRoomId cannot be blank" }
+        require(notice.isNotBlank()) { "notice cannot be blank" }
+    }
+}
+
+@Serializable
+internal data class ScrmChatRoomActionRequest(
+    val deviceUuid: String,
+    val weChatId: String,
+    val chatRoomId: String
+) {
+    init {
+        require(deviceUuid.isNotBlank()) { "deviceUuid cannot be blank" }
+        require(weChatId.isNotBlank()) { "weChatId cannot be blank" }
+        require(chatRoomId.isNotBlank()) { "chatRoomId cannot be blank" }
+    }
+}
+
+@Serializable
 internal data class ScrmSyncContactsRequest(
     val deviceUuid: String,
     val weChatId: String

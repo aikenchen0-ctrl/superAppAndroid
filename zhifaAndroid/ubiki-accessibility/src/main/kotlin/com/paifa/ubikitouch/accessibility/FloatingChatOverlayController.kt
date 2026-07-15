@@ -907,16 +907,28 @@ internal class FloatingChatOverlayController(
         val membersByRoomId = linkedMapOf<String, List<ScrmChatRoomMember>>()
         chatRooms.forEach { chatRoom ->
             val chatRoomId = chatRoom.chatRoomId?.takeIf { it.isNotBlank() } ?: return@forEach
-            val page = session.chatRoomApi.getChatRoomMembers(
-                chatRoomId = chatRoomId,
-                query = ScrmChatRoomMemberQuery(
-                    weChatId = weChatId,
-                    page = 1,
-                    pageSize = ScrmGroupAvatarMemberPageSize,
-                    includeDeleted = false
+            val allMembers = mutableListOf<ScrmChatRoomMember>()
+            var pageNumber = 1
+            do {
+                val page = session.chatRoomApi.getChatRoomMembers(
+                    chatRoomId = chatRoomId,
+                    query = ScrmChatRoomMemberQuery(
+                        weChatId = weChatId,
+                        page = pageNumber,
+                        pageSize = ScrmGroupMemberPageSize,
+                        includeDeleted = false
+                    )
+                )
+                allMembers += page.items
+                pageNumber += 1
+            } while (shouldRequestNextScrmConversationPage(
+                    returnedItemCount = page.items.size,
+                    loadedItemCount = allMembers.size,
+                    totalCount = page.totalCount,
+                    pageSize = ScrmGroupMemberPageSize
                 )
             )
-            membersByRoomId[chatRoomId] = page.items
+            membersByRoomId[chatRoomId] = allMembers
         }
         return membersByRoomId
     }
@@ -1355,7 +1367,7 @@ internal class FloatingChatOverlayController(
         const val EXTRA_EXTERNAL_DOCUMENT_URI = "floating_chat_external_document_uri"
         const val EXTRA_EXTERNAL_DOCUMENT_MIME_TYPE = "floating_chat_external_document_mime_type"
         const val ScrmConversationPageSize = 200
-        const val ScrmGroupAvatarMemberPageSize = 9
+        const val ScrmGroupMemberPageSize = 200
     }
 }
 

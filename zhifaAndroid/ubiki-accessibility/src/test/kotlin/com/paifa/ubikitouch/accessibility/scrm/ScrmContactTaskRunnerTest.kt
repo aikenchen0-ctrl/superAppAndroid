@@ -108,6 +108,27 @@ class ScrmContactTaskRunnerTest {
         assertEquals(emptyList<Long>(), taskApi.requestedTaskIds)
     }
 
+    @Test
+    fun missingRecentTaskResultStaysPendingInsteadOfError() {
+        val taskApi = MissingTaskApi()
+        val runner = ScrmContactTaskRunner(
+            taskApi = taskApi,
+            pollDelayMillis = 1L,
+            maxPollAttempts = 2,
+            sleepMillis = {}
+        )
+
+        val outcome = runner.submitAndAwait(reloadContactsOnSuccess = false) {
+            ScrmTaskSubmissionResult(taskId = 45L, success = true, message = "queued")
+        }
+
+        assertEquals(45L, outcome.taskId)
+        assertEquals(false, outcome.completed)
+        assertEquals(false, outcome.shouldReloadContacts)
+        assertTrue(outcome.message.contains("45"))
+        assertEquals(listOf(45L, 45L), taskApi.requestedTaskIds)
+    }
+
     private class FakeTaskApi(
         private vararg val results: ScrmTaskResult
     ) : ScrmTaskApi {
@@ -126,6 +147,25 @@ class ScrmContactTaskRunnerTest {
             count: Int
         ): ScrmRecentTaskResults {
             error("not used")
+        }
+    }
+
+    private class MissingTaskApi : ScrmTaskApi {
+        val requestedTaskIds = mutableListOf<Long>()
+
+        override fun getTask(taskId: Long): ScrmTaskResult {
+            requestedTaskIds += taskId
+            throw ScrmRequestException(
+                statusCode = 404,
+                message = "未找到该 taskId 的近期结果，可能 Android 尚未回包"
+            )
+        }
+
+        override fun getRecentTasks(
+            deviceUuid: String?,
+            count: Int
+        ): ScrmRecentTaskResults {
+            return ScrmRecentTaskResults(count = count)
         }
     }
 }

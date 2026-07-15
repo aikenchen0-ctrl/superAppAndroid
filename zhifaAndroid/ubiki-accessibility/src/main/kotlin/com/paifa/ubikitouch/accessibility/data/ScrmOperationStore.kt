@@ -16,6 +16,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 private val ForbiddenOutboxJsonKeys = setOf("apikey", "x-api-key", "authorization")
 private val OutboxJson = Json { isLenient = false }
@@ -208,7 +210,11 @@ internal class ScrmOperationStore(
             if (rows != 1) {
                 throw ScrmConcurrentOperationException("Outbox 状态并发更新失败")
             }
-            updateLinkedMessage(updatedOutbox)
+            updateLinkedMessage(
+                item = updatedOutbox,
+                remoteMessageServerId = task.remoteMessageServerIdFromData()
+                    .takeIf { effectiveOutboxState == ScrmOutboxState.Succeeded }
+            )
             updatedOutbox
         }
     }
@@ -483,11 +489,15 @@ internal class ScrmOperationStore(
         }
     }
 
-    private fun SQLiteDatabase.updateLinkedMessage(item: ScrmOutboxItem) {
+    private fun SQLiteDatabase.updateLinkedMessage(
+        item: ScrmOutboxItem,
+        remoteMessageServerId: String? = null
+    ) {
         if (item.aggregateType != "message" || item.aggregateId == null) return
         val values = ContentValues().apply {
             put("send_state", item.state.storageValue)
             item.remoteTaskId?.let { put("remote_task_id", it) } ?: putNull("remote_task_id")
+            remoteMessageServerId?.let { put("remote_msg_svr_id", it) }
             put("send_error_code", item.lastErrorCode)
             put("send_error_message", item.lastErrorMessage)
         }
@@ -497,6 +507,46 @@ internal class ScrmOperationStore(
             "message_id = ? AND client_request_id = ?",
             arrayOf(item.aggregateId, item.clientRequestId)
         )
+    }
+}
+
+private fun ScrmTaskRecord.remoteMessageServerIdFromData(): String? {
+    val data = dataJson?.takeIf { it.isNotBlank() } ?: return null
+    return runCatching {
+        OutboxJson.parseToJsonElement(data)
+    }.getOrNull()
+        ?.collectJsonObjects()
+        ?.firstNotNullOfOrNull { item ->
+            listOf(
+                "msgSvrId",
+                "msgSvrID",
+                "msgServerId",
+                "messageServerId",
+                "remoteMessageServerId",
+                "newMsgId"
+            ).firstNotNullOfOrNull { key ->
+                item[key]
+                    ?.jsonPrimitive
+                    ?.contentOrNull
+                    ?.takeIf { value -> value.isNotBlank() }
+            }
+        }
+}
+
+private fun JsonElement.collectJsonObjects(): Sequence<JsonObject> = sequence {
+    when (val element = this@collectJsonObjects) {
+        is JsonObject -> {
+            yield(element)
+            element.values.forEach { child ->
+                yieldAll(child.collectJsonObjects())
+            }
+        }
+        is JsonArray -> {
+            element.forEach { child ->
+                yieldAll(child.collectJsonObjects())
+            }
+        }
+        else -> Unit
     }
 }
 

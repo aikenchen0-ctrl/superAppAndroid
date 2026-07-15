@@ -130,6 +130,15 @@ internal interface ScrmChatRoomApi {
         chatRoomId: String,
         query: ScrmChatRoomMemberQuery = ScrmChatRoomMemberQuery()
     ): ScrmChatRoomMemberPage
+    fun createChatRoom(request: ScrmCreateChatRoomRequest): ScrmTaskSubmissionResult
+    fun syncChatRooms(request: ScrmSyncChatRoomsRequest): ScrmTaskSubmissionResult
+    fun refreshChatRoom(request: ScrmRefreshChatRoomRequest): ScrmTaskSubmissionResult
+    fun inviteChatRoomMembers(request: ScrmChatRoomMemberMutationRequest): ScrmTaskSubmissionResult
+    fun kickChatRoomMembers(request: ScrmChatRoomMemberMutationRequest): ScrmTaskSubmissionResult
+    fun renameChatRoom(request: ScrmRenameChatRoomRequest): ScrmTaskSubmissionResult
+    fun setChatRoomNotice(request: ScrmSetChatRoomNoticeRequest): ScrmTaskSubmissionResult
+    fun pullChatRoomQrCode(request: ScrmChatRoomActionRequest): ScrmTaskSubmissionResult
+    fun exitChatRoom(request: ScrmChatRoomActionRequest): ScrmTaskSubmissionResult
 }
 
 internal class ScrmApiClient(
@@ -472,6 +481,86 @@ internal class ScrmApiClient(
                 "includeDeleted" to query.includeDeleted.toString()
             ),
             safeRoute = "/openapi/v1/chatrooms/{chatRoomId}/members"
+        )
+    }
+
+    override fun createChatRoom(request: ScrmCreateChatRoomRequest): ScrmTaskSubmissionResult {
+        return post(
+            path = "chatrooms",
+            body = json.encodeToString(request),
+            safeRoute = "/openapi/v1/chatrooms"
+        )
+    }
+
+    override fun syncChatRooms(request: ScrmSyncChatRoomsRequest): ScrmTaskSubmissionResult {
+        return post(
+            path = "chatrooms/sync",
+            body = json.encodeToString(request),
+            safeRoute = "/openapi/v1/chatrooms/sync"
+        )
+    }
+
+    override fun refreshChatRoom(request: ScrmRefreshChatRoomRequest): ScrmTaskSubmissionResult {
+        return post(
+            path = "chatrooms/refresh",
+            body = json.encodeToString(request),
+            safeRoute = "/openapi/v1/chatrooms/refresh"
+        )
+    }
+
+    override fun inviteChatRoomMembers(
+        request: ScrmChatRoomMemberMutationRequest
+    ): ScrmTaskSubmissionResult {
+        return post(
+            path = "chatrooms/members/invite",
+            body = json.encodeToString(request),
+            safeRoute = "/openapi/v1/chatrooms/members/invite"
+        )
+    }
+
+    override fun kickChatRoomMembers(
+        request: ScrmChatRoomMemberMutationRequest
+    ): ScrmTaskSubmissionResult {
+        return post(
+            path = "chatrooms/members/kick",
+            body = json.encodeToString(request),
+            safeRoute = "/openapi/v1/chatrooms/members/kick"
+        )
+    }
+
+    override fun renameChatRoom(request: ScrmRenameChatRoomRequest): ScrmTaskSubmissionResult {
+        return post(
+            path = "chatrooms/rename",
+            body = json.encodeToString(request),
+            safeRoute = "/openapi/v1/chatrooms/rename"
+        )
+    }
+
+    override fun setChatRoomNotice(
+        request: ScrmSetChatRoomNoticeRequest
+    ): ScrmTaskSubmissionResult {
+        return post(
+            path = "chatrooms/notice",
+            body = json.encodeToString(request),
+            safeRoute = "/openapi/v1/chatrooms/notice"
+        )
+    }
+
+    override fun pullChatRoomQrCode(
+        request: ScrmChatRoomActionRequest
+    ): ScrmTaskSubmissionResult {
+        return post(
+            path = "chatrooms/qrcode",
+            body = json.encodeToString(request),
+            safeRoute = "/openapi/v1/chatrooms/qrcode"
+        )
+    }
+
+    override fun exitChatRoom(request: ScrmChatRoomActionRequest): ScrmTaskSubmissionResult {
+        return post(
+            path = "chatrooms/exit",
+            body = json.encodeToString(request),
+            safeRoute = "/openapi/v1/chatrooms/exit"
         )
     }
 

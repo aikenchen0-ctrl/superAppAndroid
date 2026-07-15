@@ -236,6 +236,7 @@ class ScrmOperationStoreTest {
             status = "success",
             pollState = ScrmTaskPollState.Completed,
             success = true,
+            dataJson = """{"msgSvrId":"88990011"}""",
             nextPollAt = null,
             leaseOwner = "worker-a",
             leaseUntil = 1_100L,
@@ -257,6 +258,7 @@ class ScrmOperationStoreTest {
             .single()
         assertEquals(com.paifa.ubikitouch.core.model.FloatingChatSendState.Succeeded, message.sendState)
         assertEquals(42L, message.remoteTaskId)
+        assertEquals("88990011", message.remoteMessageServerId)
     }
 
     @Test(timeout = 60_000L)

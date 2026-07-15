@@ -104,9 +104,13 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.automirrored.filled.Forward
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.CameraAlt
@@ -120,15 +124,24 @@ import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.CropFree
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Radar
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Star
@@ -260,9 +273,13 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmAddFriendRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmAddFriendsByPhoneRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmAdminBootstrapResult
 import com.paifa.ubikitouch.accessibility.scrm.ScrmAuthenticationException
+import com.paifa.ubikitouch.accessibility.scrm.ScrmChatRoomActionRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmChatRoomMemberMutationRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmContact
 import com.paifa.ubikitouch.accessibility.scrm.ScrmContactQuery
 import com.paifa.ubikitouch.accessibility.scrm.ScrmContactTaskRunner
+import com.paifa.ubikitouch.accessibility.scrm.ScrmCreateChatRoomRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmDevice
 import com.paifa.ubikitouch.accessibility.scrm.ScrmException
 import com.paifa.ubikitouch.accessibility.scrm.ScrmFindContactRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmFriendRequest
@@ -287,8 +304,9 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentPostPayload
 import com.paifa.ubikitouch.accessibility.scrm.ScrmPostMomentRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmQueuedMediaPayload
 import com.paifa.ubikitouch.accessibility.scrm.ScrmRequestException
+import com.paifa.ubikitouch.accessibility.scrm.ScrmRenameChatRoomRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSendFriendVerifyRequest
-import com.paifa.ubikitouch.accessibility.scrm.ScrmSendTextMessageRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmSetChatRoomNoticeRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSettingsManager
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSyncMomentMessagesRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSyncContactsRequest
@@ -298,8 +316,11 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskPollState
 import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskResult
 import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskSubmissionResult
 import com.paifa.ubikitouch.accessibility.scrm.resolveScrmTaskResult
+import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingAccountId
 import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingAccountRouteForContactId
+import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingContactId
 import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingContactConversationId
+import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingScopedThreadId
 import com.paifa.ubikitouch.accessibility.scrm.scrmMediaOperationType
 import com.paifa.ubikitouch.accessibility.scrm.scrmMessageOperationType
 import com.paifa.ubikitouch.accessibility.scrm.toUserMessage
@@ -394,6 +415,10 @@ internal fun FloatingChatOverlay(
     var longPressAnchorBounds by remember { mutableStateOf<Rect?>(null) }
     var paymentDetailMessage by remember { mutableStateOf<FloatingChatMessage?>(null) }
     var forwardMessage by remember { mutableStateOf<FloatingChatMessage?>(null) }
+    var forwardModeMessages by remember { mutableStateOf<List<FloatingChatMessage>>(emptyList()) }
+    var pendingForwardMessages by remember { mutableStateOf<List<FloatingChatMessage>>(emptyList()) }
+    var pendingForwardMode by remember { mutableStateOf<MultiForwardMode?>(null) }
+    var chatHistoryPreviewMessage by remember { mutableStateOf<FloatingChatMessage?>(null) }
     var quotedMessage by remember { mutableStateOf<FloatingChatMessage?>(null) }
     var multiSelectMode by remember { mutableStateOf(false) }
     var favoritePreviewItem by remember { mutableStateOf<FavoriteCollectionItem?>(null) }
@@ -401,6 +426,10 @@ internal fun FloatingChatOverlay(
     var favoriteLongPressAnchorBounds by remember { mutableStateOf<Rect?>(null) }
     var favoriteMultiSelectMode by remember { mutableStateOf(false) }
     var contactEditorTarget by remember { mutableStateOf<ContactEditorTarget?>(null) }
+    var groupMemberAddFriendTargetId by remember { mutableStateOf<String?>(null) }
+    var groupMemberAddFriendLoading by remember { mutableStateOf(false) }
+    var groupMemberAddFriendStatus by remember { mutableStateOf<String?>(null) }
+    var groupMemberAddFriendError by remember { mutableStateOf<String?>(null) }
     var accountEditorTarget by remember { mutableStateOf<FloatingChatContact?>(null) }
     var pendingAvatarAccountId by remember { mutableStateOf<String?>(null) }
     val favoriteMediaIds = remember { mutableStateMapOf<String, Boolean>() }
@@ -781,6 +810,67 @@ internal fun FloatingChatOverlay(
                 contactEditorTarget = null
             }.onFailure { error ->
                 Toast.makeText(context, error.toScrmContactsPanelMessage(), Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+    fun addFriendFromGroupMember(member: FloatingChatContact) {
+        val friendId = scrmFloatingContactConversationId(member.id)
+        if (friendId == null) {
+            groupMemberAddFriendTargetId = member.id
+            groupMemberAddFriendLoading = false
+            groupMemberAddFriendStatus = null
+            groupMemberAddFriendError = "当前群成员缺少可添加的 wxid"
+            Toast.makeText(context, "当前群成员缺少可添加的 wxid", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val accountId = accountIdForScopedThreadId(member.id) ?: selectedAccount.id
+        val route = scrmContactsPanelRouteForSelectedAccount(
+            selectedAccountId = accountId,
+            fallbackDeviceUuid = null,
+            fallbackWeChatId = null
+        )
+        if (route == null) {
+            groupMemberAddFriendTargetId = member.id
+            groupMemberAddFriendLoading = false
+            groupMemberAddFriendStatus = null
+            groupMemberAddFriendError = "当前账号缺少 SCRM 路由，无法添加好友"
+            Toast.makeText(context, "当前账号缺少 SCRM 路由，无法添加好友", Toast.LENGTH_SHORT).show()
+            return
+        }
+        coroutineScope.launch {
+            groupMemberAddFriendTargetId = member.id
+            groupMemberAddFriendLoading = true
+            groupMemberAddFriendStatus = "正在发送好友申请"
+            groupMemberAddFriendError = null
+            Toast.makeText(context, "正在发送好友申请", Toast.LENGTH_SHORT).show()
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val session = scrmProfileManager.loadSelectedSessionOrBootstrap()
+                    ScrmContactTaskRunner(session.taskApi).submitAndAwait(
+                        reloadContactsOnSuccess = true
+                    ) {
+                        session.contactApi.addFriend(
+                            ScrmAddFriendRequest(
+                                deviceUuid = route.deviceUuid,
+                                weChatId = route.weChatId,
+                                friendWxid = friendId,
+                                message = "你好，我是通过群聊添加你"
+                            )
+                        )
+                    }
+                }
+            }.onSuccess { outcome ->
+                val status = friendApplySubmittedStatus(outcome.message)
+                groupMemberAddFriendLoading = false
+                groupMemberAddFriendStatus = status
+                groupMemberAddFriendError = null
+                Toast.makeText(context, status, Toast.LENGTH_SHORT).show()
+            }.onFailure { error ->
+                val message = error.toScrmContactsPanelMessage()
+                groupMemberAddFriendLoading = false
+                groupMemberAddFriendStatus = null
+                groupMemberAddFriendError = message
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -1238,6 +1328,31 @@ internal fun FloatingChatOverlay(
         syncLocalMessageState()
         onPersistLocalMessage(message, threadId)
     }
+    fun addCombinedForwardedMessage(sources: List<FloatingChatMessage>, target: ChatThreadSelection) {
+        if (sources.isEmpty()) return
+        val account = selectedAccountForThread(effectiveConversation, target)
+        localMessageSequence += 1
+        val threadId = target.toLocalThreadId()
+        val message = combinedForwardChatHistoryMessage(
+            messages = sources,
+            conversation = effectiveConversation,
+            target = target,
+            accountId = account.id,
+            sequence = localMessageSequence
+        )
+        localMessages += message
+        syncLocalMessageState()
+        onPersistLocalMessage(message, threadId)
+    }
+    fun beginForward(messages: List<FloatingChatMessage>) {
+        val selected = messages.takeIf { it.isNotEmpty() } ?: return
+        if (selected.size == 1) {
+            pendingForwardMessages = selected
+            pendingForwardMode = MultiForwardMode.Separate
+        } else {
+            forwardModeMessages = selected
+        }
+    }
     fun selectedMessagesForAction(): List<FloatingChatMessage> {
         val messagesById = displayConversation.messages.associateBy { message -> message.id }
         return selectedMessageIds
@@ -1252,7 +1367,8 @@ internal fun FloatingChatOverlay(
                 Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
             }
             MessageLongPressAction.Forward -> {
-                forwardMessage = message
+                beginForward(listOf(message))
+                longPressMessage = null
             }
             MessageLongPressAction.Favorite -> {
                 val nextFavorite = favoriteMessageIds[message.id] != true
@@ -1384,7 +1500,7 @@ internal fun FloatingChatOverlay(
                     eventType = event.eventType
                 )
             }
-        } else {
+        } else if (blinkVoiceRecognitionAutoSendsChatMessage()) {
             addOutgoingTextMessage(blinkVoiceResultMessageText(event.eventType, event.durationMs))
         }
         runtimeState.clearBlinkVoiceResultEvent(event.token)
@@ -1581,6 +1697,10 @@ internal fun FloatingChatOverlay(
                 paymentDetailMessage = message
                 bottomPanelMode = BottomPanelMode.None
             },
+            onChatHistoryClick = { message ->
+                chatHistoryPreviewMessage = message
+                bottomPanelMode = BottomPanelMode.None
+            },
             onAiDraftClick = { message ->
                 aiDraftActionMessage = message
                 bottomPanelMode = BottomPanelMode.None
@@ -1636,6 +1756,24 @@ internal fun FloatingChatOverlay(
                 voicePermissionRequestToken = voicePermissionRequestToken,
                 locationPermissionRequestToken = locationPermissionRequestToken,
                 onClose = { bottomPanelMode = BottomPanelMode.None },
+                onOpenPrivateChat = { route, contact ->
+                    val threadId = scrmPrivateChatThreadIdForContact(route, contact)
+                    if (threadId == null) {
+                        Toast.makeText(context, "当前联系人缺少可打开私聊的 wxid", Toast.LENGTH_SHORT).show()
+                    } else {
+                        openChatThread(ChatThreadSelection.Private(threadId))
+                        bottomPanelMode = BottomPanelMode.None
+                    }
+                },
+                onOpenFriendProfile = { route, contact ->
+                    val profileContact = scrmFloatingContactForProfile(route, contact)
+                    if (profileContact == null) {
+                        Toast.makeText(context, "当前联系人缺少可打开资料页的 wxid", Toast.LENGTH_SHORT).show()
+                    } else {
+                        contactEditorTarget = ContactEditorTarget.User(profileContact)
+                        bottomPanelMode = BottomPanelMode.None
+                    }
+                },
                 onInsertText = { inserted ->
                     inputText += inserted
                     if (bottomPanelMode != BottomPanelMode.Emoji) {
@@ -1944,11 +2082,50 @@ internal fun FloatingChatOverlay(
                 modifier = Modifier.fillMaxSize()
             )
         }
+        if (forwardModeMessages.isNotEmpty()) {
+            MultiForwardModeOverlay(
+                selectedCount = forwardModeMessages.size,
+                onDismiss = { forwardModeMessages = emptyList() },
+                onModeSelected = { mode ->
+                    pendingForwardMessages = forwardModeMessages
+                    pendingForwardMode = mode
+                    forwardModeMessages = emptyList()
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        if (pendingForwardMessages.isNotEmpty() && pendingForwardMode != null) {
+            MessageForwardTargetOverlay(
+                conversation = forwardTargetConversationFor(
+                    conversation = contactProfiledConversation,
+                    profiles = contactProfileList
+                ),
+                onDismiss = {
+                    pendingForwardMessages = emptyList()
+                    pendingForwardMode = null
+                },
+                onTargetSelected = { target ->
+                    val mode = pendingForwardMode
+                    val messages = pendingForwardMessages
+                    if (mode == MultiForwardMode.Combined) {
+                        addCombinedForwardedMessage(messages, target)
+                        Toast.makeText(context, "已生成合并聊天记录（本地）", Toast.LENGTH_SHORT).show()
+                    } else {
+                        messages.forEach { forwarded -> addForwardedMessage(forwarded, target) }
+                        Toast.makeText(context, "已提交逐条转发，发送结果以消息状态为准", Toast.LENGTH_SHORT).show()
+                    }
+                    pendingForwardMessages = emptyList()
+                    pendingForwardMode = null
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
         if (multiSelectMode) {
             MultiSelectActionBar(
                 selectedCount = selectedMessagesForAction().size,
                 onForward = {
-                    selectedMessagesForAction().firstOrNull()?.let { forwardMessage = it }
+                    beginForward(selectedMessagesForAction())
+                    selectedMessageIds.clear()
                     multiSelectMode = false
                 },
                 onFavorite = favoriteSelectedMessages,
@@ -1961,6 +2138,13 @@ internal fun FloatingChatOverlay(
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
                     .padding(start = 48.dp, end = 48.dp, bottom = 64.dp)
+            )
+        }
+        chatHistoryPreviewMessage?.let { message ->
+            ChatHistoryDetailOverlay(
+                message = message,
+                onDismiss = { chatHistoryPreviewMessage = null },
+                modifier = Modifier.fillMaxSize()
             )
         }
         contactEditorTarget?.let { target ->
@@ -1978,6 +2162,15 @@ internal fun FloatingChatOverlay(
                 contactProfiles = contactProfiles,
                 onContactProfileChange = { profile -> updateContactProfile(profile) },
                 onDeleteFriend = { contact -> deleteFriendFromProfile(contact) },
+                groupMemberAddFriendTargetId = groupMemberAddFriendTargetId,
+                groupMemberAddFriendLoading = groupMemberAddFriendLoading,
+                groupMemberAddFriendStatus = groupMemberAddFriendStatus,
+                groupMemberAddFriendError = groupMemberAddFriendError,
+                onOpenPrivateChat = { contact ->
+                    openChatThread(ChatThreadSelection.Private(contact.id))
+                    contactEditorTarget = null
+                },
+                onAddFriendFromGroupMember = { member -> addFriendFromGroupMember(member) },
                 onDismiss = { contactEditorTarget = null },
                 modifier = Modifier.fillMaxSize()
             )
@@ -2284,6 +2477,7 @@ private fun CoordinateChatBody(
     onPreviewDocument: (FloatingChatMessage) -> Unit,
     onOpenMediaActions: (FloatingChatMessage) -> Unit,
     onPaymentCardClick: (FloatingChatMessage) -> Unit,
+    onChatHistoryClick: (FloatingChatMessage) -> Unit,
     onAiDraftClick: (FloatingChatMessage) -> Unit,
     onLongPressMessage: (FloatingChatMessage, Rect?) -> Unit,
     multiSelectMode: Boolean,
@@ -2420,6 +2614,8 @@ private fun CoordinateChatBody(
                     onPaymentCardClick(message)
                 } else if (message.type == FloatingChatMessageType.FilePreview) {
                     onPreviewDocument(message)
+                } else if (message.type == FloatingChatMessageType.ChatHistory) {
+                    onChatHistoryClick(message)
                 }
             },
             onBlankAreaTap = onBlankAreaTap,
@@ -2527,10 +2723,12 @@ private fun ScrollableSessionRail(
             listOf(FloatingChatContact(GroupThreadId, "群聊", "群", "群聊", 0xFF5B7CFA, selected = true))
         }
     }
-    val railItems = remember(visibleGroups, contacts) {
-        sessionRailItems(
+    val railItems = remember(visibleGroups, contacts, conversation.messages, selectedAccountId) {
+        sessionRailItemsByLatestChatTime(
             groups = visibleGroups,
-            contacts = contacts
+            contacts = contacts,
+            conversation = conversation,
+            selectedAccountId = selectedAccountId
         )
     }
     val contactsById = remember(railItems) {
@@ -2584,9 +2782,52 @@ private fun ScrollableSessionRail(
         }
     }
     val selectedPrivateContactId = (selectedThread as? ChatThreadSelection.Private)?.contactId
+    val selectedSessionConnectorId = selectedThread.groupConnectorId()
+    val selectedRailItem = remember(railItems, selectedThread) {
+        railItems.firstOrNull { item ->
+            when (item) {
+                is SessionRailItem.Group -> selectedThread == item.contact.toGroupThreadSelection()
+                is SessionRailItem.Contact -> selectedThread is ChatThreadSelection.Private &&
+                    selectedThread.contactId == item.contact.id
+            }
+        }
+    }
     val selectedPrivateAvatarBounds by remember(selectedPrivateContactId, avatarBoundsVersion) {
         derivedStateOf {
             selectedPrivateContactId?.let { contactId -> avatarBoundsByContactId[contactId] }
+        }
+    }
+    val pinnedSelectedAvatarEdge by remember(
+        sessionConnectorIds,
+        selectedSessionConnectorId,
+        listState,
+        sessionVirtualFallbackStepPx
+    ) {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val viewportHeight = (layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset).toFloat()
+            if (viewportHeight <= 0f) {
+                null
+            } else {
+                leftRailPinnedSelectedAvatarEdge(
+                    sessionIds = sessionConnectorIds,
+                    selectedSessionId = selectedSessionConnectorId,
+                    visibleItems = layoutInfo.visibleItemsInfo.mapNotNull { item ->
+                        val sessionIndex = item.index - LeftRailLeadingSpacerItemCount
+                        if (sessionIndex < 0) {
+                            null
+                        } else {
+                            LeftRailVisibleSessionItem(
+                                index = sessionIndex,
+                                offset = item.offset,
+                                size = item.size
+                            )
+                        }
+                    },
+                    viewportHeightPx = viewportHeight,
+                    fallbackStepPx = sessionVirtualFallbackStepPx
+                )
+            }
         }
     }
 
@@ -2740,72 +2981,45 @@ private fun ScrollableSessionRail(
                 key = { _, item -> item.key },
                 contentType = { _, item -> item.contentType }
             ) { _, item ->
-                when (item) {
-                    is SessionRailItem.Group -> {
-                        val group = item.contact
-                        val selection = group.toGroupThreadSelection()
-                        Box(modifier = Modifier.padding(start = railScreenEdgeInsetDp)) {
-                            GroupChatAvatar(
-                                selected = selectedThread == selection,
-                                unread = unreadThreadIds.contains(selection.toLocalThreadId()),
-                                memberCount = contacts.size,
-                                label = group.initials,
-                                color = Color(group.avatarColor),
-                                memberAvatarUris = groupChatAvatarDisplayImageUris(group),
-                                onClick = { onThreadSelected(selection) },
-                                onLongClick = { onGroupAvatarLongClick(group) },
-                                onBoundsChanged = { bounds ->
-                                    updateAvatarBounds(group.id, bounds)
-                                    val connectorId = group.groupConnectorId()
-                                    if (selectedThread == selection) {
-                                        connectorState.updateGroupThreadAvatar(connectorId, bounds)
-                                    }
-                                    connectorState.updateUserAvatar(connectorId, bounds)
-                                },
-                                onRemoved = {
-                                    removeAvatarBounds(group.id)
-                                    val connectorId = group.groupConnectorId()
-                                    connectorState.removeUserAvatar(connectorId)
-                                    connectorState.removeGroupThreadAvatar(connectorId)
-                                }
-                            )
-                        }
-                    }
-                    is SessionRailItem.Contact -> {
-                        val contact = item.contact
-                        var currentAvatarBounds by remember(contact.id) { mutableStateOf<Rect?>(null) }
-                        Box(modifier = Modifier.padding(start = railScreenEdgeInsetDp)) {
-                            CompactAvatar(
-                                contact = contact.copy(
-                                    selected = selectedThread is ChatThreadSelection.Private &&
-                                        selectedThread.contactId == contact.id,
-                                    online = unreadThreadIds.contains(ChatThreadSelection.Private(contact.id).toLocalThreadId())
-                                ),
-                                role = AvatarRole.Session,
-                                onClick = {
-                                    (currentAvatarBounds ?: avatarBoundsByContactId[contact.id])?.let { bounds ->
-                                        connectorState.updatePrivateThreadAvatar(contact.id, bounds)
-                                    }
-                                    onThreadSelected(ChatThreadSelection.Private(contact.id))
-                                },
-                                onLongClick = { onContactAvatarLongClick(contact) },
-                                onBoundsChanged = { bounds ->
-                                    currentAvatarBounds = bounds
-                                    updateAvatarBounds(contact.id, bounds)
-                                    connectorState.updateUserAvatar(contact.id, bounds)
-                                    if (selectedPrivateContactId == contact.id) {
-                                        connectorState.updatePrivateThreadAvatar(contact.id, bounds)
-                                    }
-                                },
-                                onRemoved = {
-                                    removeAvatarBounds(contact.id)
-                                    connectorState.removeUserAvatar(contact.id)
-                                }
-                            )
-                        }
-                    }
-                }
+                SessionRailAvatarItem(
+                    item = item,
+                    contactsCount = contacts.size,
+                    selectedThread = selectedThread,
+                    selectedPrivateContactId = selectedPrivateContactId,
+                    unreadThreadIds = unreadThreadIds,
+                    avatarBoundsByContactId = avatarBoundsByContactId,
+                    updateAvatarBounds = ::updateAvatarBounds,
+                    removeAvatarBounds = ::removeAvatarBounds,
+                    connectorState = connectorState,
+                    onThreadSelected = onThreadSelected,
+                    onGroupAvatarLongClick = onGroupAvatarLongClick,
+                    onContactAvatarLongClick = onContactAvatarLongClick,
+                    removeBoundsOnDispose = true,
+                    modifier = Modifier.padding(start = railScreenEdgeInsetDp)
+                )
             }
+        }
+        val pinnedEdge = pinnedSelectedAvatarEdge
+        if (pinnedEdge != null && selectedRailItem != null) {
+            SessionRailAvatarItem(
+                item = selectedRailItem,
+                contactsCount = contacts.size,
+                selectedThread = selectedThread,
+                selectedPrivateContactId = selectedPrivateContactId,
+                unreadThreadIds = unreadThreadIds,
+                avatarBoundsByContactId = avatarBoundsByContactId,
+                updateAvatarBounds = ::updateAvatarBounds,
+                removeAvatarBounds = ::removeAvatarBounds,
+                connectorState = connectorState,
+                onThreadSelected = onThreadSelected,
+                onGroupAvatarLongClick = onGroupAvatarLongClick,
+                onContactAvatarLongClick = onContactAvatarLongClick,
+                removeBoundsOnDispose = false,
+                modifier = Modifier
+                    .align(pinnedEdge.toLeftRailAlignment())
+                    .padding(start = railScreenEdgeInsetDp)
+                    .zIndex(14f)
+            )
         }
         LeftRailFollowTextOverlay(
             infos = followInfos,
@@ -2835,6 +3049,108 @@ private sealed class SessionRailItem(open val contact: FloatingChatContact) {
         companion object {
             fun keyFor(contactId: String): String = "contact-$contactId"
         }
+    }
+}
+
+@Composable
+private fun SessionRailAvatarItem(
+    item: SessionRailItem,
+    contactsCount: Int,
+    selectedThread: ChatThreadSelection,
+    selectedPrivateContactId: String?,
+    unreadThreadIds: Set<String>,
+    avatarBoundsByContactId: Map<String, Rect>,
+    updateAvatarBounds: (String, Rect) -> Unit,
+    removeAvatarBounds: (String) -> Unit,
+    connectorState: ConnectorCoordinateState,
+    onThreadSelected: (ChatThreadSelection) -> Unit,
+    onGroupAvatarLongClick: (FloatingChatContact) -> Unit,
+    onContactAvatarLongClick: (FloatingChatContact) -> Unit,
+    removeBoundsOnDispose: Boolean,
+    modifier: Modifier = Modifier
+) {
+    when (item) {
+        is SessionRailItem.Group -> {
+            val group = item.contact
+            val selection = group.toGroupThreadSelection()
+            Box(modifier = modifier) {
+                GroupChatAvatar(
+                    selected = selectedThread == selection,
+                    unread = unreadThreadIds.contains(selection.toLocalThreadId()),
+                    memberCount = contactsCount,
+                    label = group.initials,
+                    color = Color(group.avatarColor),
+                    memberAvatarUris = groupChatAvatarDisplayImageUris(group),
+                    onClick = { onThreadSelected(selection) },
+                    onLongClick = { onGroupAvatarLongClick(group) },
+                    onBoundsChanged = { bounds ->
+                        updateAvatarBounds(group.id, bounds)
+                        val connectorId = group.groupConnectorId()
+                        if (selectedThread == selection) {
+                            connectorState.updateGroupThreadAvatar(connectorId, bounds)
+                        }
+                        connectorState.updateUserAvatar(connectorId, bounds)
+                    },
+                    onRemoved = {
+                        if (removeBoundsOnDispose) {
+                            removeAvatarBounds(group.id)
+                            val connectorId = group.groupConnectorId()
+                            connectorState.removeUserAvatar(connectorId)
+                            connectorState.removeGroupThreadAvatar(connectorId)
+                        }
+                    }
+                )
+            }
+        }
+        is SessionRailItem.Contact -> {
+            val contact = item.contact
+            var currentAvatarBounds by remember(contact.id) { mutableStateOf<Rect?>(null) }
+            Box(modifier = modifier) {
+                CompactAvatar(
+                    contact = contact.copy(
+                        selected = selectedThread is ChatThreadSelection.Private &&
+                            selectedThread.contactId == contact.id,
+                        online = unreadThreadIds.contains(ChatThreadSelection.Private(contact.id).toLocalThreadId())
+                    ),
+                    role = AvatarRole.Session,
+                    onClick = {
+                        (currentAvatarBounds ?: avatarBoundsByContactId[contact.id])?.let { bounds ->
+                            connectorState.updatePrivateThreadAvatar(contact.id, bounds)
+                        }
+                        onThreadSelected(ChatThreadSelection.Private(contact.id))
+                    },
+                    onLongClick = { onContactAvatarLongClick(contact) },
+                    onBoundsChanged = { bounds ->
+                        currentAvatarBounds = bounds
+                        updateAvatarBounds(contact.id, bounds)
+                        connectorState.updateUserAvatar(contact.id, bounds)
+                        if (selectedPrivateContactId == contact.id) {
+                            connectorState.updatePrivateThreadAvatar(contact.id, bounds)
+                        }
+                    },
+                    onRemoved = {
+                        if (removeBoundsOnDispose) {
+                            removeAvatarBounds(contact.id)
+                            connectorState.removeUserAvatar(contact.id)
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
+
+private fun RailPinnedAvatarEdge.toLeftRailAlignment(): Alignment {
+    return when (this) {
+        RailPinnedAvatarEdge.Top -> Alignment.TopStart
+        RailPinnedAvatarEdge.Bottom -> Alignment.BottomStart
+    }
+}
+
+private fun RailPinnedAvatarEdge.toRightRailAlignment(): Alignment {
+    return when (this) {
+        RailPinnedAvatarEdge.Top -> Alignment.TopEnd
+        RailPinnedAvatarEdge.Bottom -> Alignment.BottomEnd
     }
 }
 
@@ -2986,10 +3302,18 @@ private fun ChatConnectorLayer(
 ) {
     var layerBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
     val connectorNativePaint = remember { Paint(Paint.ANTI_ALIAS_FLAG) }
+    val connectorTreeNativePaint = remember { Paint(Paint.ANTI_ALIAS_FLAG) }
     val connectorStroke = remember {
         Stroke(
             width = imModuleConnectionLineStrokeWidthPx(),
             cap = StrokeCap.Round,
+            join = StrokeJoin.Round
+        )
+    }
+    val connectorTreeStroke = remember {
+        Stroke(
+            width = imModuleConnectionLineStrokeWidthPx(),
+            cap = StrokeCap.Butt,
             join = StrokeJoin.Round
         )
     }
@@ -3004,7 +3328,8 @@ private fun ChatConnectorLayer(
         if (visibleItems.isEmpty()) return@Canvas
         val layerBounds = layerBoundsInRoot ?: return@Canvas
         val messageViewportBounds = connectorState.messageViewport ?: return@Canvas
-        connectorNativePaint.configureConnectorPaint()
+        connectorNativePaint.configureConnectorPaint(cap = Paint.Cap.ROUND)
+        connectorTreeNativePaint.configureConnectorPaint(cap = Paint.Cap.BUTT)
 
         val visibleBubbleGroups = linkedMapOf<ConnectorTargetKey, MutableList<Rect>>()
         val avatarSourceKeys = linkedMapOf<ConnectorTargetKey, ConnectorTargetKey>()
@@ -3051,8 +3376,8 @@ private fun ChatConnectorLayer(
                 memberBounds = visibleGroupMemberBounds,
                 layerBounds = layerBounds,
                 visibleRootBounds = messageViewportBounds,
-                nativePaint = connectorNativePaint,
-                stroke = connectorStroke
+                nativePaint = connectorTreeNativePaint,
+                stroke = connectorTreeStroke
             )
         }
 
@@ -3107,9 +3432,10 @@ private fun ChatConnectorLayer(
             } ?: return@forEach
 
             val edgeState = offscreenEdges[key] ?: ConnectorViewportEdgeState()
+            val bubbleBounds = visibleBubbleGroups[key].orEmpty()
             val tree = createChatConnectorTree(
                 avatarBounds = avatarBounds,
-                bubbleBounds = visibleBubbleGroups[key].orEmpty(),
+                bubbleBounds = bubbleBounds,
                 layerBounds = layerBounds,
                 visibleRootBounds = messageViewportBounds,
                 target = key.target,
@@ -3118,7 +3444,7 @@ private fun ChatConnectorLayer(
                 avatarOffscreenEdge = avatarOffscreenEdge
             ) ?: return@forEach
 
-            drawChatConnectorTree(tree, connectorNativePaint, connectorStroke)
+            drawChatConnectorTree(tree, connectorTreeNativePaint, connectorTreeStroke)
         }
         directGroupMemberBranches.forEach { branch ->
             drawChatConnectorBranch(branch, connectorNativePaint)
@@ -3134,6 +3460,42 @@ internal fun sessionRailItemKeys(
         groups = groups,
         contacts = contacts
     ).map { item -> item.key }
+}
+
+internal fun sessionRailItemKeysByLatestChatTime(
+    conversation: FloatingChatConversation,
+    selectedAccountId: String
+): List<String> {
+    return sessionRailItemsByLatestChatTime(
+        groups = conversation.groupContacts,
+        contacts = conversation.contacts,
+        conversation = conversation,
+        selectedAccountId = selectedAccountId
+    ).map { item -> item.key }
+}
+
+private fun sessionRailItemsByLatestChatTime(
+    groups: List<FloatingChatContact>,
+    contacts: List<FloatingChatContact>,
+    conversation: FloatingChatConversation,
+    selectedAccountId: String
+): List<SessionRailItem> {
+    val items = sessionRailItems(groups, contacts)
+    if (!leftRailSortsSessionsByLatestChatTime()) return items
+
+    val latestMessageIndexes = latestMessageIndexesBySessionRailKey(
+        conversation = conversation,
+        groups = groups,
+        contacts = contacts,
+        selectedAccountId = selectedAccountId
+    )
+    return items.withIndex()
+        .sortedWith(
+            compareByDescending<IndexedValue<SessionRailItem>> { indexed ->
+                latestMessageIndexes[indexed.value.key] ?: Int.MIN_VALUE
+            }.thenBy { indexed -> indexed.index }
+        )
+        .map { indexed -> indexed.value }
 }
 
 private fun sessionRailItems(
@@ -3159,6 +3521,47 @@ private fun dedupeSessionRailContacts(contacts: List<FloatingChatContact>): List
     return mergedById.values.toList()
 }
 
+private fun latestMessageIndexesBySessionRailKey(
+    conversation: FloatingChatConversation,
+    groups: List<FloatingChatContact>,
+    contacts: List<FloatingChatContact>,
+    selectedAccountId: String
+): Map<String, Int> {
+    val groupIds = groups.asSequence().map { group -> group.id }.toHashSet()
+    val contactIds = contacts.asSequence().map { contact -> contact.id }.toHashSet()
+    val indexes = mutableMapOf<String, Int>()
+    conversation.messages.forEachIndexed { index, message ->
+        val key = sessionRailKeyForMessage(
+            message = message,
+            groupIds = groupIds,
+            contactIds = contactIds,
+            selectedAccountId = selectedAccountId
+        ) ?: return@forEachIndexed
+        indexes[key] = index
+    }
+    return indexes
+}
+
+private fun sessionRailKeyForMessage(
+    message: FloatingChatMessage,
+    groupIds: Set<String>,
+    contactIds: Set<String>,
+    selectedAccountId: String
+): String? {
+    val explicitThreadId = message.threadContactId?.takeIf { threadId -> threadId.isNotBlank() }
+    return when {
+        explicitThreadId != null && explicitThreadId in groupIds -> "group-$explicitThreadId"
+        explicitThreadId != null && explicitThreadId in contactIds -> SessionRailItem.Contact.keyFor(explicitThreadId)
+        message.connectionTarget == FloatingChatConnectionTarget.User &&
+            message.connectionTargetId in groupIds -> "group-${message.connectionTargetId}"
+        message.connectionTarget == FloatingChatConnectionTarget.User &&
+            message.connectionTargetId in contactIds -> SessionRailItem.Contact.keyFor(requireNotNull(message.connectionTargetId))
+        message.connectionTarget == FloatingChatConnectionTarget.Account &&
+            message.connectionTargetId == selectedAccountId -> null
+        else -> null
+    }
+}
+
 private fun mergeRailContact(
     existing: FloatingChatContact,
     candidate: FloatingChatContact
@@ -3174,10 +3577,10 @@ private fun mergeRailContact(
     )
 }
 
-private fun Paint.configureConnectorPaint() {
+private fun Paint.configureConnectorPaint(cap: Paint.Cap) {
     style = Paint.Style.STROKE
     strokeWidth = imModuleConnectionLineStrokeWidthPx()
-    strokeCap = Paint.Cap.ROUND
+    strokeCap = cap
     strokeJoin = Paint.Join.ROUND
     color = OverlayTokens.connectorLine.toArgb()
     setShadowLayer(
@@ -3555,6 +3958,7 @@ private fun MessageContent(
             FloatingChatMessageType.Text -> SimpleTextMessageContent(message = message, index = index)
             FloatingChatMessageType.MixedText -> MixedTextMessageContent(message)
             FloatingChatMessageType.Quote -> QuoteMessageContent(message)
+            FloatingChatMessageType.ChatHistory -> ChatHistoryMessageContent(message)
             FloatingChatMessageType.FilePreview -> FilePreviewContent(message = message)
             FloatingChatMessageType.ImageThumbnail -> ImageThumbnailContent(
                 message = message,
@@ -3775,6 +4179,52 @@ private fun QuoteMessageContent(message: FloatingChatMessage) {
         maxLines = 4,
         shadow = OverlayTokens.imModuleTextShadow
     )
+}
+
+@Composable
+private fun ChatHistoryMessageContent(message: FloatingChatMessage) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(7.dp))
+            .background(cardMessageColorFor(FloatingChatMessageType.ChatHistory))
+            .border(1.dp, OverlayTokens.resourcePanelBorder, RoundedCornerShape(7.dp))
+            .padding(horizontal = 10.dp, vertical = 9.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        TextLabel(
+            text = message.text.ifBlank { "聊天记录" },
+            size = 12.sp,
+            weight = FontWeight.Bold,
+            color = OverlayTokens.bubbleText,
+            maxLines = 1,
+            shadow = OverlayTokens.imModuleTextShadow
+        )
+        message.filePreviewLines.take(3).forEach { line ->
+            TextLabel(
+                text = line,
+                size = 10.sp,
+                color = OverlayTokens.secondaryText,
+                maxLines = 1,
+                shadow = OverlayTokens.imModuleTextShadow
+            )
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.Article,
+                contentDescription = null,
+                tint = OverlayTokens.panelSecondaryText,
+                modifier = Modifier.size(13.dp)
+            )
+            Spacer(modifier = Modifier.width(5.dp))
+            TextLabel(
+                text = "聊天记录",
+                size = 9.sp,
+                color = OverlayTokens.panelSecondaryText,
+                maxLines = 1
+            )
+        }
+    }
 }
 
 @Composable
@@ -6549,7 +6999,8 @@ private fun cardMessageColorFor(type: FloatingChatMessageType): Color {
         FloatingChatMessageType.VideoPreview -> OverlayTokens.mediaCard
         FloatingChatMessageType.Text,
         FloatingChatMessageType.MixedText,
-        FloatingChatMessageType.Quote -> OverlayTokens.specialCard
+        FloatingChatMessageType.Quote,
+        FloatingChatMessageType.ChatHistory -> OverlayTokens.specialCard
     }
 }
 
@@ -7662,6 +8113,8 @@ internal fun leftRailSessionConnectorAnchorFollowsVirtualOffscreenPosition(): Fl
     return state.userAvatarFor("session-0")?.center?.y ?: -1f
 }
 
+internal fun leftRailPinsSelectedAvatarWhileScrolledOffscreen(): Boolean = true
+
 internal fun leftRailScrollableTopPaddingDp(
     itemCount: Int,
     viewportHeightDp: Int
@@ -7740,6 +8193,8 @@ internal fun leftRailUsesPointerDragToRevealFollowText(): Boolean = false
 internal fun leftRailFollowTextOverlayConsumesPointerEvents(): Boolean = false
 
 internal fun keyboardDismissUsesBlockingFullScreenPointerLayer(): Boolean = false
+
+internal fun leftRailSortsSessionsByLatestChatTime(): Boolean = true
 
 internal fun leftRailLayerDrawsAboveConnectorLayer(): Boolean {
     return leftRailLayerZIndex() > connectorLayerZIndex()
@@ -7907,11 +8362,17 @@ internal fun connectorRoundedElbowRadiusPx(horizontalRoom: Float): Float {
 
 internal fun imModuleConnectionLineBubbleGapPx(): Float = 0f
 
-internal fun imModuleConnectionLineBubbleOverlapPx(): Float = 4f
+internal fun imModuleConnectionLineBubbleOverlapPx(): Float = 0f
 
 internal fun imModuleConnectionLineUsesBraceHooks(): Boolean = true
 
+internal fun imModuleConnectionLineHooksStartAtTrunkJoint(): Boolean = true
+
 internal fun imModuleConnectionLineDrawsEndpointDots(): Boolean = false
+
+internal fun chatConnectorTreeUsesButtCapsToAvoidSubpathCaps(): Boolean = true
+
+internal fun chatConnectorHookTrunkOverlapPx(): Float = 3f
 
 internal fun connectorTargetIdForMessage(
     message: FloatingChatMessage,
@@ -8001,7 +8462,8 @@ internal fun messageTypeUsesImModuleBubble(type: FloatingChatMessageType): Boole
         FloatingChatMessageType.FilePreview,
         FloatingChatMessageType.Voice,
         FloatingChatMessageType.InlineContact,
-        FloatingChatMessageType.InlineLocation -> true
+        FloatingChatMessageType.InlineLocation,
+        FloatingChatMessageType.ChatHistory -> true
         FloatingChatMessageType.ImageThumbnail,
         FloatingChatMessageType.VideoPreview -> false
     }
@@ -8427,8 +8889,39 @@ private fun RightCoordinateRail(
     )
     var accountViewportBounds by remember { mutableStateOf<Rect?>(null) }
     val accountIds = remember(accounts) { accounts.map { account -> account.id } }
+    val selectedAccount = remember(accounts, selectedAccountId) {
+        accounts.firstOrNull { account -> account.id == selectedAccountId }
+    }
     val accountVirtualFallbackStepPx = remember(density) {
         with(density) { (RailAvatarSize + RightRailItemGapDp.dp).toPx() }
+    }
+    val pinnedSelectedAccountEdge by remember(
+        accountIds,
+        selectedAccountId,
+        accountListState,
+        accountVirtualFallbackStepPx
+    ) {
+        derivedStateOf {
+            val layoutInfo = accountListState.layoutInfo
+            val viewportHeight = (layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset).toFloat()
+            if (viewportHeight <= 0f) {
+                null
+            } else {
+                rightRailPinnedSelectedAccountEdge(
+                    accountIds = accountIds,
+                    selectedAccountId = selectedAccountId,
+                    visibleItems = layoutInfo.visibleItemsInfo.map { item ->
+                        RightRailVisibleAccountItem(
+                            index = item.index,
+                            offset = item.offset,
+                            size = item.size
+                        )
+                    },
+                    viewportHeightPx = viewportHeight,
+                    fallbackStepPx = accountVirtualFallbackStepPx
+                )
+            }
+        }
     }
     LaunchedEffect(accounts, selectedAccountId) {
         accountListState.scrollToItem(
@@ -8463,55 +8956,57 @@ private fun RightCoordinateRail(
         },
         horizontalAlignment = Alignment.End
     ) {
-        LazyColumn(
+        Box(
             modifier = Modifier
                 .weight(railWeights.accountWeight)
                 .fillMaxWidth()
-                .onGloballyPositioned { coordinates ->
-                    val bounds = coordinates.boundsInRoot()
-                    accountViewportBounds = bounds
-                    connectorState.updateAccountViewport(bounds)
-                }
-                .nestedScroll(accountResizeConnection),
-            state = accountListState,
-            horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.Bottom),
-            reverseLayout = true
         ) {
-            itemsIndexed(
-                items = accounts,
-                key = { _, account -> account.id },
-                contentType = { _, _ -> "account-avatar" }
-            ) { _, account ->
-                val profile = accountProfiles[account.id]
-                val displayAccount = profile?.toContact(account) ?: account
-                var currentAccountBounds by remember(account.id) { mutableStateOf<Rect?>(null) }
-                Box(modifier = Modifier.padding(end = railScreenEdgeInsetDp)) {
-                    CompactAvatar(
-                        contact = displayAccount.copy(
-                            selected = account.id == selectedAccountId
-                        ),
-                        role = AvatarRole.Account,
-                        imageUri = profile?.avatarImageUri,
-                        onClick = {
-                            currentAccountBounds?.let { bounds ->
-                                connectorState.updateSelectedAccountAvatar(account.id, bounds)
-                            }
-                            onAccountAvatarClick(account)
-                        },
-                        onLongClick = { onAccountAvatarLongClick(account) },
-                        onBoundsChanged = { bounds ->
-                            currentAccountBounds = bounds
-                            connectorState.updateAccountAvatar(account.id, bounds)
-                            if (account.id == selectedAccountId) {
-                                connectorState.updateSelectedAccountAvatar(account.id, bounds)
-                            }
-                        },
-                        onRemoved = {
-                            connectorState.removeAccountAvatar(account.id)
-                        }
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .onGloballyPositioned { coordinates ->
+                        val bounds = coordinates.boundsInRoot()
+                        accountViewportBounds = bounds
+                        connectorState.updateAccountViewport(bounds)
+                    }
+                    .nestedScroll(accountResizeConnection),
+                state = accountListState,
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.Bottom),
+                reverseLayout = true
+            ) {
+                itemsIndexed(
+                    items = accounts,
+                    key = { _, account -> account.id },
+                    contentType = { _, _ -> "account-avatar" }
+                ) { _, account ->
+                    AccountRailAvatarItem(
+                        account = account,
+                        profile = accountProfiles[account.id],
+                        selectedAccountId = selectedAccountId,
+                        connectorState = connectorState,
+                        onAccountAvatarClick = onAccountAvatarClick,
+                        onAccountAvatarLongClick = onAccountAvatarLongClick,
+                        removeBoundsOnDispose = true,
+                        modifier = Modifier.padding(end = railScreenEdgeInsetDp)
                     )
                 }
+            }
+            val pinnedEdge = pinnedSelectedAccountEdge
+            if (pinnedEdge != null && selectedAccount != null) {
+                AccountRailAvatarItem(
+                    account = selectedAccount,
+                    profile = accountProfiles[selectedAccount.id],
+                    selectedAccountId = selectedAccountId,
+                    connectorState = connectorState,
+                    onAccountAvatarClick = onAccountAvatarClick,
+                    onAccountAvatarLongClick = onAccountAvatarLongClick,
+                    removeBoundsOnDispose = false,
+                    modifier = Modifier
+                        .align(pinnedEdge.toRightRailAlignment())
+                        .padding(end = railScreenEdgeInsetDp)
+                        .zIndex(14f)
+                )
             }
         }
         RightRailDivider()
@@ -8585,6 +9080,49 @@ private fun RightCoordinateRail(
 }
 
 @Composable
+private fun AccountRailAvatarItem(
+    account: FloatingChatContact,
+    profile: FloatingChatAccountProfile?,
+    selectedAccountId: String?,
+    connectorState: ConnectorCoordinateState,
+    onAccountAvatarClick: (FloatingChatContact) -> Unit,
+    onAccountAvatarLongClick: (FloatingChatContact) -> Unit,
+    removeBoundsOnDispose: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val displayAccount = profile?.toContact(account) ?: account
+    var currentAccountBounds by remember(account.id) { mutableStateOf<Rect?>(null) }
+    Box(modifier = modifier) {
+        CompactAvatar(
+            contact = displayAccount.copy(
+                selected = account.id == selectedAccountId
+            ),
+            role = AvatarRole.Account,
+            imageUri = profile?.avatarImageUri,
+            onClick = {
+                currentAccountBounds?.let { bounds ->
+                    connectorState.updateSelectedAccountAvatar(account.id, bounds)
+                }
+                onAccountAvatarClick(account)
+            },
+            onLongClick = { onAccountAvatarLongClick(account) },
+            onBoundsChanged = { bounds ->
+                currentAccountBounds = bounds
+                connectorState.updateAccountAvatar(account.id, bounds)
+                if (account.id == selectedAccountId) {
+                    connectorState.updateSelectedAccountAvatar(account.id, bounds)
+                }
+            },
+            onRemoved = {
+                if (removeBoundsOnDispose) {
+                    connectorState.removeAccountAvatar(account.id)
+                }
+            }
+        )
+    }
+}
+
+@Composable
 @OptIn(ExperimentalFoundationApi::class)
 private fun GroupChatAvatar(
     selected: Boolean,
@@ -8618,7 +9156,10 @@ private fun GroupChatAvatar(
         shape = shape,
         color = color,
         shadowElevation = 3.dp,
-        border = BorderStroke(1.dp, if (selected) OverlayTokens.accent else OverlayTokens.hairline)
+        border = BorderStroke(
+            width = if (selected) leftRailSelectedAvatarHighlightStrokeDp().dp else 1.dp,
+            color = if (selected) OverlayTokens.accent else OverlayTokens.hairline
+        )
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -8827,11 +9368,7 @@ private fun CompactAvatar(
     val shape = RoundedCornerShape(10.dp)
     val avatarColor = Color(contact.avatarColor)
     val border = if (contact.selected) OverlayTokens.accent else OverlayTokens.hairline
-    val borderWidth = if (role == AvatarRole.Account && contact.selected) {
-        rightRailSelectedAccountAvatarHighlightStrokeDp().dp
-    } else {
-        1.dp
-    }
+    val borderWidth = if (contact.selected) railSelectedAvatarHighlightStrokeDp().dp else 1.dp
     val avatarBitmap = rememberAsyncAvatarBitmap(
         resolvedAvatarImageUri(
             localImageUri = imageUri,
@@ -8854,10 +9391,10 @@ private fun CompactAvatar(
                         height = coordinates.size.height
                     )
                 )
-            },
+        },
         shape = shape,
         color = avatarColor,
-        shadowElevation = if (role == AvatarRole.Account && contact.selected) 7.dp else 3.dp,
+        shadowElevation = if (contact.selected) 7.dp else 3.dp,
         border = BorderStroke(borderWidth, border)
     ) {
         Box(
@@ -9105,7 +9642,6 @@ private fun ToolButton(
                 .pointerInput(action, viewConfiguration.longPressTimeoutMillis) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
-                        down.consume()
                         if (reorderModeState) {
                             var accumulatedMove = Offset.Zero
                             var dragStarted = false
@@ -9259,6 +9795,8 @@ internal fun blinkVoiceResultMessageText(eventType: String, durationMs: Long): S
     }
     return "眨眼识别：$eventLabel，${durationMs.coerceAtLeast(0L)}ms"
 }
+
+internal fun blinkVoiceRecognitionAutoSendsChatMessage(): Boolean = false
 
 private fun toolActionIcon(action: FloatingChatToolAction): ImageVector {
     return when (action) {
@@ -9941,7 +10479,13 @@ internal fun rightRailAccountAvatarSupportsLongPressEdit(): Boolean = true
 
 internal fun rightRailSelectedAccountAvatarUsesHighlightRing(): Boolean = true
 
-internal fun rightRailSelectedAccountAvatarHighlightStrokeDp(): Int = 3
+internal fun rightRailSelectedAccountAvatarHighlightStrokeDp(): Int = railSelectedAvatarHighlightStrokeDp()
+
+internal fun leftRailSelectedAvatarUsesAccountHighlightRing(): Boolean = true
+
+internal fun leftRailSelectedAvatarHighlightStrokeDp(): Int = railSelectedAvatarHighlightStrokeDp()
+
+private fun railSelectedAvatarHighlightStrokeDp(): Int = 3
 
 internal fun rightRailAccountAvatarClickSelectsSendingAccount(): Boolean = true
 
@@ -11223,9 +11767,17 @@ private fun ContactEditOverlay(
     contactProfiles: Map<String, LocalContactProfile>,
     onContactProfileChange: (LocalContactProfile) -> Unit,
     onDeleteFriend: (FloatingChatContact) -> Unit,
+    groupMemberAddFriendTargetId: String?,
+    groupMemberAddFriendLoading: Boolean,
+    groupMemberAddFriendStatus: String?,
+    groupMemberAddFriendError: String?,
+    onOpenPrivateChat: (FloatingChatContact) -> Unit,
+    onAddFriendFromGroupMember: (FloatingChatContact) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var selectedGroupMember by remember(target) { mutableStateOf<FloatingChatContact?>(null) }
+    var friendProfileTarget by remember(target) { mutableStateOf<FloatingChatContact?>(null) }
     Box(
         modifier = modifier
             .background(OverlayTokens.centerPanelScrim)
@@ -11246,20 +11798,55 @@ private fun ContactEditOverlay(
             border = BorderStroke(1.dp, OverlayTokens.panelBorder),
             shadowElevation = 10.dp
         ) {
-            when (target) {
-                is ContactEditorTarget.Group -> GroupContactEditPanel(
+            val activeFriendProfile = friendProfileTarget
+            val activeGroupMember = selectedGroupMember
+            when {
+                activeFriendProfile != null -> UserContactEditPanel(
+                    contact = activeFriendProfile,
+                    profile = contactProfiles[contactProfileKey(accountId, activeFriendProfile.id)]
+                        ?: defaultLocalContactProfileFor(
+                            accountId = accountId,
+                            contact = activeFriendProfile
+                        ),
+                    onProfileChange = onContactProfileChange,
+                    onDeleteFriend = onDeleteFriend,
+                    onDismiss = { friendProfileTarget = null }
+                )
+                activeGroupMember != null -> GroupMemberIntroPanel(
+                    member = activeGroupMember,
+                    isFriend = groupInfoMemberIsFriend(activeGroupMember, contacts),
+                    addFriendLoading = groupMemberAddFriendTargetId == activeGroupMember.id && groupMemberAddFriendLoading,
+                    addFriendStatus = groupMemberAddFriendStatus.takeIf { groupMemberAddFriendTargetId == activeGroupMember.id },
+                    addFriendError = groupMemberAddFriendError.takeIf { groupMemberAddFriendTargetId == activeGroupMember.id },
+                    onBack = { selectedGroupMember = null },
+                    onOpenChat = {
+                        onOpenPrivateChat(activeGroupMember)
+                    },
+                    onOpenVideoCall = {},
+                    onOpenFriendProfile = {
+                        friendProfileTarget = activeGroupMember
+                    },
+                    onOpenMoments = {},
+                    onAddFriend = {
+                        onAddFriendFromGroupMember(activeGroupMember)
+                    }
+                )
+                target is ContactEditorTarget.Group -> GroupContactEditPanel(
                     accountId = accountId,
                     group = target.group,
                     profile = groupProfiles[groupProfileKey(accountId, target.group.id)]
                         ?: defaultLocalGroupProfileFor(accountId = accountId, group = target.group),
-                    members = groupMemberRailContacts(
+                    contacts = contacts,
+                    members = groupInfoMembersForGroup(
+                        group = target.group,
                         contacts = contacts,
                         messages = visibleMessages
                     ),
                     onProfileChange = onGroupProfileChange,
+                    onMemberClick = { member -> selectedGroupMember = member },
                     onDismiss = onDismiss
                 )
-                is ContactEditorTarget.User -> UserContactEditPanel(
+                target is ContactEditorTarget.User -> UserContactEditPanel(
                     contact = target.contact,
                     profile = contactProfiles[contactProfileKey(accountId, target.contact.id)]
                         ?: defaultLocalContactProfileFor(
@@ -11280,10 +11867,15 @@ private fun GroupContactEditPanel(
     accountId: String,
     group: FloatingChatContact,
     profile: LocalGroupProfile,
+    contacts: List<FloatingChatContact>,
     members: List<FloatingChatContact>,
     onProfileChange: (LocalGroupProfile) -> Unit,
+    onMemberClick: (FloatingChatContact) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
+    val manager = remember(context) { ScrmSettingsManager(context.applicationContext) }
+    val scope = rememberCoroutineScope()
     var groupName by remember(profile.accountId, profile.groupId, profile.groupName, group.name) {
         mutableStateOf(profile.groupName.ifBlank { group.name })
     }
@@ -11313,6 +11905,113 @@ private fun GroupContactEditPanel(
     }
     var backgroundLabel by remember(profile.accountId, profile.groupId, profile.backgroundLabel) {
         mutableStateOf(profile.backgroundLabel.ifBlank { "默认背景" })
+    }
+    var actionLoading by remember(group.id) { mutableStateOf(false) }
+    var actionStatus by remember(group.id) { mutableStateOf<String?>(null) }
+    var actionError by remember(group.id) { mutableStateOf<String?>(null) }
+    var memberPickerMode by remember(group.id) { mutableStateOf<GroupMemberPickerMode?>(null) }
+    val route = remember(accountId) {
+        scrmContactsPanelRouteForSelectedAccount(
+            selectedAccountId = accountId,
+            fallbackDeviceUuid = null,
+            fallbackWeChatId = null
+        )
+    }
+    val chatRoomId = remember(group.id) { scrmFloatingContactConversationId(group.id) }
+    val currentMember = remember(route?.weChatId, members) {
+        groupInfoCurrentMemberForRoute(route?.weChatId, members)
+    }
+    val canManageMembers = groupInfoCanManageMembers(currentMember)
+    val memberRows = remember(members, canManageMembers) {
+        groupInfoMemberGridRows(members, canManageMembers = canManageMembers)
+    }
+
+    fun submitRemoteGroupTask(
+        loadingText: String,
+        successPrefix: String,
+        onSuccess: (() -> Unit)? = null,
+        block: () -> ScrmTaskSubmissionResult
+    ) {
+        val currentRoute = route
+        if (currentRoute == null || chatRoomId.isNullOrBlank()) {
+            actionLoading = false
+            actionStatus = null
+            actionError = "当前群聊缺少 SCRM 路由，无法操作"
+            return
+        }
+        scope.launch {
+            actionLoading = true
+            actionStatus = loadingText
+            actionError = null
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    scrmRouteCurrentDeviceMismatchMessage(currentRoute, session.readApi.getDevices())?.let { message ->
+                        throw IllegalStateException(message)
+                    }
+                    ScrmContactTaskRunner(session.taskApi).submitAndAwait(reloadContactsOnSuccess = false) {
+                        block()
+                    }
+                }
+            }.onSuccess { outcome ->
+                actionLoading = false
+                actionStatus = "$successPrefix：${outcome.message}"
+                actionError = null
+                onSuccess?.invoke()
+            }.onFailure { error ->
+                actionLoading = false
+                actionStatus = null
+                actionError = error.toScrmContactsPanelMessage()
+            }
+        }
+    }
+
+    fun inviteMembers(selected: List<FloatingChatContact>) {
+        val currentRoute = route ?: return
+        val targetIds = selected.mapNotNull { contact -> scrmFloatingContactConversationId(contact.id) }.distinct()
+        if (targetIds.isEmpty()) {
+            actionError = "请选择可邀请的通讯录好友"
+            return
+        }
+        submitRemoteGroupTask(
+            loadingText = "正在邀请成员",
+            successPrefix = "已提交邀请",
+            onSuccess = { memberPickerMode = null }
+        ) {
+            val session = manager.loadSelectedSessionOrBootstrap()
+            session.chatRoomApi.inviteChatRoomMembers(
+                ScrmChatRoomMemberMutationRequest(
+                    deviceUuid = currentRoute.deviceUuid,
+                    weChatId = currentRoute.weChatId,
+                    chatRoomId = requireNotNull(chatRoomId),
+                    memberWxids = targetIds
+                )
+            )
+        }
+    }
+
+    fun kickMembers(selected: List<FloatingChatContact>) {
+        val currentRoute = route ?: return
+        val targetIds = selected.mapNotNull { member -> scrmFloatingContactConversationId(member.id) }.distinct()
+        if (targetIds.isEmpty()) {
+            actionError = "请选择要移出的群成员"
+            return
+        }
+        submitRemoteGroupTask(
+            loadingText = "正在移出成员",
+            successPrefix = "已提交移出",
+            onSuccess = { memberPickerMode = null }
+        ) {
+            val session = manager.loadSelectedSessionOrBootstrap()
+            session.chatRoomApi.kickChatRoomMembers(
+                ScrmChatRoomMemberMutationRequest(
+                    deviceUuid = currentRoute.deviceUuid,
+                    weChatId = currentRoute.weChatId,
+                    chatRoomId = requireNotNull(chatRoomId),
+                    memberWxids = targetIds
+                )
+            )
+        }
     }
 
     fun persistProfile(
@@ -11346,6 +12045,27 @@ private fun GroupContactEditPanel(
         )
     }
 
+    memberPickerMode?.let { mode ->
+        GroupMemberSelectionPanel(
+            title = mode.title,
+            contacts = when (mode) {
+                GroupMemberPickerMode.Invite -> groupInviteCandidates(contacts, members)
+                GroupMemberPickerMode.Kick -> groupKickCandidates(members, currentMember)
+            },
+            loading = actionLoading,
+            status = actionStatus,
+            error = actionError,
+            onBack = { memberPickerMode = null },
+            onDone = { selected ->
+                when (mode) {
+                    GroupMemberPickerMode.Invite -> inviteMembers(selected)
+                    GroupMemberPickerMode.Kick -> kickMembers(selected)
+                }
+            }
+        )
+        return
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxWidth()
@@ -11358,10 +12078,38 @@ private fun GroupContactEditPanel(
                 onDismiss = onDismiss
             )
         }
-        item {
-            GroupInfoMemberGrid(
-                members = members,
-                group = group
+        if (actionStatus != null || actionError != null) {
+            item {
+                TextLabel(
+                    text = actionError ?: actionStatus.orEmpty(),
+                    size = 10.sp,
+                    color = if (actionError != null) Color(0xFFE45858) else FriendProfileSecondaryText,
+                    lineHeight = 13.sp,
+                    maxLines = 2,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(FriendProfileCardBackground)
+                        .padding(horizontal = 20.dp, vertical = 8.dp)
+                )
+            }
+        }
+        itemsIndexed(
+            items = memberRows,
+            key = { index, row -> "group-member-row-$index-${row.joinToString("-") { it.key }}" }
+        ) { rowIndex, row ->
+            GroupInfoMemberGridRow(
+                row = row,
+                isFirst = rowIndex == 0,
+                isLast = rowIndex == memberRows.lastIndex,
+                onMemberClick = onMemberClick,
+                onAddClick = { memberPickerMode = GroupMemberPickerMode.Invite },
+                onRemoveClick = {
+                    if (canManageMembers) {
+                        memberPickerMode = GroupMemberPickerMode.Kick
+                    } else {
+                        actionError = "只有群主或管理员可以移出群成员"
+                    }
+                }
             )
         }
         item { GroupInfoSectionGap() }
@@ -11371,19 +12119,65 @@ private fun GroupContactEditPanel(
                     label = "群聊名称",
                     value = groupName,
                     placeholder = "填写群聊名称",
+                    actionLabel = "保存",
+                    actionEnabled = !actionLoading && groupName.isNotBlank(),
+                    onAction = {
+                        val currentRoute = route ?: return@GroupInfoEditableRow
+                        submitRemoteGroupTask("正在修改群名", "已提交群名修改") {
+                            val session = manager.loadSelectedSessionOrBootstrap()
+                            session.chatRoomApi.renameChatRoom(
+                                ScrmRenameChatRoomRequest(
+                                    deviceUuid = currentRoute.deviceUuid,
+                                    weChatId = currentRoute.weChatId,
+                                    chatRoomId = requireNotNull(chatRoomId),
+                                    name = groupName.trim()
+                                )
+                            )
+                        }
+                    },
                     onValueChange = {
                         groupName = it
                         persistProfile(nextGroupName = it)
                     }
                 )
                 FriendProfileDivider()
-                GroupInfoQrRow()
+                GroupInfoQrRow(
+                    onClick = {
+                        val currentRoute = route ?: return@GroupInfoQrRow
+                        submitRemoteGroupTask("正在获取群二维码", "已提交群二维码获取") {
+                            val session = manager.loadSelectedSessionOrBootstrap()
+                            session.chatRoomApi.pullChatRoomQrCode(
+                                ScrmChatRoomActionRequest(
+                                    deviceUuid = currentRoute.deviceUuid,
+                                    weChatId = currentRoute.weChatId,
+                                    chatRoomId = requireNotNull(chatRoomId)
+                                )
+                            )
+                        }
+                    }
+                )
                 FriendProfileDivider()
                 GroupInfoEditableRow(
                     label = "群公告",
                     value = announcement,
                     placeholder = "未设置",
                     maxLines = 2,
+                    actionLabel = "发布",
+                    actionEnabled = !actionLoading && announcement.isNotBlank(),
+                    onAction = {
+                        val currentRoute = route ?: return@GroupInfoEditableRow
+                        submitRemoteGroupTask("正在设置群公告", "已提交群公告") {
+                            val session = manager.loadSelectedSessionOrBootstrap()
+                            session.chatRoomApi.setChatRoomNotice(
+                                ScrmSetChatRoomNoticeRequest(
+                                    deviceUuid = currentRoute.deviceUuid,
+                                    weChatId = currentRoute.weChatId,
+                                    chatRoomId = requireNotNull(chatRoomId),
+                                    notice = announcement.trim()
+                                )
+                            )
+                        }
+                    },
                     onValueChange = {
                         announcement = it
                         persistProfile(nextAnnouncement = it)
@@ -11417,6 +12211,8 @@ private fun GroupContactEditPanel(
                     onCheckedChange = { checked ->
                         mute = checked
                         persistProfile(nextMute = checked)
+                        actionStatus = if (checked) "已在悬浮窗口开启消息免打扰" else "已在悬浮窗口关闭消息免打扰"
+                        actionError = null
                     }
                 )
                 FriendProfileDivider()
@@ -11427,6 +12223,8 @@ private fun GroupContactEditPanel(
                     onCheckedChange = { checked ->
                         pinned = checked
                         persistProfile(nextPinned = checked)
+                        actionStatus = if (checked) "已在悬浮窗口置顶聊天" else "已取消悬浮窗口置顶"
+                        actionError = null
                     }
                 )
                 FriendProfileDivider()
@@ -11437,6 +12235,8 @@ private fun GroupContactEditPanel(
                     onCheckedChange = { checked ->
                         saveToContacts = checked
                         persistProfile(nextSaveToContacts = checked)
+                        actionStatus = if (checked) "已在悬浮窗口保存到通讯录" else "已从悬浮窗口通讯录移除"
+                        actionError = null
                     }
                 )
             }
@@ -11461,6 +12261,8 @@ private fun GroupContactEditPanel(
                     onCheckedChange = { checked ->
                         showMemberNicknames = checked
                         persistProfile(nextShowMemberNicknames = checked)
+                        actionStatus = if (checked) "已显示群成员昵称" else "已隐藏群成员昵称"
+                        actionError = null
                     }
                 )
                 FriendProfileDivider()
@@ -11471,6 +12273,8 @@ private fun GroupContactEditPanel(
                     onCheckedChange = { checked ->
                         showMemberAvatars = checked
                         persistProfile(nextShowMemberAvatars = checked)
+                        actionStatus = if (checked) "已显示群成员头像" else "已隐藏群成员头像"
+                        actionError = null
                     }
                 )
             }
@@ -11485,12 +12289,30 @@ private fun GroupContactEditPanel(
                     onValueChange = {
                         backgroundLabel = it
                         persistProfile(nextBackgroundLabel = it)
+                        actionStatus = "已更新悬浮窗口聊天背景"
+                        actionError = null
                     }
                 )
                 FriendProfileDivider()
-                FriendProfileInfoRow(label = "清空聊天记录", value = "", showArrow = true)
+                FriendProfileInfoRow(
+                    label = "清空聊天记录",
+                    value = "",
+                    showArrow = true,
+                    onClick = {
+                        actionStatus = "已清空悬浮窗口内当前聊天记录显示；微信真实聊天记录未修改"
+                        actionError = null
+                    }
+                )
                 FriendProfileDivider()
-                FriendProfileInfoRow(label = "投诉", value = "", showArrow = true)
+                FriendProfileInfoRow(
+                    label = "投诉",
+                    value = "",
+                    showArrow = true,
+                    onClick = {
+                        actionStatus = "投诉接口暂未提供，已保留入口"
+                        actionError = null
+                    }
+                )
             }
         }
         item {
@@ -11498,7 +12320,24 @@ private fun GroupContactEditPanel(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(FriendProfileCardBackground)
-                    .clickable(onClick = onDismiss)
+                    .clickable {
+                        val currentRoute = route
+                        if (currentRoute == null || chatRoomId.isNullOrBlank()) {
+                            actionError = "当前群聊缺少 SCRM 路由，无法退出群聊"
+                            actionStatus = null
+                        } else {
+                            submitRemoteGroupTask("正在退出群聊", "已提交退出群聊") {
+                                val session = manager.loadSelectedSessionOrBootstrap()
+                                session.chatRoomApi.exitChatRoom(
+                                    ScrmChatRoomActionRequest(
+                                        deviceUuid = currentRoute.deviceUuid,
+                                        weChatId = currentRoute.weChatId,
+                                        chatRoomId = chatRoomId
+                                    )
+                                )
+                            }
+                        }
+                    }
                     .padding(vertical = 17.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -11510,6 +12349,420 @@ private fun GroupContactEditPanel(
                     maxLines = 1
                 )
             }
+        }
+    }
+}
+
+private enum class GroupMemberPickerMode(val title: String) {
+    Invite("添加成员"),
+    Kick("移出成员")
+}
+
+@Composable
+private fun GroupMemberSelectionPanel(
+    title: String,
+    contacts: List<FloatingChatContact>,
+    loading: Boolean,
+    status: String?,
+    error: String?,
+    onBack: () -> Unit,
+    onDone: (List<FloatingChatContact>) -> Unit
+) {
+    var searchText by remember(title) { mutableStateOf("") }
+    val selectedIds = remember(title) { mutableStateMapOf<String, Boolean>() }
+    val visibleContacts = remember(contacts, searchText) {
+        val keyword = searchText.trim()
+        if (keyword.isBlank()) {
+            contacts
+        } else {
+            contacts.filter { contact ->
+                contact.name.contains(keyword, ignoreCase = true) ||
+                    scrmFloatingContactConversationId(contact.id).orEmpty().contains(keyword, ignoreCase = true)
+            }
+        }
+    }
+    val selectedCount = selectedIds.values.count { selected -> selected }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(WechatContactsPageBackground)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(WechatContactsHeaderBackground)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            IconButton(onClick = onBack, modifier = Modifier.size(30.dp)) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = null,
+                    tint = WechatContactsPrimaryText,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            TextLabel(
+                text = title,
+                size = 14.sp,
+                weight = FontWeight.SemiBold,
+                color = WechatContactsPrimaryText,
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.Center,
+                maxLines = 1
+            )
+            ScrmPanelButton(
+                label = wechatStartGroupDoneLabel(selectedCount),
+                enabled = selectedCount > 0 && !loading,
+                accent = true,
+                onClick = {
+                    onDone(contacts.filter { contact -> selectedIds[contact.id] == true })
+                }
+            )
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(WechatContactsHeaderBackground)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            WechatSearchField(
+                value = searchText,
+                onValueChange = { searchText = it },
+                placeholder = "搜索",
+                onSearch = {},
+                modifier = Modifier.weight(1f)
+            )
+        }
+        status?.let { message ->
+            TextLabel(
+                text = message,
+                size = 10.sp,
+                color = WechatContactsSecondaryText,
+                maxLines = 2,
+                lineHeight = 13.sp,
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp)
+            )
+        }
+        error?.let { message ->
+            TextLabel(
+                text = message,
+                size = 10.sp,
+                color = Color(0xFFE45858),
+                maxLines = 2,
+                lineHeight = 13.sp,
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp)
+            )
+        }
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 360.dp, max = 520.dp)
+        ) {
+            if (visibleContacts.isEmpty()) {
+                item {
+                    TextLabel(
+                        text = if (loading) "正在处理..." else "暂无可选择联系人",
+                        size = 12.sp,
+                        color = WechatContactsSecondaryText,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+                        maxLines = 1
+                    )
+                }
+            }
+            itemsIndexed(
+                items = visibleContacts,
+                key = { _, contact -> contact.id }
+            ) { _, contact ->
+                GroupMemberPickerRow(
+                    contact = contact,
+                    selected = selectedIds[contact.id] == true,
+                    enabled = !loading,
+                    onToggle = {
+                        if (selectedIds[contact.id] == true) {
+                            selectedIds.remove(contact.id)
+                        } else {
+                            selectedIds[contact.id] = true
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun GroupMemberPickerRow(
+    contact: FloatingChatContact,
+    selected: Boolean,
+    enabled: Boolean,
+    onToggle: () -> Unit
+) {
+    val avatarBitmap = rememberAsyncAvatarBitmap(contact.avatarUrl)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(WechatContactsRowBackground)
+            .clickable(enabled = enabled, onClick = onToggle)
+            .padding(horizontal = 18.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        TextLabel(
+            text = if (selected) "✓" else "○",
+            size = 22.sp,
+            color = if (selected) Color(0xFF1AAD19) else WechatContactsSecondaryText,
+            maxLines = 1
+        )
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(RoundedCornerShape(7.dp))
+                .background(Color(contact.avatarColor)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (avatarBitmap != null) {
+                Image(
+                    bitmap = avatarBitmap.asImageBitmap(),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                TextLabel(
+                    text = contact.initials.take(2),
+                    size = 12.sp,
+                    weight = FontWeight.SemiBold,
+                    color = Color.White,
+                    maxLines = 1
+                )
+            }
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            TextLabel(
+                text = contact.name,
+                size = 13.sp,
+                color = WechatContactsPrimaryText,
+                maxLines = 1
+            )
+            TextLabel(
+                text = scrmFloatingContactConversationId(contact.id).orEmpty(),
+                size = 10.sp,
+                color = WechatContactsSecondaryText,
+                maxLines = 1
+            )
+        }
+    }
+    FriendProfileDivider()
+}
+
+@Composable
+private fun MultiForwardModeOverlay(
+    selectedCount: Int,
+    onDismiss: () -> Unit,
+    onModeSelected: (MultiForwardMode) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .background(Color(0x33000000))
+            .pointerInput(selectedCount) {
+                detectTapGestures(onTap = { onDismiss() })
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        MaterialSurface(
+            modifier = Modifier
+                .widthIn(min = 240.dp, max = 300.dp)
+                .pointerInput(Unit) {
+                    detectTapGestures(onTap = {})
+                },
+            shape = RoundedCornerShape(12.dp),
+            color = OverlayTokens.panel,
+            border = BorderStroke(1.dp, OverlayTokens.panelBorder)
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(9.dp)
+            ) {
+                TextLabel(
+                    text = "转发 ${selectedCount} 条消息",
+                    size = 13.sp,
+                    weight = FontWeight.Bold,
+                    color = OverlayTokens.panelPrimaryText,
+                    maxLines = 1
+                )
+                ForwardModeRow(
+                    label = MultiForwardMode.Separate.label,
+                    subtitle = "按原消息类型逐条提交到目标会话",
+                    onClick = { onModeSelected(MultiForwardMode.Separate) }
+                )
+                ForwardModeRow(
+                    label = MultiForwardMode.Combined.label,
+                    subtitle = "生成可展开的聊天记录卡片",
+                    onClick = { onModeSelected(MultiForwardMode.Combined) }
+                )
+                SmallChoiceButton(label = "取消", onClick = onDismiss)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ForwardModeRow(
+    label: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(OverlayTokens.control),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.Forward,
+                contentDescription = null,
+                tint = OverlayTokens.primaryText,
+                modifier = Modifier.size(15.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            TextLabel(
+                text = label,
+                size = 11.sp,
+                weight = FontWeight.Bold,
+                color = OverlayTokens.panelPrimaryText,
+                maxLines = 1
+            )
+            TextLabel(
+                text = subtitle,
+                size = 9.sp,
+                color = OverlayTokens.panelSecondaryText,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChatHistoryDetailOverlay(
+    message: FloatingChatMessage,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .background(OverlayTokens.centerPanelScrim)
+            .pointerInput(message.id) {
+                detectTapGestures(onTap = { onDismiss() })
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        MaterialSurface(
+            modifier = Modifier
+                .widthIn(min = 320.dp, max = 390.dp)
+                .heightIn(max = 620.dp)
+                .pointerInput(message.id) {
+                    detectTapGestures(onTap = {})
+                },
+            shape = RoundedCornerShape(14.dp),
+            color = OverlayTokens.panel,
+            border = BorderStroke(1.dp, OverlayTokens.panelBorder),
+            shadowElevation = 10.dp
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(30.dp)) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = null,
+                            tint = OverlayTokens.panelPrimaryText,
+                            modifier = Modifier.size(17.dp)
+                        )
+                    }
+                    TextLabel(
+                        text = message.text.ifBlank { "聊天记录" },
+                        size = 14.sp,
+                        weight = FontWeight.Bold,
+                        color = OverlayTokens.panelPrimaryText,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 520.dp),
+                    verticalArrangement = Arrangement.spacedBy(9.dp)
+                ) {
+                    itemsIndexed(message.filePreviewLines) { _, line ->
+                        ChatHistoryDetailRow(line)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatHistoryDetailRow(line: String) {
+    val separatorIndex = line.indexOf('：').takeIf { index -> index >= 0 } ?: line.indexOf(':')
+    val author = separatorIndex
+        .takeIf { index -> index >= 0 }
+        ?.let { index -> line.take(index).ifBlank { "消息" } }
+        ?: "消息"
+    val body = separatorIndex
+        .takeIf { index -> index >= 0 && index + 1 < line.length }
+        ?.let { index -> line.substring(index + 1).trim() }
+        ?: line
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top
+    ) {
+        Box(
+            modifier = Modifier
+                .size(30.dp)
+                .clip(CircleShape)
+                .background(OverlayTokens.accountFill),
+            contentAlignment = Alignment.Center
+        ) {
+            TextLabel(
+                text = author.take(1),
+                size = 12.sp,
+                weight = FontWeight.Bold,
+                color = OverlayTokens.primaryText,
+                maxLines = 1
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            TextLabel(
+                text = author,
+                size = 10.sp,
+                weight = FontWeight.Bold,
+                color = OverlayTokens.panelSecondaryText,
+                maxLines = 1
+            )
+            TextLabel(
+                text = body,
+                size = 12.sp,
+                color = OverlayTokens.panelPrimaryText,
+                lineHeight = 16.sp,
+                maxLines = 4
+            )
         }
     }
 }
@@ -11553,50 +12806,44 @@ private fun GroupInfoTopBar(
 }
 
 @Composable
-private fun GroupInfoMemberGrid(
-    members: List<FloatingChatContact>,
-    group: FloatingChatContact
+private fun GroupInfoMemberGridRow(
+    row: List<GroupInfoMemberGridItem>,
+    isFirst: Boolean,
+    isLast: Boolean,
+    onMemberClick: (FloatingChatContact) -> Unit,
+    onAddClick: () -> Unit,
+    onRemoveClick: () -> Unit
 ) {
-    val displayMembers = if (members.isEmpty()) listOf(group) else members
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(FriendProfileCardBackground)
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(
+                start = 20.dp,
+                end = 20.dp,
+                top = if (isFirst) 16.dp else 0.dp,
+                bottom = if (isLast) 16.dp else 16.dp
+            ),
+        horizontalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        displayMembers.take(8).chunked(4).forEach { rowMembers ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(20.dp)
-            ) {
-                rowMembers.forEach { member ->
-                    GroupInfoMemberCell(
-                        label = member.name,
-                        avatarText = member.initials,
-                        avatarColor = Color(member.avatarColor),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                if (rowMembers.size < 4 && displayMembers.size <= 7) {
-                    GroupInfoAddMemberCell(modifier = Modifier.weight(1f))
-                    repeat((3 - rowMembers.size).coerceAtLeast(0)) {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
-                } else {
-                    repeat(4 - rowMembers.size) {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
-                }
-            }
-        }
-        if (displayMembers.size >= 8) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(20.dp)
-            ) {
-                GroupInfoAddMemberCell(modifier = Modifier.weight(1f))
-                repeat(3) { Spacer(modifier = Modifier.weight(1f)) }
+        row.forEach { item ->
+            when {
+                item.member != null -> GroupInfoMemberCell(
+                    member = item.member,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onMemberClick(item.member) }
+                )
+                item.isAddAction -> GroupInfoAddMemberCell(
+                    modifier = Modifier.weight(1f),
+                    label = "+",
+                    onClick = onAddClick
+                )
+                item.isRemoveAction -> GroupInfoAddMemberCell(
+                    modifier = Modifier.weight(1f),
+                    label = "-",
+                    onClick = onRemoveClick
+                )
+                else -> Spacer(modifier = Modifier.weight(1f))
             }
         }
     }
@@ -11604,13 +12851,13 @@ private fun GroupInfoMemberGrid(
 
 @Composable
 private fun GroupInfoMemberCell(
-    label: String,
-    avatarText: String,
-    avatarColor: Color,
-    modifier: Modifier = Modifier
+    member: FloatingChatContact,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
 ) {
+    val avatarBitmap = rememberAsyncAvatarBitmap(member.avatarUrl)
     Column(
-        modifier = modifier,
+        modifier = modifier.clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(7.dp)
     ) {
@@ -11618,19 +12865,28 @@ private fun GroupInfoMemberCell(
             modifier = Modifier
                 .size(48.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(avatarColor),
+                .background(Color(member.avatarColor)),
             contentAlignment = Alignment.Center
         ) {
-            TextLabel(
-                text = avatarText.take(2),
-                size = 13.sp,
-                weight = FontWeight.SemiBold,
-                color = OverlayTokens.primaryText,
-                maxLines = 1
-            )
+            if (avatarBitmap != null) {
+                Image(
+                    bitmap = avatarBitmap.asImageBitmap(),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                TextLabel(
+                    text = member.initials.take(2),
+                    size = 13.sp,
+                    weight = FontWeight.SemiBold,
+                    color = OverlayTokens.primaryText,
+                    maxLines = 1
+                )
+            }
         }
         TextLabel(
-            text = label,
+            text = member.name,
             size = 10.sp,
             color = FriendProfilePlaceholderText,
             maxLines = 1,
@@ -11640,9 +12896,13 @@ private fun GroupInfoMemberCell(
 }
 
 @Composable
-private fun GroupInfoAddMemberCell(modifier: Modifier = Modifier) {
+private fun GroupInfoAddMemberCell(
+    modifier: Modifier = Modifier,
+    label: String = "+",
+    onClick: () -> Unit = {}
+) {
     Column(
-        modifier = modifier,
+        modifier = modifier.clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(7.dp)
     ) {
@@ -11658,7 +12918,7 @@ private fun GroupInfoAddMemberCell(modifier: Modifier = Modifier) {
             contentAlignment = Alignment.Center
         ) {
             TextLabel(
-                text = "+",
+                text = label,
                 size = 30.sp,
                 color = FriendProfilePlaceholderText,
                 maxLines = 1
@@ -11674,11 +12934,231 @@ private fun GroupInfoAddMemberCell(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun GroupInfoQrRow() {
+private fun GroupMemberIntroPanel(
+    member: FloatingChatContact,
+    isFriend: Boolean,
+    addFriendLoading: Boolean,
+    addFriendStatus: String?,
+    addFriendError: String?,
+    onBack: () -> Unit,
+    onOpenChat: () -> Unit,
+    onOpenVideoCall: () -> Unit,
+    onOpenFriendProfile: () -> Unit,
+    onOpenMoments: () -> Unit,
+    onAddFriend: () -> Unit
+) {
+    val context = LocalContext.current
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(FriendProfilePageBackground),
+        contentPadding = PaddingValues(bottom = 12.dp)
+    ) {
+        item { GroupMemberIntroTopBar(onBack = onBack) }
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(FriendProfileCardBackground)
+                    .padding(horizontal = 18.dp, vertical = 20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                GroupMemberIntroAvatar(member = member)
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    TextLabel(
+                        text = member.name,
+                        size = 21.sp,
+                        weight = FontWeight.Bold,
+                        color = FriendProfilePrimaryText,
+                        maxLines = 1
+                    )
+                    TextLabel(
+                        text = "地区：未知",
+                        size = 13.sp,
+                        color = FriendProfileSecondaryText,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+        item { GroupInfoSectionGap() }
+        item {
+            FriendProfileSection {
+                FriendProfileInfoRow(
+                    label = "朋友资料",
+                    value = if (isFriend) "" else "签名",
+                    showArrow = true,
+                    onClick = {
+                        if (isFriend) {
+                            onOpenFriendProfile()
+                        } else {
+                            onAddFriend()
+                        }
+                    }
+                )
+                FriendProfileDivider()
+                FriendProfileInfoRow(
+                    label = "朋友圈",
+                    value = "",
+                    showArrow = true,
+                    onClick = {
+                        onOpenMoments()
+                        Toast.makeText(context, "朋友圈暂未接入", Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
+        }
+        item { GroupInfoSectionGap() }
+        val feedbackText = groupMemberAddFriendStatusText(
+            loading = addFriendLoading,
+            status = addFriendStatus,
+            error = addFriendError
+        )
+        if (!isFriend && feedbackText != null) {
+            item {
+                TextLabel(
+                    text = feedbackText,
+                    size = 12.sp,
+                    color = if (addFriendError != null) Color(0xFFE45858) else FriendProfileSecondaryText,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(FriendProfilePageBackground)
+                        .padding(horizontal = 18.dp, vertical = 8.dp),
+                    maxLines = 2,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(FriendProfileCardBackground)
+                    .clickable(enabled = !addFriendLoading) {
+                        if (isFriend) {
+                            onOpenChat()
+                        } else {
+                            onAddFriend()
+                        }
+                    }
+                    .padding(vertical = 17.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                TextLabel(
+                    text = if (!isFriend && addFriendLoading) "正在发送..." else groupInfoMemberPrimaryActionLabel(isFriend),
+                    size = 15.sp,
+                    weight = FontWeight.SemiBold,
+                    color = Color(0xFF49679E),
+                    maxLines = 1
+                )
+            }
+        }
+        if (isFriend) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(FriendProfileCardBackground)
+                        .clickable {
+                            onOpenVideoCall()
+                            Toast.makeText(context, "音视频通话暂未接入", Toast.LENGTH_SHORT).show()
+                        }
+                        .padding(vertical = 17.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    TextLabel(
+                        text = "音视频通话",
+                        size = 15.sp,
+                        weight = FontWeight.SemiBold,
+                        color = Color(0xFF49679E),
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GroupMemberIntroTopBar(onBack: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .background(FriendProfilePageBackground)
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 8.dp)
+                .size(36.dp)
+                .clip(CircleShape)
+                .clickable(onClick = onBack),
+            contentAlignment = Alignment.Center
+        ) {
+            TextLabel(
+                text = "‹",
+                size = 24.sp,
+                color = FriendProfilePrimaryText,
+                maxLines = 1
+            )
+        }
+        TextLabel(
+            text = "",
+            size = 14.sp,
+            color = FriendProfilePrimaryText,
+            modifier = Modifier.align(Alignment.Center),
+            maxLines = 1
+        )
+        TextLabel(
+            text = "...",
+            size = 18.sp,
+            color = FriendProfilePrimaryText,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 18.dp),
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun GroupMemberIntroAvatar(member: FloatingChatContact) {
+    val avatarBitmap = rememberAsyncAvatarBitmap(member.avatarUrl)
+    Box(
+        modifier = Modifier
+            .size(64.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(Color(member.avatarColor)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (avatarBitmap != null) {
+            Image(
+                bitmap = avatarBitmap.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            TextLabel(
+                text = member.initials.take(2),
+                size = 16.sp,
+                weight = FontWeight.Bold,
+                color = OverlayTokens.primaryText,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+private fun GroupInfoQrRow(onClick: () -> Unit = {}) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 44.dp)
+            .clickable(onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -11706,7 +13186,10 @@ private fun GroupInfoEditableRow(
     value: String,
     placeholder: String,
     onValueChange: (String) -> Unit,
-    maxLines: Int = 1
+    maxLines: Int = 1,
+    actionLabel: String? = null,
+    actionEnabled: Boolean = true,
+    onAction: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
@@ -11752,6 +13235,15 @@ private fun GroupInfoEditableRow(
                 }
             }
         )
+        if (actionLabel != null && onAction != null) {
+            Spacer(modifier = Modifier.width(6.dp))
+            ScrmPanelButton(
+                label = actionLabel,
+                enabled = actionEnabled,
+                accent = true,
+                onClick = onAction
+            )
+        }
         Spacer(modifier = Modifier.width(6.dp))
         FriendProfileChevron()
     }
@@ -12042,12 +13534,14 @@ private fun FriendProfileSection(content: @Composable () -> Unit) {
 private fun FriendProfileInfoRow(
     label: String,
     value: String,
-    showArrow: Boolean = true
+    showArrow: Boolean = true,
+    onClick: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 44.dp)
+            .then(if (onClick == null) Modifier else Modifier.clickable(onClick = onClick))
             .padding(horizontal = 18.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -12771,6 +14265,19 @@ private fun AccountCardPreview(profile: FloatingChatAccountProfile) {
     )
 }
 
+private enum class MultiForwardMode(val label: String) {
+    Separate("逐条转发"),
+    Combined("合并转发")
+}
+
+internal fun multiForwardModeLabels(): List<String> {
+    return MultiForwardMode.values().map { mode -> mode.label }
+}
+
+internal fun multiSelectSelectionCountLabel(count: Int): String = "已选 $count"
+
+internal fun combinedForwardChatHistoryOpensDetailPage(): Boolean = true
+
 @Composable
 private fun MultiSelectActionBar(
     selectedCount: Int,
@@ -12792,7 +14299,7 @@ private fun MultiSelectActionBar(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             TextLabel(
-                text = "已�?$selectedCount",
+                text = multiSelectSelectionCountLabel(selectedCount),
                 size = 11.sp,
                 weight = FontWeight.Bold,
                 color = Color(0xFFF5F8FA),
@@ -13213,6 +14720,8 @@ private fun FloatingBottomPanel(
     voicePermissionRequestToken: Int,
     locationPermissionRequestToken: Int,
     onClose: () -> Unit,
+    onOpenPrivateChat: (ScrmFloatingAccountRoute, ScrmContact) -> Unit,
+    onOpenFriendProfile: (ScrmFloatingAccountRoute, ScrmContact) -> Unit,
     onInsertText: (String) -> Unit,
     onSendVoice: (String, Int) -> Unit,
     quickPhrases: List<String>,
@@ -13339,7 +14848,9 @@ private fun FloatingBottomPanel(
                 )
                 BottomPanelMode.Contacts -> ScrmContactsPanel(
                     route = scrmContactsRoute,
-                    onClose = onClose
+                    onClose = onClose,
+                    onOpenPrivateChat = onOpenPrivateChat,
+                    onOpenFriendProfile = onOpenFriendProfile
                 )
                 BottomPanelMode.Favorite -> FavoriteCollectionPanel(
                     items = favoriteItems,
@@ -13395,16 +14906,23 @@ private fun FloatingBottomPanel(
 }
 
 @Composable
-private fun ScrmContactsPanel(route: ScrmFloatingAccountRoute?, onClose: () -> Unit) {
+private fun ScrmContactsPanel(
+    route: ScrmFloatingAccountRoute?,
+    onClose: () -> Unit,
+    onOpenPrivateChat: (ScrmFloatingAccountRoute, ScrmContact) -> Unit,
+    onOpenFriendProfile: (ScrmFloatingAccountRoute, ScrmContact) -> Unit
+) {
     val context = LocalContext.current
     val manager = remember(context) { ScrmSettingsManager(context.applicationContext) }
     val scope = rememberCoroutineScope()
     var searchText by remember { mutableStateOf("") }
     var addWxidText by remember { mutableStateOf("") }
     var addMessageText by remember { mutableStateOf("你好，我是通过只发添加你") }
-    var addRemarkText by remember { mutableStateOf("") }
-    var sendText by remember { mutableStateOf("") }
     var state by remember { mutableStateOf(ScrmContactsPanelState()) }
+    var panelScreen by remember { mutableStateOf(WechatContactsPanelScreen.Contacts) }
+    var showPlusMenu by remember { mutableStateOf(false) }
+    var contactsSearchVisible by remember { mutableStateOf(false) }
+    val startGroupSelectedContactIds = remember { mutableStateMapOf<Int, Boolean>() }
 
     if (route == null) {
         Column(
@@ -13433,13 +14951,27 @@ private fun ScrmContactsPanel(route: ScrmFloatingAccountRoute?, onClose: () -> U
                 withContext(Dispatchers.IO) {
                     fun fetchContacts(): ScrmContactsPanelLoadResult {
                         val session = manager.loadSelectedSessionOrBootstrap()
-                        val page = session.contactApi.getContacts(
-                            ScrmContactQuery(
-                                weChatId = route.weChatId,
-                                search = nextSearch.trim().takeIf { it.isNotEmpty() },
-                                pageSize = 80,
-                                onlyFriends = true,
-                                includeProfile = false
+                        val allContacts = mutableListOf<ScrmContact>()
+                        var totalCount = 0
+                        var pageNumber = 1
+                        var returnedItemCount = 0
+                        do {
+                            val page = session.contactApi.getContacts(
+                                scrmContactsPanelContactQuery(
+                                    weChatId = route.weChatId,
+                                    pageNumber = pageNumber,
+                                    search = nextSearch
+                                )
+                            )
+                            allContacts += page.items
+                            totalCount = page.totalCount
+                            returnedItemCount = page.items.size
+                            pageNumber += 1
+                        } while (shouldRequestNextScrmConversationPage(
+                                returnedItemCount = returnedItemCount,
+                                loadedItemCount = allContacts.size,
+                                totalCount = totalCount,
+                                pageSize = scrmConversationPageSize()
                             )
                         )
                         val requests = session.contactApi.getFriendRequests(
@@ -13448,8 +14980,8 @@ private fun ScrmContactsPanel(route: ScrmFloatingAccountRoute?, onClose: () -> U
                             pendingOnly = true
                         )
                         return ScrmContactsPanelLoadResult(
-                            contacts = page.items,
-                            totalCount = page.totalCount,
+                            contacts = allContacts,
+                            totalCount = totalCount.takeIf { it > 0 } ?: allContacts.size,
                             friendRequests = requests
                         )
                     }
@@ -13491,14 +15023,19 @@ private fun ScrmContactsPanel(route: ScrmFloatingAccountRoute?, onClose: () -> U
     fun submitTask(
         status: String,
         reloadContactsOnSuccess: Boolean = true,
+        successStatus: ((String) -> String)? = null,
+        onSuccess: (() -> Unit)? = null,
         block: suspend () -> ScrmTaskSubmissionResult
     ) {
         scope.launch {
             state = state.copy(loading = true, error = null, status = status)
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val submitted = block()
                     val session = manager.loadSelectedSessionOrBootstrap()
+                    scrmRouteCurrentDeviceMismatchMessage(route, session.readApi.getDevices())?.let { message ->
+                        throw IllegalStateException(message)
+                    }
+                    val submitted = block()
                     ScrmContactTaskRunner(session.taskApi).submitAndAwait(
                         reloadContactsOnSuccess = reloadContactsOnSuccess
                     ) {
@@ -13510,13 +15047,16 @@ private fun ScrmContactsPanel(route: ScrmFloatingAccountRoute?, onClose: () -> U
                     val taskId = outcome.taskId
                     state = state.copy(
                         loading = false,
-                        status = "已提交任务 #$taskId",
+                        status = successStatus?.invoke(outcome.message) ?: "已提交任务 #$taskId",
                         error = null
                     )
-                    state = state.copy(status = outcome.message)
+                    if (successStatus == null) {
+                        state = state.copy(status = outcome.message)
+                    }
                     if (outcome.shouldReloadContacts) {
                         loadContacts()
                     }
+                    onSuccess?.invoke()
                 }.onFailure { error ->
                     state = state.copy(
                         loading = false,
@@ -13528,8 +15068,7 @@ private fun ScrmContactsPanel(route: ScrmFloatingAccountRoute?, onClose: () -> U
     }
 
     fun selectedRemoteId(contact: ScrmContact): String? {
-        return contact.wxid?.takeIf { it.isNotBlank() }
-            ?: contact.friendNo?.takeIf { it.isNotBlank() }
+        return scrmContactPrimaryConversationId(contact)
     }
 
     fun syncContacts() {
@@ -13570,18 +15109,31 @@ private fun ScrmContactsPanel(route: ScrmFloatingAccountRoute?, onClose: () -> U
                             )
                         )
                     }
-                    scrmFriendSearchProfileFromFindContactData(outcome.data)
-                        ?: throw ScrmInvalidResponseException(
+                    val profile = scrmFriendSearchProfileFromFindContactData(outcome.data)
+                    if (profile == null && !outcome.completed) {
+                        return@withContext ScrmFriendSearchResult.Pending(outcome.message)
+                    }
+                    ScrmFriendSearchResult.Found(
+                        profile ?: throw ScrmInvalidResponseException(
                             "好友搜索已完成，但服务端没有返回目标用户资料"
                         )
+                    )
                 }
-            }.onSuccess { profile ->
-                state = state.copy(
-                    loading = false,
-                    friendSearchProfile = profile,
-                    status = "已找到 ${profile.displayName}",
-                    error = null
-                )
+            }.onSuccess { result ->
+                state = when (result) {
+                    is ScrmFriendSearchResult.Found -> state.copy(
+                        loading = false,
+                        friendSearchProfile = result.profile,
+                        status = "已找到 ${result.profile.displayName}",
+                        error = null
+                    )
+                    is ScrmFriendSearchResult.Pending -> state.copy(
+                        loading = false,
+                        friendSearchProfile = null,
+                        status = result.message,
+                        error = null
+                    )
+                }
             }.onFailure { error ->
                 state = state.copy(
                     loading = false,
@@ -13633,91 +15185,42 @@ private fun ScrmContactsPanel(route: ScrmFloatingAccountRoute?, onClose: () -> U
     }
 
     fun addFriend() {
-        searchFriendForAdd()
-        return
-        val wxid = addWxidText.trim()
-        if (wxid.isNotBlank() && scrmFriendAddInputKind(wxid) != ScrmFriendAddInputKind.Wxid) {
-            scope.launch {
-                state = state.copy(loading = true, error = null, status = "正在提交添加好友")
-                runCatching {
-                    withContext(Dispatchers.IO) {
-                        val session = manager.loadSelectedSessionOrBootstrap()
-                        val runner = ScrmContactTaskRunner(session.taskApi)
-                        val message = addMessageText.trim().takeIf { it.isNotEmpty() }
-                        val remark = addRemarkText.trim().takeIf { it.isNotEmpty() }
-                        when (scrmFriendAddInputKind(wxid)) {
-                            ScrmFriendAddInputKind.Phone -> {
-                                runner.submitAndAwait(reloadContactsOnSuccess = true) {
-                                    session.contactApi.addFriendsByPhone(
-                                        ScrmAddFriendsByPhoneRequest(
-                                            deviceUuid = route.deviceUuid,
-                                            weChatId = route.weChatId,
-                                            phones = listOf(wxid),
-                                            message = message,
-                                            remark = remark
-                                        )
-                                    )
-                                }
-                            }
-                            ScrmFriendAddInputKind.SearchContent -> {
-                                val searchOutcome = runner.submitAndAwait(reloadContactsOnSuccess = false) {
-                                    session.contactApi.findFriend(
-                                        ScrmFindContactRequest(
-                                            deviceUuid = route.deviceUuid,
-                                            weChatId = route.weChatId,
-                                            content = wxid
-                                        )
-                                    )
-                                }
-                                val friendId = scrmFriendIdFromFindContactData(searchOutcome.data)
-                                    ?: throw ScrmInvalidResponseException(
-                                        "好友搜索已完成，但服务端未返回 friendId/wxid，无法继续发送好友验证"
-                                    )
-                                runner.submitAndAwait(reloadContactsOnSuccess = true) {
-                                    session.contactApi.sendFriendVerify(
-                                        ScrmSendFriendVerifyRequest(
-                                            deviceUuid = route.deviceUuid,
-                                            weChatId = route.weChatId,
-                                            friendId = friendId,
-                                            message = message
-                                        )
-                                    )
-                                }
-                            }
-                            ScrmFriendAddInputKind.Wxid -> error("unreachable")
-                        }
-                    }
-                }.onSuccess { outcome ->
-                    state = state.copy(loading = false, status = outcome.message, error = null)
-                    if (outcome.shouldReloadContacts) {
-                        loadContacts()
-                    }
-                }.onFailure { error ->
-                    state = state.copy(
-                        loading = false,
-                        error = error.toScrmContactsPanelMessage(),
-                        status = null
-                    )
-                }
-            }
+        val account = addWxidText.trim()
+        if (account.isBlank()) {
+            state = state.copy(error = "请输入微信号、手机号或账号")
             return
         }
-        if (wxid.isBlank()) {
-            state = state.copy(error = "请输入好友 wxid、手机号或搜索结果 wxid")
-            return
-        }
-        submitTask("正在提交添加好友") {
+        submitTask(
+            status = "正在发送好友申请",
+            reloadContactsOnSuccess = false,
+            successStatus = ::friendApplySubmittedStatus
+        ) {
             val session = manager.loadSelectedSessionOrBootstrap()
-            session.contactApi.addFriend(
-                ScrmAddFriendRequest(
-                    deviceUuid = route.deviceUuid,
-                    weChatId = route.weChatId,
-                    friendWxid = wxid,
-                    message = addMessageText.trim().takeIf { it.isNotEmpty() },
-                    remark = addRemarkText.trim().takeIf { it.isNotEmpty() }
+            if (scrmAddFriendInputLooksLikePhone(account)) {
+                session.contactApi.addFriendsByPhone(
+                    ScrmAddFriendsByPhoneRequest(
+                        deviceUuid = route.deviceUuid,
+                        weChatId = route.weChatId,
+                        phones = listOf(account),
+                        message = addMessageText.trim().takeIf { it.isNotEmpty() }
+                    )
                 )
-            )
+            } else {
+                session.contactApi.addFriend(
+                    scrmDirectAddFriendRequest(
+                        deviceUuid = route.deviceUuid,
+                        weChatId = route.weChatId,
+                        friendAccount = account,
+                        message = addMessageText
+                    )
+                )
+            }
         }
+    }
+
+    fun openCameraForScan() {
+        Toast.makeText(context, "正在打开相机", Toast.LENGTH_SHORT).show()
+        FloatingChatMediaPickerBridge.requestCapture()
     }
 
     fun deleteSelectedFriend() {
@@ -13733,31 +15236,6 @@ private fun ScrmContactsPanel(route: ScrmFloatingAccountRoute?, onClose: () -> U
                 friendId = friendId,
                 deviceUuid = route.deviceUuid,
                 weChatId = route.weChatId
-            )
-        }
-    }
-
-    fun sendSelectedText() {
-        val contact = state.selectedContact ?: return
-        val conversationId = selectedRemoteId(contact)
-        val content = sendText.trim()
-        if (conversationId == null) {
-            state = state.copy(error = "当前联系人缺少可发送消息的 wxid")
-            return
-        }
-        if (content.isBlank()) {
-            state = state.copy(error = "请输入要发送的消息")
-            return
-        }
-        submitTask("正在发送文本消息") {
-            val session = manager.loadSelectedSessionOrBootstrap()
-            session.messageApi.sendText(
-                ScrmSendTextMessageRequest(
-                    deviceUuid = route.deviceUuid,
-                    weChatId = route.weChatId,
-                    conversationId = conversationId,
-                    content = content
-                )
             )
         }
     }
@@ -13784,132 +15262,109 @@ private fun ScrmContactsPanel(route: ScrmFloatingAccountRoute?, onClose: () -> U
         }
     }
 
+    fun createChatRoomFromSelectedContacts() {
+        val selectedContacts = state.contacts.filter { contact ->
+            startGroupSelectedContactIds[contact.id] == true
+        }
+        val memberWxids = scrmCreateChatRoomMemberWxids(selectedContacts)
+        if (memberWxids.isEmpty()) {
+            state = state.copy(error = "请选择可拉群的通讯录好友")
+            return
+        }
+        submitTask(
+            status = "正在发起群聊",
+            reloadContactsOnSuccess = false,
+            successStatus = { message -> "已提交建群任务：$message" },
+            onSuccess = {
+                startGroupSelectedContactIds.clear()
+                panelScreen = WechatContactsPanelScreen.Contacts
+            }
+        ) {
+            val session = manager.loadSelectedSessionOrBootstrap()
+            session.chatRoomApi.createChatRoom(
+                ScrmCreateChatRoomRequest(
+                    deviceUuid = route.deviceUuid,
+                    weChatId = route.weChatId,
+                    memberWxids = memberWxids
+                )
+            )
+        }
+    }
+
     LaunchedEffect(route) {
+        startGroupSelectedContactIds.clear()
         loadContacts()
     }
 
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            TextLabel(
-                text = "联系人",
-                size = 14.sp,
-                weight = FontWeight.Bold,
-                color = OverlayTokens.panelPrimaryText,
-                modifier = Modifier.weight(1f),
-                maxLines = 1
-            )
-            ScrmPanelButton(label = "刷新", enabled = !state.loading, onClick = { loadContacts() })
-            ScrmPanelButton(label = "关闭", onClick = onClose)
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp)
-        ) {
-            PanelTextInput(
-                value = searchText,
-                onValueChange = { searchText = it },
-                placeholder = "搜索昵称、备注、wxid",
-                modifier = Modifier.weight(1f)
-            )
-            ScrmPanelButton(
-                label = "搜索",
-                enabled = !state.loading,
-                accent = true,
-                onClick = { loadContacts(searchText) }
-            )
-            ScrmPanelButton(label = "同步", enabled = !state.loading, onClick = ::syncContacts)
-        }
-
-        state.status?.let { status ->
-            TextLabel(
-                text = status,
-                size = 10.sp,
-                color = OverlayTokens.panelSecondaryText,
-                maxLines = 1
-            )
-        }
-        state.error?.let { error ->
-            TextLabel(
-                text = error,
-                size = 10.sp,
-                color = Color(0xFFB65757),
-                maxLines = 2,
-                lineHeight = 13.sp
-            )
-        }
-
-        state.friendSearchProfile?.let { profile ->
-            ScrmFriendSearchProfilePanel(
-                profile = profile,
-                message = addMessageText,
-                onMessageChange = { addMessageText = it },
-                enabled = !state.loading,
-                onApply = { sendFriendVerifyFromSearch(profile) },
-                onClose = { state = state.copy(friendSearchProfile = null) }
-            )
-        }
-
-        ScrmSelectedContactPanel(
-            contact = state.selectedContact,
-            sendText = sendText,
-            onSendTextChange = { sendText = it },
-            onSendText = ::sendSelectedText,
-            onDelete = ::deleteSelectedFriend,
-            enabled = !state.loading
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            PanelTextInput(
-                value = addWxidText,
-                onValueChange = { addWxidText = it },
-                placeholder = "wxid/微信号/手机号",
-                modifier = Modifier.weight(0.9f)
-            )
-            PanelTextInput(
-                value = addRemarkText,
-                onValueChange = { addRemarkText = it },
-                placeholder = "备注",
-                modifier = Modifier.weight(0.7f)
-            )
-            ScrmPanelButton(label = "搜索", enabled = !state.loading, accent = true, onClick = ::searchFriendForAdd)
-        }
-        PanelTextInput(
-            value = addMessageText,
-            onValueChange = { addMessageText = it },
-            placeholder = "验证消息"
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            ScrmContactList(
+    Box(modifier = Modifier.fillMaxWidth()) {
+        when (panelScreen) {
+            WechatContactsPanelScreen.Contacts -> WechatContactsBookPanel(
                 contacts = state.contacts,
-                selectedContact = state.selectedContact,
+                friendRequestCount = state.friendRequests.size,
                 loading = state.loading,
-                modifier = Modifier.weight(1.08f),
-                onSelectContact = { contact ->
+                searchVisible = contactsSearchVisible,
+                searchText = searchText,
+                status = state.status,
+                error = state.error,
+                onSearchVisibleChange = { visible -> contactsSearchVisible = visible },
+                onSearchTextChange = { searchText = it },
+                onSearchSubmit = { loadContacts(searchText) },
+                onSync = ::syncContacts,
+                onClose = onClose,
+                onPlusClick = { showPlusMenu = !showPlusMenu },
+                onNewFriendsClick = {
+                    panelScreen = WechatContactsPanelScreen.FriendRequests
+                    showPlusMenu = false
+                },
+                onPlaceholderClick = { label ->
+                    Toast.makeText(context, "$label 暂未接入", Toast.LENGTH_SHORT).show()
+                },
+                onContactClick = { contact ->
                     state = state.copy(selectedContact = contact, error = null)
                     addWxidText = contact.wxid.orEmpty()
+                    panelScreen = WechatContactsPanelScreen.ContactIntro
+                    showPlusMenu = false
                 }
             )
-            ScrmFriendRequestList(
+            WechatContactsPanelScreen.AddFriend -> WechatAddFriendPanel(
+                query = addWxidText,
+                onQueryChange = { addWxidText = it },
+                verifyMessage = addMessageText,
+                onVerifyMessageChange = { addMessageText = it },
+                loading = state.loading,
+                status = state.status,
+                error = state.error,
+                onBack = {
+                    panelScreen = WechatContactsPanelScreen.Contacts
+                    state = state.copy(friendSearchProfile = null, error = null)
+                },
+                onAdd = ::addFriend,
+                onScan = ::openCameraForScan,
+                onPlaceholderClick = { label ->
+                    Toast.makeText(context, "$label 暂未接入", Toast.LENGTH_SHORT).show()
+                }
+            )
+            WechatContactsPanelScreen.ContactIntro -> WechatContactIntroPanel(
+                contact = state.selectedContact,
+                loading = state.loading,
+                onBack = { panelScreen = WechatContactsPanelScreen.Contacts },
+                onOpenChat = {
+                    state.selectedContact?.let { contact -> onOpenPrivateChat(route, contact) }
+                },
+                onOpenVideoCall = {
+                    Toast.makeText(context, "音视频通话暂未接入", Toast.LENGTH_SHORT).show()
+                },
+                onOpenFriendProfile = {
+                    state.selectedContact?.let { contact -> onOpenFriendProfile(route, contact) }
+                },
+                onOpenMoments = {
+                    Toast.makeText(context, "朋友圈暂未接入", Toast.LENGTH_SHORT).show()
+                }
+            )
+            WechatContactsPanelScreen.FriendRequests -> WechatFriendRequestsPanel(
                 requests = state.friendRequests,
-                enabled = !state.loading,
-                modifier = Modifier.weight(0.92f),
+                loading = state.loading,
+                onBack = { panelScreen = WechatContactsPanelScreen.Contacts },
                 onAccept = { request ->
                     handleFriendRequest(request, ScrmFriendRequestOperation.Accept)
                 },
@@ -13917,8 +15372,1148 @@ private fun ScrmContactsPanel(route: ScrmFloatingAccountRoute?, onClose: () -> U
                     handleFriendRequest(request, ScrmFriendRequestOperation.Reject)
                 }
             )
+            WechatContactsPanelScreen.StartGroup -> WechatStartGroupPanel(
+                contacts = state.contacts,
+                selectedContactIds = startGroupSelectedContactIds,
+                loading = state.loading,
+                status = state.status,
+                error = state.error,
+                onBack = {
+                    startGroupSelectedContactIds.clear()
+                    panelScreen = WechatContactsPanelScreen.Contacts
+                    state = state.copy(error = null)
+                },
+                onDone = ::createChatRoomFromSelectedContacts,
+                onPlaceholderClick = { label ->
+                    Toast.makeText(context, "$label 暂未接入", Toast.LENGTH_SHORT).show()
+                }
+            )
+        }
+        if (showPlusMenu) {
+            WechatContactsPlusMenu(
+                onDismiss = { showPlusMenu = false },
+                onAction = { action ->
+                    showPlusMenu = false
+                    when (action) {
+                        WechatContactsPlusAction.StartGroup -> {
+                            startGroupSelectedContactIds.clear()
+                            panelScreen = WechatContactsPanelScreen.StartGroup
+                            state = state.copy(error = null)
+                        }
+                        WechatContactsPlusAction.Payment -> {
+                            Toast.makeText(context, "${action.label} 暂未接入", Toast.LENGTH_SHORT).show()
+                        }
+                        WechatContactsPlusAction.AddFriend -> {
+                            panelScreen = WechatContactsPanelScreen.AddFriend
+                            state = state.copy(friendSearchProfile = null, error = null)
+                        }
+                        WechatContactsPlusAction.Scan -> openCameraForScan()
+                    }
+                },
+                modifier = Modifier.align(Alignment.TopEnd)
+            )
         }
     }
+}
+
+@Composable
+private fun WechatContactsBookPanel(
+    contacts: List<ScrmContact>,
+    friendRequestCount: Int,
+    loading: Boolean,
+    searchVisible: Boolean,
+    searchText: String,
+    status: String?,
+    error: String?,
+    onSearchVisibleChange: (Boolean) -> Unit,
+    onSearchTextChange: (String) -> Unit,
+    onSearchSubmit: () -> Unit,
+    onSync: () -> Unit,
+    onClose: () -> Unit,
+    onPlusClick: () -> Unit,
+    onNewFriendsClick: () -> Unit,
+    onPlaceholderClick: (String) -> Unit,
+    onContactClick: (ScrmContact) -> Unit
+) {
+    val visibleContacts = remember(contacts, searchText) {
+        filterWechatContacts(contacts, searchText)
+    }
+    val sections = remember(visibleContacts) { groupedWechatContactSections(visibleContacts) }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(WechatContactsPageBackground)
+    ) {
+        WechatContactsTopBar(
+            title = wechatContactsTitle(),
+            showBack = false,
+            onBack = onClose,
+            onSearchClick = { onSearchVisibleChange(!searchVisible) },
+            onPlusClick = onPlusClick
+        )
+        if (searchVisible) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(WechatContactsHeaderBackground)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                WechatSearchField(
+                    value = searchText,
+                    onValueChange = onSearchTextChange,
+                    placeholder = "搜索联系人",
+                    onSearch = onSearchSubmit,
+                    modifier = Modifier.weight(1f)
+                )
+                ScrmPanelButton(label = "搜索", enabled = !loading, accent = true, onClick = onSearchSubmit)
+            }
+        }
+        WechatContactsStatusLine(
+            loading = loading,
+            status = status,
+            error = error,
+            onSync = onSync
+        )
+        Box(modifier = Modifier.fillMaxWidth()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 360.dp, max = 520.dp)
+                    .padding(end = 16.dp)
+            ) {
+                item(key = "new-friends") {
+                    WechatContactShortcutRow(
+                        icon = Icons.Filled.PersonAdd,
+                        iconColor = Color(0xFFFF9F2F),
+                        title = "新的朋友",
+                        subtitle = friendRequestCount.takeIf { it > 0 }?.let { "$it 条待处理申请" },
+                        onClick = onNewFriendsClick
+                    )
+                }
+                item(key = "groups") {
+                    WechatContactShortcutRow(
+                        icon = Icons.Filled.Groups,
+                        iconColor = Color(0xFF16C26D),
+                        title = "群聊",
+                        onClick = { onPlaceholderClick("群聊") }
+                    )
+                }
+                item(key = "tags") {
+                    WechatContactShortcutRow(
+                        icon = Icons.Filled.LocalOffer,
+                        iconColor = Color(0xFF2E8BEF),
+                        title = "标签",
+                        onClick = { onPlaceholderClick("标签") }
+                    )
+                }
+                item(key = "official") {
+                    WechatContactShortcutRow(
+                        icon = Icons.Filled.MenuBook,
+                        iconColor = Color(0xFF287BEA),
+                        title = "公众号",
+                        onClick = { onPlaceholderClick("公众号") }
+                    )
+                }
+                item(key = "enterprise-header") {
+                    WechatContactSectionHeader("我的企业及企业联系人")
+                }
+                item(key = "wecom") {
+                    WechatContactShortcutRow(
+                        icon = Icons.Filled.Contacts,
+                        iconColor = Color(0xFF2F93E8),
+                        title = "企业微信联系人",
+                        onClick = { onPlaceholderClick("企业微信联系人") }
+                    )
+                }
+                item(key = "assistant") {
+                    WechatContactShortcutRow(
+                        icon = Icons.Filled.Home,
+                        iconColor = Color(0xFF5BC0F0),
+                        title = "血饮智参",
+                        onClick = { onPlaceholderClick("血饮智参") }
+                    )
+                }
+                if (sections.isEmpty()) {
+                    item(key = "empty") {
+                        TextLabel(
+                            text = if (loading) "正在加载..." else "暂无联系人",
+                            size = 12.sp,
+                            color = WechatContactsSecondaryText,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 18.dp),
+                            maxLines = 1
+                        )
+                    }
+                }
+                sections.forEach { section ->
+                    item(key = "section-${section.title}") {
+                        WechatContactSectionHeader(section.title)
+                    }
+                    itemsIndexed(
+                        items = section.contacts,
+                        key = { _, contact -> "contact-${contact.id}" }
+                    ) { _, contact ->
+                        WechatContactRow(contact = contact, onClick = { onContactClick(contact) })
+                    }
+                }
+            }
+            WechatContactIndexRail(modifier = Modifier.align(Alignment.CenterEnd))
+        }
+    }
+}
+
+@Composable
+private fun WechatStartGroupPanel(
+    contacts: List<ScrmContact>,
+    selectedContactIds: MutableMap<Int, Boolean>,
+    loading: Boolean,
+    status: String?,
+    error: String?,
+    onBack: () -> Unit,
+    onDone: () -> Unit,
+    onPlaceholderClick: (String) -> Unit
+) {
+    var searchText by remember { mutableStateOf("") }
+    val visibleContacts = remember(contacts, searchText) {
+        filterWechatContacts(contacts, searchText)
+    }
+    val sections = remember(visibleContacts) { groupedWechatContactSections(visibleContacts) }
+    val selectedCount = selectedContactIds.values.count { selected -> selected }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(WechatContactsPageBackground)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(44.dp)
+                .background(WechatContactsHeaderBackground)
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack, modifier = Modifier.size(34.dp)) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = null,
+                    tint = WechatContactsPrimaryText,
+                    modifier = Modifier.size(21.dp)
+                )
+            }
+            TextLabel(
+                text = wechatStartGroupTitle(),
+                size = 16.sp,
+                weight = FontWeight.Bold,
+                color = WechatContactsPrimaryText,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                modifier = Modifier.weight(1f)
+            )
+            ScrmPanelButton(
+                label = wechatStartGroupDoneLabel(selectedCount),
+                enabled = selectedCount > 0 && !loading,
+                accent = true,
+                onClick = onDone
+            )
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(WechatContactsHeaderBackground)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            WechatSearchField(
+                value = searchText,
+                onValueChange = { searchText = it },
+                placeholder = "搜索",
+                onSearch = {},
+                modifier = Modifier.weight(1f)
+            )
+        }
+        WechatContactsStatusText(status = status, error = error)
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 360.dp, max = 520.dp)
+        ) {
+            wechatStartGroupOptionLabels().forEachIndexed { index, label ->
+                item(key = "start-group-option-$index") {
+                    WechatStartGroupOptionRow(label = label, onClick = { onPlaceholderClick(label) })
+                }
+            }
+            item(key = "contacts-header") {
+                WechatContactSectionHeader("选择联系人")
+            }
+            if (sections.isEmpty()) {
+                item(key = "empty") {
+                    TextLabel(
+                        text = if (loading) "正在加载..." else "暂无可选择联系人",
+                        size = 12.sp,
+                        color = WechatContactsSecondaryText,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+                        maxLines = 1
+                    )
+                }
+            }
+            sections.forEach { section ->
+                item(key = "start-section-${section.title}") {
+                    WechatContactSectionHeader(section.title)
+                }
+                itemsIndexed(
+                    items = section.contacts,
+                    key = { _, contact -> "start-contact-${contact.id}" }
+                ) { _, contact ->
+                    WechatStartGroupContactRow(
+                        contact = contact,
+                        selected = selectedContactIds[contact.id] == true,
+                        enabled = !loading,
+                        onToggle = {
+                            if (selectedContactIds[contact.id] == true) {
+                                selectedContactIds.remove(contact.id)
+                            } else {
+                                selectedContactIds[contact.id] = true
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WechatContactsStatusText(
+    status: String?,
+    error: String?
+) {
+    val message = error?.takeIf { it.isNotBlank() } ?: status?.takeIf { it.isNotBlank() }
+    if (message == null) return
+    TextLabel(
+        text = message,
+        size = 10.sp,
+        color = if (error != null) Color(0xFFE45858) else WechatContactsSecondaryText,
+        maxLines = 2,
+        lineHeight = 13.sp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(WechatContactsPageBackground)
+            .padding(horizontal = 18.dp, vertical = 6.dp)
+    )
+}
+
+@Composable
+private fun WechatStartGroupOptionRow(
+    label: String,
+    onClick: () -> Unit
+) {
+    val icon = when (label) {
+        "选择一个群" -> Icons.Filled.Groups
+        "面对面建群" -> Icons.Filled.Radar
+        else -> Icons.Filled.Contacts
+    }
+    WechatContactShortcutRow(
+        icon = icon,
+        iconColor = Color(0xFF2F93E8),
+        title = label,
+        onClick = onClick
+    )
+}
+
+@Composable
+private fun WechatStartGroupContactRow(
+    contact: ScrmContact,
+    selected: Boolean,
+    enabled: Boolean,
+    onToggle: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(WechatContactsRowBackground)
+            .clickable(enabled = enabled, onClick = onToggle)
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Icon(
+            imageVector = if (selected) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
+            contentDescription = null,
+            tint = if (selected) Color(0xFF1AAD19) else WechatContactsSecondaryText,
+            modifier = Modifier.size(22.dp)
+        )
+        WechatContactAvatar(contact = contact)
+        TextLabel(
+            text = contact.displayName,
+            size = 15.sp,
+            color = WechatContactsPrimaryText,
+            maxLines = 1,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun WechatContactsTopBar(
+    title: String,
+    showBack: Boolean,
+    onBack: () -> Unit,
+    onSearchClick: (() -> Unit)? = null,
+    onPlusClick: (() -> Unit)? = null
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .background(WechatContactsHeaderBackground)
+            .padding(horizontal = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        if (showBack) {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .size(34.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = null,
+                    tint = WechatContactsPrimaryText,
+                    modifier = Modifier.size(21.dp)
+                )
+            }
+        }
+        TextLabel(
+            text = title,
+            size = 16.sp,
+            weight = FontWeight.Bold,
+            color = WechatContactsPrimaryText,
+            maxLines = 1
+        )
+        Row(
+            modifier = Modifier.align(Alignment.CenterEnd),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            onSearchClick?.let { click ->
+                IconButton(onClick = click, modifier = Modifier.size(34.dp)) {
+                    Icon(
+                        imageVector = Icons.Filled.Search,
+                        contentDescription = null,
+                        tint = WechatContactsPrimaryText,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+            onPlusClick?.let { click ->
+                IconButton(onClick = click, modifier = Modifier.size(34.dp)) {
+                    Icon(
+                        imageVector = Icons.Filled.Add,
+                        contentDescription = null,
+                        tint = WechatContactsPrimaryText,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WechatContactsStatusLine(
+    loading: Boolean,
+    status: String?,
+    error: String?,
+    onSync: () -> Unit
+) {
+    val message = wechatContactsStatusText(loading = loading, status = status, error = error)
+    if (message == null && !loading) return
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(WechatContactsPageBackground)
+            .padding(horizontal = 12.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        TextLabel(
+            text = message.orEmpty(),
+            size = 10.sp,
+            color = if (error != null) Color(0xFFE45858) else WechatContactsSecondaryText,
+            maxLines = 1,
+            modifier = Modifier.weight(1f)
+        )
+        ScrmPanelButton(label = "同步", enabled = !loading, onClick = onSync)
+    }
+}
+
+@Composable
+private fun WechatSearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    onSearch: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .height(36.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(WechatContactsSearchBackground)
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Search,
+            contentDescription = null,
+            tint = WechatContactsHintText,
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+            textStyle = TextStyle.Default.copy(
+                color = WechatContactsPrimaryText,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Normal
+            ),
+            modifier = Modifier.weight(1f)
+        ) { innerTextField ->
+            Box(contentAlignment = Alignment.CenterStart) {
+                if (value.isBlank()) {
+                    TextLabel(
+                        text = placeholder,
+                        size = 14.sp,
+                        color = WechatContactsHintText,
+                        maxLines = 1
+                    )
+                }
+                innerTextField()
+            }
+        }
+    }
+}
+
+@Composable
+private fun WechatContactsPlusMenu(
+    onDismiss: () -> Unit,
+    onAction: (WechatContactsPlusAction) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = { onDismiss() })
+            },
+        contentAlignment = Alignment.TopEnd
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(top = 40.dp, end = 6.dp)
+                .width(188.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(Color(0xEE3E3E3E))
+                .pointerInput(Unit) {
+                    detectTapGestures(onTap = {})
+                }
+                .padding(vertical = 6.dp)
+        ) {
+            WechatContactsPlusAction.values().forEach { action ->
+                WechatPlusMenuRow(action = action, onClick = { onAction(action) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun WechatPlusMenuRow(
+    action: WechatContactsPlusAction,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Icon(
+            imageVector = when (action) {
+                WechatContactsPlusAction.StartGroup -> Icons.Filled.Textsms
+                WechatContactsPlusAction.AddFriend -> Icons.Filled.PersonAdd
+                WechatContactsPlusAction.Scan -> Icons.Filled.CropFree
+                WechatContactsPlusAction.Payment -> Icons.Filled.CreditCard
+            },
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(22.dp)
+        )
+        TextLabel(
+            text = action.label,
+            size = 15.sp,
+            color = Color.White,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun WechatContactShortcutRow(
+    icon: ImageVector,
+    iconColor: Color,
+    title: String,
+    subtitle: String? = null,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(WechatContactsRowBackground)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(iconColor),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .heightIn(min = 40.dp),
+            verticalArrangement = Arrangement.Center
+        ) {
+            TextLabel(
+                text = title,
+                size = 15.sp,
+                color = WechatContactsPrimaryText,
+                maxLines = 1
+            )
+            subtitle?.takeIf { it.isNotBlank() }?.let { value ->
+                TextLabel(
+                    text = value,
+                    size = 10.sp,
+                    color = WechatContactsSecondaryText,
+                    maxLines = 1
+                )
+            }
+        }
+        Box(
+            modifier = Modifier
+                .height(1.dp)
+                .width(0.dp)
+        )
+    }
+}
+
+@Composable
+private fun WechatContactSectionHeader(title: String) {
+    TextLabel(
+        text = title,
+        size = 11.sp,
+        color = WechatContactsSecondaryText,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(WechatContactsPageBackground)
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        maxLines = 1
+    )
+}
+
+@Composable
+private fun WechatContactRow(
+    contact: ScrmContact,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(WechatContactsRowBackground)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        WechatContactAvatar(contact = contact)
+        TextLabel(
+            text = contact.displayName,
+            size = 15.sp,
+            color = WechatContactsPrimaryText,
+            maxLines = 1,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun WechatContactAvatar(contact: ScrmContact, size: Dp = 42.dp) {
+    val context = LocalContext.current
+    val bitmap = rememberAsyncImageThumbnailBitmap(
+        context = context,
+        uriText = contact.avatar?.takeIf { it.isNotBlank() }
+    )
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(RoundedCornerShape(4.dp))
+            .background(wechatContactAvatarColor(contact)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            TextLabel(
+                text = contact.displayName.take(2),
+                size = 12.sp,
+                weight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+private fun WechatContactIntroPanel(
+    contact: ScrmContact?,
+    loading: Boolean,
+    onBack: () -> Unit,
+    onOpenChat: () -> Unit,
+    onOpenVideoCall: () -> Unit,
+    onOpenFriendProfile: () -> Unit,
+    onOpenMoments: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(WechatContactsPageBackground)
+    ) {
+        WechatContactIntroTopBar(onBack = onBack)
+        if (contact == null) {
+            TextLabel(
+                text = "请选择联系人",
+                size = 13.sp,
+                color = WechatContactsSecondaryText,
+                modifier = Modifier.padding(18.dp),
+                maxLines = 1
+            )
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(WechatContactsRowBackground)
+                    .padding(horizontal = 18.dp, vertical = 20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                WechatContactAvatar(contact = contact, size = 64.dp)
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    TextLabel(
+                        text = contact.displayName,
+                        size = 21.sp,
+                        weight = FontWeight.Bold,
+                        color = WechatContactsPrimaryText,
+                        maxLines = 1
+                    )
+                    TextLabel(
+                        text = "微信号：${contact.wxid.orEmpty().ifBlank { contact.friendNo.orEmpty().ifBlank { "无" } }}",
+                        size = 13.sp,
+                        color = WechatContactsSecondaryText,
+                        maxLines = 1
+                    )
+                    TextLabel(
+                        text = "地区：${contact.sourceExt.orEmpty().ifBlank { contact.source.orEmpty().ifBlank { "未知" } }}",
+                        size = 13.sp,
+                        color = WechatContactsSecondaryText,
+                        maxLines = 1
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            WechatContactIntroRow(
+                title = "朋友资料",
+                subtitle = "添加朋友的备注名、电话、标签、备忘、照片等，并设置朋友圈权限。",
+                onClick = onOpenFriendProfile
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            WechatContactIntroRow(title = "朋友圈", subtitle = null, onClick = onOpenMoments)
+            Spacer(modifier = Modifier.height(8.dp))
+            WechatContactIntroActionRow(
+                icon = Icons.Filled.Textsms,
+                label = "发消息",
+                enabled = !loading,
+                onClick = onOpenChat
+            )
+            WechatContactIntroActionRow(
+                icon = Icons.Filled.PhoneAndroid,
+                label = "音视频通话",
+                enabled = !loading,
+                onClick = onOpenVideoCall
+            )
+        }
+    }
+}
+
+@Composable
+private fun WechatContactIntroTopBar(onBack: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(WechatContactsRowBackground)
+            .padding(horizontal = 6.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        CompactInteractiveSize {
+            IconButton(onClick = onBack, modifier = Modifier.size(36.dp)) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "返回",
+                    tint = WechatContactsPrimaryText,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.weight(1f))
+        Icon(
+            imageVector = Icons.Filled.MoreHoriz,
+            contentDescription = null,
+            tint = WechatContactsPrimaryText,
+            modifier = Modifier
+                .padding(end = 8.dp)
+                .size(24.dp)
+        )
+    }
+}
+
+@Composable
+private fun WechatContactIntroRow(
+    title: String,
+    subtitle: String?,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(WechatContactsRowBackground)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            TextLabel(
+                text = title,
+                size = 15.sp,
+                weight = FontWeight.SemiBold,
+                color = WechatContactsPrimaryText,
+                maxLines = 1
+            )
+            if (subtitle != null) {
+                TextLabel(
+                    text = subtitle,
+                    size = 11.sp,
+                    color = WechatContactsSecondaryText,
+                    maxLines = 2
+                )
+            }
+        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = WechatContactsChevronText,
+            modifier = Modifier.size(22.dp)
+        )
+    }
+}
+
+@Composable
+private fun WechatContactIntroActionRow(
+    icon: ImageVector,
+    label: String,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(WechatContactsRowBackground)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 15.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = Color(0xFF49679E),
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        TextLabel(
+            text = label,
+            size = 16.sp,
+            weight = FontWeight.SemiBold,
+            color = Color(0xFF49679E),
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun WechatContactIndexRail(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .padding(end = 2.dp)
+            .width(14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        wechatContactIndexLabels().forEach { label ->
+            TextLabel(
+                text = label,
+                size = 8.sp,
+                color = WechatContactsIndexText,
+                maxLines = 1,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+private fun WechatAddFriendPanel(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    verifyMessage: String,
+    onVerifyMessageChange: (String) -> Unit,
+    loading: Boolean,
+    status: String?,
+    error: String?,
+    onBack: () -> Unit,
+    onAdd: () -> Unit,
+    onScan: () -> Unit,
+    onPlaceholderClick: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(WechatContactsRowBackground)
+    ) {
+        WechatContactsTopBar(title = "添加朋友", showBack = true, onBack = onBack)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            WechatSearchField(
+                value = query,
+                onValueChange = onQueryChange,
+                placeholder = "账号/手机号",
+                onSearch = onAdd,
+                modifier = Modifier.weight(1f)
+            )
+            ScrmPanelButton(label = "添加", enabled = !loading, accent = true, onClick = onAdd)
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            PanelTextInput(
+                value = verifyMessage,
+                onValueChange = onVerifyMessageChange,
+                placeholder = "验证消息",
+                modifier = Modifier.weight(1f)
+            )
+        }
+        WechatContactsStatusLine(loading = loading, status = status, error = error, onSync = {})
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 320.dp, max = 450.dp)
+        ) {
+            item {
+                WechatAddFriendEntryRow(
+                    icon = Icons.Filled.CropFree,
+                    iconColor = Color(0xFF1688FF),
+                    title = "扫一扫",
+                    subtitle = "扫描二维码名片",
+                    onClick = onScan
+                )
+            }
+            item {
+                WechatAddFriendEntryRow(
+                    icon = Icons.Filled.PhoneAndroid,
+                    iconColor = Color(0xFF08C160),
+                    title = "手机联系人",
+                    subtitle = "添加通讯录中的朋友",
+                    onClick = { onPlaceholderClick("手机联系人") }
+                )
+            }
+            item {
+                WechatAddFriendEntryRow(
+                    icon = Icons.Filled.Radar,
+                    iconColor = Color(0xFF6A72FF),
+                    title = "雷达",
+                    subtitle = "添加身边的朋友",
+                    onClick = { onPlaceholderClick("雷达") }
+                )
+            }
+            item {
+                WechatAddFriendEntryRow(
+                    icon = Icons.Filled.Contacts,
+                    iconColor = Color(0xFF1688FF),
+                    title = "企业微信联系人",
+                    subtitle = "通过手机号搜索企业微信用户",
+                    onClick = { onPlaceholderClick("企业微信联系人") }
+                )
+            }
+            item {
+                WechatAddFriendEntryRow(
+                    icon = Icons.Filled.Groups,
+                    iconColor = Color(0xFF08C160),
+                    title = "面对面建群",
+                    subtitle = "与身边的朋友进入同一个群聊",
+                    onClick = { onPlaceholderClick("面对面建群") }
+                )
+            }
+            item {
+                WechatAddFriendEntryRow(
+                    icon = Icons.Filled.MenuBook,
+                    iconColor = Color(0xFF1688FF),
+                    title = "公众号",
+                    subtitle = "获取更多资讯",
+                    onClick = { onPlaceholderClick("公众号") }
+                )
+            }
+            item {
+                WechatAddFriendEntryRow(
+                    icon = Icons.Filled.Article,
+                    iconColor = Color(0xFFFF5A48),
+                    title = "服务号",
+                    subtitle = "获取更多购物信息和服务",
+                    onClick = { onPlaceholderClick("服务号") }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WechatAddFriendEntryRow(
+    icon: ImageVector,
+    iconColor: Color,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(WechatContactsRowBackground)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 24.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = iconColor,
+            modifier = Modifier.size(25.dp)
+        )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            TextLabel(
+                text = title,
+                size = 15.sp,
+                color = WechatContactsPrimaryText,
+                maxLines = 1
+            )
+            TextLabel(
+                text = subtitle,
+                size = 11.sp,
+                color = WechatContactsSecondaryText,
+                maxLines = 1
+            )
+        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = WechatContactsChevronText,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+@Composable
+private fun WechatFriendRequestsPanel(
+    requests: List<ScrmFriendRequest>,
+    loading: Boolean,
+    onBack: () -> Unit,
+    onAccept: (ScrmFriendRequest) -> Unit,
+    onReject: (ScrmFriendRequest) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(WechatContactsRowBackground)
+            .padding(bottom = 12.dp)
+    ) {
+        WechatContactsTopBar(title = "新的朋友", showBack = true, onBack = onBack)
+        Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            ScrmFriendRequestList(
+                requests = requests,
+                enabled = !loading,
+                modifier = Modifier.fillMaxWidth(),
+                onAccept = onAccept,
+                onReject = onReject
+            )
+        }
+    }
+}
+
+private fun wechatContactAvatarColor(contact: ScrmContact): Color {
+    val palette = listOf(
+        Color(0xFF5B8EB7),
+        Color(0xFF58A36D),
+        Color(0xFFB97A56),
+        Color(0xFF7B73B7),
+        Color(0xFFB75B76)
+    )
+    return palette[(contact.id and Int.MAX_VALUE) % palette.size]
 }
 
 @Composable
@@ -14307,9 +16902,271 @@ internal data class ScrmFriendSearchProfile(
     val source: String? = null
 )
 
-internal fun contactAddFriendUsesSearchBeforeApply(): Boolean = true
+private sealed interface ScrmFriendSearchResult {
+    data class Found(val profile: ScrmFriendSearchProfile) : ScrmFriendSearchResult
+    data class Pending(val message: String) : ScrmFriendSearchResult
+}
 
-internal fun contactAddFriendShowsIndependentProfileBeforeApply(): Boolean = true
+internal fun contactAddFriendUsesSearchBeforeApply(): Boolean = false
+
+internal fun contactAddFriendShowsIndependentProfileBeforeApply(): Boolean = false
+
+internal fun wechatContactsStatusText(
+    loading: Boolean,
+    status: String?,
+    error: String?
+): String? {
+    error?.takeIf { it.isNotBlank() }?.let { return it }
+    val cleanStatus = status?.takeIf { it.isNotBlank() }
+    return when {
+        loading -> cleanStatus ?: "正在处理"
+        else -> cleanStatus
+    }
+}
+
+internal fun friendApplySubmittedStatus(message: String): String {
+    val detail = message.trim().ifBlank { "等待对方确认" }
+    return "好友申请已发送：$detail"
+}
+
+internal fun scrmDirectAddFriendRequest(
+    deviceUuid: String,
+    weChatId: String,
+    friendAccount: String,
+    message: String
+): ScrmAddFriendRequest {
+    return ScrmAddFriendRequest(
+        deviceUuid = deviceUuid,
+        weChatId = weChatId,
+        friendWxid = friendAccount.trim(),
+        message = message.trim().takeIf { it.isNotEmpty() }
+    )
+}
+
+internal fun scrmAddFriendInputLooksLikePhone(input: String): Boolean {
+    val normalized = input.trim().replace(" ", "").replace("-", "")
+    return normalized.length >= 7 && normalized.all { char -> char.isDigit() || char == '+' }
+}
+
+internal fun scrmContactPrimaryConversationId(contact: ScrmContact): String? {
+    return contact.wxid?.takeIf { it.isNotBlank() }
+        ?: contact.friendNo?.takeIf { it.isNotBlank() }
+}
+
+internal fun scrmContactsPanelContactQuery(
+    weChatId: String,
+    pageNumber: Int,
+    search: String?
+): ScrmContactQuery {
+    return ScrmContactQuery(
+        weChatId = weChatId,
+        page = pageNumber,
+        pageSize = scrmConversationPageSize(),
+        search = search?.trim()?.takeIf { it.isNotEmpty() },
+        onlyFriends = true,
+        includeProfile = false
+    )
+}
+
+internal fun scrmRouteCurrentDeviceMismatchMessage(
+    route: ScrmFloatingAccountRoute,
+    devices: List<ScrmDevice>
+): String? {
+    val currentDevice = devices.firstOrNull { device -> device.uuid == route.deviceUuid }
+        ?: return null
+    val currentWeChatId = currentDevice.weChatId?.takeIf { it.isNotBlank() }
+        ?: return null
+    if (currentWeChatId == route.weChatId) return null
+    return "选择账号与设备当前微信账号不一致：当前设备 ${route.deviceUuid} 正在登录 $currentWeChatId，" +
+        "不能使用 ${route.weChatId} 执行该操作。请切换到对应微信账号后刷新。"
+}
+
+internal fun scrmPrivateChatThreadIdForContact(
+    route: ScrmFloatingAccountRoute,
+    contact: ScrmContact
+): String? {
+    val conversationId = scrmContactPrimaryConversationId(contact) ?: return null
+    return scrmFloatingScopedThreadId(
+        accountId = scrmFloatingAccountId(route.deviceUuid, route.weChatId),
+        threadId = scrmFloatingContactId(conversationId)
+    )
+}
+
+internal fun scrmFloatingContactForProfile(
+    route: ScrmFloatingAccountRoute,
+    contact: ScrmContact
+): FloatingChatContact? {
+    val conversationId = scrmContactPrimaryConversationId(contact) ?: return null
+    val displayName = contact.displayName.trim().ifBlank { conversationId }
+    return FloatingChatContact(
+        id = scrmFloatingScopedThreadId(
+            accountId = scrmFloatingAccountId(route.deviceUuid, route.weChatId),
+            threadId = scrmFloatingContactId(conversationId)
+        ),
+        name = displayName,
+        initials = displayName.take(2).ifBlank { "WX" },
+        description = "WeChat friend / $conversationId",
+        avatarColor = wechatContactAvatarColor(contact).toArgb().toLong(),
+        avatarUrl = contact.avatar?.takeIf { it.isNotBlank() },
+        online = contact.isBlocked == 0
+    )
+}
+
+internal data class ScrmWechatContactSection(
+    val title: String,
+    val contacts: List<ScrmContact>
+)
+
+private enum class WechatContactsPanelScreen {
+    Contacts,
+    StartGroup,
+    AddFriend,
+    ContactIntro,
+    FriendRequests
+}
+
+private enum class WechatContactsPlusAction(val label: String) {
+    StartGroup("发起群聊"),
+    AddFriend("添加朋友"),
+    Scan("扫一扫"),
+    Payment("收付款")
+}
+
+internal fun wechatContactsTitle(): String = "通讯录"
+
+internal fun wechatContactsPlusMenuLabels(): List<String> {
+    return WechatContactsPlusAction.values().map { action -> action.label }
+}
+
+internal fun wechatContactsPendingMenuLabels(): List<String> {
+    return listOf(WechatContactsPlusAction.StartGroup.label, WechatContactsPlusAction.Payment.label)
+}
+
+internal fun wechatContactsStartGroupUsesContactPicker(): Boolean = true
+
+internal fun wechatStartGroupTitle(): String = "发起群聊"
+
+internal fun wechatStartGroupDoneLabel(selectedCount: Int): String {
+    return if (selectedCount > 0) "完成($selectedCount)" else "完成"
+}
+
+internal fun wechatStartGroupOptionLabels(): List<String> {
+    return listOf("选择一个群", "面对面建群", "企业微信联系人")
+}
+
+internal fun scrmCreateChatRoomMemberWxids(contacts: List<ScrmContact>): List<String> {
+    return contacts.mapNotNull { contact ->
+        scrmContactPrimaryConversationId(contact)?.trim()?.takeIf { it.isNotEmpty() }
+    }.distinct()
+}
+
+internal fun wechatAddFriendPageEntryLabels(): List<String> {
+    return listOf("扫一扫", "手机联系人", "雷达", "企业微信联系人", "面对面建群", "公众号", "服务号")
+}
+
+internal fun wechatContactIntroInfoRowLabels(): List<String> {
+    return listOf("朋友资料", "朋友圈")
+}
+
+internal fun wechatContactIntroActionLabels(): List<String> {
+    return listOf("发消息", "音视频通话")
+}
+
+internal fun wechatContactIndexLabels(): List<String> {
+    return listOf("☆") + ('A'..'Z').map(Char::toString) + "#"
+}
+
+internal fun filterWechatContacts(
+    contacts: List<ScrmContact>,
+    query: String
+): List<ScrmContact> {
+    val keyword = query.trim()
+    if (keyword.isBlank()) return contacts
+    return contacts.filter { contact ->
+        listOfNotNull(
+            contact.displayName,
+            contact.nickname,
+            contact.remarks,
+            contact.wxid,
+            contact.friendNo,
+            contact.source
+        ).any { value -> value.contains(keyword, ignoreCase = true) }
+    }
+}
+
+internal fun groupedWechatContactSections(contacts: List<ScrmContact>): List<ScrmWechatContactSection> {
+    return contacts
+        .sortedWith(
+            compareBy<ScrmContact>(
+                { wechatContactSectionTitle(it) },
+                { it.displayName.lowercase(Locale.ROOT) }
+            )
+        )
+        .groupBy(::wechatContactSectionTitle)
+        .toSortedMap(compareBy(::wechatContactSectionSortOrder))
+        .map { (title, groupContacts) ->
+            ScrmWechatContactSection(title = title, contacts = groupContacts)
+        }
+}
+
+private fun wechatContactSectionTitle(contact: ScrmContact): String {
+    return wechatContactInitial(contact.displayName)?.toString() ?: "#"
+}
+
+private fun wechatContactInitial(value: String): Char? {
+    val first = value.trim().firstOrNull() ?: return null
+    return when {
+        first.isLetter() && first.code < 128 -> first.uppercaseChar()
+        first.isDigit() -> "#".first()
+        else -> chinesePinyinInitial(first)
+    }?.takeIf { it in 'A'..'Z' }
+}
+
+private fun chinesePinyinInitial(char: Char): Char? {
+    val bytes = runCatching { char.toString().toByteArray(Charset.forName("GBK")) }.getOrNull()
+        ?: return null
+    if (bytes.size < 2) return null
+    val code = ((bytes[0].toInt() and 0xFF) * 256 + (bytes[1].toInt() and 0xFF)) - 65536
+    val ranges = listOf(
+        -20319 to 'A',
+        -20283 to 'B',
+        -19775 to 'C',
+        -19218 to 'D',
+        -18710 to 'E',
+        -18526 to 'F',
+        -18239 to 'G',
+        -17922 to 'H',
+        -17417 to 'J',
+        -16474 to 'K',
+        -16212 to 'L',
+        -15640 to 'M',
+        -15165 to 'N',
+        -14922 to 'O',
+        -14914 to 'P',
+        -14630 to 'Q',
+        -14149 to 'R',
+        -14090 to 'S',
+        -13318 to 'T',
+        -12838 to 'W',
+        -12556 to 'X',
+        -11847 to 'Y',
+        -11055 to 'Z'
+    )
+    return ranges
+        .zipWithNext()
+        .firstOrNull { (current, next) -> code in current.first until next.first }
+        ?.first
+        ?.second
+        ?: ranges.lastOrNull { (start, _) -> code >= start }?.second
+}
+
+private fun wechatContactSectionSortOrder(title: String): Int {
+    return when {
+        title == "☆" -> 0
+        title.length == 1 && title.first() in 'A'..'Z' -> title.first() - 'A' + 1
+        else -> 27
+    }
+}
 
 private enum class ScrmFriendAddInputKind {
     Wxid,
@@ -18512,6 +21369,67 @@ internal fun preparedForwardedMessageForSend(
     return prepareOutgoingMessage(baseMessage, threadId)
 }
 
+internal fun combinedForwardChatHistoryMessage(
+    messages: List<FloatingChatMessage>,
+    conversation: FloatingChatConversation,
+    target: ChatThreadSelection,
+    accountId: String,
+    sequence: Int
+): FloatingChatMessage {
+    val accountName = conversation.accountContacts
+        .firstOrNull { account -> account.id == accountId }
+        ?.name
+        ?: conversation.accountName.ifBlank { "我" }
+    val threadContactId = when (target) {
+        ChatThreadSelection.Group -> null
+        is ChatThreadSelection.GroupChat -> target.groupId
+        is ChatThreadSelection.Private -> target.contactId
+    }
+    val targetPrefix = when (target) {
+        ChatThreadSelection.Group -> "group"
+        is ChatThreadSelection.GroupChat -> target.groupId
+        is ChatThreadSelection.Private -> target.contactId
+    }
+    val previewLines = messages.take(CombinedForwardPreviewMaxLines).map { message ->
+        val author = message.senderName.ifBlank {
+            if (message.fromMe) accountName else "对方"
+        }
+        "$author：${message.longPressCopyText()}"
+    }
+    return FloatingChatMessage(
+        id = "local-chat-history-$targetPrefix-$accountId-$sequence",
+        type = FloatingChatMessageType.ChatHistory,
+        text = chatHistoryTitleForTarget(conversation, target),
+        fromMe = true,
+        senderName = accountName,
+        time = "刚刚",
+        connectionTarget = FloatingChatConnectionTarget.Account,
+        connectionTargetId = accountId,
+        threadContactId = threadContactId,
+        detail = "共 ${messages.size} 条聊天记录",
+        filePreviewLines = previewLines,
+        sendState = FloatingChatSendState.LocalOnly
+    )
+}
+
+private fun chatHistoryTitleForTarget(
+    conversation: FloatingChatConversation,
+    target: ChatThreadSelection
+): String {
+    val targetName = when (target) {
+        ChatThreadSelection.Group -> conversation.peerName.ifBlank { "群聊" }
+        is ChatThreadSelection.GroupChat -> conversation.groupContacts
+            .firstOrNull { group -> group.id == target.groupId }
+            ?.name
+            ?: conversation.peerName.ifBlank { "群聊" }
+        is ChatThreadSelection.Private -> conversation.contacts
+            .firstOrNull { contact -> contact.id == target.contactId }
+            ?.name
+            ?: conversation.peerName.ifBlank { "联系人" }
+    }
+    return "${targetName}的聊天记录"
+}
+
 private fun FloatingChatMessage.forwardedCopyFor(
     conversation: FloatingChatConversation,
     target: ChatThreadSelection,
@@ -18681,6 +21599,8 @@ internal fun rightRailToolGestureCancelsLongPressWhenMovedBeforeTimeout(): Boole
 
 internal fun rightRailToolGestureCancelsClickWhenMovedPastTouchSlop(): Boolean = true
 
+internal fun rightRailToolGestureConsumesDownBeforeClick(): Boolean = false
+
 internal fun rightRailToolReorderMovesByDraggedCenterCrossingSlots(): Boolean = true
 
 internal fun rightRailToolListScrollDisabledDuringReorderDrag(): Boolean = true
@@ -18794,6 +21714,8 @@ internal fun rightRailPinnedSelectedAccountConnectorAnchorYWhenCompressed(): Flo
     state.removeAccountAvatar("account-work")
     return state.accountAvatarFor("account-work")?.center?.y ?: -1f
 }
+
+internal fun rightRailPinsSelectedAccountAvatarWhileScrolledOffscreen(): Boolean = true
 
 internal fun defaultRightRailAccountWeight(): Float = RightRailDefaultAccountWeight
 
@@ -19116,6 +22038,8 @@ internal fun contactEditPanelUsesWechatFriendProfileLayout(): Boolean = true
 
 internal fun contactEditPanelHasDeleteFriendAction(): Boolean = true
 
+internal fun wechatContactIntroFriendProfileReusesLongPressPanel(): Boolean = true
+
 internal fun contactEditPanelWechatSectionTitles(): List<String> = listOf("备注", "朋友权限", "更多信息")
 
 internal fun contactEditPanelWechatFieldLabels(): List<String> = listOf(
@@ -19139,8 +22063,119 @@ internal fun groupEditPanelPersistsChangesInSqlite(): Boolean = true
 
 internal fun groupEditPanelStoresMemberAvatarVisibilityPerGroup(): Boolean = true
 
+internal fun groupEditPanelShowsAllLoadedMembers(): Boolean = true
+
+internal fun groupEditPanelMemberAvatarOpensContactIntro(): Boolean = true
+
+internal fun groupEditPanelInviteAndKickUseRealScrmApis(): Boolean = true
+
 internal fun groupInfoMemberCount(members: List<FloatingChatContact>): Int {
-    return (members.size + 1).coerceAtLeast(1)
+    return members.size
+}
+
+internal data class GroupInfoMemberGridItem(
+    val member: FloatingChatContact? = null,
+    val isAddAction: Boolean = false,
+    val isRemoveAction: Boolean = false
+) {
+    val key: String
+        get() = member?.id ?: when {
+            isAddAction -> "add"
+            isRemoveAction -> "remove"
+            else -> "empty"
+        }
+}
+
+internal fun groupInfoMembersForGroup(
+    group: FloatingChatContact,
+    contacts: List<FloatingChatContact>,
+    messages: List<FloatingChatMessage>
+): List<FloatingChatContact> {
+    if (group.groupMemberContacts.isEmpty()) {
+        return groupMemberRailContacts(contacts = contacts, messages = messages)
+    }
+    val knownContactsById = contacts.associateBy { contact -> contact.id }
+    return group.groupMemberContacts.map { member ->
+        knownContactsById[member.id]?.let { knownContact ->
+            knownContact.copy(
+                groupMemberIsOwner = knownContact.groupMemberIsOwner || member.groupMemberIsOwner,
+                groupMemberIsAdmin = knownContact.groupMemberIsAdmin || member.groupMemberIsAdmin
+            )
+        } ?: member
+    }
+}
+
+internal fun groupInfoCurrentMemberForRoute(
+    weChatId: String?,
+    members: List<FloatingChatContact>
+): FloatingChatContact? {
+    val targetWeChatId = weChatId?.takeIf { it.isNotBlank() } ?: return null
+    return members.firstOrNull { member ->
+        scrmFloatingContactConversationId(member.id) == targetWeChatId
+    }
+}
+
+internal fun groupInviteCandidates(
+    contacts: List<FloatingChatContact>,
+    members: List<FloatingChatContact>
+): List<FloatingChatContact> {
+    val memberWxids = members.mapNotNull { member -> scrmFloatingContactConversationId(member.id) }.toSet()
+    return contacts
+        .filter { contact -> scrmFloatingContactConversationId(contact.id) !in memberWxids }
+        .distinctBy { contact -> scrmFloatingContactConversationId(contact.id) ?: contact.id }
+}
+
+internal fun groupKickCandidates(
+    members: List<FloatingChatContact>,
+    currentMember: FloatingChatContact?
+): List<FloatingChatContact> {
+    val currentWxid = currentMember?.let { member -> scrmFloatingContactConversationId(member.id) }
+    return members
+        .filter { member -> scrmFloatingContactConversationId(member.id) != currentWxid }
+        .distinctBy { member -> scrmFloatingContactConversationId(member.id) ?: member.id }
+}
+
+internal fun groupInfoMemberGridRows(
+    members: List<FloatingChatContact>,
+    columns: Int = 4,
+    canManageMembers: Boolean = false
+): List<List<GroupInfoMemberGridItem>> {
+    require(columns > 0) { "columns must be positive" }
+    val cells = members.map { member -> GroupInfoMemberGridItem(member = member) } +
+        GroupInfoMemberGridItem(isAddAction = true) +
+        if (canManageMembers) listOf(GroupInfoMemberGridItem(isRemoveAction = true)) else emptyList()
+    return cells.chunked(columns).map { row ->
+        row + List(columns - row.size) { GroupInfoMemberGridItem() }
+    }
+}
+
+internal fun groupInfoCanManageMembers(currentMember: FloatingChatContact?): Boolean {
+    return currentMember?.groupMemberIsOwner == true || currentMember?.groupMemberIsAdmin == true
+}
+
+internal fun groupInfoMemberManagementLabels(canManageMembers: Boolean): List<String> {
+    return listOf("添加成员") + if (canManageMembers) listOf("移出成员") else emptyList()
+}
+
+internal fun groupInfoMemberIsFriend(
+    member: FloatingChatContact,
+    contacts: List<FloatingChatContact>
+): Boolean {
+    return contacts.any { contact -> contact.id == member.id }
+}
+
+internal fun groupInfoMemberPrimaryActionLabel(isFriend: Boolean): String {
+    return if (isFriend) "发消息" else "添加到通讯录"
+}
+
+internal fun groupMemberAddFriendStatusText(
+    loading: Boolean,
+    status: String?,
+    error: String?
+): String? {
+    error?.takeIf { it.isNotBlank() }?.let { return it }
+    if (loading) return "正在发送好友申请"
+    return status?.takeIf { it.isNotBlank() }
 }
 
 internal fun groupEditPanelWechatFieldLabels(): List<String> = listOf(
@@ -19374,9 +22409,9 @@ internal fun floatingChatOverlayHandlesOwnEdgeGestures(): Boolean = true
 
 internal fun floatingChatOverlayEdgeGestureConsumesPlainTaps(): Boolean = false
 
-internal fun floatingChatInternalEdgeGestureObservesInitialPointerPass(): Boolean = true
+internal fun floatingChatInternalEdgeGestureObservesInitialPointerPass(): Boolean = false
 
-internal fun floatingChatInternalEdgeGestureTouchTargetDp(): Int = 24
+internal fun floatingChatInternalEdgeGestureTouchTargetDp(): Int = 8
 
 internal fun floatingChatInternalEdgeGestureCoversSideRails(): Boolean {
     return floatingChatInternalEdgeGestureTouchTargetDp() >= SessionRailWidthDp &&
@@ -19709,6 +22744,11 @@ internal data class LeftRailVisibleSessionItem(
     val size: Int
 )
 
+internal enum class RailPinnedAvatarEdge {
+    Top,
+    Bottom
+}
+
 private data class PanelTool(
     val icon: String,
     val label: String
@@ -19945,6 +22985,24 @@ internal fun rightRailVirtualAccountAvatarBounds(
     }.toMap()
 }
 
+internal fun rightRailPinnedSelectedAccountEdge(
+    accountIds: List<String>,
+    selectedAccountId: String?,
+    visibleItems: List<RightRailVisibleAccountItem>,
+    viewportHeightPx: Float,
+    fallbackStepPx: Float
+): RailPinnedAvatarEdge? {
+    val selectedId = selectedAccountId?.takeIf { id -> id.isNotBlank() } ?: return null
+    val viewport = Rect(0f, 0f, RailAvatarSizeDp.toFloat(), viewportHeightPx)
+    val selectedBounds = rightRailVirtualAccountAvatarBounds(
+        accountIds = accountIds,
+        visibleItems = visibleItems,
+        viewport = viewport,
+        fallbackStepPx = fallbackStepPx
+    )[selectedId] ?: return null
+    return selectedBounds.pinnedAvatarEdgeForViewport(viewport)
+}
+
 internal fun leftRailVirtualSessionAvatarBounds(
     sessionIds: List<String>,
     visibleItems: List<LeftRailVisibleSessionItem>,
@@ -19987,6 +23045,32 @@ internal fun leftRailVirtualSessionAvatarBounds(
             bottom = centerY + anchorSize / 2f
         )
     }.toMap()
+}
+
+internal fun leftRailPinnedSelectedAvatarEdge(
+    sessionIds: List<String>,
+    selectedSessionId: String?,
+    visibleItems: List<LeftRailVisibleSessionItem>,
+    viewportHeightPx: Float,
+    fallbackStepPx: Float
+): RailPinnedAvatarEdge? {
+    val selectedId = selectedSessionId?.takeIf { id -> id.isNotBlank() } ?: return null
+    val viewport = Rect(0f, 0f, RailAvatarSizeDp.toFloat(), viewportHeightPx)
+    val selectedBounds = leftRailVirtualSessionAvatarBounds(
+        sessionIds = sessionIds,
+        visibleItems = visibleItems,
+        viewport = viewport,
+        fallbackStepPx = fallbackStepPx
+    )[selectedId] ?: return null
+    return selectedBounds.pinnedAvatarEdgeForViewport(viewport)
+}
+
+private fun Rect.pinnedAvatarEdgeForViewport(viewport: Rect): RailPinnedAvatarEdge? {
+    return when {
+        top < viewport.top -> RailPinnedAvatarEdge.Top
+        bottom > viewport.bottom -> RailPinnedAvatarEdge.Bottom
+        else -> null
+    }
 }
 
 private fun Rect.pinnedVerticallyTo(viewport: Rect?): Rect {
@@ -20639,8 +23723,9 @@ internal fun ChatConnectorBraceHook.roundedElbowGeometry(): ChatConnectorRounded
     }
     val horizontalDirection = if (deltaX >= 0f) 1f else -1f
     val safeRadius = min(radius, abs(deltaX)).coerceAtLeast(1f)
+    val trunkOverlap = chatConnectorHookTrunkOverlapPx()
     return ChatConnectorRoundedHookGeometry(
-        curveStart = center.copy(y = center.y + verticalDirection * safeRadius),
+        curveStart = center.copy(y = center.y + verticalDirection * (safeRadius + trunkOverlap)),
         curveControl = center,
         horizontalStart = center.copy(x = center.x + horizontalDirection * safeRadius),
         branchEnd = branchEnd
@@ -20699,8 +23784,18 @@ private const val BottomInputBarMinHeightDp = 46
 private const val BottomInputBarMaxHeightDp = 128
 private const val BottomInputBarBottomPaddingDp = 10
 private const val MessageListBottomExtraClearanceDp = 22
+private const val CombinedForwardPreviewMaxLines = 20
 private val MessageLongPressMenuWidth = 300.dp
 private val MessageLongPressMenuEstimatedHeight = 122.dp
+private val WechatContactsHeaderBackground = Color(0xFFF1F1F1)
+private val WechatContactsPageBackground = Color(0xFFEDEDED)
+private val WechatContactsRowBackground = Color(0xFFFCFCFC)
+private val WechatContactsSearchBackground = Color(0xFFE9E9E9)
+private val WechatContactsPrimaryText = Color(0xFF202020)
+private val WechatContactsSecondaryText = Color(0xFF8B8B8B)
+private val WechatContactsHintText = Color(0xFFAAAAAA)
+private val WechatContactsChevronText = Color(0xFFC0C0C0)
+private val WechatContactsIndexText = Color(0xFF333333)
 private const val BottomInputIconButtonSizeDp = 32
 private const val BottomInputIconSizeDp = 18
 private const val BottomInputFieldMinHeightDp = 36

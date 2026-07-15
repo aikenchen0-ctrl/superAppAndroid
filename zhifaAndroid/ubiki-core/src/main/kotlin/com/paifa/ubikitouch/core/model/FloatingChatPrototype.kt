@@ -22,7 +22,10 @@ data class FloatingChatContact(
     val selected: Boolean = false,
     val online: Boolean = true,
     val avatarUrl: String? = null,
-    val groupMemberAvatarUrls: List<String> = emptyList()
+    val groupMemberAvatarUrls: List<String> = emptyList(),
+    val groupMemberContacts: List<FloatingChatContact> = emptyList(),
+    val groupMemberIsOwner: Boolean = false,
+    val groupMemberIsAdmin: Boolean = false
 )
 
 data class FloatingChatMessage(
@@ -91,6 +94,7 @@ enum class FloatingChatMessageType(val label: String) {
     Text("文本消息"),
     MixedText("文本夹杂消息"),
     Quote("引用消息"),
+    ChatHistory("聊天记录"),
     FilePreview("文件消息"),
     ImageThumbnail("文本夹杂缩略图"),
     VideoPreview("视频消息"),
@@ -689,7 +693,21 @@ object FloatingChatPrototype {
             voiceMessage(18, "语音 0:08", true, "企业微信号", "account-work", null, "https://aiff.app/audio/group-18.m4a", 8_000),
             message(19, FloatingChatMessageType.InlineContact, "推名片: 许知南", true, "林舟", connectionTargetId = "account-main", cardName = "许知南", cardSubtitle = "视觉设计 · 移动端"),
             message(20, FloatingChatMessageType.InlineLocation, "坐标：深圳湾 9 栋北门", false, "许知南", connectionTargetId = "wang-wu", locationTitle = "深圳湾 9 栋北门", locationAddress = "离地铁口 280 米"),
-            message(21, FloatingChatMessageType.Text, "系统提示：钱越加入群聊，沈嘉木更新了一条文件权限。", false, "系统", presentation = FloatingChatMessagePresentation.System, connectionTarget = FloatingChatConnectionTarget.None)
+            message(
+                21,
+                FloatingChatMessageType.ChatHistory,
+                "群聊的聊天记录",
+                true,
+                "林舟",
+                connectionTargetId = "account-main",
+                detail = "共 3 条聊天记录",
+                filePreviewLines = listOf(
+                    "沈嘉木：首页入口我又补了两处异常态",
+                    "许知南：空状态文案我改好了",
+                    "唐一澈：连续三条未回要在主页合并展示"
+                )
+            ),
+            message(22, FloatingChatMessageType.Text, "系统提示：钱越加入群聊，沈嘉木更新了一条文件权限。", false, "系统", presentation = FloatingChatMessagePresentation.System, connectionTarget = FloatingChatConnectionTarget.None)
         )
     }
 
