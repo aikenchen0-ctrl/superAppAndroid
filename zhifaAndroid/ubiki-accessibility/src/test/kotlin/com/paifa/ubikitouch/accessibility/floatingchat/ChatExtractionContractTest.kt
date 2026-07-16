@@ -65,8 +65,9 @@ class ChatExtractionContractTest {
         val content = sourceFile("floatingchat/message/MessageContent.kt")
         val row = sourceFile("floatingchat/message/MessageRow.kt")
         val textContent = sourceFile("floatingchat/message/MessageTextContent.kt")
+        val cards = sourceFile("floatingchat/message/MessageCards.kt")
 
-        listOf(presentation, listPresentation, content, row, textContent).forEach { source ->
+        listOf(presentation, listPresentation, content, row, textContent, cards).forEach { source ->
             assertTrue("Missing extracted message source: ${source.path}", source.isFile)
         }
         assertTrue(content.readText().contains("fun MessageContent("))
@@ -76,6 +77,9 @@ class ChatExtractionContractTest {
         assertTrue(textContent.readText().contains("fun MixedTextMessageContent("))
         assertTrue(textContent.readText().contains("fun QuoteMessageContent("))
         assertTrue(textContent.readText().contains("fun ChatHistoryMessageContent("))
+        assertTrue(cards.readText().contains("fun LocationMessageContent("))
+        assertTrue(cards.readText().contains("fun ContactLinkCardContent("))
+        assertTrue(cards.readText().contains("fun MiniProgramLinkContent("))
 
         val legacy = sourceFile("FloatingChatOverlayUi.kt").readText()
         assertFalse(legacy.contains("private fun MessageContent("))
@@ -85,6 +89,9 @@ class ChatExtractionContractTest {
         assertFalse(legacy.contains("internal fun MixedTextMessageContent("))
         assertFalse(legacy.contains("internal fun QuoteMessageContent("))
         assertFalse(legacy.contains("internal fun ChatHistoryMessageContent("))
+        assertFalse(legacy.contains("internal fun LocationMessageContent("))
+        assertFalse(legacy.contains("internal fun ContactLinkCardContent("))
+        assertFalse(legacy.contains("internal fun MiniProgramLinkContent("))
     }
 
     @Test

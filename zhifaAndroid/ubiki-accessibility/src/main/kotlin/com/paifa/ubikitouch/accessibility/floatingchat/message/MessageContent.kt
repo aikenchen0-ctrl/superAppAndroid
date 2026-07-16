@@ -5,14 +5,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.unit.dp
-import com.paifa.ubikitouch.accessibility.ContactLinkCardContent
 import com.paifa.ubikitouch.accessibility.DraftBadge
 import com.paifa.ubikitouch.accessibility.FilePreviewContent
 import com.paifa.ubikitouch.accessibility.ImageThumbnailContent
 import com.paifa.ubikitouch.accessibility.InlineContactContent
 import com.paifa.ubikitouch.accessibility.InlineLocationContent
-import com.paifa.ubikitouch.accessibility.LocationMessageContent
-import com.paifa.ubikitouch.accessibility.MiniProgramLinkContent
 import com.paifa.ubikitouch.accessibility.VideoPreviewContent
 import com.paifa.ubikitouch.accessibility.VoiceMessageContent
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
