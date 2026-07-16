@@ -8513,14 +8513,6 @@ private fun defaultMomentPosts(): List<AppMomentPost> {
     )
 }
 
-private fun defaultLocationOptions(): List<AppLocationOption> {
-    return listOf(
-        AppLocationOption("深圳湾科技生态园 9 栋", "深圳市南山区高新南十道 9 号"),
-        AppLocationOption("星河创意园 3 号楼", "深圳市南山区科苑南路"),
-        AppLocationOption("后海中心 A 座", "深圳市南山区海德三道")
-    )
-}
-
 private fun currentDeviceLocationState(context: Context): DeviceLocationState {
     if (!hasLocationPermission(context)) {
         return DeviceLocationState(permissionDenied = true, error = "需要授权后才能发送真实位置")
@@ -16886,7 +16878,7 @@ private inline fun <reified T : Enum<T>> enumValueOrDefault(value: String, defau
     return runCatching { enumValueOf<T>(value) }.getOrDefault(default)
 }
 
-private data class AppLocationOption(
+internal data class AppLocationOption(
     val title: String,
     val address: String,
     val latitude: Double? = null,
