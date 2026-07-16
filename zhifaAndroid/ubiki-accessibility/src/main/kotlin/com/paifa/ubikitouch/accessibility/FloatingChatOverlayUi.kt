@@ -16884,13 +16884,6 @@ internal enum class MomentMediaKind {
     Link
 }
 
-private data class DeviceLocationState(
-    val option: AppLocationOption? = null,
-    val loading: Boolean = false,
-    val permissionDenied: Boolean = false,
-    val error: String? = null
-)
-
 internal data class FavoriteCollectionItem(
     val messageId: String,
     val type: FloatingChatMessageType,
