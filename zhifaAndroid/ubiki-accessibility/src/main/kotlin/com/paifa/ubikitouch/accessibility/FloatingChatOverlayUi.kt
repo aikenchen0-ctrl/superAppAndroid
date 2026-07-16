@@ -14945,14 +14945,7 @@ private fun MomentMaterialsPanel(
             state = state.copy(loading = true, status = "正在复制朋友圈素材", error = null)
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val session = manager.loadSelectedSessionOrBootstrap()
-                    session.momentApi.copyMomentMaterial(
-                        materialId = material.id,
-                        request = ScrmMomentMaterialCopyRequest(
-                            name = "${material.displayName} 副本",
-                            enableImmediately = true
-                        )
-                    )
+                    copyScrmMomentMaterial(context.applicationContext, material)
                 }
             }.onSuccess { copied ->
                 state = state.copy(
@@ -14980,11 +14973,7 @@ private fun MomentMaterialsPanel(
             state = state.copy(loading = true, status = "正在归档朋友圈素材", error = null)
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val session = manager.loadSelectedSessionOrBootstrap()
-                    session.momentApi.archiveMomentMaterial(
-                        materialId = material.id,
-                        request = ScrmMomentMaterialControlRequest(reason = "app archive")
-                    )
+                    archiveScrmMomentMaterial(context.applicationContext, material)
                 }
             }.onSuccess { archived ->
                 state = state.copy(
