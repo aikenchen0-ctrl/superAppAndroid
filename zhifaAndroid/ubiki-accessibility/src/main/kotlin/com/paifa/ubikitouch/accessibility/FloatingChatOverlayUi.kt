@@ -14801,7 +14801,6 @@ private fun MomentMaterialsPanel(
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
-    val manager = remember(context) { ScrmSettingsManager(context.applicationContext) }
     val scope = rememberCoroutineScope()
     var nameDraft by remember { mutableStateOf("") }
     var categoryDraft by remember { mutableStateOf("") }
