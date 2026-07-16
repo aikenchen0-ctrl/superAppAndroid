@@ -14908,20 +14908,12 @@ private fun MomentMaterialsPanel(
             state = state.copy(loading = true, status = "正在创建朋友圈素材", error = null)
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val session = manager.loadSelectedSessionOrBootstrap()
-                    session.momentApi.createMomentMaterial(
-                        ScrmMomentMaterialCreateRequest(
-                            payload = ScrmMomentPostPayload(
-                                weChatId = currentRoute.weChatId,
-                                content = content
-                            ),
-                            clientRequestId = "moment-material-${System.currentTimeMillis()}",
-                            content = content,
-                            name = name.takeIf { it.isNotEmpty() },
-                            category = categoryDraft.trim().takeIf { it.isNotEmpty() },
-                            tenantId = momentMaterialTenantIdForRoute(currentRoute),
-                            enableImmediately = true
-                        )
+                    createScrmMomentMaterial(
+                        context.applicationContext,
+                        currentRoute,
+                        content,
+                        name.takeIf { it.isNotEmpty() },
+                        categoryDraft.trim().takeIf { it.isNotEmpty() }
                     )
                 }
             }.onSuccess { material ->
