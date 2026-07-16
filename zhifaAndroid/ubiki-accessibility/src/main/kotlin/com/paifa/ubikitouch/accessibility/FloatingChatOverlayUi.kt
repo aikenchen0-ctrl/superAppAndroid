@@ -14037,38 +14037,7 @@ private fun MomentsTimelinePanel(
             state = state.copy(loading = true, status = "正在同步真实朋友圈", error = null)
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val session = manager.loadSelectedSessionOrBootstrap()
-                    val syncMoments = submitScrmMomentTaskAndAwait(session.taskApi) {
-                        session.momentApi.syncMoments(
-                            ScrmSyncMomentsRequest(
-                                deviceUuid = currentRoute.deviceUuid,
-                                weChatId = currentRoute.weChatId,
-                                startTime = 0L
-                            )
-                        )
-                    }
-                    val syncMessages = submitScrmMomentTaskAndAwait(session.taskApi) {
-                        session.momentApi.syncMomentMessages(
-                            ScrmSyncMomentMessagesRequest(
-                                deviceUuid = currentRoute.deviceUuid,
-                                weChatId = currentRoute.weChatId,
-                                onlyComment = false,
-                                getAll = true
-                            )
-                        )
-                    }
-                    val loadedPosts = (syncMoments.data + syncMessages.data)
-                        .flatMap { data -> scrmMomentPostsFromTaskData(data) }
-                        .distinctBy { post -> post.id }
-                        .sortedByDescending { post -> post.createdAt }
-                    ScrmMomentsLoadResult(
-                        posts = loadedPosts,
-                        message = if (loadedPosts.isEmpty()) {
-                            "已提交同步任务，服务端暂未返回可展示的朋友圈明细"
-                        } else {
-                            "已同步 ${loadedPosts.size} 条真实朋友圈"
-                        }
-                    )
+                    loadScrmMoments(context.applicationContext, currentRoute)
                 }
             }.onSuccess { result ->
                 if (result.posts.isNotEmpty()) {
@@ -14391,11 +14360,6 @@ private data class ScrmMomentsPanelState(
     val loading: Boolean = false,
     val status: String? = null,
     val error: String? = null
-)
-
-private data class ScrmMomentsLoadResult(
-    val posts: List<AppMomentPost>,
-    val message: String
 )
 
 @Composable
