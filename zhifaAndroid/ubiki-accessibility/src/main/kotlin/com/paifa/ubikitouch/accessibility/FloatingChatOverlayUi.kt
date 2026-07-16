@@ -3635,90 +3635,7 @@ private fun TransferPaymentGlyph(modifier: Modifier = Modifier) {
 }
 
 @Composable
-internal fun ImageThumbnailContent(
-    message: FloatingChatMessage,
-    onPreviewMedia: (FloatingChatMessage) -> Unit,
-    onOpenMediaActions: (FloatingChatMessage) -> Unit,
-    onLongPressMessage: (FloatingChatMessage, Rect?) -> Unit,
-    multiSelectMode: Boolean,
-    onToggleSelection: () -> Unit,
-    onContentBoundsChanged: ((Rect) -> Unit)? = null
-) {
-    if (message.presentation == FloatingChatMessagePresentation.MediaStandalone) {
-        StandaloneMediaMessageContent(
-            message = message,
-            onPreviewMedia = onPreviewMedia,
-            onLongPressMessage = onLongPressMessage,
-            multiSelectMode = multiSelectMode,
-            onToggleSelection = onToggleSelection,
-            onContentBoundsChanged = onContentBoundsChanged
-        )
-    } else {
-        InlineImageThumbnailContent(message)
-    }
-}
-
-@Composable
-@OptIn(ExperimentalFoundationApi::class)
-private fun StandaloneMediaMessageContent(
-    message: FloatingChatMessage,
-    onPreviewMedia: (FloatingChatMessage) -> Unit,
-    onLongPressMessage: (FloatingChatMessage, Rect?) -> Unit,
-    multiSelectMode: Boolean,
-    onToggleSelection: () -> Unit,
-    onContentBoundsChanged: ((Rect) -> Unit)?
-) {
-    val mediaClickSource = remember { MutableInteractionSource() }
-    var currentBounds by remember(message.id) { mutableStateOf<Rect?>(null) }
-    val mediaFrame = standaloneMediaListFrameSize(
-        orientation = message.thumbnailOrientation,
-        mediaAspectRatio = message.mediaAspectRatio
-    )
-    Column(
-        modifier = Modifier.width(mediaFrame.width),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .width(mediaFrame.width)
-                .height(mediaFrame.height)
-                .clip(RoundedCornerShape(7.dp))
-                .background(OverlayTokens.imageBase)
-                .border(1.dp, OverlayTokens.standaloneMediaBorder, RoundedCornerShape(7.dp))
-                .onGloballyPositioned { coordinates ->
-                    val bounds = rootBoundsFromPosition(
-                        positionInRoot = coordinates.positionInRoot(),
-                        width = coordinates.size.width,
-                        height = coordinates.size.height
-                    )
-                    currentBounds = bounds
-                    onContentBoundsChanged?.invoke(bounds)
-                }
-                .combinedClickable(
-                    interactionSource = mediaClickSource,
-                    indication = null,
-                    onClick = {
-                        if (multiSelectMode) {
-                            onToggleSelection()
-                        } else {
-                            onPreviewMedia(message)
-                        }
-                    },
-                    onLongClick = { onLongPressMessage(message, currentBounds) }
-                )
-        ) {
-            MediaThumbnailSurface(
-                message = message,
-                modifier = Modifier.fillMaxSize(),
-                showChrome = false,
-                useAspectFit = standaloneMediaListUsesAspectFit()
-            )
-        }
-    }
-}
-
-@Composable
-private fun InlineImageThumbnailContent(message: FloatingChatMessage) {
+internal fun InlineImageThumbnailContent(message: FloatingChatMessage) {
     val context = LocalContext.current
     val mediaBitmap = rememberAsyncImageThumbnailBitmap(
         context = context,
@@ -3776,7 +3693,7 @@ private fun ImageThumbnailSurface(
 }
 
 @Composable
-private fun MediaThumbnailSurface(
+internal fun MediaThumbnailSurface(
     message: FloatingChatMessage,
     modifier: Modifier = Modifier,
     mediaBitmap: Bitmap? = rememberAsyncMediaThumbnailBitmap(message),
@@ -3856,7 +3773,7 @@ private fun rememberAsyncImageThumbnailBitmap(
 }
 
 @Composable
-private fun rememberAsyncMediaThumbnailBitmap(message: FloatingChatMessage): Bitmap? {
+internal fun rememberAsyncMediaThumbnailBitmap(message: FloatingChatMessage): Bitmap? {
     val context = LocalContext.current
     return produceState(
         initialValue = cachedMediaThumbnailBitmap(message),
@@ -4938,76 +4855,6 @@ private fun MediaSheetActionItem(
 }
 
 @Composable
-internal fun VideoPreviewContent(
-    message: FloatingChatMessage,
-    onPreviewMedia: (FloatingChatMessage) -> Unit,
-    onLongPressMessage: (FloatingChatMessage, Rect?) -> Unit,
-    multiSelectMode: Boolean,
-    onToggleSelection: () -> Unit,
-    onContentBoundsChanged: ((Rect) -> Unit)? = null
-) {
-    if (message.presentation == FloatingChatMessagePresentation.MediaStandalone) {
-        StandaloneMediaMessageContent(
-            message = message,
-            onPreviewMedia = onPreviewMedia,
-            onLongPressMessage = onLongPressMessage,
-            multiSelectMode = multiSelectMode,
-            onToggleSelection = onToggleSelection,
-            onContentBoundsChanged = onContentBoundsChanged
-        )
-        return
-    }
-
-    val mediaBitmap = rememberAsyncMediaThumbnailBitmap(message)
-    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(fixedThumbnailHeightDp(message.thumbnailOrientation).dp)
-                .clip(RoundedCornerShape(7.dp))
-                .background(OverlayTokens.videoBase)
-                .border(1.dp, OverlayTokens.resourcePanelBorder, RoundedCornerShape(7.dp))
-        ) {
-            if (mediaBitmap != null) {
-                Image(
-                    bitmap = mediaBitmap.asImageBitmap(),
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                PlaceholderVideoCanvas(modifier = Modifier.fillMaxSize())
-            }
-            VideoPlayGlyph(modifier = Modifier.fillMaxSize())
-            TextLabel(
-                text = message.text,
-                size = 10.sp,
-                weight = FontWeight.Bold,
-                color = OverlayTokens.primaryText,
-                maxLines = 1,
-                shadow = OverlayTokens.imModuleTextShadow,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(start = 8.dp, top = 7.dp, end = 8.dp)
-            )
-            TextLabel(
-                text = mediaWatermarkText(
-                    resourceUrl = message.resourceUrl,
-                    thumbnailUrl = message.thumbnailUrl
-                ),
-                size = 8.sp,
-                color = OverlayTokens.imageWatermark,
-                maxLines = 1,
-                shadow = OverlayTokens.imModuleTextShadow,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(horizontal = 7.dp, vertical = 5.dp)
-            )
-        }
-    }
-}
-
-@Composable
 private fun PlaceholderImageCanvas(
     orientation: FloatingChatThumbnailOrientation?,
     modifier: Modifier = Modifier
@@ -5040,7 +4887,7 @@ private fun PlaceholderImageCanvas(
 }
 
 @Composable
-private fun PlaceholderVideoCanvas(modifier: Modifier = Modifier) {
+internal fun PlaceholderVideoCanvas(modifier: Modifier = Modifier) {
     Canvas(modifier = modifier) {
         drawRoundRect(
             color = OverlayTokens.videoFrame,
@@ -5068,7 +4915,7 @@ private fun VerticalImageCropOverlay(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun VideoPlayGlyph(modifier: Modifier = Modifier) {
+internal fun VideoPlayGlyph(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier,
         contentAlignment = Alignment.Center
@@ -6998,11 +6845,6 @@ private data class MediaPreviewFrame(
     val height: Dp
 )
 
-private data class MediaListFrame(
-    val width: Dp,
-    val height: Dp
-)
-
 private fun mediaPreviewFrameSize(
     maxWidth: Dp,
     maxHeight: Dp,
@@ -7111,30 +6953,6 @@ private fun applyTextureViewAspectFitTransform(
         setScale(scaleX, scaleY, width / 2f, height / 2f)
     }
     textureView.setTransform(matrix)
-}
-
-private fun standaloneMediaListFrameSize(
-    orientation: FloatingChatThumbnailOrientation?,
-    mediaAspectRatio: Float?
-): MediaListFrame {
-    val aspectRatio = mediaAspectRatio ?: when (orientation) {
-        FloatingChatThumbnailOrientation.Vertical -> 0.68f
-        FloatingChatThumbnailOrientation.Horizontal,
-        null -> 16f / 9f
-    }
-    val maxWidth = StandaloneImageMaxWidthDp.toFloat()
-    var width = maxWidth
-    var height = width / aspectRatio
-    if (height > StandaloneMediaMaxHeightDp) {
-        height = StandaloneMediaMaxHeightDp.toFloat()
-        width = height * aspectRatio
-    }
-    if (height < StandaloneMediaMinHeightDp) {
-        height = StandaloneMediaMinHeightDp.toFloat()
-        width = height * aspectRatio
-    }
-    width = width.coerceIn(84f, maxWidth)
-    return MediaListFrame(width = width.dp, height = height.dp)
 }
 
 private fun videoPreviewAspectRatio(

@@ -116,18 +116,24 @@ class ChatExtractionContractTest {
     fun documentPreviewLivesInMediaPackage() {
         val documentPreview = sourceFile("floatingchat/media/DocumentPreview.kt")
         val nativeMediaSurface = sourceFile("floatingchat/media/NativeMediaSurface.kt")
+        val mediaPreview = sourceFile("floatingchat/media/MediaPreview.kt")
         assertTrue("Missing extracted document preview", documentPreview.isFile)
         assertTrue("Missing extracted native media surface", nativeMediaSurface.isFile)
+        assertTrue("Missing extracted media preview", mediaPreview.isFile)
 
         val text = documentPreview.readText()
         assertTrue(text.contains("fun FilePreviewContent("))
         assertTrue(text.contains("fun fileBadgeLabelFor("))
         assertTrue(nativeMediaSurface.readText().contains("fun VoiceMessageContent("))
+        assertTrue(mediaPreview.readText().contains("fun ImageThumbnailContent("))
+        assertTrue(mediaPreview.readText().contains("fun VideoPreviewContent("))
 
         val legacy = sourceFile("FloatingChatOverlayUi.kt").readText()
         assertFalse(legacy.contains("internal fun FilePreviewContent("))
         assertFalse(legacy.contains("internal fun fileBadgeLabelFor("))
         assertFalse(legacy.contains("internal fun VoiceMessageContent("))
+        assertFalse(legacy.contains("internal fun ImageThumbnailContent("))
+        assertFalse(legacy.contains("internal fun VideoPreviewContent("))
     }
 
     private fun sourceFile(relativePath: String): File {

@@ -7,8 +7,8 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.unit.dp
 import com.paifa.ubikitouch.accessibility.DraftBadge
 import com.paifa.ubikitouch.accessibility.floatingchat.media.FilePreviewContent
-import com.paifa.ubikitouch.accessibility.ImageThumbnailContent
-import com.paifa.ubikitouch.accessibility.VideoPreviewContent
+import com.paifa.ubikitouch.accessibility.floatingchat.media.ImageThumbnailContent
+import com.paifa.ubikitouch.accessibility.floatingchat.media.VideoPreviewContent
 import com.paifa.ubikitouch.accessibility.floatingchat.media.VoiceMessageContent
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import com.paifa.ubikitouch.core.model.FloatingChatMessageKind
