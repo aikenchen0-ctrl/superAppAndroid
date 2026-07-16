@@ -48,6 +48,21 @@ class FloatingChatContractBoundaryTest {
         assertFalse(text.contains("Intent"))
     }
 
+    @Test
+    fun mediaContractUsesStableIdsWithoutPlatformTypes() {
+        val source = sourceFile("contract/MediaContract.kt")
+
+        assertTrue("Media contract source must exist", source.isFile)
+        val text = source.readText()
+        assertTrue(text.contains("sealed interface MediaUiEvent"))
+        assertTrue(text.contains("interface MediaPlatformPort"))
+        assertFalse(text.contains("import android."))
+        assertFalse(text.contains("import androidx.compose."))
+        assertFalse(text.contains("Context"))
+        assertFalse(text.contains("Uri"))
+        assertFalse(text.contains("Intent"))
+    }
+
     private fun sourceFile(relativePath: String): File {
         val moduleRelative = File(
             "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat",

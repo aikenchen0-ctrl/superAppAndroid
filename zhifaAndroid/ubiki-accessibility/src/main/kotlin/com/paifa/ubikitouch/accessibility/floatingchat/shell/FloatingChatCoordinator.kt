@@ -2,12 +2,15 @@ package com.paifa.ubikitouch.accessibility.floatingchat.shell
 
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.FloatingChatShellEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.FloatingChatShellState
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.FloatingChatEffect
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.MediaUiEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ChatUiEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.reduceChatState
 
 internal class FloatingChatCoordinator(
     initialState: FloatingChatShellState,
-    private val onStateChanged: (FloatingChatShellState) -> Unit = {}
+    private val onStateChanged: (FloatingChatShellState) -> Unit = {},
+    private val effectSink: (FloatingChatEffect) -> Unit = {}
 ) {
     var state: FloatingChatShellState = initialState
         private set
@@ -27,5 +30,13 @@ internal class FloatingChatCoordinator(
         if (next == state) return
         state = next
         onStateChanged(next)
+    }
+
+    fun onMediaEvent(event: MediaUiEvent) {
+        when (event) {
+            is MediaUiEvent.DocumentClicked -> {
+                effectSink(FloatingChatEffect.OpenDocument(event.messageId))
+            }
+        }
     }
 }

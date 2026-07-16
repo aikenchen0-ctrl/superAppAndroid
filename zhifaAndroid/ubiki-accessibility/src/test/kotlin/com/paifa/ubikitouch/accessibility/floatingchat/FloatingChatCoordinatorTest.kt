@@ -4,12 +4,30 @@ import com.paifa.ubikitouch.accessibility.floatingchat.contract.ChatUiEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ChatUiState
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.FloatingChatShellEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.FloatingChatShellState
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.FloatingChatEffect
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.MediaUiEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.FloatingChatCoordinator
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
 import org.junit.Test
 
 class FloatingChatCoordinatorTest {
+    @Test
+    fun documentClickRequestsExternalOpenByMessageId() {
+        val effects = mutableListOf<FloatingChatEffect>()
+        val coordinator = FloatingChatCoordinator(
+            initialState = FloatingChatShellState(),
+            effectSink = effects::add
+        )
+
+        coordinator.onMediaEvent(MediaUiEvent.DocumentClicked("message-42"))
+
+        assertEquals(
+            listOf(FloatingChatEffect.OpenDocument("message-42")),
+            effects
+        )
+    }
+
     @Test
     fun inputChangeProducesNewChatStateAndSingleNotification() {
         val notifications = mutableListOf<FloatingChatShellState>()
