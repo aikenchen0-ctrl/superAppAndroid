@@ -181,6 +181,29 @@ class ChatExtractionContractTest {
         assertFalse(legacy.contains("private fun ScrmFriendRequestList("))
     }
 
+    @Test
+    fun contactsScreenUsesPlatformIndependentStateAndContactEvents() {
+        val screen = sourceFile("floatingchat/contacts/ContactsScreen.kt")
+        assertTrue("Missing extracted contacts screen", screen.isFile)
+
+        val text = screen.readText()
+        assertTrue(text.contains("fun ContactsScreen("))
+        assertTrue(text.contains("state: ContactsScreenUiState"))
+        assertTrue(text.contains("onEvent: (ContactsUiEvent) -> Unit"))
+        assertTrue(text.contains("ContactsUiEvent.QueryChanged"))
+        assertTrue(text.contains("ContactsUiEvent.SearchSubmitted"))
+        assertTrue(text.contains("ContactsUiEvent.SyncRequested"))
+        assertTrue(text.contains("ContactsUiEvent.ContactSelected"))
+        assertTrue(text.contains("ContactsUiEvent.ShortcutSelected"))
+        assertTrue(text.contains("ContactsUiEvent.PlusMenuRequested"))
+        assertFalse(text.contains("ScrmContact"))
+        assertFalse(text.contains("Context"))
+        assertFalse(text.contains("Service"))
+
+        val legacy = sourceFile("FloatingChatOverlayUi.kt").readText()
+        assertFalse(legacy.contains("private fun WechatContactsBookPanel("))
+    }
+
     private fun sourceFile(relativePath: String): File {
         val moduleRelative = File(
             "src/main/kotlin/com/paifa/ubikitouch/accessibility",

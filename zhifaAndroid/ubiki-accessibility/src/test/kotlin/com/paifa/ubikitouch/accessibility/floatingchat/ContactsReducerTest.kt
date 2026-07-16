@@ -1,9 +1,12 @@
 package com.paifa.ubikitouch.accessibility.floatingchat
 
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactOperationState
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsScreenAction
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsShortcut
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsUiEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsUiState
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.FriendRequestSummary
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.contactsScreenAction
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.reduceContactsState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
@@ -58,6 +61,27 @@ class ContactsReducerTest {
         assertEquals("alice", backed.query)
         assertEquals(null, backed.selectedContactId)
         assertEquals(initial.friendRequests, backed.friendRequests)
+    }
+
+    @Test
+    fun contactsScreenEventsMapToPlatformIndependentActions() {
+        val cases = listOf(
+            ContactsUiEvent.QueryChanged("alice") to ContactsScreenAction.UpdateQuery("alice"),
+            ContactsUiEvent.SearchVisibilityChanged(true) to ContactsScreenAction.SetSearchVisible(true),
+            ContactsUiEvent.SearchSubmitted to ContactsScreenAction.SubmitSearch,
+            ContactsUiEvent.SyncRequested to ContactsScreenAction.Sync,
+            ContactsUiEvent.ContactSelected("contact-7") to ContactsScreenAction.OpenContact("contact-7"),
+            ContactsUiEvent.ShortcutSelected(ContactsShortcut.NewFriends) to
+                ContactsScreenAction.OpenFriendRequests,
+            ContactsUiEvent.ShortcutSelected(ContactsShortcut.Groups) to
+                ContactsScreenAction.ShowPlaceholder(ContactsShortcut.Groups),
+            ContactsUiEvent.PlusMenuRequested to ContactsScreenAction.TogglePlusMenu,
+            ContactsUiEvent.CloseRequested to ContactsScreenAction.Close
+        )
+
+        cases.forEach { (event, expected) ->
+            assertEquals(expected, contactsScreenAction(event))
+        }
     }
 
     private fun request(id: String): FriendRequestSummary {

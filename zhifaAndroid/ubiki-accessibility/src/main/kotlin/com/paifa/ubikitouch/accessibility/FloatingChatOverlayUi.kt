@@ -7,7 +7,14 @@ import com.paifa.ubikitouch.accessibility.floatingchat.chat.SessionRailItem
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.sessionRailItemsByLatestChatTime
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.*
 import com.paifa.ubikitouch.accessibility.floatingchat.contacts.FriendRequestScreen
+import com.paifa.ubikitouch.accessibility.floatingchat.contacts.ContactsScreen
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactGroupSummary
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactSummary
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsScreenUiState
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsScreenAction
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsShortcut
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsUiEvent
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.contactsScreenAction
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.FriendRequestSummary
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.FriendRequestUiState
 import com.paifa.ubikitouch.accessibility.floatingchat.message.*
@@ -13261,34 +13268,56 @@ private fun ScrmContactsPanel(
         loadContacts()
     }
 
+    val contactGroups = remember(state.contacts, searchText) {
+        scrmContactGroupSummaries(state.contacts, searchText)
+    }
+    val contactsById = remember(state.contacts) {
+        scrmContactsBySummaryId(state.contacts)
+    }
+
     Box(modifier = Modifier.fillMaxWidth()) {
         when (panelScreen) {
-            WechatContactsPanelScreen.Contacts -> WechatContactsBookPanel(
-                contacts = state.contacts,
-                friendRequestCount = state.friendRequests.size,
-                loading = state.loading,
-                searchVisible = contactsSearchVisible,
-                searchText = searchText,
-                status = state.status,
-                error = state.error,
-                onSearchVisibleChange = { visible -> contactsSearchVisible = visible },
-                onSearchTextChange = { searchText = it },
-                onSearchSubmit = { loadContacts(searchText) },
-                onSync = ::syncContacts,
-                onClose = onClose,
-                onPlusClick = { showPlusMenu = !showPlusMenu },
-                onNewFriendsClick = {
-                    panelScreen = WechatContactsPanelScreen.FriendRequests
-                    showPlusMenu = false
-                },
-                onPlaceholderClick = { label ->
-                    Toast.makeText(context, "$label 暂未接入", Toast.LENGTH_SHORT).show()
-                },
-                onContactClick = { contact ->
-                    state = state.copy(selectedContact = contact, error = null)
-                    addWxidText = contact.wxid.orEmpty()
-                    panelScreen = WechatContactsPanelScreen.ContactIntro
-                    showPlusMenu = false
+            WechatContactsPanelScreen.Contacts -> ContactsScreen(
+                state = ContactsScreenUiState(
+                    query = searchText,
+                    searchVisible = contactsSearchVisible,
+                    groups = contactGroups,
+                    friendRequestCount = state.friendRequests.size,
+                    loading = state.loading,
+                    status = state.status,
+                    error = state.error
+                ),
+                onEvent = { event ->
+                    when (val action = contactsScreenAction(event)) {
+                        is ContactsScreenAction.UpdateQuery -> searchText = action.value
+                        is ContactsScreenAction.SetSearchVisible -> {
+                            contactsSearchVisible = action.visible
+                        }
+                        ContactsScreenAction.SubmitSearch -> loadContacts(searchText)
+                        ContactsScreenAction.Sync -> syncContacts()
+                        ContactsScreenAction.Close -> onClose()
+                        ContactsScreenAction.TogglePlusMenu -> showPlusMenu = !showPlusMenu
+                        ContactsScreenAction.OpenFriendRequests -> {
+                            panelScreen = WechatContactsPanelScreen.FriendRequests
+                            showPlusMenu = false
+                        }
+                        is ContactsScreenAction.ShowPlaceholder -> {
+                            Toast.makeText(
+                                context,
+                                "${action.shortcut.placeholderLabel()} 暂未接入",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                        is ContactsScreenAction.OpenContact -> {
+                            contactsById[action.contactId]?.let { contact ->
+                                state = state.copy(selectedContact = contact, error = null)
+                                addWxidText = contact.wxid.orEmpty()
+                                panelScreen = WechatContactsPanelScreen.ContactIntro
+                                showPlusMenu = false
+                            }
+                        }
+                        ContactsScreenAction.Ignore -> Unit
+                    }
                 }
             )
             WechatContactsPanelScreen.AddFriend -> WechatAddFriendPanel(
@@ -13393,154 +13422,6 @@ private fun ScrmContactsPanel(
                 },
                 modifier = Modifier.align(Alignment.TopEnd)
             )
-        }
-    }
-}
-
-@Composable
-private fun WechatContactsBookPanel(
-    contacts: List<ScrmContact>,
-    friendRequestCount: Int,
-    loading: Boolean,
-    searchVisible: Boolean,
-    searchText: String,
-    status: String?,
-    error: String?,
-    onSearchVisibleChange: (Boolean) -> Unit,
-    onSearchTextChange: (String) -> Unit,
-    onSearchSubmit: () -> Unit,
-    onSync: () -> Unit,
-    onClose: () -> Unit,
-    onPlusClick: () -> Unit,
-    onNewFriendsClick: () -> Unit,
-    onPlaceholderClick: (String) -> Unit,
-    onContactClick: (ScrmContact) -> Unit
-) {
-    val visibleContacts = remember(contacts, searchText) {
-        filterWechatContacts(contacts, searchText)
-    }
-    val sections = remember(visibleContacts) { groupedWechatContactSections(visibleContacts) }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(WechatContactsPageBackground)
-    ) {
-        WechatContactsTopBar(
-            title = wechatContactsTitle(),
-            showBack = false,
-            onBack = onClose,
-            onSearchClick = { onSearchVisibleChange(!searchVisible) },
-            onPlusClick = onPlusClick
-        )
-        if (searchVisible) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(WechatContactsHeaderBackground)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                WechatSearchField(
-                    value = searchText,
-                    onValueChange = onSearchTextChange,
-                    placeholder = "搜索联系人",
-                    onSearch = onSearchSubmit,
-                    modifier = Modifier.weight(1f)
-                )
-                ScrmPanelButton(label = "搜索", enabled = !loading, accent = true, onClick = onSearchSubmit)
-            }
-        }
-        WechatContactsStatusLine(
-            loading = loading,
-            status = status,
-            error = error,
-            onSync = onSync
-        )
-        Box(modifier = Modifier.fillMaxWidth()) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 360.dp, max = 520.dp)
-                    .padding(end = 16.dp)
-            ) {
-                item(key = "new-friends") {
-                    WechatContactShortcutRow(
-                        icon = Icons.Filled.PersonAdd,
-                        iconColor = Color(0xFFFF9F2F),
-                        title = "新的朋友",
-                        subtitle = friendRequestCount.takeIf { it > 0 }?.let { "$it 条待处理申请" },
-                        onClick = onNewFriendsClick
-                    )
-                }
-                item(key = "groups") {
-                    WechatContactShortcutRow(
-                        icon = Icons.Filled.Groups,
-                        iconColor = Color(0xFF16C26D),
-                        title = "群聊",
-                        onClick = { onPlaceholderClick("群聊") }
-                    )
-                }
-                item(key = "tags") {
-                    WechatContactShortcutRow(
-                        icon = Icons.Filled.LocalOffer,
-                        iconColor = Color(0xFF2E8BEF),
-                        title = "标签",
-                        onClick = { onPlaceholderClick("标签") }
-                    )
-                }
-                item(key = "official") {
-                    WechatContactShortcutRow(
-                        icon = Icons.Filled.MenuBook,
-                        iconColor = Color(0xFF287BEA),
-                        title = "公众号",
-                        onClick = { onPlaceholderClick("公众号") }
-                    )
-                }
-                item(key = "enterprise-header") {
-                    WechatContactSectionHeader("我的企业及企业联系人")
-                }
-                item(key = "wecom") {
-                    WechatContactShortcutRow(
-                        icon = Icons.Filled.Contacts,
-                        iconColor = Color(0xFF2F93E8),
-                        title = "企业微信联系人",
-                        onClick = { onPlaceholderClick("企业微信联系人") }
-                    )
-                }
-                item(key = "assistant") {
-                    WechatContactShortcutRow(
-                        icon = Icons.Filled.Home,
-                        iconColor = Color(0xFF5BC0F0),
-                        title = "血饮智参",
-                        onClick = { onPlaceholderClick("血饮智参") }
-                    )
-                }
-                if (sections.isEmpty()) {
-                    item(key = "empty") {
-                        TextLabel(
-                            text = if (loading) "正在加载..." else "暂无联系人",
-                            size = 12.sp,
-                            color = WechatContactsSecondaryText,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 18.dp),
-                            maxLines = 1
-                        )
-                    }
-                }
-                sections.forEach { section ->
-                    item(key = "section-${section.title}") {
-                        WechatContactSectionHeader(section.title)
-                    }
-                    itemsIndexed(
-                        items = section.contacts,
-                        key = { _, contact -> "contact-${contact.id}" }
-                    ) { _, contact ->
-                        WechatContactRow(contact = contact, onClick = { onContactClick(contact) })
-                    }
-                }
-            }
-            WechatContactIndexRail(modifier = Modifier.align(Alignment.CenterEnd))
         }
     }
 }
@@ -14023,31 +13904,6 @@ private fun WechatContactSectionHeader(title: String) {
 }
 
 @Composable
-private fun WechatContactRow(
-    contact: ScrmContact,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(WechatContactsRowBackground)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 9.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        WechatContactAvatar(contact = contact)
-        TextLabel(
-            text = contact.displayName,
-            size = 15.sp,
-            color = WechatContactsPrimaryText,
-            maxLines = 1,
-            modifier = Modifier.weight(1f)
-        )
-    }
-}
-
-@Composable
 private fun WechatContactAvatar(contact: ScrmContact, size: Dp = 42.dp) {
     val context = LocalContext.current
     val bitmap = rememberAsyncImageThumbnailBitmap(
@@ -14264,27 +14120,6 @@ private fun WechatContactIntroActionRow(
             color = Color(0xFF49679E),
             maxLines = 1
         )
-    }
-}
-
-@Composable
-private fun WechatContactIndexRail(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .padding(end = 2.dp)
-            .width(14.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        wechatContactIndexLabels().forEach { label ->
-            TextLabel(
-                text = label,
-                size = 8.sp,
-                color = WechatContactsIndexText,
-                maxLines = 1,
-                textAlign = TextAlign.Center
-            )
-        }
     }
 }
 
@@ -14783,6 +14618,49 @@ private fun ScrmFriendRequest.toFriendRequestSummary(): FriendRequestSummary {
             ?: requestWxid?.takeIf { it.isNotBlank() },
         avatarUrl = avatar?.takeIf { it.isNotBlank() }
     )
+}
+
+private fun ScrmContact.toContactSummary(): ContactSummary {
+    return ContactSummary(
+        id = id.toString(),
+        displayName = displayName,
+        secondaryText = listOfNotNull(
+            nickname,
+            remarks,
+            wxid,
+            friendNo,
+            source
+        ).joinToString(separator = "\n").takeIf { it.isNotBlank() },
+        avatarUrl = avatar?.takeIf { it.isNotBlank() },
+        avatarColor = wechatContactAvatarColor(this).toArgb()
+    )
+}
+
+internal fun scrmContactGroupSummaries(
+    contacts: List<ScrmContact>,
+    query: String
+): List<ContactGroupSummary> {
+    return groupedWechatContactSections(filterWechatContacts(contacts, query)).map { section ->
+        ContactGroupSummary(
+            title = section.title,
+            contacts = section.contacts.map { contact -> contact.toContactSummary() }
+        )
+    }
+}
+
+internal fun scrmContactsBySummaryId(contacts: List<ScrmContact>): Map<String, ScrmContact> {
+    return contacts.associateBy { contact -> contact.id.toString() }
+}
+
+private fun ContactsShortcut.placeholderLabel(): String {
+    return when (this) {
+        ContactsShortcut.NewFriends -> "新的朋友"
+        ContactsShortcut.Groups -> "群聊"
+        ContactsShortcut.Tags -> "标签"
+        ContactsShortcut.OfficialAccounts -> "公众号"
+        ContactsShortcut.WeComContacts -> "企业微信联系人"
+        ContactsShortcut.Assistant -> "血饮智参"
+    }
 }
 
 internal data class ScrmFriendSearchProfile(
