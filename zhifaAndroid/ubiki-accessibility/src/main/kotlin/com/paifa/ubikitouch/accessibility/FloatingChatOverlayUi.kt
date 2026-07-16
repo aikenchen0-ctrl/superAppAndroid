@@ -3276,107 +3276,6 @@ private fun MessageCoordinatePane(
 }
 
 @Composable
-internal fun VoiceMessageContent(message: FloatingChatMessage) {
-    val context = LocalContext.current
-    var playing by remember(message.id) { mutableStateOf(false) }
-    var failed by remember(message.id) { mutableStateOf(false) }
-    var playerRef by remember(message.id) { mutableStateOf<MediaPlayer?>(null) }
-    val durationText = message.detail ?: formatVoiceTimecode(message.mediaDurationMs ?: 0)
-
-    DisposableEffect(message.id) {
-        onDispose {
-            playerRef?.release()
-            playerRef = null
-        }
-    }
-
-    Row(
-        modifier = Modifier.widthIn(min = 132.dp, max = 228.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(9.dp)
-    ) {
-        CompactInteractiveSize {
-            FilledTonalIconButton(
-                onClick = {
-                    val currentPlayer = playerRef
-                    if (currentPlayer?.isPlaying == true) {
-                        currentPlayer.pause()
-                        playing = false
-                        return@FilledTonalIconButton
-                    }
-                    if (currentPlayer != null) {
-                        currentPlayer.start()
-                        playing = true
-                        failed = false
-                        return@FilledTonalIconButton
-                    }
-                    val uri = message.resourceUrl?.let(Uri::parse)
-                    if (uri == null) {
-                        failed = true
-                        return@FilledTonalIconButton
-                    }
-                    runCatching {
-                        MediaPlayer().apply {
-                            setDataSource(context, uri)
-                            setOnCompletionListener {
-                                playing = false
-                                it.seekTo(0)
-                            }
-                            setOnErrorListener { mp, _, _ ->
-                                playing = false
-                                failed = true
-                                mp.release()
-                                playerRef = null
-                                true
-                            }
-                            prepare()
-                            start()
-                        }
-                    }.onSuccess { mediaPlayer ->
-                        playerRef = mediaPlayer
-                        playing = true
-                        failed = false
-                    }.onFailure {
-                        playing = false
-                        failed = true
-                    }
-                },
-                modifier = Modifier.size(30.dp),
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = OverlayTokens.voiceButton,
-                    contentColor = OverlayTokens.voiceIcon
-                )
-            ) {
-                Icon(
-                    imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (playing) "暂停语音" else "播放语音",
-                    tint = OverlayTokens.voiceIcon,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            TextLabel(
-                text = if (failed) "语音播放失败" else "语音消息",
-                size = 11.sp,
-                weight = FontWeight.SemiBold,
-                color = OverlayTokens.cardPrimaryText,
-                maxLines = 1,
-                shadow = OverlayTokens.imModuleTextShadow
-            )
-            TextLabel(
-                text = durationText,
-                size = 10.sp,
-                weight = FontWeight.SemiBold,
-                color = OverlayTokens.cardSecondaryText,
-                maxLines = 1,
-                shadow = OverlayTokens.imModuleTextShadow
-            )
-        }
-    }
-}
-
-@Composable
 internal fun PaymentCardContent(
     message: FloatingChatMessage,
     claimed: Boolean
@@ -7372,15 +7271,6 @@ private fun hasRecordAudioPermission(context: Context): Boolean {
 
 private fun voiceInputIdleLabel(): String = "点击开始录音，停止后会发送语音消息"
 
-private fun formatVoiceTimecode(durationMs: Int): String {
-    val totalSeconds = kotlin.math.ceil(durationMs.coerceAtLeast(0) / 1000.0)
-        .toInt()
-        .coerceAtLeast(0)
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-    return String.format(Locale.US, "%d:%02d", minutes, seconds)
-}
-
 private fun createVoiceRecorderSession(context: Context): VoiceRecorderSession {
     val directory = File(context.cacheDir, "floating-chat-voice").apply {
         mkdirs()
@@ -8543,7 +8433,7 @@ private fun MediaActionIcon(
 }
 
 @Composable
-private fun CompactInteractiveSize(content: @Composable () -> Unit) {
+internal fun CompactInteractiveSize(content: @Composable () -> Unit) {
     CompositionLocalProvider(
         LocalMinimumInteractiveComponentSize provides Dp.Unspecified,
         content = content
