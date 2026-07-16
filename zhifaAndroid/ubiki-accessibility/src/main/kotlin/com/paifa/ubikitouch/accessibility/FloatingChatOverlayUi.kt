@@ -3615,130 +3615,6 @@ internal fun VoiceMessageContent(message: FloatingChatMessage) {
 }
 
 @Composable
-internal fun SimpleTextMessageContent(message: FloatingChatMessage, index: Int) {
-    val isSystem = message.presentation == FloatingChatMessagePresentation.System
-    TextLabel(
-        text = message.text,
-        size = if (isSystem) 9.sp else 11.sp,
-        weight = if (isSystem) FontWeight.Normal else FontWeight.Bold,
-        color = if (isSystem) OverlayTokens.systemPromptText else OverlayTokens.bubbleText,
-        lineHeight = if (isSystem) 13.sp else 15.sp,
-        maxLines = if (isSystem) 2 else if (index < 2) 3 else 4,
-        shadow = OverlayTokens.imModuleTextShadow
-    )
-    message.detail?.let { detail ->
-        Spacer(modifier = Modifier.height(2.dp))
-        TextLabel(
-            text = detail,
-            size = 9.sp,
-            weight = FontWeight.SemiBold,
-            color = OverlayTokens.bubbleTextMuted,
-            lineHeight = 12.sp,
-            maxLines = 1,
-            shadow = OverlayTokens.imModuleTextShadow
-        )
-    }
-}
-
-@Composable
-internal fun MixedTextMessageContent(message: FloatingChatMessage) {
-    val text = remember(message.inlineTokens, message.text) {
-        if (message.inlineTokens.isEmpty()) {
-            AnnotatedString(message.text)
-        } else {
-            buildAnnotatedString {
-                message.inlineTokens.forEach { token ->
-                    val color = when (token.type) {
-                        FloatingChatInlineTokenType.Plain -> OverlayTokens.bubbleText
-                        FloatingChatInlineTokenType.PaidianLink,
-                        FloatingChatInlineTokenType.FileLink,
-                        FloatingChatInlineTokenType.Url,
-                        FloatingChatInlineTokenType.Mention,
-                        FloatingChatInlineTokenType.ImageName -> OverlayTokens.linkText
-                        FloatingChatInlineTokenType.Ai -> OverlayTokens.aiGold
-                    }
-                    val weight = when (token.type) {
-                        FloatingChatInlineTokenType.Ai -> FontWeight.Black
-                        FloatingChatInlineTokenType.Plain -> FontWeight.SemiBold
-                        else -> FontWeight.Bold
-                    }
-                    withStyle(SpanStyle(color = color, fontWeight = weight)) {
-                        append(token.text)
-                    }
-                }
-            }
-        }
-    }
-    AnnotatedTextLabel(
-        text = text,
-        size = 11.sp,
-        lineHeight = 15.sp,
-        maxLines = 5,
-        shadow = OverlayTokens.imModuleTextShadow
-    )
-}
-
-@Composable
-internal fun QuoteMessageContent(message: FloatingChatMessage) {
-    QuoteBlock(message)
-    TextLabel(
-        text = message.text,
-        size = 11.sp,
-        weight = FontWeight.Bold,
-        color = OverlayTokens.bubbleText,
-        lineHeight = 15.sp,
-        maxLines = 4,
-        shadow = OverlayTokens.imModuleTextShadow
-    )
-}
-
-@Composable
-internal fun ChatHistoryMessageContent(message: FloatingChatMessage) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(7.dp))
-            .background(cardMessageColorFor(FloatingChatMessageType.ChatHistory))
-            .border(1.dp, OverlayTokens.resourcePanelBorder, RoundedCornerShape(7.dp))
-            .padding(horizontal = 10.dp, vertical = 9.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        TextLabel(
-            text = message.text.ifBlank { "聊天记录" },
-            size = 12.sp,
-            weight = FontWeight.Bold,
-            color = OverlayTokens.bubbleText,
-            maxLines = 1,
-            shadow = OverlayTokens.imModuleTextShadow
-        )
-        message.filePreviewLines.take(3).forEach { line ->
-            TextLabel(
-                text = line,
-                size = 10.sp,
-                color = OverlayTokens.secondaryText,
-                maxLines = 1,
-                shadow = OverlayTokens.imModuleTextShadow
-            )
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.Article,
-                contentDescription = null,
-                tint = OverlayTokens.panelSecondaryText,
-                modifier = Modifier.size(13.dp)
-            )
-            Spacer(modifier = Modifier.width(5.dp))
-            TextLabel(
-                text = "聊天记录",
-                size = 9.sp,
-                color = OverlayTokens.panelSecondaryText,
-                maxLines = 1
-            )
-        }
-    }
-}
-
-@Composable
 internal fun LocationMessageContent(message: FloatingChatMessage) {
     Column(
         modifier = Modifier
@@ -5736,41 +5612,6 @@ internal fun InlineLocationContent(message: FloatingChatMessage) {
                 text = message.locationAddress.orEmpty(),
                 size = 8.5.sp,
                 color = OverlayTokens.cardSecondaryText,
-                maxLines = 1,
-                shadow = OverlayTokens.imModuleTextShadow
-            )
-        }
-    }
-}
-
-@Composable
-private fun QuoteBlock(message: FloatingChatMessage) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(5.dp))
-            .background(OverlayTokens.quoteBackground)
-            .padding(horizontal = 7.dp, vertical = 5.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .width(2.dp)
-                .height(26.dp)
-                .background(OverlayTokens.quoteBar)
-        )
-        Spacer(modifier = Modifier.width(5.dp))
-        Column {
-            TextLabel(
-                text = message.quoteAuthor.orEmpty(),
-                size = 9.sp,
-                weight = FontWeight.SemiBold,
-                color = OverlayTokens.bubbleText,
-                maxLines = 1,
-                shadow = OverlayTokens.imModuleTextShadow
-            )
-            TextLabel(
-                text = message.quoteText.orEmpty(),
-                size = 9.sp,
-                color = OverlayTokens.bubbleTextMuted,
                 maxLines = 1,
                 shadow = OverlayTokens.imModuleTextShadow
             )
@@ -19873,30 +19714,6 @@ private fun Color.darkenedForFrostedBackdrop(): Color {
         green = (green * 0.82f).coerceIn(0f, 1f),
         blue = (blue * 0.82f).coerceIn(0f, 1f),
         alpha = 1f
-    )
-}
-
-@Composable
-private fun AnnotatedTextLabel(
-    text: AnnotatedString,
-    size: TextUnit,
-    modifier: Modifier = Modifier,
-    lineHeight: TextUnit = TextUnit.Unspecified,
-    maxLines: Int = Int.MAX_VALUE,
-    shadow: Shadow? = null
-) {
-    androidx.compose.foundation.text.BasicText(
-        text = text,
-        modifier = modifier,
-        maxLines = maxLines,
-        overflow = TextOverflow.Ellipsis,
-        style = TextStyle.Default.copy(
-            color = OverlayTokens.bubbleText,
-            fontSize = size,
-            lineHeight = lineHeight,
-            fontWeight = FontWeight.SemiBold,
-            shadow = shadow
-        )
     )
 }
 
