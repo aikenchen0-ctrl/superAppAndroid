@@ -38,5 +38,9 @@ class VideoPlaybackDecisionTest {
             VideoPlaybackDecision.Restart,
             decideVideoPlayback(true, failed = false, playerReady = true, playing = false, completed = true)
         )
+        assertEquals(
+            VideoPlaybackDecision.Play,
+            decideVideoPlayback(true, failed = false, playerReady = true, playing = false, completed = false)
+        )
     }
 }
