@@ -21,8 +21,7 @@ internal object VideoPreviewMetadataResolver {
                 if (width == null || height == null || width <= 0 || height <= 0) {
                     null
                 } else {
-                    val rotated = rotation == 90 || rotation == 270
-                    if (rotated) height.toFloat() / width else width.toFloat() / height
+                    videoAspectRatioFromDimensions(width, height, rotation)
                 }
             }
         }.getOrNull()
