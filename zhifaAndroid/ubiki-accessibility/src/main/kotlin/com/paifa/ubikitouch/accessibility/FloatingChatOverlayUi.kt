@@ -9,6 +9,12 @@ import com.paifa.ubikitouch.accessibility.floatingchat.chat.*
 import com.paifa.ubikitouch.accessibility.floatingchat.contacts.FriendRequestScreen
 import com.paifa.ubikitouch.accessibility.floatingchat.contacts.ContactsScreen
 import com.paifa.ubikitouch.accessibility.floatingchat.contacts.ContactProfileScreen
+import com.paifa.ubikitouch.accessibility.floatingchat.group.GroupInfoScreen
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoAction
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoMemberUiState
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoUiEvent
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoUiState
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.groupInfoAction
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactProfileEditorAction
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactProfileIntroAction
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactProfileUiEvent
@@ -9810,7 +9816,7 @@ private fun ContactEditOverlay(
                         onAddFriendFromGroupMember(activeGroupMember)
                     }
                 )
-                target is ContactEditorTarget.Group -> GroupContactEditPanel(
+                target is ContactEditorTarget.Group -> GroupInfoHost(
                     accountId = accountId,
                     group = target.group,
                     profile = groupProfiles[groupProfileKey(accountId, target.group.id)]
@@ -9842,7 +9848,7 @@ private fun ContactEditOverlay(
 }
 
 @Composable
-private fun GroupContactEditPanel(
+private fun GroupInfoHost(
     accountId: String,
     group: FloatingChatContact,
     profile: LocalGroupProfile,
@@ -10024,6 +10030,124 @@ private fun GroupContactEditPanel(
         )
     }
 
+    fun handleGroupInfoEvent(event: GroupInfoUiEvent) {
+        when (val action = groupInfoAction(event)) {
+            GroupInfoAction.Back -> onDismiss()
+            GroupInfoAction.InviteMembers -> memberPickerMode = GroupMemberPickerMode.Invite
+            GroupInfoAction.RemoveMembers -> {
+                if (canManageMembers) memberPickerMode = GroupMemberPickerMode.Kick
+                else {
+                    actionError = "鍙湁缇や富鎴栫鐞嗗憳鍙互绉诲嚭缇ゆ垚鍛?"
+                    actionStatus = null
+                }
+            }
+            is GroupInfoAction.OpenMember -> members.firstOrNull { it.id == action.memberId }?.let(onMemberClick)
+            is GroupInfoAction.UpdateGroupName -> {
+                groupName = action.value
+                persistProfile(nextGroupName = action.value)
+            }
+            GroupInfoAction.RenameGroup -> {
+                val currentRoute = route ?: return
+                submitRemoteGroupTask("姝ｅ湪淇敼缇ゅ悕", "宸叉彁浜ょ兢鍚嶄慨鏀?") {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    session.chatRoomApi.renameChatRoom(
+                        ScrmRenameChatRoomRequest(currentRoute.deviceUuid, currentRoute.weChatId, requireNotNull(chatRoomId), groupName.trim())
+                    )
+                }
+            }
+            GroupInfoAction.LoadQrCode -> {
+                val currentRoute = route ?: return
+                submitRemoteGroupTask("姝ｅ湪鑾峰彇缇や簩缁寸爜", "宸叉彁浜ょ兢浜岀淮鐮佽幏鍙?") {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    session.chatRoomApi.pullChatRoomQrCode(
+                        ScrmChatRoomActionRequest(currentRoute.deviceUuid, currentRoute.weChatId, requireNotNull(chatRoomId))
+                    )
+                }
+            }
+            is GroupInfoAction.UpdateAnnouncement -> {
+                announcement = action.value
+                persistProfile(nextAnnouncement = action.value)
+            }
+            GroupInfoAction.PublishAnnouncement -> {
+                val currentRoute = route ?: return
+                submitRemoteGroupTask("姝ｅ湪璁剧疆缇ゅ叕鍛?", "宸叉彁浜ょ兢鍏憡") {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    session.chatRoomApi.setChatRoomNotice(
+                        ScrmSetChatRoomNoticeRequest(currentRoute.deviceUuid, currentRoute.weChatId, requireNotNull(chatRoomId), announcement.trim())
+                    )
+                }
+            }
+            is GroupInfoAction.UpdateRemark -> {
+                remark = action.value
+                persistProfile(nextRemark = action.value)
+            }
+            GroupInfoAction.SearchChatHistory -> {
+                actionStatus = "鏌ユ壘鑱婂ぉ璁板綍鍏ュ彛宸蹭繚鐣?"
+                actionError = null
+            }
+            is GroupInfoAction.SetMuted -> {
+                mute = action.enabled
+                persistProfile(nextMute = action.enabled)
+                actionStatus = if (action.enabled) "宸插湪鎮诞绐楀彛寮€鍚秷鎭厤鎵撴壈" else "宸插湪鎮诞绐楀彛鍏抽棴娑堟伅鍏嶆墦鎵?"
+                actionError = null
+            }
+            is GroupInfoAction.SetPinned -> {
+                pinned = action.enabled
+                persistProfile(nextPinned = action.enabled)
+                actionStatus = if (action.enabled) "宸插湪鎮诞绐楀彛缃《鑱婂ぉ" else "宸插彇娑堟偓娴獥鍙ｇ疆椤?"
+                actionError = null
+            }
+            is GroupInfoAction.SetSavedToContacts -> {
+                saveToContacts = action.enabled
+                persistProfile(nextSaveToContacts = action.enabled)
+                actionStatus = if (action.enabled) "宸插湪鎮诞绐楀彛淇濆瓨鍒伴€氳褰?" else "宸蹭粠鎮诞绐楀彛閫氳褰曠Щ闄?"
+                actionError = null
+            }
+            is GroupInfoAction.UpdateMyNickname -> {
+                myNickname = action.value
+                persistProfile(nextMyNickname = action.value)
+            }
+            is GroupInfoAction.SetMemberNicknamesVisible -> {
+                showMemberNicknames = action.visible
+                persistProfile(nextShowMemberNicknames = action.visible)
+                actionStatus = if (action.visible) "宸叉樉绀虹兢鎴愬憳鏄电О" else "宸查殣钘忕兢鎴愬憳鏄电О"
+                actionError = null
+            }
+            is GroupInfoAction.SetMemberAvatarsVisible -> {
+                showMemberAvatars = action.visible
+                persistProfile(nextShowMemberAvatars = action.visible)
+                actionStatus = if (action.visible) "宸叉樉绀虹兢鎴愬憳澶村儚" else "宸查殣钘忕兢鎴愬憳澶村儚"
+                actionError = null
+            }
+            is GroupInfoAction.UpdateBackground -> {
+                backgroundLabel = action.value
+                persistProfile(nextBackgroundLabel = action.value)
+                actionStatus = "宸叉洿鏂版偓娴獥鍙ｈ亰澶╄儗鏅?"
+                actionError = null
+            }
+            GroupInfoAction.ClearChatHistory -> {
+                actionStatus = "宸叉竻绌烘偓娴獥鍙ｅ唴褰撳墠鑱婂ぉ璁板綍鏄剧ず锛涘井淇＄湡瀹炶亰澶╄褰曟湭淇敼"
+                actionError = null
+            }
+            GroupInfoAction.Report -> {
+                actionStatus = "鎶曡瘔鎺ュ彛鏆傛湭鎻愪緵锛屽凡淇濈暀鍏ュ彛"
+                actionError = null
+            }
+            GroupInfoAction.ExitGroup -> {
+                val currentRoute = route
+                if (currentRoute == null || chatRoomId.isNullOrBlank()) {
+                    actionError = "褰撳墠缇よ亰缂哄皯 SCRM 璺敱锛屾棤娉曢€€鍑虹兢鑱?"
+                    actionStatus = null
+                } else submitRemoteGroupTask("姝ｅ湪閫€鍑虹兢鑱?", "宸叉彁浜ら€€鍑虹兢鑱?") {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    session.chatRoomApi.exitChatRoom(
+                        ScrmChatRoomActionRequest(currentRoute.deviceUuid, currentRoute.weChatId, chatRoomId)
+                    )
+                }
+            }
+        }
+    }
+
     memberPickerMode?.let { mode ->
         GroupMemberSelectionPanel(
             title = mode.title,
@@ -10045,291 +10169,29 @@ private fun GroupContactEditPanel(
         return
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(FriendProfilePageBackground),
-        contentPadding = PaddingValues(bottom = 12.dp)
-    ) {
-        item {
-            GroupInfoTopBar(
-                title = "聊天信息(${groupInfoMemberCount(members)})",
-                onDismiss = onDismiss
-            )
-        }
-        if (actionStatus != null || actionError != null) {
-            item {
-                TextLabel(
-                    text = actionError ?: actionStatus.orEmpty(),
-                    size = 10.sp,
-                    color = if (actionError != null) Color(0xFFE45858) else FriendProfileSecondaryText,
-                    lineHeight = 13.sp,
-                    maxLines = 2,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(FriendProfileCardBackground)
-                        .padding(horizontal = 20.dp, vertical = 8.dp)
-                )
-            }
-        }
-        itemsIndexed(
-            items = memberRows,
-            key = { index, row -> "group-member-row-$index-${row.joinToString("-") { it.key }}" }
-        ) { rowIndex, row ->
-            GroupInfoMemberGridRow(
-                row = row,
-                isFirst = rowIndex == 0,
-                isLast = rowIndex == memberRows.lastIndex,
-                onMemberClick = onMemberClick,
-                onAddClick = { memberPickerMode = GroupMemberPickerMode.Invite },
-                onRemoveClick = {
-                    if (canManageMembers) {
-                        memberPickerMode = GroupMemberPickerMode.Kick
-                    } else {
-                        actionError = "只有群主或管理员可以移出群成员"
-                    }
-                }
-            )
-        }
-        item { GroupInfoSectionGap() }
-        item {
-            FriendProfileSection {
-                GroupInfoEditableRow(
-                    label = "群聊名称",
-                    value = groupName,
-                    placeholder = "填写群聊名称",
-                    actionLabel = "保存",
-                    actionEnabled = !actionLoading && groupName.isNotBlank(),
-                    onAction = {
-                        val currentRoute = route ?: return@GroupInfoEditableRow
-                        submitRemoteGroupTask("正在修改群名", "已提交群名修改") {
-                            val session = manager.loadSelectedSessionOrBootstrap()
-                            session.chatRoomApi.renameChatRoom(
-                                ScrmRenameChatRoomRequest(
-                                    deviceUuid = currentRoute.deviceUuid,
-                                    weChatId = currentRoute.weChatId,
-                                    chatRoomId = requireNotNull(chatRoomId),
-                                    name = groupName.trim()
-                                )
-                            )
-                        }
-                    },
-                    onValueChange = {
-                        groupName = it
-                        persistProfile(nextGroupName = it)
-                    }
-                )
-                FriendProfileDivider()
-                GroupInfoQrRow(
-                    onClick = {
-                        val currentRoute = route ?: return@GroupInfoQrRow
-                        submitRemoteGroupTask("正在获取群二维码", "已提交群二维码获取") {
-                            val session = manager.loadSelectedSessionOrBootstrap()
-                            session.chatRoomApi.pullChatRoomQrCode(
-                                ScrmChatRoomActionRequest(
-                                    deviceUuid = currentRoute.deviceUuid,
-                                    weChatId = currentRoute.weChatId,
-                                    chatRoomId = requireNotNull(chatRoomId)
-                                )
-                            )
-                        }
-                    }
-                )
-                FriendProfileDivider()
-                GroupInfoEditableRow(
-                    label = "群公告",
-                    value = announcement,
-                    placeholder = "未设置",
-                    maxLines = 2,
-                    actionLabel = "发布",
-                    actionEnabled = !actionLoading && announcement.isNotBlank(),
-                    onAction = {
-                        val currentRoute = route ?: return@GroupInfoEditableRow
-                        submitRemoteGroupTask("正在设置群公告", "已提交群公告") {
-                            val session = manager.loadSelectedSessionOrBootstrap()
-                            session.chatRoomApi.setChatRoomNotice(
-                                ScrmSetChatRoomNoticeRequest(
-                                    deviceUuid = currentRoute.deviceUuid,
-                                    weChatId = currentRoute.weChatId,
-                                    chatRoomId = requireNotNull(chatRoomId),
-                                    notice = announcement.trim()
-                                )
-                            )
-                        }
-                    },
-                    onValueChange = {
-                        announcement = it
-                        persistProfile(nextAnnouncement = it)
-                    }
-                )
-                FriendProfileDivider()
-                GroupInfoEditableRow(
-                    label = "备注",
-                    value = remark,
-                    placeholder = "添加备注",
-                    onValueChange = {
-                        remark = it
-                        persistProfile(nextRemark = it)
-                    }
-                )
-            }
-        }
-        item { GroupInfoSectionGap() }
-        item {
-            FriendProfileSection {
-                FriendProfileInfoRow(label = "查找聊天记录", value = "", showArrow = true)
-            }
-        }
-        item { GroupInfoSectionGap() }
-        item {
-            FriendProfileSection {
-                FriendProfileSwitchRow(
-                    label = "消息免打扰",
-                    value = "",
-                    checked = mute,
-                    onCheckedChange = { checked ->
-                        mute = checked
-                        persistProfile(nextMute = checked)
-                        actionStatus = if (checked) "已在悬浮窗口开启消息免打扰" else "已在悬浮窗口关闭消息免打扰"
-                        actionError = null
-                    }
-                )
-                FriendProfileDivider()
-                FriendProfileSwitchRow(
-                    label = "置顶聊天",
-                    value = "",
-                    checked = pinned,
-                    onCheckedChange = { checked ->
-                        pinned = checked
-                        persistProfile(nextPinned = checked)
-                        actionStatus = if (checked) "已在悬浮窗口置顶聊天" else "已取消悬浮窗口置顶"
-                        actionError = null
-                    }
-                )
-                FriendProfileDivider()
-                FriendProfileSwitchRow(
-                    label = "保存到通讯录",
-                    value = "",
-                    checked = saveToContacts,
-                    onCheckedChange = { checked ->
-                        saveToContacts = checked
-                        persistProfile(nextSaveToContacts = checked)
-                        actionStatus = if (checked) "已在悬浮窗口保存到通讯录" else "已从悬浮窗口通讯录移除"
-                        actionError = null
-                    }
-                )
-            }
-        }
-        item { GroupInfoSectionGap() }
-        item {
-            FriendProfileSection {
-                GroupInfoEditableRow(
-                    label = "我在群里的昵称",
-                    value = myNickname,
-                    placeholder = "填写昵称",
-                    onValueChange = {
-                        myNickname = it
-                        persistProfile(nextMyNickname = it)
-                    }
-                )
-                FriendProfileDivider()
-                FriendProfileSwitchRow(
-                    label = "显示群成员昵称",
-                    value = "",
-                    checked = showMemberNicknames,
-                    onCheckedChange = { checked ->
-                        showMemberNicknames = checked
-                        persistProfile(nextShowMemberNicknames = checked)
-                        actionStatus = if (checked) "已显示群成员昵称" else "已隐藏群成员昵称"
-                        actionError = null
-                    }
-                )
-                FriendProfileDivider()
-                FriendProfileSwitchRow(
-                    label = "显示群成员头像",
-                    value = "",
-                    checked = showMemberAvatars,
-                    onCheckedChange = { checked ->
-                        showMemberAvatars = checked
-                        persistProfile(nextShowMemberAvatars = checked)
-                        actionStatus = if (checked) "已显示群成员头像" else "已隐藏群成员头像"
-                        actionError = null
-                    }
-                )
-            }
-        }
-        item { GroupInfoSectionGap() }
-        item {
-            FriendProfileSection {
-                GroupInfoEditableRow(
-                    label = "设置当前聊天背景",
-                    value = backgroundLabel,
-                    placeholder = "默认背景",
-                    onValueChange = {
-                        backgroundLabel = it
-                        persistProfile(nextBackgroundLabel = it)
-                        actionStatus = "已更新悬浮窗口聊天背景"
-                        actionError = null
-                    }
-                )
-                FriendProfileDivider()
-                FriendProfileInfoRow(
-                    label = "清空聊天记录",
-                    value = "",
-                    showArrow = true,
-                    onClick = {
-                        actionStatus = "已清空悬浮窗口内当前聊天记录显示；微信真实聊天记录未修改"
-                        actionError = null
-                    }
-                )
-                FriendProfileDivider()
-                FriendProfileInfoRow(
-                    label = "投诉",
-                    value = "",
-                    showArrow = true,
-                    onClick = {
-                        actionStatus = "投诉接口暂未提供，已保留入口"
-                        actionError = null
-                    }
-                )
-            }
-        }
-        item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(FriendProfileCardBackground)
-                    .clickable {
-                        val currentRoute = route
-                        if (currentRoute == null || chatRoomId.isNullOrBlank()) {
-                            actionError = "当前群聊缺少 SCRM 路由，无法退出群聊"
-                            actionStatus = null
-                        } else {
-                            submitRemoteGroupTask("正在退出群聊", "已提交退出群聊") {
-                                val session = manager.loadSelectedSessionOrBootstrap()
-                                session.chatRoomApi.exitChatRoom(
-                                    ScrmChatRoomActionRequest(
-                                        deviceUuid = currentRoute.deviceUuid,
-                                        weChatId = currentRoute.weChatId,
-                                        chatRoomId = chatRoomId
-                                    )
-                                )
-                            }
-                        }
-                    }
-                    .padding(vertical = 17.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                TextLabel(
-                    text = "退出群聊",
-                    size = 14.sp,
-                    weight = FontWeight.SemiBold,
-                    color = GroupInfoDestructiveText,
-                    maxLines = 1
-                )
-            }
-        }
-    }
+    GroupInfoScreen(
+        state = GroupInfoUiState(
+            memberCount = groupInfoMemberCount(members),
+            members = members.map { member ->
+                GroupInfoMemberUiState(member.id, member.name, member.initials, member.avatarUrl, member.avatarColor.toInt())
+            },
+            canManageMembers = canManageMembers,
+            groupName = groupName,
+            announcement = announcement,
+            remark = remark,
+            myNickname = myNickname,
+            muted = mute,
+            pinned = pinned,
+            savedToContacts = saveToContacts,
+            memberNicknamesVisible = showMemberNicknames,
+            memberAvatarsVisible = showMemberAvatars,
+            backgroundLabel = backgroundLabel,
+            loading = actionLoading,
+            status = actionStatus,
+            error = actionError
+        ),
+        onEvent = ::handleGroupInfoEvent
+    )
 }
 
 private enum class GroupMemberPickerMode(val title: String) {
@@ -10747,172 +10609,6 @@ private fun ChatHistoryDetailRow(line: String) {
 }
 
 @Composable
-private fun GroupInfoTopBar(
-    title: String,
-    onDismiss: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp)
-            .background(FriendProfilePageBackground)
-    ) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 8.dp)
-                .size(36.dp)
-                .clip(CircleShape)
-                .clickable(onClick = onDismiss),
-            contentAlignment = Alignment.Center
-        ) {
-            TextLabel(
-                text = "‹",
-                size = 24.sp,
-                color = FriendProfilePrimaryText,
-                maxLines = 1
-            )
-        }
-        TextLabel(
-            text = title,
-            size = 14.sp,
-            weight = FontWeight.SemiBold,
-            color = FriendProfilePrimaryText,
-            modifier = Modifier.align(Alignment.Center),
-            maxLines = 1
-        )
-    }
-}
-
-@Composable
-private fun GroupInfoMemberGridRow(
-    row: List<GroupInfoMemberGridItem>,
-    isFirst: Boolean,
-    isLast: Boolean,
-    onMemberClick: (FloatingChatContact) -> Unit,
-    onAddClick: () -> Unit,
-    onRemoveClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(FriendProfileCardBackground)
-            .padding(
-                start = 20.dp,
-                end = 20.dp,
-                top = if (isFirst) 16.dp else 0.dp,
-                bottom = if (isLast) 16.dp else 16.dp
-            ),
-        horizontalArrangement = Arrangement.spacedBy(20.dp)
-    ) {
-        row.forEach { item ->
-            when {
-                item.member != null -> GroupInfoMemberCell(
-                    member = item.member,
-                    modifier = Modifier.weight(1f),
-                    onClick = { onMemberClick(item.member) }
-                )
-                item.isAddAction -> GroupInfoAddMemberCell(
-                    modifier = Modifier.weight(1f),
-                    label = "+",
-                    onClick = onAddClick
-                )
-                item.isRemoveAction -> GroupInfoAddMemberCell(
-                    modifier = Modifier.weight(1f),
-                    label = "-",
-                    onClick = onRemoveClick
-                )
-                else -> Spacer(modifier = Modifier.weight(1f))
-            }
-        }
-    }
-}
-
-@Composable
-private fun GroupInfoMemberCell(
-    member: FloatingChatContact,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    val avatarBitmap = rememberAsyncAvatarBitmap(member.avatarUrl)
-    Column(
-        modifier = modifier.clickable(onClick = onClick),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(7.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(member.avatarColor)),
-            contentAlignment = Alignment.Center
-        ) {
-            if (avatarBitmap != null) {
-                Image(
-                    bitmap = avatarBitmap.asImageBitmap(),
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                TextLabel(
-                    text = member.initials.take(2),
-                    size = 13.sp,
-                    weight = FontWeight.SemiBold,
-                    color = OverlayTokens.primaryText,
-                    maxLines = 1
-                )
-            }
-        }
-        TextLabel(
-            text = member.name,
-            size = 10.sp,
-            color = FriendProfilePlaceholderText,
-            maxLines = 1,
-            textAlign = TextAlign.Center
-        )
-    }
-}
-
-@Composable
-private fun GroupInfoAddMemberCell(
-    modifier: Modifier = Modifier,
-    label: String = "+",
-    onClick: () -> Unit = {}
-) {
-    Column(
-        modifier = modifier.clickable(onClick = onClick),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(7.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .border(
-                    width = 1.dp,
-                    color = FriendProfilePlaceholderText,
-                    shape = RoundedCornerShape(8.dp)
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            TextLabel(
-                text = label,
-                size = 30.sp,
-                color = FriendProfilePlaceholderText,
-                maxLines = 1
-            )
-        }
-        TextLabel(
-            text = "",
-            size = 10.sp,
-            color = FriendProfilePlaceholderText,
-            maxLines = 1
-        )
-    }
-}
-
-@Composable
 private fun GroupMemberIntroPanel(
     member: FloatingChatContact,
     isFriend: Boolean,
@@ -10961,7 +10657,7 @@ private fun GroupMemberIntroPanel(
                 }
             }
         }
-        item { GroupInfoSectionGap() }
+        item { GroupMemberIntroSectionGap() }
         item {
             FriendProfileSection {
                 FriendProfileInfoRow(
@@ -10988,7 +10684,7 @@ private fun GroupMemberIntroPanel(
                 )
             }
         }
-        item { GroupInfoSectionGap() }
+        item { GroupMemberIntroSectionGap() }
         val feedbackText = groupMemberAddFriendStatusText(
             loading = addFriendLoading,
             status = addFriendStatus,
@@ -11132,104 +10828,7 @@ private fun GroupMemberIntroAvatar(member: FloatingChatContact) {
 }
 
 @Composable
-private fun GroupInfoQrRow(onClick: () -> Unit = {}) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 44.dp)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        TextLabel(
-            text = "群二维码",
-            size = 13.sp,
-            color = FriendProfilePrimaryText,
-            modifier = Modifier.weight(1f),
-            maxLines = 1
-        )
-        TextLabel(
-            text = "▦",
-            size = 19.sp,
-            color = FriendProfileSecondaryText,
-            maxLines = 1
-        )
-        Spacer(modifier = Modifier.width(6.dp))
-        FriendProfileChevron()
-    }
-}
-
-@Composable
-private fun GroupInfoEditableRow(
-    label: String,
-    value: String,
-    placeholder: String,
-    onValueChange: (String) -> Unit,
-    maxLines: Int = 1,
-    actionLabel: String? = null,
-    actionEnabled: Boolean = true,
-    onAction: (() -> Unit)? = null
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = if (maxLines == 1) 44.dp else 58.dp)
-            .padding(horizontal = 18.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        TextLabel(
-            text = label,
-            size = 13.sp,
-            color = FriendProfilePrimaryText,
-            modifier = Modifier.width(126.dp),
-            maxLines = 1
-        )
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            singleLine = maxLines == 1,
-            maxLines = maxLines,
-            textStyle = TextStyle.Default.copy(
-                color = FriendProfileSecondaryText,
-                fontSize = 12.sp,
-                textAlign = TextAlign.End
-            ),
-            cursorBrush = SolidColor(OverlayTokens.accent),
-            modifier = Modifier.weight(1f),
-            decorationBox = { innerTextField ->
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.CenterEnd
-                ) {
-                    if (value.isBlank()) {
-                        TextLabel(
-                            text = placeholder,
-                            size = 12.sp,
-                            color = FriendProfilePlaceholderText,
-                            maxLines = 1,
-                            textAlign = TextAlign.End
-                        )
-                    }
-                    innerTextField()
-                }
-            }
-        )
-        if (actionLabel != null && onAction != null) {
-            Spacer(modifier = Modifier.width(6.dp))
-            ScrmPanelButton(
-                label = actionLabel,
-                enabled = actionEnabled,
-                accent = true,
-                onClick = onAction
-            )
-        }
-        Spacer(modifier = Modifier.width(6.dp))
-        FriendProfileChevron()
-    }
-}
-
-@Composable
-private fun GroupInfoSectionGap() {
+private fun GroupMemberIntroSectionGap() {
     Spacer(
         modifier = Modifier
             .fillMaxWidth()

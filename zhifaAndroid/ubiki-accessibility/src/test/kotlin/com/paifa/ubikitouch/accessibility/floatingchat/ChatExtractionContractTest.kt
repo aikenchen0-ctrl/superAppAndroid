@@ -251,10 +251,53 @@ class ChatExtractionContractTest {
         assertFalse(legacy.contains("private fun FriendProfileHeader("))
         assertFalse(legacy.contains("private fun FriendProfilePhotosRow("))
         assertFalse(legacy.contains("private fun friendProfilePhotoColor("))
-        assertTrue(legacy.contains("private fun GroupContactEditPanel("))
+        assertTrue(legacy.contains("private fun GroupInfoHost("))
         assertTrue(legacy.contains("private fun defaultLocalGroupProfileFor("))
         assertTrue(legacy.contains("contactProfileIntroAction(event)"))
         assertTrue(legacy.contains("contactProfileEditorAction(event)"))
+    }
+
+    @Test
+    fun groupInfoScreenUsesPlatformIndependentStateAndEvents() {
+        val screen = sourceFile("floatingchat/group/GroupInfoScreen.kt")
+        val contract = sourceFile("floatingchat/contract/ContactsContract.kt")
+        assertTrue("Missing extracted group info screen", screen.isFile)
+
+        val text = screen.readText()
+        assertTrue(text.contains("fun GroupInfoScreen("))
+        assertTrue("GroupInfoScreen.kt must stay under 800 lines", screen.readLines().size < 800)
+        assertTrue(text.contains("state: GroupInfoUiState"))
+        assertTrue(text.contains("onEvent: (GroupInfoUiEvent) -> Unit"))
+        assertFalse(text.contains("scrm", ignoreCase = true))
+        assertFalse(text.contains("FloatingChatContact"))
+        assertFalse(text.contains("LocalGroupProfile"))
+        assertFalse(text.contains("database", ignoreCase = true))
+        assertFalse(text.contains("http", ignoreCase = true))
+        assertFalse(text.contains("Activity"))
+        assertFalse(text.contains("Context"))
+        assertFalse(text.contains("Coroutine"))
+
+        val contractText = contract.readText()
+        assertTrue(contractText.contains("data class GroupInfoUiState"))
+        assertTrue(contractText.contains("sealed interface GroupInfoUiEvent"))
+        assertTrue(contractText.contains("sealed interface GroupInfoAction"))
+        assertFalse(contractText.contains("import android."))
+        assertFalse(contractText.contains("import androidx.compose."))
+
+        val legacy = sourceFile("FloatingChatOverlayUi.kt").readText()
+        assertFalse(legacy.contains("private fun GroupContactEditPanel("))
+        assertFalse(legacy.contains("private fun GroupInfoTopBar("))
+        assertFalse(legacy.contains("private fun GroupInfoMemberGridRow("))
+        assertFalse(legacy.contains("private fun GroupInfoMemberCell("))
+        assertFalse(legacy.contains("private fun GroupInfoAddMemberCell("))
+        assertFalse(legacy.contains("private fun GroupInfoQrRow("))
+        assertFalse(legacy.contains("private fun GroupInfoEditableRow("))
+        assertFalse(legacy.contains("private fun GroupInfoSectionGap("))
+        assertFalse(legacy.contains("private fun LegacyGroupInfo"))
+        assertTrue(legacy.contains("private fun GroupMemberSelectionPanel("))
+        assertTrue(legacy.contains("private fun GroupMemberPickerRow("))
+        assertTrue(legacy.contains("private fun GroupMemberIntroPanel("))
+        assertTrue(legacy.contains("groupInfoAction(event)"))
     }
 
     private fun sourceFile(relativePath: String): File {

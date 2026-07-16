@@ -123,6 +123,105 @@ fun contactProfileEditorAction(event: ContactProfileUiEvent): ContactProfileEdit
     }
 }
 
+data class GroupInfoMemberUiState(
+    val id: String,
+    val displayName: String,
+    val initials: String,
+    val avatarUrl: String? = null,
+    val avatarColor: Int = 0
+)
+
+data class GroupInfoUiState(
+    val memberCount: Int = 0,
+    val members: List<GroupInfoMemberUiState> = emptyList(),
+    val canManageMembers: Boolean = false,
+    val groupName: String = "",
+    val announcement: String = "",
+    val remark: String = "",
+    val myNickname: String = "",
+    val muted: Boolean = false,
+    val pinned: Boolean = false,
+    val savedToContacts: Boolean = false,
+    val memberNicknamesVisible: Boolean = true,
+    val memberAvatarsVisible: Boolean = true,
+    val backgroundLabel: String = "",
+    val loading: Boolean = false,
+    val status: String? = null,
+    val error: String? = null
+)
+
+sealed interface GroupInfoUiEvent {
+    data object BackRequested : GroupInfoUiEvent
+    data object AddMemberRequested : GroupInfoUiEvent
+    data object RemoveMemberRequested : GroupInfoUiEvent
+    data class MemberSelected(val memberId: String) : GroupInfoUiEvent
+    data class GroupNameChanged(val value: String) : GroupInfoUiEvent
+    data object RenameRequested : GroupInfoUiEvent
+    data object QrCodeRequested : GroupInfoUiEvent
+    data class AnnouncementChanged(val value: String) : GroupInfoUiEvent
+    data object PublishAnnouncementRequested : GroupInfoUiEvent
+    data class RemarkChanged(val value: String) : GroupInfoUiEvent
+    data object SearchChatHistoryRequested : GroupInfoUiEvent
+    data class MutedChanged(val enabled: Boolean) : GroupInfoUiEvent
+    data class PinnedChanged(val enabled: Boolean) : GroupInfoUiEvent
+    data class SavedToContactsChanged(val enabled: Boolean) : GroupInfoUiEvent
+    data class MyNicknameChanged(val value: String) : GroupInfoUiEvent
+    data class MemberNicknamesVisibleChanged(val visible: Boolean) : GroupInfoUiEvent
+    data class MemberAvatarsVisibleChanged(val visible: Boolean) : GroupInfoUiEvent
+    data class BackgroundChanged(val value: String) : GroupInfoUiEvent
+    data object ClearChatHistoryRequested : GroupInfoUiEvent
+    data object ReportRequested : GroupInfoUiEvent
+    data object ExitGroupRequested : GroupInfoUiEvent
+}
+
+sealed interface GroupInfoAction {
+    data object Back : GroupInfoAction
+    data object InviteMembers : GroupInfoAction
+    data object RemoveMembers : GroupInfoAction
+    data class OpenMember(val memberId: String) : GroupInfoAction
+    data class UpdateGroupName(val value: String) : GroupInfoAction
+    data object RenameGroup : GroupInfoAction
+    data object LoadQrCode : GroupInfoAction
+    data class UpdateAnnouncement(val value: String) : GroupInfoAction
+    data object PublishAnnouncement : GroupInfoAction
+    data class UpdateRemark(val value: String) : GroupInfoAction
+    data object SearchChatHistory : GroupInfoAction
+    data class SetMuted(val enabled: Boolean) : GroupInfoAction
+    data class SetPinned(val enabled: Boolean) : GroupInfoAction
+    data class SetSavedToContacts(val enabled: Boolean) : GroupInfoAction
+    data class UpdateMyNickname(val value: String) : GroupInfoAction
+    data class SetMemberNicknamesVisible(val visible: Boolean) : GroupInfoAction
+    data class SetMemberAvatarsVisible(val visible: Boolean) : GroupInfoAction
+    data class UpdateBackground(val value: String) : GroupInfoAction
+    data object ClearChatHistory : GroupInfoAction
+    data object Report : GroupInfoAction
+    data object ExitGroup : GroupInfoAction
+}
+
+fun groupInfoAction(event: GroupInfoUiEvent): GroupInfoAction = when (event) {
+    GroupInfoUiEvent.BackRequested -> GroupInfoAction.Back
+    GroupInfoUiEvent.AddMemberRequested -> GroupInfoAction.InviteMembers
+    GroupInfoUiEvent.RemoveMemberRequested -> GroupInfoAction.RemoveMembers
+    is GroupInfoUiEvent.MemberSelected -> GroupInfoAction.OpenMember(event.memberId)
+    is GroupInfoUiEvent.GroupNameChanged -> GroupInfoAction.UpdateGroupName(event.value)
+    GroupInfoUiEvent.RenameRequested -> GroupInfoAction.RenameGroup
+    GroupInfoUiEvent.QrCodeRequested -> GroupInfoAction.LoadQrCode
+    is GroupInfoUiEvent.AnnouncementChanged -> GroupInfoAction.UpdateAnnouncement(event.value)
+    GroupInfoUiEvent.PublishAnnouncementRequested -> GroupInfoAction.PublishAnnouncement
+    is GroupInfoUiEvent.RemarkChanged -> GroupInfoAction.UpdateRemark(event.value)
+    GroupInfoUiEvent.SearchChatHistoryRequested -> GroupInfoAction.SearchChatHistory
+    is GroupInfoUiEvent.MutedChanged -> GroupInfoAction.SetMuted(event.enabled)
+    is GroupInfoUiEvent.PinnedChanged -> GroupInfoAction.SetPinned(event.enabled)
+    is GroupInfoUiEvent.SavedToContactsChanged -> GroupInfoAction.SetSavedToContacts(event.enabled)
+    is GroupInfoUiEvent.MyNicknameChanged -> GroupInfoAction.UpdateMyNickname(event.value)
+    is GroupInfoUiEvent.MemberNicknamesVisibleChanged -> GroupInfoAction.SetMemberNicknamesVisible(event.visible)
+    is GroupInfoUiEvent.MemberAvatarsVisibleChanged -> GroupInfoAction.SetMemberAvatarsVisible(event.visible)
+    is GroupInfoUiEvent.BackgroundChanged -> GroupInfoAction.UpdateBackground(event.value)
+    GroupInfoUiEvent.ClearChatHistoryRequested -> GroupInfoAction.ClearChatHistory
+    GroupInfoUiEvent.ReportRequested -> GroupInfoAction.Report
+    GroupInfoUiEvent.ExitGroupRequested -> GroupInfoAction.ExitGroup
+}
+
 data class ContactsUiState(
     val query: String = "",
     val searchVisible: Boolean = false,
