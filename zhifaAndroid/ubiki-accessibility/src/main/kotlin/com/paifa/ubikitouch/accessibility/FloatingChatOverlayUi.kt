@@ -16878,14 +16878,6 @@ private inline fun <reified T : Enum<T>> enumValueOrDefault(value: String, defau
     return runCatching { enumValueOf<T>(value) }.getOrDefault(default)
 }
 
-internal data class AppLocationOption(
-    val title: String,
-    val address: String,
-    val latitude: Double? = null,
-    val longitude: Double? = null,
-    val geoUri: String? = null
-)
-
 internal enum class MomentMediaKind {
     Image,
     Video,
