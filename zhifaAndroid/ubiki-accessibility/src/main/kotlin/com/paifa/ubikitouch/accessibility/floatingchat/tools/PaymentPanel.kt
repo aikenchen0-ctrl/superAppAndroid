@@ -18,8 +18,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.paifa.ubikitouch.accessibility.TextLabel
+import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.PaymentUiEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.PaymentUiState
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactSummary
 
 private val PanelBackground = Color(0xFFF7F7F7)
 private val PrimaryText = Color(0xFF222222)
@@ -67,6 +69,33 @@ private fun ToolInput(value: String, placeholder: String, onValueChange: (String
         decorationBox = { inner ->
             if (value.isBlank()) TextLabel(placeholder, 12.sp, color = SecondaryText, maxLines = 1)
             inner()
+        }
+    )
+}
+
+@Composable
+internal fun PaymentComposerPanel(
+    title: String,
+    amountLabel: String,
+    noteLabel: String,
+    defaultNote: String,
+    confirmLabel: String,
+    recipients: List<FloatingChatContact> = emptyList(),
+    onConfirm: (String, String, FloatingChatContact?) -> Unit
+) {
+    PaymentPanel(
+        state = PaymentUiState(
+            title = title,
+            amountLabel = amountLabel,
+            noteLabel = noteLabel,
+            defaultNote = defaultNote,
+            confirmLabel = confirmLabel,
+            recipients = recipients.map { ContactSummary(it.id, it.name) }
+        ),
+        onEvent = { event ->
+            if (event is PaymentUiEvent.ConfirmRequested) {
+                onConfirm(event.amount, event.note, recipients.firstOrNull { it.id == event.recipientId })
+            }
         }
     )
 }
