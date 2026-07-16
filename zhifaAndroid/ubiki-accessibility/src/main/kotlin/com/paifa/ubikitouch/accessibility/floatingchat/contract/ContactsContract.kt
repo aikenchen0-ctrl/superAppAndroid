@@ -150,6 +150,49 @@ data class GroupInfoUiState(
     val error: String? = null
 )
 
+data class GroupMemberUiState(
+    val id: String,
+    val displayName: String,
+    val initials: String,
+    val avatarUrl: String? = null,
+    val avatarColor: Int = 0,
+    val isFriend: Boolean = false
+)
+
+data class GroupMemberScreenUiState(
+    val member: GroupMemberUiState,
+    val addFriendLoading: Boolean = false,
+    val addFriendStatus: String? = null,
+    val addFriendError: String? = null
+)
+
+sealed interface GroupMemberUiEvent {
+    data object BackRequested : GroupMemberUiEvent
+    data object OpenChatRequested : GroupMemberUiEvent
+    data object OpenProfileRequested : GroupMemberUiEvent
+    data object OpenMomentsRequested : GroupMemberUiEvent
+    data object StartVideoCallRequested : GroupMemberUiEvent
+    data object AddFriendRequested : GroupMemberUiEvent
+}
+
+sealed interface GroupMemberAction {
+    data object Back : GroupMemberAction
+    data object OpenChat : GroupMemberAction
+    data object OpenProfile : GroupMemberAction
+    data object OpenMoments : GroupMemberAction
+    data object StartVideoCall : GroupMemberAction
+    data object AddFriend : GroupMemberAction
+}
+
+fun groupMemberAction(event: GroupMemberUiEvent): GroupMemberAction = when (event) {
+    GroupMemberUiEvent.BackRequested -> GroupMemberAction.Back
+    GroupMemberUiEvent.OpenChatRequested -> GroupMemberAction.OpenChat
+    GroupMemberUiEvent.OpenProfileRequested -> GroupMemberAction.OpenProfile
+    GroupMemberUiEvent.OpenMomentsRequested -> GroupMemberAction.OpenMoments
+    GroupMemberUiEvent.StartVideoCallRequested -> GroupMemberAction.StartVideoCall
+    GroupMemberUiEvent.AddFriendRequested -> GroupMemberAction.AddFriend
+}
+
 sealed interface GroupInfoUiEvent {
     data object BackRequested : GroupInfoUiEvent
     data object AddMemberRequested : GroupInfoUiEvent

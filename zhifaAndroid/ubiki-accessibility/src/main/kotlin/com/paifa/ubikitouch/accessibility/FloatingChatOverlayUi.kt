@@ -10,10 +10,15 @@ import com.paifa.ubikitouch.accessibility.floatingchat.contacts.FriendRequestScr
 import com.paifa.ubikitouch.accessibility.floatingchat.contacts.ContactsScreen
 import com.paifa.ubikitouch.accessibility.floatingchat.contacts.ContactProfileScreen
 import com.paifa.ubikitouch.accessibility.floatingchat.group.GroupInfoScreen
+import com.paifa.ubikitouch.accessibility.floatingchat.group.GroupMemberScreen
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoAction
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoMemberUiState
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoUiEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoUiState
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupMemberScreenUiState
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupMemberUiEvent
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.groupMemberAction
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupMemberAction
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.groupInfoAction
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactProfileEditorAction
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactProfileIntroAction
@@ -9797,23 +9802,29 @@ private fun ContactEditOverlay(
                     onDeleteFriend = onDeleteFriend,
                     onDismiss = { friendProfileTarget = null }
                 )
-                activeGroupMember != null -> GroupMemberIntroPanel(
-                    member = activeGroupMember,
-                    isFriend = groupInfoMemberIsFriend(activeGroupMember, contacts),
-                    addFriendLoading = groupMemberAddFriendTargetId == activeGroupMember.id && groupMemberAddFriendLoading,
-                    addFriendStatus = groupMemberAddFriendStatus.takeIf { groupMemberAddFriendTargetId == activeGroupMember.id },
-                    addFriendError = groupMemberAddFriendError.takeIf { groupMemberAddFriendTargetId == activeGroupMember.id },
-                    onBack = { selectedGroupMember = null },
-                    onOpenChat = {
-                        onOpenPrivateChat(activeGroupMember)
-                    },
-                    onOpenVideoCall = {},
-                    onOpenFriendProfile = {
-                        friendProfileTarget = activeGroupMember
-                    },
-                    onOpenMoments = {},
-                    onAddFriend = {
-                        onAddFriendFromGroupMember(activeGroupMember)
+                activeGroupMember != null -> GroupMemberScreen(
+                    state = GroupMemberScreenUiState(
+                        member = com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupMemberUiState(
+                            id = activeGroupMember.id,
+                            displayName = activeGroupMember.name,
+                            initials = activeGroupMember.initials,
+                            avatarUrl = activeGroupMember.avatarUrl,
+                            avatarColor = activeGroupMember.avatarColor.toInt(),
+                            isFriend = groupInfoMemberIsFriend(activeGroupMember, contacts)
+                        ),
+                        addFriendLoading = groupMemberAddFriendTargetId == activeGroupMember.id && groupMemberAddFriendLoading,
+                        addFriendStatus = groupMemberAddFriendStatus.takeIf { groupMemberAddFriendTargetId == activeGroupMember.id },
+                        addFriendError = groupMemberAddFriendError.takeIf { groupMemberAddFriendTargetId == activeGroupMember.id }
+                    ),
+                    onEvent = { event ->
+                        when (groupMemberAction(event)) {
+                            GroupMemberAction.Back -> selectedGroupMember = null
+                            GroupMemberAction.OpenChat -> onOpenPrivateChat(activeGroupMember)
+                            GroupMemberAction.OpenProfile -> friendProfileTarget = activeGroupMember
+                            GroupMemberAction.OpenMoments -> Unit
+                            GroupMemberAction.StartVideoCall -> Unit
+                            GroupMemberAction.AddFriend -> onAddFriendFromGroupMember(activeGroupMember)
+                        }
                     }
                 )
                 target is ContactEditorTarget.Group -> GroupInfoHost(
