@@ -14876,11 +14876,7 @@ private fun MomentMaterialsPanel(
             )
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val session = manager.loadSelectedSessionOrBootstrap()
-                    session.momentApi.getMomentMaterialDetail(
-                        material.id,
-                        material.tenantId ?: momentMaterialTenantIdForRoute(currentRoute)
-                    )
+                    loadScrmMomentMaterialDetail(context.applicationContext, currentRoute, material)
                 }
             }.onSuccess { detail ->
                 state = state.copy(
