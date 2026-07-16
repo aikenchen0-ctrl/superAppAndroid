@@ -14,6 +14,8 @@ import com.paifa.ubikitouch.accessibility.floatingchat.group.GroupMemberScreen
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.PaymentComposerPanel
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.AiConfigPanel
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.QuickPhrasePanel
+import com.paifa.ubikitouch.accessibility.floatingchat.tools.FavoritePanel
+import com.paifa.ubikitouch.accessibility.floatingchat.tools.FavoriteUiItem
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoAction
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoMemberUiState
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoUiEvent
@@ -16264,6 +16266,26 @@ private data class ScrmMomentMaterialsPanelState(
 
 @Composable
 private fun FavoriteCollectionPanel(
+    items: List<FavoriteCollectionItem>,
+    multiSelectMode: Boolean,
+    selectedItemIds: Map<String, Boolean>,
+    onPreviewItem: (FavoriteCollectionItem) -> Unit,
+    onLongPressItem: (FavoriteCollectionItem, Rect?) -> Unit,
+    onToggleSelection: (FavoriteCollectionItem) -> Unit,
+    onForwardSelected: () -> Unit,
+    onDeleteSelected: () -> Unit,
+    onCancelSelection: () -> Unit
+) {
+    FavoritePanel(
+        items = items.map { FavoriteUiItem(it.messageId, it.title, it.description) },
+        selectedIds = selectedItemIds.filterValues { it }.keys,
+        onToggleSelection = { id -> items.firstOrNull { it.messageId == id }?.let(onToggleSelection) },
+        onOpen = { id -> items.firstOrNull { it.messageId == id }?.let(onPreviewItem) }
+    )
+}
+
+@Composable
+private fun LegacyFavoriteCollectionPanel(
     items: List<FavoriteCollectionItem>,
     multiSelectMode: Boolean,
     selectedItemIds: Map<String, Boolean>,
