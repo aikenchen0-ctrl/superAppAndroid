@@ -13998,7 +13998,6 @@ private fun MomentsTimelinePanel(
     onRemotePostsLoaded: (List<AppMomentPost>) -> Unit
 ) {
     val context = LocalContext.current
-    val manager = remember(context) { ScrmSettingsManager(context.applicationContext) }
     val scope = rememberCoroutineScope()
     var draft by remember { mutableStateOf("") }
     var commentingPostId by remember { mutableStateOf<String?>(null) }
