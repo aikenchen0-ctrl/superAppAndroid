@@ -14119,17 +14119,12 @@ private fun MomentsTimelinePanel(
             state = state.copy(loading = true, status = "正在提交朋友圈点赞", error = null)
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val session = manager.loadSelectedSessionOrBootstrap()
-                    submitScrmMomentTaskAndAwait(session.taskApi) {
-                        session.momentApi.likeMoment(
-                            ScrmMomentLikeRequest(
-                                deviceUuid = currentRoute.deviceUuid,
-                                weChatId = currentRoute.weChatId,
-                                circleId = circleId,
-                                isCancel = cancel
-                            )
-                        )
-                    }
+                    likeScrmMoment(
+                        context = context.applicationContext,
+                        route = currentRoute,
+                        circleId = circleId,
+                        cancel = cancel
+                    )
                 }
             }.onSuccess { outcome ->
                 state = state.copy(loading = false, status = outcome.message, error = null)
@@ -14162,19 +14157,12 @@ private fun MomentsTimelinePanel(
             state = state.copy(loading = true, status = "正在提交朋友圈评论", error = null)
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val session = manager.loadSelectedSessionOrBootstrap()
-                    submitScrmMomentTaskAndAwait(session.taskApi) {
-                        session.momentApi.commentMoment(
-                            ScrmMomentCommentRequest(
-                                deviceUuid = currentRoute.deviceUuid,
-                                weChatId = currentRoute.weChatId,
-                                circleId = circleId,
-                                content = text,
-                                replyCommentId = 0L,
-                                isResend = false
-                            )
-                        )
-                    }
+                    commentScrmMoment(
+                        context = context.applicationContext,
+                        route = currentRoute,
+                        circleId = circleId,
+                        text = text
+                    )
                 }
             }.onSuccess { outcome ->
                 state = state.copy(loading = false, status = outcome.message, error = null)

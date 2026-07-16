@@ -11,6 +11,8 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentPostPayload
 import com.paifa.ubikitouch.accessibility.scrm.ScrmPostMomentRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentTaskAwaitOutcome
 import com.paifa.ubikitouch.accessibility.scrm.uploadScrmMomentMedia
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentLikeRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentCommentRequest
 
 internal data class ScrmMomentsLoadResult(
     val posts: List<AppMomentPost>,
@@ -59,6 +61,39 @@ internal fun publishScrmMoment(
                     content = trimmedContent,
                     attachment = uploadedMedia?.let { ScrmMomentPostAttachment(it.attachmentTypeCode, listOf(it.url)) }
                 )
+            )
+        )
+    }
+}
+
+internal fun likeScrmMoment(
+    context: Context,
+    route: ScrmFloatingAccountRoute,
+    circleId: Long,
+    cancel: Boolean
+): ScrmMomentTaskAwaitOutcome {
+    val session = ScrmSettingsManager(context.applicationContext).loadSelectedSessionOrBootstrap()
+    return submitScrmMomentTaskAndAwait(session.taskApi) {
+        session.momentApi.likeMoment(ScrmMomentLikeRequest(route.deviceUuid, route.weChatId, circleId, cancel))
+    }
+}
+
+internal fun commentScrmMoment(
+    context: Context,
+    route: ScrmFloatingAccountRoute,
+    circleId: Long,
+    text: String
+): ScrmMomentTaskAwaitOutcome {
+    val session = ScrmSettingsManager(context.applicationContext).loadSelectedSessionOrBootstrap()
+    return submitScrmMomentTaskAndAwait(session.taskApi) {
+        session.momentApi.commentMoment(
+            ScrmMomentCommentRequest(
+                deviceUuid = route.deviceUuid,
+                weChatId = route.weChatId,
+                circleId = circleId,
+                content = text,
+                replyCommentId = 0L,
+                isResend = false
             )
         )
     }
