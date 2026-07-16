@@ -9,8 +9,8 @@ import android.provider.MediaStore
 import java.io.File
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 
-internal object AndroidMediaRuntimePort {
-    fun share(context: Context, message: FloatingChatMessage): MediaActionResult {
+internal object AndroidMediaRuntimePort : MediaRuntimePort {
+    override fun share(context: Context, message: FloatingChatMessage): MediaActionResult {
         val uri = mediaActionUri(message) ?: return MediaActionResult("没有可分享的媒体")
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = mediaMimeType(message)
@@ -28,7 +28,7 @@ internal object AndroidMediaRuntimePort {
         }
     }
 
-    fun save(context: Context, message: FloatingChatMessage): MediaActionResult {
+    override fun save(context: Context, message: FloatingChatMessage): MediaActionResult {
         val sourceUri = mediaActionUri(message) ?: return MediaActionResult("没有可保存的媒体")
         if (sourceUri.scheme !in setOf("content", "file")) return MediaActionResult("网络媒体暂不支持直接保存")
         return runCatching {
