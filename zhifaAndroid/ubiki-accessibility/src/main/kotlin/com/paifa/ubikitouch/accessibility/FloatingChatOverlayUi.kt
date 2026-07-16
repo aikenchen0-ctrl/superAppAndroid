@@ -355,6 +355,9 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskPollState
 import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskResult
 import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskSubmissionResult
 import com.paifa.ubikitouch.accessibility.scrm.resolveScrmTaskResult
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentTaskAwaitOutcome
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentTaskPollDelayMillis
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentTaskMaxPollAttempts
 import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingAccountId
 import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingAccountRouteForContactId
 import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingContactId
@@ -14380,8 +14383,6 @@ private fun MomentsTimelinePanel(
 private const val CurrentUserMomentLikeName = "\u6211"
 private const val ScrmMomentPostIdPrefix = "scrm-moment:"
 private const val LocalScrmMomentPostIdPrefix = "local-scrm-moment:"
-private const val ScrmMomentTaskPollDelayMillis = 1_500L
-private const val ScrmMomentTaskMaxPollAttempts = 8
 
 private data class ScrmMomentsPanelState(
     val loading: Boolean = false,
@@ -14392,13 +14393,6 @@ private data class ScrmMomentsPanelState(
 private data class ScrmMomentsLoadResult(
     val posts: List<AppMomentPost>,
     val message: String
-)
-
-internal data class ScrmMomentTaskAwaitOutcome(
-    val taskId: Long,
-    val completed: Boolean,
-    val message: String,
-    val data: List<JsonElement>
 )
 
 private data class ScrmUploadedMomentMedia(
