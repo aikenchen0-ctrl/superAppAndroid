@@ -14067,38 +14067,13 @@ private fun MomentsTimelinePanel(
             state = state.copy(loading = true, status = "正在发表朋友圈", error = null)
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val session = manager.loadSelectedSessionOrBootstrap()
-                    val uploadedMedia = uploadScrmMomentMedia(
-                        context = context,
-                        api = session.messageApi,
-                        media = media
+                    publishScrmMoment(
+                        context = context.applicationContext,
+                        route = currentRoute,
+                        content = trimmedContent,
+                        media = media,
+                        clientRequestId = clientRequestId
                     )
-                    submitScrmMomentTaskAndAwait(
-                        taskApi = session.taskApi,
-                        treatMissingRecentTaskAsAccepted = true
-                    ) {
-                        session.momentApi.postMoment(
-                            ScrmPostMomentRequest(
-                                deviceUuid = currentRoute.deviceUuid,
-                                weChatId = currentRoute.weChatId,
-                                clientRequestId = clientRequestId,
-                                content = trimmedContent.takeIf { it.isNotBlank() },
-                                attachmentType = uploadedMedia?.attachmentType,
-                                attachments = uploadedMedia?.url?.let(::listOf),
-                                payload = ScrmMomentPostPayload(
-                                    clientRequestId = clientRequestId,
-                                    weChatId = currentRoute.weChatId,
-                                    content = trimmedContent.takeIf { it.isNotBlank() },
-                                    attachment = uploadedMedia?.let { mediaInfo ->
-                                        ScrmMomentPostAttachment(
-                                            type = mediaInfo.attachmentTypeCode,
-                                            content = listOf(mediaInfo.url)
-                                        )
-                                    }
-                                )
-                            )
-                        )
-                    }
                 }
             }.onSuccess { outcome ->
                 state = state.copy(loading = false, status = outcome.message, error = null)
