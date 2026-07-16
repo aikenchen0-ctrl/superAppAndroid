@@ -336,11 +336,8 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterialCreateRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterialDetail
 import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterialQuery
 import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentAttachmentType
-import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentCommentRequest
-import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentLikeRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentPostAttachment
 import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentPostPayload
-import com.paifa.ubikitouch.accessibility.scrm.ScrmPostMomentRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmQueuedMediaPayload
 import com.paifa.ubikitouch.accessibility.scrm.ScrmRequestException
 import com.paifa.ubikitouch.accessibility.scrm.ScrmRenameChatRoomRequest
@@ -349,7 +346,6 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmSetChatRoomNoticeRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSettingsManager
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSyncMomentMessagesRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSyncContactsRequest
-import com.paifa.ubikitouch.accessibility.scrm.ScrmSyncMomentsRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskApi
 import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskPollState
 import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskResult
