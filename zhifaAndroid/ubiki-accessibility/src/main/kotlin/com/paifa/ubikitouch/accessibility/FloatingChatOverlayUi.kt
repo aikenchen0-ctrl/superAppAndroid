@@ -42,6 +42,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.contract.FriendRequestSum
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.FriendRequestUiState
 import com.paifa.ubikitouch.accessibility.floatingchat.message.*
 import com.paifa.ubikitouch.accessibility.floatingchat.media.*
+import com.paifa.ubikitouch.accessibility.floatingchat.moments.scrmCircleIdForMomentPostId
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -14985,13 +14986,6 @@ private fun AppMomentMedia.scrmMomentMimeType(): String {
 internal fun momentsTimelineUsesRemoteScrmSource(): Boolean = true
 
 internal fun momentsTimelineSeedsWechatSimulationPosts(): Boolean = false
-
-internal fun scrmCircleIdForMomentPostId(postId: String): Long? {
-    return postId
-        .takeIf { it.startsWith(ScrmMomentPostIdPrefix) }
-        ?.removePrefix(ScrmMomentPostIdPrefix)
-        ?.toLongOrNull()
-}
 
 internal fun localScrmMomentPostForSubmittedDraft(
     clientRequestId: String,
