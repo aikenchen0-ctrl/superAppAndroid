@@ -79,6 +79,22 @@ class FloatingChatContractBoundaryTest {
         assertTrue(runtime.readText().contains("fun handle(effect: FloatingChatEffect)"))
     }
 
+    @Test
+    fun contactsContractDefinesPlatformIndependentStateAndEvents() {
+        val source = sourceFile("contract/ContactsContract.kt")
+
+        assertTrue("Contacts contract source must exist", source.isFile)
+        val text = source.readText()
+        assertTrue(text.contains("data class ContactsUiState"))
+        assertTrue(text.contains("sealed interface ContactsUiEvent"))
+        assertTrue(text.contains("sealed interface ContactOperationState"))
+        assertTrue(text.contains("fun reduceContactsState("))
+        assertFalse(text.contains("import android."))
+        assertFalse(text.contains("import androidx.compose."))
+        assertFalse(text.contains("Scrm"))
+        assertFalse(text.contains("Context"))
+    }
+
     private fun sourceFile(relativePath: String): File {
         val moduleRelative = File(
             "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat",
