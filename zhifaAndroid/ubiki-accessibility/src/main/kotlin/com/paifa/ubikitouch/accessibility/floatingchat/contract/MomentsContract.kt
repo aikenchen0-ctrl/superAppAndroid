@@ -19,7 +19,7 @@ sealed interface MomentsUiEvent {
     data object RefreshRequested : MomentsUiEvent
     data object ComposeRequested : MomentsUiEvent
     data class LikeRequested(val postId: String) : MomentsUiEvent
-    data class CommentRequested(val postId: String) : MomentsUiEvent
+    data class CommentRequested(val postId: String, val text: String = "") : MomentsUiEvent
 }
 
 sealed interface MomentsAction {

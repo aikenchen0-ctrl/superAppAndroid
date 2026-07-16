@@ -19,7 +19,10 @@ internal class MomentsCoordinator(private val runtime: MomentsRuntimePort) {
             val updated = runtime.like(event.postId)
             state.copy(posts = state.posts.map { if (it.id == updated.id) updated else it })
         }.getOrElse { state.copy(error = it.message ?: "点赞失败") }
-        is MomentsUiEvent.CommentRequested -> state
+        is MomentsUiEvent.CommentRequested -> runCatching {
+            val updated = runtime.comment(event.postId, event.text)
+            state.copy(posts = state.posts.map { if (it.id == updated.id) updated else it })
+        }.getOrElse { state.copy(error = it.message ?: "评论失败") }
         else -> state
     }
 }

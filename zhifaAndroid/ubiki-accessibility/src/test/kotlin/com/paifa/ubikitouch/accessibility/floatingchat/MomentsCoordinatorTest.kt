@@ -25,4 +25,19 @@ class MomentsCoordinatorTest {
         assertEquals("a", next.posts.first { it.id == "a" }.text)
         assertEquals("updated", next.posts.first { it.id == "b" }.text)
     }
+
+    @Test
+    fun commentUpdatesOnlyTargetPost() = runBlocking {
+        val port = object : MomentsRuntimePort {
+            override suspend fun sync() = emptyList<MomentPostUiState>()
+            override suspend fun publish(draft: MomentDraft) = MomentPostUiState("new", "A", draft.text)
+            override suspend fun like(postId: String) = MomentPostUiState(postId, "A", "liked")
+            override suspend fun comment(postId: String, text: String) = MomentPostUiState(postId, "A", text)
+        }
+        val coordinator = MomentsCoordinator(port)
+        val state = MomentsUiState(listOf(MomentPostUiState("a", "A", "a"), MomentPostUiState("b", "B", "b")))
+        val next = coordinator.dispatch(state, MomentsUiEvent.CommentRequested("b", "hello"))
+        assertEquals("a", next.posts.first { it.id == "a" }.text)
+        assertEquals("hello", next.posts.first { it.id == "b" }.text)
+    }
 }
