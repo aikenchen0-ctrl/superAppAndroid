@@ -5460,61 +5460,6 @@ private fun VideoPlayGlyph(modifier: Modifier = Modifier) {
 }
 
 @Composable
-internal fun InlineContactContent(message: FloatingChatMessage) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(28.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        SquareAvatarChip(
-            text = message.cardName?.take(2).orEmpty().ifBlank { "名片" },
-            background = OverlayTokens.inlineAvatar,
-            sizeDp = 26
-        )
-        Spacer(modifier = Modifier.width(7.dp))
-        TextLabel(
-            text = message.text,
-            size = 11.sp,
-            weight = FontWeight.Bold,
-            color = OverlayTokens.cardPrimaryText,
-            maxLines = 1,
-            shadow = OverlayTokens.imModuleTextShadow
-        )
-    }
-}
-
-@Composable
-internal fun InlineLocationContent(message: FloatingChatMessage) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(28.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        LocationGlyph(modifier = Modifier.size(24.dp))
-        Spacer(modifier = Modifier.width(7.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            TextLabel(
-                text = message.locationTitle ?: message.text,
-                size = 10.5.sp,
-                weight = FontWeight.Bold,
-                color = OverlayTokens.cardPrimaryText,
-                maxLines = 1,
-                shadow = OverlayTokens.imModuleTextShadow
-            )
-            TextLabel(
-                text = message.locationAddress.orEmpty(),
-                size = 8.5.sp,
-                color = OverlayTokens.cardSecondaryText,
-                maxLines = 1,
-                shadow = OverlayTokens.imModuleTextShadow
-            )
-        }
-    }
-}
-
-@Composable
 private fun VisibilityAccessStrip(
     visibility: FloatingChatVisibilityScope?,
     accessState: FloatingChatAccessState?,
@@ -5560,7 +5505,7 @@ private fun TinyChip(label: String, color: Color) {
 }
 
 @Composable
-private fun SquareAvatarChip(
+internal fun SquareAvatarChip(
     text: String,
     background: Color,
     sizeDp: Int = 34,
@@ -5626,7 +5571,7 @@ private fun FileFormatIcon(
 }
 
 @Composable
-private fun LocationGlyph(modifier: Modifier = Modifier) {
+internal fun LocationGlyph(modifier: Modifier = Modifier) {
     Canvas(modifier = modifier) {
         val stroke = Stroke(width = 2.0f, cap = StrokeCap.Round, join = StrokeJoin.Round)
         drawCircle(

@@ -80,6 +80,8 @@ class ChatExtractionContractTest {
         assertTrue(cards.readText().contains("fun LocationMessageContent("))
         assertTrue(cards.readText().contains("fun ContactLinkCardContent("))
         assertTrue(cards.readText().contains("fun MiniProgramLinkContent("))
+        assertTrue(cards.readText().contains("fun InlineContactContent("))
+        assertTrue(cards.readText().contains("fun InlineLocationContent("))
 
         val legacy = sourceFile("FloatingChatOverlayUi.kt").readText()
         assertFalse(legacy.contains("private fun MessageContent("))
@@ -92,6 +94,8 @@ class ChatExtractionContractTest {
         assertFalse(legacy.contains("internal fun LocationMessageContent("))
         assertFalse(legacy.contains("internal fun ContactLinkCardContent("))
         assertFalse(legacy.contains("internal fun MiniProgramLinkContent("))
+        assertFalse(legacy.contains("internal fun InlineContactContent("))
+        assertFalse(legacy.contains("internal fun InlineLocationContent("))
     }
 
     @Test

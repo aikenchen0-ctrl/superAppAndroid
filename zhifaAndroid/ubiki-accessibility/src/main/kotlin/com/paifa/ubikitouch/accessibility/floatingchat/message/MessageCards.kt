@@ -30,8 +30,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.paifa.ubikitouch.accessibility.AccountCardPreviewContent
+import com.paifa.ubikitouch.accessibility.LocationGlyph
 import com.paifa.ubikitouch.accessibility.OverlayTokens
 import com.paifa.ubikitouch.accessibility.PaymentCardContent
+import com.paifa.ubikitouch.accessibility.SquareAvatarChip
 import com.paifa.ubikitouch.accessibility.TextLabel
 import com.paifa.ubikitouch.accessibility.isPaymentCardMessage
 import com.paifa.ubikitouch.accessibility.locationMapPreviewHeightDp
@@ -83,6 +85,61 @@ internal fun ContactLinkCardContent(message: FloatingChatMessage) {
         avatarColor = cardColorFor(message.cardKind),
         avatarImageUri = message.thumbnailUrl
     )
+}
+
+@Composable
+internal fun InlineContactContent(message: FloatingChatMessage) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(28.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SquareAvatarChip(
+            text = message.cardName?.take(2).orEmpty().ifBlank { "名片" },
+            background = OverlayTokens.inlineAvatar,
+            sizeDp = 26
+        )
+        Spacer(modifier = Modifier.width(7.dp))
+        TextLabel(
+            text = message.text,
+            size = 11.sp,
+            weight = FontWeight.Bold,
+            color = OverlayTokens.cardPrimaryText,
+            maxLines = 1,
+            shadow = OverlayTokens.imModuleTextShadow
+        )
+    }
+}
+
+@Composable
+internal fun InlineLocationContent(message: FloatingChatMessage) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(28.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        LocationGlyph(modifier = Modifier.size(24.dp))
+        Spacer(modifier = Modifier.width(7.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            TextLabel(
+                text = message.locationTitle ?: message.text,
+                size = 10.5.sp,
+                weight = FontWeight.Bold,
+                color = OverlayTokens.cardPrimaryText,
+                maxLines = 1,
+                shadow = OverlayTokens.imModuleTextShadow
+            )
+            TextLabel(
+                text = message.locationAddress.orEmpty(),
+                size = 8.5.sp,
+                color = OverlayTokens.cardSecondaryText,
+                maxLines = 1,
+                shadow = OverlayTokens.imModuleTextShadow
+            )
+        }
+    }
 }
 
 @Composable

@@ -8,8 +8,6 @@ import androidx.compose.ui.unit.dp
 import com.paifa.ubikitouch.accessibility.DraftBadge
 import com.paifa.ubikitouch.accessibility.FilePreviewContent
 import com.paifa.ubikitouch.accessibility.ImageThumbnailContent
-import com.paifa.ubikitouch.accessibility.InlineContactContent
-import com.paifa.ubikitouch.accessibility.InlineLocationContent
 import com.paifa.ubikitouch.accessibility.VideoPreviewContent
 import com.paifa.ubikitouch.accessibility.VoiceMessageContent
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
