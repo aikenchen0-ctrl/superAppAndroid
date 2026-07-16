@@ -13,6 +13,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.group.GroupInfoScreen
 import com.paifa.ubikitouch.accessibility.floatingchat.group.GroupMemberScreen
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.PaymentComposerPanel
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.AiConfigPanel
+import com.paifa.ubikitouch.accessibility.floatingchat.tools.QuickPhrasePanel
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoAction
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoMemberUiState
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoUiEvent
@@ -14281,7 +14282,7 @@ private fun Throwable.toScrmContactsPanelMessage(): String {
 }
 
 @Composable
-private fun QuickPhrasePanel(
+private fun LegacyQuickPhrasePanel(
     phrases: List<String>,
     onSendPhrase: (String) -> Unit,
     onAddPhrase: (String) -> Unit,
