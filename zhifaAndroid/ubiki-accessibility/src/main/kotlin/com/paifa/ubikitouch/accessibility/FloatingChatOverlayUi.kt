@@ -14839,13 +14839,7 @@ private fun MomentMaterialsPanel(
             state = state.copy(loading = true, status = "正在加载朋友圈素材", error = null)
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val session = manager.loadSelectedSessionOrBootstrap()
-                    session.momentApi.getMomentMaterials(
-                        ScrmMomentMaterialQuery(
-                            tenantId = momentMaterialTenantIdForRoute(currentRoute),
-                            take = 80
-                        )
-                    )
+                    loadScrmMomentMaterials(context.applicationContext, currentRoute)
                 }
             }.onSuccess { materials ->
                 val selected = state.selectedMaterial?.let { selected ->
