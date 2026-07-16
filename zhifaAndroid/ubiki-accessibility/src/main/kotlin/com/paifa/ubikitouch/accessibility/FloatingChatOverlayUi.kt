@@ -9,8 +9,12 @@ import com.paifa.ubikitouch.accessibility.floatingchat.chat.*
 import com.paifa.ubikitouch.accessibility.floatingchat.contacts.FriendRequestScreen
 import com.paifa.ubikitouch.accessibility.floatingchat.contacts.ContactsScreen
 import com.paifa.ubikitouch.accessibility.floatingchat.contacts.ContactProfileScreen
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactProfileEditorAction
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactProfileIntroAction
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactProfileUiEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactProfileUiState
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.contactProfileEditorAction
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.contactProfileIntroAction
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactGroupSummary
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactSummary
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsScreenAction
@@ -11265,23 +11269,24 @@ private fun ContactProfileEditorHost(
     ContactProfileScreen(
         state = state,
         onEvent = { event ->
-            val changedProfile = when (event) {
-                is ContactProfileUiEvent.RemarkChanged -> profile.copy(remark = event.value)
-                is ContactProfileUiEvent.TagsChanged -> profile.copy(tags = event.value)
-                is ContactProfileUiEvent.MemoChanged -> profile.copy(memo = event.value)
-                is ContactProfileUiEvent.FriendCircleVisibilityChanged -> {
-                    profile.copy(friendCircleVisible = event.visible)
+            val action = contactProfileEditorAction(event)
+            val changedProfile = when (action) {
+                is ContactProfileEditorAction.UpdateRemark -> profile.copy(remark = action.value)
+                is ContactProfileEditorAction.UpdateTags -> profile.copy(tags = action.value)
+                is ContactProfileEditorAction.UpdateMemo -> profile.copy(memo = action.value)
+                is ContactProfileEditorAction.SetFriendCircleVisibility -> {
+                    profile.copy(friendCircleVisible = action.visible)
                 }
-                is ContactProfileUiEvent.OnlyChatChanged -> profile.copy(onlyChat = event.enabled)
+                is ContactProfileEditorAction.SetOnlyChat -> profile.copy(onlyChat = action.enabled)
                 else -> null
             }
             if (changedProfile != null) {
                 onProfileChange(changedProfile.copy(updatedAt = System.currentTimeMillis()))
             }
-            when (event) {
-                ContactProfileUiEvent.BackRequested,
-                ContactProfileUiEvent.DoneRequested -> onDismiss()
-                ContactProfileUiEvent.DeleteRequested -> onDeleteFriend(contact)
+            when (action) {
+                ContactProfileEditorAction.Back,
+                ContactProfileEditorAction.Save -> onDismiss()
+                ContactProfileEditorAction.Delete -> onDeleteFriend(contact)
                 else -> Unit
             }
         }
@@ -13088,23 +13093,26 @@ private fun ScrmContactsPanel(
                 ContactProfileScreen(
                     state = selectedContact.toContactIntroUiState(loading = state.loading),
                     onEvent = { event ->
-                        when (event) {
-                            ContactProfileUiEvent.BackRequested -> {
+                        when (contactProfileIntroAction(event)) {
+                            ContactProfileIntroAction.Back -> {
                                 panelScreen = WechatContactsPanelScreen.Contacts
                             }
-                            ContactProfileUiEvent.MessageRequested -> {
+                            ContactProfileIntroAction.SendMessage -> {
                                 selectedContact?.let { contact -> onOpenPrivateChat(route, contact) }
                             }
-                            ContactProfileUiEvent.VideoCallRequested -> {
-                                Toast.makeText(context, "音视频通话暂未接入", Toast.LENGTH_SHORT).show()
+                            ContactProfileIntroAction.StartVoiceCall -> {
+                                Toast.makeText(context, "语音通话暂未接入", Toast.LENGTH_SHORT).show()
                             }
-                            ContactProfileUiEvent.EditRequested -> {
+                            ContactProfileIntroAction.StartVideoCall -> {
+                                Toast.makeText(context, "视频通话暂未接入", Toast.LENGTH_SHORT).show()
+                            }
+                            ContactProfileIntroAction.Edit -> {
                                 selectedContact?.let { contact -> onOpenFriendProfile(route, contact) }
                             }
-                            ContactProfileUiEvent.MomentsRequested -> {
+                            ContactProfileIntroAction.ShowMoments -> {
                                 Toast.makeText(context, "朋友圈暂未接入", Toast.LENGTH_SHORT).show()
                             }
-                            else -> Unit
+                            ContactProfileIntroAction.Ignore -> Unit
                         }
                     }
                 )

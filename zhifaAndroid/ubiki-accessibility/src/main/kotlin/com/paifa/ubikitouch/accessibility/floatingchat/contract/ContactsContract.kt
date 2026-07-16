@@ -62,6 +62,7 @@ sealed interface ContactProfileUiEvent {
     data object EditRequested : ContactProfileUiEvent
     data object MomentsRequested : ContactProfileUiEvent
     data object MessageRequested : ContactProfileUiEvent
+    data object VoiceCallRequested : ContactProfileUiEvent
     data object VideoCallRequested : ContactProfileUiEvent
     data class RemarkChanged(val value: String) : ContactProfileUiEvent
     data class TagsChanged(val value: String) : ContactProfileUiEvent
@@ -70,6 +71,56 @@ sealed interface ContactProfileUiEvent {
     data class OnlyChatChanged(val enabled: Boolean) : ContactProfileUiEvent
     data object DeleteRequested : ContactProfileUiEvent
     data object DoneRequested : ContactProfileUiEvent
+}
+
+sealed interface ContactProfileIntroAction {
+    data object Back : ContactProfileIntroAction
+    data object Edit : ContactProfileIntroAction
+    data object ShowMoments : ContactProfileIntroAction
+    data object SendMessage : ContactProfileIntroAction
+    data object StartVoiceCall : ContactProfileIntroAction
+    data object StartVideoCall : ContactProfileIntroAction
+    data object Ignore : ContactProfileIntroAction
+}
+
+fun contactProfileIntroAction(event: ContactProfileUiEvent): ContactProfileIntroAction {
+    return when (event) {
+        ContactProfileUiEvent.BackRequested -> ContactProfileIntroAction.Back
+        ContactProfileUiEvent.EditRequested -> ContactProfileIntroAction.Edit
+        ContactProfileUiEvent.MomentsRequested -> ContactProfileIntroAction.ShowMoments
+        ContactProfileUiEvent.MessageRequested -> ContactProfileIntroAction.SendMessage
+        ContactProfileUiEvent.VoiceCallRequested -> ContactProfileIntroAction.StartVoiceCall
+        ContactProfileUiEvent.VideoCallRequested -> ContactProfileIntroAction.StartVideoCall
+        else -> ContactProfileIntroAction.Ignore
+    }
+}
+
+sealed interface ContactProfileEditorAction {
+    data object Back : ContactProfileEditorAction
+    data object Save : ContactProfileEditorAction
+    data class UpdateRemark(val value: String) : ContactProfileEditorAction
+    data class UpdateTags(val value: String) : ContactProfileEditorAction
+    data class UpdateMemo(val value: String) : ContactProfileEditorAction
+    data class SetFriendCircleVisibility(val visible: Boolean) : ContactProfileEditorAction
+    data class SetOnlyChat(val enabled: Boolean) : ContactProfileEditorAction
+    data object Delete : ContactProfileEditorAction
+    data object Ignore : ContactProfileEditorAction
+}
+
+fun contactProfileEditorAction(event: ContactProfileUiEvent): ContactProfileEditorAction {
+    return when (event) {
+        ContactProfileUiEvent.BackRequested -> ContactProfileEditorAction.Back
+        ContactProfileUiEvent.DoneRequested -> ContactProfileEditorAction.Save
+        is ContactProfileUiEvent.RemarkChanged -> ContactProfileEditorAction.UpdateRemark(event.value)
+        is ContactProfileUiEvent.TagsChanged -> ContactProfileEditorAction.UpdateTags(event.value)
+        is ContactProfileUiEvent.MemoChanged -> ContactProfileEditorAction.UpdateMemo(event.value)
+        is ContactProfileUiEvent.FriendCircleVisibilityChanged -> {
+            ContactProfileEditorAction.SetFriendCircleVisibility(event.visible)
+        }
+        is ContactProfileUiEvent.OnlyChatChanged -> ContactProfileEditorAction.SetOnlyChat(event.enabled)
+        ContactProfileUiEvent.DeleteRequested -> ContactProfileEditorAction.Delete
+        else -> ContactProfileEditorAction.Ignore
+    }
 }
 
 data class ContactsUiState(

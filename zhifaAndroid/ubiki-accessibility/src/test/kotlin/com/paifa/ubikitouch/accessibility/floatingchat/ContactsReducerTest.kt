@@ -1,12 +1,17 @@
 package com.paifa.ubikitouch.accessibility.floatingchat
 
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactOperationState
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactProfileEditorAction
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactProfileIntroAction
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactProfileUiEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsScreenAction
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsShortcut
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsUiEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsUiState
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.FriendRequestSummary
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.contactsScreenAction
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.contactProfileEditorAction
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.contactProfileIntroAction
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.reduceContactsState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
@@ -94,6 +99,45 @@ class ContactsReducerTest {
         )
 
         assertEquals(true, visible.searchVisible)
+    }
+
+    @Test
+    fun contactProfileIntroEventsMapToDistinctHostActions() {
+        val cases = listOf(
+            ContactProfileUiEvent.BackRequested to ContactProfileIntroAction.Back,
+            ContactProfileUiEvent.EditRequested to ContactProfileIntroAction.Edit,
+            ContactProfileUiEvent.MessageRequested to ContactProfileIntroAction.SendMessage,
+            ContactProfileUiEvent.VoiceCallRequested to ContactProfileIntroAction.StartVoiceCall,
+            ContactProfileUiEvent.VideoCallRequested to ContactProfileIntroAction.StartVideoCall
+        )
+
+        cases.forEach { (event, expected) ->
+            assertEquals(expected, contactProfileIntroAction(event))
+        }
+        assertEquals(
+            ContactProfileIntroAction.Ignore,
+            contactProfileIntroAction(ContactProfileUiEvent.RemarkChanged("Alice"))
+        )
+    }
+
+    @Test
+    fun contactProfileEditorEventsMapToEditsAndNeverIntroRoutes() {
+        val cases = listOf(
+            ContactProfileUiEvent.BackRequested to ContactProfileEditorAction.Back,
+            ContactProfileUiEvent.DoneRequested to ContactProfileEditorAction.Save,
+            ContactProfileUiEvent.RemarkChanged("Alice") to
+                ContactProfileEditorAction.UpdateRemark("Alice"),
+            ContactProfileUiEvent.TagsChanged("VIP") to
+                ContactProfileEditorAction.UpdateTags("VIP")
+        )
+
+        cases.forEach { (event, expected) ->
+            assertEquals(expected, contactProfileEditorAction(event))
+        }
+        assertEquals(
+            ContactProfileEditorAction.Ignore,
+            contactProfileEditorAction(ContactProfileUiEvent.MessageRequested)
+        )
     }
 
     private fun request(id: String): FriendRequestSummary {

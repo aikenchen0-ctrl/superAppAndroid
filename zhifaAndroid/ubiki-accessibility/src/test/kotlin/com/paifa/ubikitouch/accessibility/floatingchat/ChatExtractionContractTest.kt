@@ -218,15 +218,21 @@ class ChatExtractionContractTest {
 
         val text = screen.readText()
         assertTrue(text.contains("fun ContactProfileScreen("))
+        assertTrue("ContactProfileScreen.kt must stay under 800 lines", screen.readLines().size < 800)
         assertTrue(text.contains("state: ContactProfileUiState"))
         assertTrue(text.contains("onEvent: (ContactProfileUiEvent) -> Unit"))
         assertTrue(text.contains("ContactSummary("))
         assertTrue(text.contains("avatarUrl = avatarUrl"))
-        assertFalse(text.contains("ScrmContact"))
+        assertTrue(text.contains("ContactProfileUiEvent.VoiceCallRequested"))
+        assertTrue(text.contains("ContactProfileUiEvent.VideoCallRequested"))
+        assertFalse(text.contains("scrm", ignoreCase = true))
         assertFalse(text.contains("FloatingChatContact"))
         assertFalse(text.contains("LocalContactProfile"))
-        assertFalse(text.contains("Context"))
+        assertFalse(text.contains("database", ignoreCase = true))
+        assertFalse(text.contains("http", ignoreCase = true))
         assertFalse(text.contains("Activity"))
+        assertFalse(text.contains("import android.content.Context"))
+        assertFalse(text.contains("LocalContext.current"))
 
         val contractText = contract.readText()
         assertTrue(contractText.contains("data class ContactProfileUiState"))
@@ -242,6 +248,13 @@ class ChatExtractionContractTest {
         assertFalse(legacy.contains("private fun WechatContactIntroActionRow("))
         assertFalse(legacy.contains("private fun UserContactEditPanel("))
         assertFalse(legacy.contains("private fun FriendProfileTopBar("))
+        assertFalse(legacy.contains("private fun FriendProfileHeader("))
+        assertFalse(legacy.contains("private fun FriendProfilePhotosRow("))
+        assertFalse(legacy.contains("private fun friendProfilePhotoColor("))
+        assertTrue(legacy.contains("private fun GroupContactEditPanel("))
+        assertTrue(legacy.contains("private fun defaultLocalGroupProfileFor("))
+        assertTrue(legacy.contains("contactProfileIntroAction(event)"))
+        assertTrue(legacy.contains("contactProfileEditorAction(event)"))
     }
 
     private fun sourceFile(relativePath: String): File {

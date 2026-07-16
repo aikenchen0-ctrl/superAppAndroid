@@ -122,7 +122,10 @@ private fun ContactIntroContent(
         ContactIntroActionRow(Icons.Filled.Textsms, "发消息", !state.loading) {
             onEvent(ContactProfileUiEvent.MessageRequested)
         }
-        ContactIntroActionRow(Icons.Filled.PhoneAndroid, "音视频通话", !state.loading) {
+        ContactIntroActionRow(Icons.Filled.PhoneAndroid, "语音通话", !state.loading) {
+            onEvent(ContactProfileUiEvent.VoiceCallRequested)
+        }
+        ContactIntroActionRow(Icons.Filled.PhoneAndroid, "视频通话", !state.loading) {
             onEvent(ContactProfileUiEvent.VideoCallRequested)
         }
     }
