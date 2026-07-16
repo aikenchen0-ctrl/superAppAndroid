@@ -14276,12 +14276,6 @@ private const val CurrentUserMomentLikeName = "\u6211"
 private const val ScrmMomentPostIdPrefix = "scrm-moment:"
 private const val LocalScrmMomentPostIdPrefix = "local-scrm-moment:"
 
-private data class ScrmMomentsPanelState(
-    val loading: Boolean = false,
-    val status: String? = null,
-    val error: String? = null
-)
-
 @Composable
 private fun MomentPostRow(
     post: AppMomentPost,
