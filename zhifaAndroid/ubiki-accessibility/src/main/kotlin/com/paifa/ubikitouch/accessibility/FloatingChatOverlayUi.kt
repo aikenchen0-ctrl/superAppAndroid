@@ -11270,18 +11270,14 @@ private fun ContactProfileEditorHost(
         state = state,
         onEvent = { event ->
             val action = contactProfileEditorAction(event)
-            val changedProfile = when (action) {
-                is ContactProfileEditorAction.UpdateRemark -> profile.copy(remark = action.value)
-                is ContactProfileEditorAction.UpdateTags -> profile.copy(tags = action.value)
-                is ContactProfileEditorAction.UpdateMemo -> profile.copy(memo = action.value)
-                is ContactProfileEditorAction.SetFriendCircleVisibility -> {
-                    profile.copy(friendCircleVisible = action.visible)
-                }
-                is ContactProfileEditorAction.SetOnlyChat -> profile.copy(onlyChat = action.enabled)
-                else -> null
-            }
+            val changedProfile = mergeContactProfileDraft(
+                profile = profile,
+                draft = state,
+                action = action,
+                updatedAt = System.currentTimeMillis()
+            )
             if (changedProfile != null) {
-                onProfileChange(changedProfile.copy(updatedAt = System.currentTimeMillis()))
+                onProfileChange(changedProfile)
             }
             when (action) {
                 ContactProfileEditorAction.Back,
@@ -11290,6 +11286,35 @@ private fun ContactProfileEditorHost(
                 else -> Unit
             }
         }
+    )
+}
+
+internal fun mergeContactProfileDraft(
+    profile: LocalContactProfile,
+    draft: ContactProfileUiState,
+    action: ContactProfileEditorAction,
+    updatedAt: Long
+): LocalContactProfile? {
+    val updatedDraft = when (action) {
+        is ContactProfileEditorAction.UpdateRemark -> draft.copy(
+            displayName = action.value.ifBlank { draft.originalName },
+            remark = action.value
+        )
+        is ContactProfileEditorAction.UpdateTags -> draft.copy(tags = action.value)
+        is ContactProfileEditorAction.UpdateMemo -> draft.copy(memo = action.value)
+        is ContactProfileEditorAction.SetFriendCircleVisibility -> {
+            draft.copy(friendCircleVisible = action.visible)
+        }
+        is ContactProfileEditorAction.SetOnlyChat -> draft.copy(onlyChat = action.enabled)
+        else -> return null
+    }
+    return profile.copy(
+        remark = updatedDraft.remark,
+        tags = updatedDraft.tags,
+        memo = updatedDraft.memo,
+        friendCircleVisible = updatedDraft.friendCircleVisible,
+        onlyChat = updatedDraft.onlyChat,
+        updatedAt = updatedAt
     )
 }
 

@@ -1,9 +1,12 @@
 package com.paifa.ubikitouch.accessibility.floatingchat
 
+import com.paifa.ubikitouch.accessibility.data.LocalContactProfile
+import com.paifa.ubikitouch.accessibility.mergeContactProfileDraft
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactOperationState
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactProfileEditorAction
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactProfileIntroAction
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactProfileUiEvent
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactProfileUiState
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsScreenAction
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsShortcut
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsUiEvent
@@ -106,6 +109,7 @@ class ContactsReducerTest {
         val cases = listOf(
             ContactProfileUiEvent.BackRequested to ContactProfileIntroAction.Back,
             ContactProfileUiEvent.EditRequested to ContactProfileIntroAction.Edit,
+            ContactProfileUiEvent.MomentsRequested to ContactProfileIntroAction.ShowMoments,
             ContactProfileUiEvent.MessageRequested to ContactProfileIntroAction.SendMessage,
             ContactProfileUiEvent.VoiceCallRequested to ContactProfileIntroAction.StartVoiceCall,
             ContactProfileUiEvent.VideoCallRequested to ContactProfileIntroAction.StartVideoCall
@@ -114,10 +118,13 @@ class ContactsReducerTest {
         cases.forEach { (event, expected) ->
             assertEquals(expected, contactProfileIntroAction(event))
         }
-        assertEquals(
-            ContactProfileIntroAction.Ignore,
-            contactProfileIntroAction(ContactProfileUiEvent.RemarkChanged("Alice"))
-        )
+        listOf(
+            ContactProfileUiEvent.RemarkChanged("Alice"),
+            ContactProfileUiEvent.DoneRequested,
+            ContactProfileUiEvent.DeleteRequested
+        ).forEach { event ->
+            assertEquals(ContactProfileIntroAction.Ignore, contactProfileIntroAction(event))
+        }
     }
 
     @Test
@@ -128,16 +135,76 @@ class ContactsReducerTest {
             ContactProfileUiEvent.RemarkChanged("Alice") to
                 ContactProfileEditorAction.UpdateRemark("Alice"),
             ContactProfileUiEvent.TagsChanged("VIP") to
-                ContactProfileEditorAction.UpdateTags("VIP")
+                ContactProfileEditorAction.UpdateTags("VIP"),
+            ContactProfileUiEvent.MemoChanged("memo") to
+                ContactProfileEditorAction.UpdateMemo("memo"),
+            ContactProfileUiEvent.FriendCircleVisibilityChanged(false) to
+                ContactProfileEditorAction.SetFriendCircleVisibility(false),
+            ContactProfileUiEvent.OnlyChatChanged(true) to
+                ContactProfileEditorAction.SetOnlyChat(true),
+            ContactProfileUiEvent.DeleteRequested to ContactProfileEditorAction.Delete
         )
 
         cases.forEach { (event, expected) ->
             assertEquals(expected, contactProfileEditorAction(event))
         }
-        assertEquals(
-            ContactProfileEditorAction.Ignore,
-            contactProfileEditorAction(ContactProfileUiEvent.MessageRequested)
+        listOf(
+            ContactProfileUiEvent.EditRequested,
+            ContactProfileUiEvent.MomentsRequested,
+            ContactProfileUiEvent.MessageRequested,
+            ContactProfileUiEvent.VoiceCallRequested,
+            ContactProfileUiEvent.VideoCallRequested
+        ).forEach { event ->
+            assertEquals(ContactProfileEditorAction.Ignore, contactProfileEditorAction(event))
+        }
+    }
+
+    @Test
+    fun contactProfileUpdatesPersistTheCompleteCurrentDraft() {
+        val original = LocalContactProfile(
+            accountId = "account-1",
+            contactId = "contact-1",
+            remark = "stale remark",
+            tags = "stale tags",
+            memo = "",
+            friendCircleVisible = true,
+            onlyChat = false,
+            updatedAt = 1L
         )
+        val draft = ContactProfileUiState(
+            displayName = "Draft display name",
+            remark = "Draft remark",
+            tags = "Draft tags",
+            memo = "Default memo shown by the editor",
+            friendCircleVisible = false,
+            onlyChat = true
+        )
+        val completeDraft = original.copy(
+            remark = draft.remark,
+            tags = draft.tags,
+            memo = draft.memo,
+            friendCircleVisible = draft.friendCircleVisible,
+            onlyChat = draft.onlyChat,
+            updatedAt = 99L
+        )
+        val cases = listOf(
+            ContactProfileEditorAction.UpdateRemark("Updated remark") to
+                completeDraft.copy(remark = "Updated remark"),
+            ContactProfileEditorAction.UpdateTags("Updated tags") to
+                completeDraft.copy(tags = "Updated tags"),
+            ContactProfileEditorAction.UpdateMemo("Updated memo") to
+                completeDraft.copy(memo = "Updated memo"),
+            ContactProfileEditorAction.SetFriendCircleVisibility(true) to
+                completeDraft.copy(friendCircleVisible = true),
+            ContactProfileEditorAction.SetOnlyChat(false) to
+                completeDraft.copy(onlyChat = false)
+        )
+
+        cases.forEach { (action, expected) ->
+            val persisted = mergeContactProfileDraft(original, draft, action, updatedAt = 99L)
+
+            assertEquals(expected, persisted)
+        }
     }
 
     private fun request(id: String): FriendRequestSummary {
