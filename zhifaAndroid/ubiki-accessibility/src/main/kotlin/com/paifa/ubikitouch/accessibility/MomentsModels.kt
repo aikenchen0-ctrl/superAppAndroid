@@ -3,6 +3,12 @@ package com.paifa.ubikitouch.accessibility
 import androidx.compose.ui.graphics.Color
 import com.paifa.ubikitouch.core.model.FloatingChatThumbnailOrientation
 
+internal enum class MomentMediaKind {
+    Image,
+    Video,
+    Link
+}
+
 internal data class AppMomentPost(
     val id: String = "moment-${System.nanoTime()}",
     val author: String,

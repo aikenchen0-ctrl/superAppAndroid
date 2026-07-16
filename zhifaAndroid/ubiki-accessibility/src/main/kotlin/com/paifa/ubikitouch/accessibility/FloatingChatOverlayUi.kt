@@ -16103,12 +16103,6 @@ private inline fun <reified T : Enum<T>> enumValueOrDefault(value: String, defau
     return runCatching { enumValueOf<T>(value) }.getOrDefault(default)
 }
 
-internal enum class MomentMediaKind {
-    Image,
-    Video,
-    Link
-}
-
 internal data class FavoriteCollectionItem(
     val messageId: String,
     val type: FloatingChatMessageType,
