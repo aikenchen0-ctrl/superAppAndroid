@@ -40,4 +40,19 @@ class MomentsCoordinatorTest {
         assertEquals("a", next.posts.first { it.id == "a" }.text)
         assertEquals("hello", next.posts.first { it.id == "b" }.text)
     }
+
+    @Test
+    fun commentFailureIsExposedWithoutChangingPosts() = runBlocking {
+        val port = object : MomentsRuntimePort {
+            override suspend fun sync() = emptyList<MomentPostUiState>()
+            override suspend fun publish(draft: MomentDraft) = MomentPostUiState("new", "A", draft.text)
+            override suspend fun like(postId: String) = MomentPostUiState(postId, "A", "liked")
+            override suspend fun comment(postId: String, text: String): MomentPostUiState = error("network down")
+        }
+        val coordinator = MomentsCoordinator(port)
+        val state = MomentsUiState(listOf(MomentPostUiState("a", "A", "original")))
+        val next = coordinator.dispatch(state, MomentsUiEvent.CommentRequested("a", "hello"))
+        assertEquals("original", next.posts.single().text)
+        assertEquals("network down", next.error)
+    }
 }
