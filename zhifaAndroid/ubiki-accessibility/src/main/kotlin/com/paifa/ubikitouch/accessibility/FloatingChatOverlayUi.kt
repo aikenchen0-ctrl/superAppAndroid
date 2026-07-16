@@ -14,8 +14,6 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.Manifest
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.ImageDecoder
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.SurfaceTexture
@@ -234,7 +232,6 @@ import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.exifinterface.media.ExifInterface
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -330,15 +327,11 @@ import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingScopedThreadId
 import com.paifa.ubikitouch.accessibility.scrm.scrmMediaOperationType
 import com.paifa.ubikitouch.accessibility.scrm.scrmMessageOperationType
 import com.paifa.ubikitouch.accessibility.scrm.toUserMessage
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.InputStream
 import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.Semaphore
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
@@ -3680,125 +3673,6 @@ internal fun InlineImageThumbnailContent(message: FloatingChatMessage) {
 }
 
 @Composable
-private fun ImageThumbnailSurface(
-    message: FloatingChatMessage,
-    modifier: Modifier = Modifier,
-    mediaBitmap: Bitmap? = rememberAsyncImageThumbnailBitmap(message)
-) {
-    MediaThumbnailSurface(
-        message = message,
-        modifier = modifier,
-        mediaBitmap = mediaBitmap
-    )
-}
-
-@Composable
-internal fun MediaThumbnailSurface(
-    message: FloatingChatMessage,
-    modifier: Modifier = Modifier,
-    mediaBitmap: Bitmap? = rememberAsyncMediaThumbnailBitmap(message),
-    showChrome: Boolean = true,
-    useAspectFit: Boolean = false
-) {
-    Box(modifier = modifier) {
-        if (mediaBitmap != null) {
-            Image(
-                bitmap = mediaBitmap.asImageBitmap(),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = if (useAspectFit) ContentScale.Fit else ContentScale.Crop
-            )
-        } else {
-            PlaceholderImageCanvas(
-                orientation = message.thumbnailOrientation,
-                modifier = Modifier.fillMaxSize()
-            )
-        }
-        if (showChrome && message.thumbnailOrientation == FloatingChatThumbnailOrientation.Vertical) {
-            VerticalImageCropOverlay(modifier = Modifier.fillMaxSize())
-        }
-        if (message.type == FloatingChatMessageType.VideoPreview) {
-            VideoPlayGlyph(modifier = Modifier.fillMaxSize())
-        }
-        if (showChrome) {
-            TextLabel(
-                text = mediaWatermarkText(
-                    resourceUrl = message.resourceUrl,
-                    thumbnailUrl = message.thumbnailUrl
-                ),
-                size = 8.sp,
-                color = OverlayTokens.imageWatermark,
-                maxLines = 1,
-                shadow = OverlayTokens.imModuleTextShadow,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 7.dp, end = 86.dp, bottom = 5.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun rememberAsyncImageThumbnailBitmap(message: FloatingChatMessage): Bitmap? {
-    val context = LocalContext.current
-    return rememberAsyncImageThumbnailBitmap(
-        context = context,
-        uriText = message.thumbnailUrl
-    )
-}
-
-@Composable
-private fun rememberAsyncImageThumbnailBitmap(
-    context: Context,
-    uriText: String?,
-    maxSizePx: Int = REAL_MEDIA_DECODE_MAX_SIZE_PX,
-    cacheNamespace: String = ImageThumbnailCacheNamespace
-): Bitmap? {
-    return produceState(
-        initialValue = cachedImageThumbnailBitmap(uriText, cacheNamespace),
-        context,
-        uriText,
-        maxSizePx,
-        cacheNamespace
-    ) {
-        value = withContext(Dispatchers.IO) {
-            loadImageThumbnailBitmap(
-                context = context.applicationContext,
-                uriText = uriText,
-                maxSizePx = maxSizePx,
-                cacheNamespace = cacheNamespace
-            )
-        }
-    }.value
-}
-
-@Composable
-internal fun rememberAsyncMediaThumbnailBitmap(message: FloatingChatMessage): Bitmap? {
-    val context = LocalContext.current
-    return produceState(
-        initialValue = cachedMediaThumbnailBitmap(message),
-        context,
-        message.type,
-        message.resourceUrl,
-        message.thumbnailUrl
-    ) {
-        value = withContext(Dispatchers.IO) {
-            when (message.type) {
-                FloatingChatMessageType.VideoPreview -> loadVideoPreviewBitmap(
-                    context = context.applicationContext,
-                    thumbnailUriText = message.thumbnailUrl,
-                    resourceUriText = message.resourceUrl
-                )
-                else -> loadImageThumbnailBitmap(
-                    context = context.applicationContext,
-                    uriText = message.thumbnailUrl
-                )
-            }
-        }
-    }.value
-}
-
-@Composable
 private fun StandaloneImageQuickActions(
     onOpenActions: () -> Unit,
     onShare: () -> Unit,
@@ -4855,81 +4729,6 @@ private fun MediaSheetActionItem(
 }
 
 @Composable
-private fun PlaceholderImageCanvas(
-    orientation: FloatingChatThumbnailOrientation?,
-    modifier: Modifier = Modifier
-) {
-    Canvas(modifier = modifier) {
-        drawRoundRect(
-            color = OverlayTokens.imageBlock,
-            topLeft = Offset(size.width * 0.25f, size.height * 0.12f),
-            size = Size(size.width * 0.68f, size.height * 0.76f),
-            cornerRadius = CornerRadius(10f, 10f)
-        )
-        drawCircle(
-            color = OverlayTokens.imageHighlight,
-            radius = size.minDimension * 0.15f,
-            center = Offset(size.width * 0.74f, size.height * 0.30f)
-        )
-        if (orientation == FloatingChatThumbnailOrientation.Vertical) {
-            drawRect(
-                color = OverlayTokens.imageFade,
-                topLeft = Offset.Zero,
-                size = Size(size.width, size.height * 0.18f)
-            )
-            drawRect(
-                color = OverlayTokens.imageFade,
-                topLeft = Offset(0f, size.height * 0.82f),
-                size = Size(size.width, size.height * 0.18f)
-            )
-        }
-    }
-}
-
-@Composable
-internal fun PlaceholderVideoCanvas(modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        drawRoundRect(
-            color = OverlayTokens.videoFrame,
-            topLeft = Offset(size.width * 0.05f, size.height * 0.14f),
-            size = Size(size.width * 0.90f, size.height * 0.72f),
-            cornerRadius = CornerRadius(10f, 10f)
-        )
-    }
-}
-
-@Composable
-private fun VerticalImageCropOverlay(modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        drawRect(
-            color = OverlayTokens.imageFade,
-            topLeft = Offset.Zero,
-            size = Size(size.width, size.height * 0.15f)
-        )
-        drawRect(
-            color = OverlayTokens.imageFade,
-            topLeft = Offset(0f, size.height * 0.85f),
-            size = Size(size.width, size.height * 0.15f)
-        )
-    }
-}
-
-@Composable
-internal fun VideoPlayGlyph(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier,
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = Icons.Filled.PlayArrow,
-            contentDescription = null,
-            modifier = Modifier.size(58.dp),
-            tint = OverlayTokens.primaryText
-        )
-    }
-}
-
-@Composable
 private fun VisibilityAccessStrip(
     visibility: FloatingChatVisibilityScope?,
     accessState: FloatingChatAccessState?,
@@ -5939,143 +5738,6 @@ private fun mediaMimeType(message: FloatingChatMessage): String {
     return if (message.type == FloatingChatMessageType.VideoPreview) "video/*" else "image/*"
 }
 
-private fun loadImageThumbnailBitmap(
-    context: Context,
-    uriText: String?,
-    maxSizePx: Int = REAL_MEDIA_DECODE_MAX_SIZE_PX,
-    cacheNamespace: String = ImageThumbnailCacheNamespace
-): Bitmap? {
-    val cacheKey = imageThumbnailCacheKey(uriText, cacheNamespace) ?: return null
-    val resolvedUriText = normalizedRemoteImageUri(uriText) ?: return null
-    val remoteImage = isRemoteImageUri(resolvedUriText)
-    if (remoteImage && remoteImageRetrySuppressed(cacheKey)) return null
-    return SharedBitmapMemoryCache.getOrPut(cacheKey) {
-        val uri = Uri.parse(resolvedUriText)
-        val bitmap = runCatching {
-            when {
-                remoteImage -> decodeRemoteImageBitmap(resolvedUriText, maxSizePx)
-                uri.scheme == "file" -> decodeFileBitmapRespectingExif(
-                    path = uri.path,
-                    maxSizePx = maxSizePx
-                )
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.P -> {
-                    val source = ImageDecoder.createSource(context.contentResolver, uri)
-                    ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
-                        val width = info.size.width.coerceAtLeast(1)
-                        val height = info.size.height.coerceAtLeast(1)
-                        val scale = (width.coerceAtLeast(height).toFloat() / maxSizePx.coerceAtLeast(1))
-                            .coerceAtLeast(1f)
-                        decoder.setTargetSize(
-                            (width / scale).toInt().coerceAtLeast(1),
-                            (height / scale).toInt().coerceAtLeast(1)
-                        )
-                    }
-                }
-                else -> {
-                    @Suppress("DEPRECATION")
-                    MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
-                }
-            }
-        }.onFailure { error ->
-            if (remoteImage) {
-                Log.w(TAG, "failed to load remote image thumbnail host=${uri.host.orEmpty()}", error)
-            }
-        }.getOrNull()
-        if (remoteImage) {
-            if (bitmap == null) {
-                FailedRemoteImageLoads[cacheKey] = System.currentTimeMillis()
-            } else {
-                FailedRemoteImageLoads.remove(cacheKey)
-            }
-        }
-        bitmap
-    }
-}
-
-private fun decodeRemoteImageBitmap(uriText: String, maxSizePx: Int): Bitmap? {
-    return RemoteImageLoadSemaphore.withPermit {
-        val connection = URL(uriText).openConnection().apply {
-            connectTimeout = REMOTE_IMAGE_CONNECT_TIMEOUT_MS
-            readTimeout = REMOTE_IMAGE_READ_TIMEOUT_MS
-            useCaches = true
-        }
-        connection.getInputStream().use { input ->
-            val bytes = input.readAtMostBytes(REMOTE_IMAGE_MAX_BYTES) ?: return@withPermit null
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-            BitmapFactory.decodeByteArray(
-                bytes,
-                0,
-                bytes.size,
-                BitmapFactory.Options().apply {
-                    inSampleSize = imageDecodeSampleSize(
-                        width = bounds.outWidth,
-                        height = bounds.outHeight,
-                        maxSize = maxSizePx
-                    )
-                    inPreferredConfig = Bitmap.Config.RGB_565
-                    inDither = true
-                }
-            )
-        }
-    }
-}
-
-private inline fun <T> Semaphore.withPermit(block: () -> T): T {
-    acquire()
-    return try {
-        block()
-    } finally {
-        release()
-    }
-}
-
-private fun imageThumbnailCacheKey(
-    uriText: String?,
-    cacheNamespace: String = ImageThumbnailCacheNamespace
-): String? {
-    return normalizedRemoteImageUri(uriText)
-        ?.takeIf { uri -> isLocalMediaUri(uri) || isRemoteImageUri(uri) }
-        ?.let { uri -> "$cacheNamespace:$uri" }
-}
-
-private fun videoThumbnailCacheKey(uriText: String?): String? {
-    return uriText
-        ?.takeIf(::isLocalMediaUri)
-        ?.let { uri -> "video:$uri" }
-}
-
-private fun cachedImageThumbnailBitmap(
-    uriText: String?,
-    cacheNamespace: String = ImageThumbnailCacheNamespace
-): Bitmap? {
-    return imageThumbnailCacheKey(uriText, cacheNamespace)?.let(SharedBitmapMemoryCache::get)
-}
-
-private fun cachedMediaThumbnailBitmap(message: FloatingChatMessage): Bitmap? {
-    return if (message.type == FloatingChatMessageType.VideoPreview) {
-        cachedImageThumbnailBitmap(message.thumbnailUrl)
-            ?: videoThumbnailCacheKey(message.resourceUrl ?: message.thumbnailUrl)
-                ?.let(SharedBitmapMemoryCache::get)
-    } else {
-        cachedImageThumbnailBitmap(message.thumbnailUrl)
-    }
-}
-
-private val SharedBitmapMemoryCache = WeightedLruCache<String, Bitmap>(
-    maxWeight = sharedBitmapMemoryCacheBytes(Runtime.getRuntime().maxMemory()),
-    weightOf = { bitmap -> bitmap.allocationByteCount }
-)
-
-private val FailedRemoteImageLoads = ConcurrentHashMap<String, Long>()
-
-private val RemoteImageLoadSemaphore = Semaphore(REMOTE_IMAGE_MAX_CONCURRENT_LOADS, true)
-
-private fun sharedBitmapMemoryCacheBytes(runtimeMaxMemoryBytes: Long): Int {
-    val targetBytes = (runtimeMaxMemoryBytes / 16L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-    return targetBytes.coerceIn(MIN_BITMAP_MEMORY_CACHE_BYTES, MAX_BITMAP_MEMORY_CACHE_BYTES)
-}
-
 internal fun avatarImageDecodeMaxSizePx(): Int = AVATAR_IMAGE_DECODE_MAX_SIZE_PX
 
 internal fun avatarImageLoadsUseDedicatedSmallDecodeSize(): Boolean {
@@ -6093,94 +5755,6 @@ internal fun remoteImageRetrySuppressedByRecentFailure(
 ): Boolean {
     val lastFailure = lastFailureUptimeMillis ?: return false
     return nowUptimeMillis - lastFailure in 0 until retryDelayMillis
-}
-
-private fun remoteImageRetrySuppressed(cacheKey: String): Boolean {
-    return remoteImageRetrySuppressedByRecentFailure(
-        lastFailureUptimeMillis = FailedRemoteImageLoads[cacheKey],
-        nowUptimeMillis = System.currentTimeMillis(),
-        retryDelayMillis = REMOTE_IMAGE_FAILURE_RETRY_DELAY_MS.toLong()
-    )
-}
-
-private fun InputStream.readAtMostBytes(maxBytes: Int): ByteArray? {
-    val safeMaxBytes = maxBytes.coerceAtLeast(1)
-    val buffer = ByteArray(DEFAULT_REMOTE_IMAGE_BUFFER_BYTES)
-    val output = ByteArrayOutputStream()
-    var totalBytes = 0
-    while (true) {
-        val read = read(buffer)
-        if (read < 0) break
-        totalBytes += read
-        if (totalBytes > safeMaxBytes) return null
-        output.write(buffer, 0, read)
-    }
-    return output.toByteArray()
-}
-
-private fun decodeFileBitmapRespectingExif(
-    path: String?,
-    maxSizePx: Int = REAL_MEDIA_DECODE_MAX_SIZE_PX
-): Bitmap? {
-    if (path.isNullOrBlank()) return null
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeFile(path, bounds)
-    val bitmap = BitmapFactory.decodeFile(
-        path,
-        BitmapFactory.Options().apply {
-            inSampleSize = imageDecodeSampleSize(
-                width = bounds.outWidth,
-                height = bounds.outHeight,
-                maxSize = maxSizePx
-            )
-        }
-    ) ?: return null
-    val rotationDegrees = runCatching {
-        when (ExifInterface(path).getAttributeInt(
-            ExifInterface.TAG_ORIENTATION,
-            ExifInterface.ORIENTATION_NORMAL
-        )) {
-            ExifInterface.ORIENTATION_ROTATE_90 -> 90f
-            ExifInterface.ORIENTATION_ROTATE_180 -> 180f
-            ExifInterface.ORIENTATION_ROTATE_270 -> 270f
-            else -> 0f
-        }
-    }.getOrDefault(0f)
-    if (rotationDegrees == 0f) return bitmap
-    return Bitmap.createBitmap(
-        bitmap,
-        0,
-        0,
-        bitmap.width,
-        bitmap.height,
-        Matrix().apply { postRotate(rotationDegrees) },
-        true
-    )
-}
-
-private fun loadVideoPreviewBitmap(
-    context: Context,
-    thumbnailUriText: String?,
-    resourceUriText: String?
-): Bitmap? {
-    return loadImageThumbnailBitmap(context, thumbnailUriText)
-        ?: loadVideoThumbnailBitmap(context, resourceUriText ?: thumbnailUriText)
-}
-
-private fun loadVideoThumbnailBitmap(
-    context: Context,
-    uriText: String?
-): Bitmap? {
-    val cacheKey = videoThumbnailCacheKey(uriText) ?: return null
-    return SharedBitmapMemoryCache.getOrPut(cacheKey) {
-        val uri = Uri.parse(uriText)
-        runCatching {
-            MediaMetadataRetriever().use { retriever ->
-                retriever.setDataSource(context, uri)
-                retriever.getFrameAtTime(0L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-            }
-        }.getOrNull()
-    }
 }
 
 internal fun imageDecodeSampleSize(width: Int, height: Int, maxSize: Int): Int {
@@ -21735,10 +21309,6 @@ private const val REMOTE_IMAGE_READ_TIMEOUT_MS = 3_500
 private const val REMOTE_IMAGE_MAX_BYTES = 2 * 1024 * 1024
 private const val REMOTE_IMAGE_MAX_CONCURRENT_LOADS = 2
 private const val REMOTE_IMAGE_FAILURE_RETRY_DELAY_MS = 10 * 60 * 1000
-private const val DEFAULT_REMOTE_IMAGE_BUFFER_BYTES = 8 * 1024
-private const val MIN_BITMAP_MEMORY_CACHE_BYTES = 8 * 1024 * 1024
-private const val MAX_BITMAP_MEMORY_CACHE_BYTES = 32 * 1024 * 1024
-private const val ImageThumbnailCacheNamespace = "image"
 private const val AvatarImageCacheNamespace = "avatar"
 private val DefaultQuickPhrases = listOf(
     "收到，我先看一下，稍后同步进展。",

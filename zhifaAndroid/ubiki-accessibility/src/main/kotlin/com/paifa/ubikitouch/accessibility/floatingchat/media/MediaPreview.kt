@@ -33,15 +33,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.paifa.ubikitouch.accessibility.InlineImageThumbnailContent
-import com.paifa.ubikitouch.accessibility.MediaThumbnailSurface
 import com.paifa.ubikitouch.accessibility.OverlayTokens
-import com.paifa.ubikitouch.accessibility.PlaceholderVideoCanvas
 import com.paifa.ubikitouch.accessibility.TextLabel
-import com.paifa.ubikitouch.accessibility.VideoPlayGlyph
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.rootBoundsFromPosition
 import com.paifa.ubikitouch.accessibility.floatingchat.message.fixedThumbnailHeightDp
 import com.paifa.ubikitouch.accessibility.mediaWatermarkText
-import com.paifa.ubikitouch.accessibility.rememberAsyncMediaThumbnailBitmap
 import com.paifa.ubikitouch.accessibility.standaloneMediaListMaxHeightDp
 import com.paifa.ubikitouch.accessibility.standaloneMediaListMaxWidthDp
 import com.paifa.ubikitouch.accessibility.standaloneMediaListMinHeightDp

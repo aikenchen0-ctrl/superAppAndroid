@@ -136,6 +136,34 @@ class ChatExtractionContractTest {
         assertFalse(legacy.contains("internal fun VideoPreviewContent("))
     }
 
+    @Test
+    fun mediaThumbnailRenderingAndLoadingLiveInMediaPackage() {
+        val surface = sourceFile("floatingchat/media/MediaThumbnailSurface.kt")
+        val loader = sourceFile("floatingchat/media/MediaThumbnailBitmapLoader.kt")
+        assertTrue("Missing extracted media thumbnail surface", surface.isFile)
+        assertTrue("Missing extracted media thumbnail loader", loader.isFile)
+
+        val surfaceText = surface.readText()
+        assertTrue(surfaceText.contains("fun MediaThumbnailSurface("))
+        assertTrue(surfaceText.contains("fun PlaceholderVideoCanvas("))
+        assertTrue(surfaceText.contains("fun VideoPlayGlyph("))
+
+        val loaderText = loader.readText()
+        assertTrue(loaderText.contains("fun rememberAsyncMediaThumbnailBitmap("))
+        assertTrue(loaderText.contains("fun loadImageThumbnailBitmap("))
+        assertTrue(loaderText.contains("fun loadVideoPreviewBitmap("))
+        assertTrue(loaderText.contains("SharedBitmapMemoryCache"))
+        assertTrue(loaderText.contains("fun decodeRemoteImageBitmap("))
+        assertTrue(loaderText.contains("fun decodeFileBitmapRespectingExif("))
+
+        val legacy = sourceFile("FloatingChatOverlayUi.kt").readText()
+        assertFalse(legacy.contains("internal fun MediaThumbnailSurface("))
+        assertFalse(legacy.contains("internal fun rememberAsyncMediaThumbnailBitmap("))
+        assertFalse(legacy.contains("private val SharedBitmapMemoryCache"))
+        assertFalse(legacy.contains("private fun decodeRemoteImageBitmap("))
+        assertFalse(legacy.contains("private fun decodeFileBitmapRespectingExif("))
+    }
+
     private fun sourceFile(relativePath: String): File {
         val moduleRelative = File(
             "src/main/kotlin/com/paifa/ubikitouch/accessibility",
