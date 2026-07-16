@@ -16644,7 +16644,7 @@ private fun FavoriteCollectionSelectionBar(
 }
 
 @Composable
-private fun PaymentComposerPanel(
+private fun LegacyPaymentComposerPanel(
     title: String,
     amountLabel: String,
     noteLabel: String,
