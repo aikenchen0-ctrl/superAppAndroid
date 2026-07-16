@@ -25,6 +25,41 @@ data class LocationUiState(
     val error: String? = null
 )
 
+data class AiUiState(
+    val baseUrl: String = "",
+    val apiKey: String = "",
+    val model: String = "",
+    val systemPrompt: String = "",
+    val temperature: String = "0.7",
+    val maxTokens: String = "1024",
+    val saving: Boolean = false,
+    val testing: Boolean = false,
+    val error: String? = null
+)
+
+sealed interface AiUiEvent {
+    data class BaseUrlChanged(val value: String) : AiUiEvent
+    data class ApiKeyChanged(val value: String) : AiUiEvent
+    data class ModelChanged(val value: String) : AiUiEvent
+    data class PromptChanged(val value: String) : AiUiEvent
+    data class TemperatureChanged(val value: String) : AiUiEvent
+    data class MaxTokensChanged(val value: String) : AiUiEvent
+    data object SaveRequested : AiUiEvent
+    data object TestRequested : AiUiEvent
+    data object CloseRequested : AiUiEvent
+}
+
+data class QuickPhraseUiState(val phrases: List<String> = emptyList(), val editingIndex: Int? = null, val draft: String = "")
+
+sealed interface QuickPhraseUiEvent {
+    data object AddRequested : QuickPhraseUiEvent
+    data class EditRequested(val index: Int) : QuickPhraseUiEvent
+    data class DraftChanged(val value: String) : QuickPhraseUiEvent
+    data object SaveRequested : QuickPhraseUiEvent
+    data class DeleteRequested(val index: Int) : QuickPhraseUiEvent
+    data class SendRequested(val index: Int) : QuickPhraseUiEvent
+}
+
 sealed interface LocationUiEvent {
     data object RefreshRequested : LocationUiEvent
     data class SendRequested(val optionId: String) : LocationUiEvent
