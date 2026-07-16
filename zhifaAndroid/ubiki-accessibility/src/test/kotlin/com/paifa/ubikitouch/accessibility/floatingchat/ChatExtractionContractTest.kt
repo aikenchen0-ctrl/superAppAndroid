@@ -44,7 +44,9 @@ class ChatExtractionContractTest {
     @Test
     fun connectorGeometryLivesInChatPackage() {
         val extracted = sourceFile("floatingchat/chat/ChatConnectorGeometry.kt")
+        val layer = sourceFile("floatingchat/chat/ChatConnectorLayer.kt")
         assertTrue("Missing extracted connector geometry", extracted.isFile)
+        assertTrue("Missing extracted connector layer", layer.isFile)
 
         val text = extracted.readText()
         assertTrue(text.contains("data class ChatConnectorTree"))
@@ -56,6 +58,7 @@ class ChatExtractionContractTest {
         assertFalse(legacy.contains("internal data class ChatConnectorTree"))
         assertFalse(legacy.contains("internal fun createChatConnectorLine("))
         assertFalse(legacy.contains("internal fun createChatConnectorTree("))
+        assertFalse(legacy.contains("private fun ChatConnectorLayer("))
     }
 
     @Test

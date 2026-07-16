@@ -3275,245 +3275,6 @@ private fun MessageCoordinatePane(
 }
 
 @Composable
-private fun ChatConnectorLayer(
-    messages: List<FloatingChatMessage>,
-    selection: ChatThreadSelection,
-    selectedAccountId: String,
-    homeOverviewVisible: Boolean,
-    groupMemberAvatarsVisible: Boolean,
-    listState: LazyListState,
-    offscreenIndex: ConnectorOffscreenIndex,
-    connectorState: ConnectorCoordinateState,
-    modifier: Modifier = Modifier
-) {
-    var layerBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
-    val connectorNativePaint = remember { Paint(Paint.ANTI_ALIAS_FLAG) }
-    val connectorTreeNativePaint = remember { Paint(Paint.ANTI_ALIAS_FLAG) }
-    val connectorStroke = remember {
-        Stroke(
-            width = imModuleConnectionLineStrokeWidthPx(),
-            cap = StrokeCap.Round,
-            join = StrokeJoin.Round
-        )
-    }
-    val connectorTreeStroke = remember {
-        Stroke(
-            width = imModuleConnectionLineStrokeWidthPx(),
-            cap = StrokeCap.Butt,
-            join = StrokeJoin.Round
-        )
-    }
-    Canvas(
-        modifier = modifier.onGloballyPositioned { coordinates ->
-            layerBoundsInRoot = coordinates.boundsInRoot()
-        }
-    ) {
-        @Suppress("UNUSED_VARIABLE")
-        val connectorInvalidationVersion = connectorState.version
-        val visibleItems = listState.layoutInfo.visibleItemsInfo
-        if (visibleItems.isEmpty()) return@Canvas
-        val layerBounds = layerBoundsInRoot ?: return@Canvas
-        val messageViewportBounds = connectorState.messageViewport ?: return@Canvas
-        connectorNativePaint.configureConnectorPaint(cap = Paint.Cap.ROUND)
-        connectorTreeNativePaint.configureConnectorPaint(cap = Paint.Cap.BUTT)
-
-        val visibleBubbleGroups = linkedMapOf<ConnectorTargetKey, MutableList<Rect>>()
-        val avatarSourceKeys = linkedMapOf<ConnectorTargetKey, ConnectorTargetKey>()
-        val directGroupMemberBranches = mutableListOf<ChatConnectorBranch>()
-        val visibleGroupMemberBounds = mutableListOf<Rect>()
-        visibleItems.forEach { itemInfo ->
-            val message = messages.getOrNull(itemInfo.index) ?: return@forEach
-            val key = if (homeOverviewVisible) {
-                message.toHomeOverviewConnectorTargetKey()
-            } else {
-                message.toConnectorTargetKey(
-                    selection = selection,
-                    selectedAccountId = selectedAccountId,
-                    groupMemberAvatarsVisible = groupMemberAvatarsVisible
-                )
-            } ?: return@forEach
-
-            val bubbleBounds = connectorState.messageBubbles[message.id] ?: return@forEach
-            avatarSourceKeys[key] = if (homeOverviewVisible) {
-                message.toHomeOverviewConnectorSourceKey() ?: key
-            } else {
-                key
-            }
-            if (key.lane == ConnectorAvatarLane.GroupMember) {
-                connectorState.groupMemberAvatars[key.targetId]?.let { bounds ->
-                    visibleGroupMemberBounds += bounds
-                    directGroupMemberBranches += createGroupMemberMessageConnectorBranch(
-                        avatarBounds = bounds,
-                        bubbleBounds = bubbleBounds,
-                        layerBounds = layerBounds
-                    )
-                }
-            }
-            visibleBubbleGroups
-                .getOrPut(key) {
-                    mutableListOf()
-                }
-                .add(bubbleBounds)
-        }
-
-        if (selection.isGroupThread() && groupMemberAvatarsVisible) {
-            drawGroupMemberConnectorTree(
-                connectorState = connectorState,
-                memberBounds = visibleGroupMemberBounds,
-                layerBounds = layerBounds,
-                visibleRootBounds = messageViewportBounds,
-                nativePaint = connectorTreeNativePaint,
-                stroke = connectorTreeStroke
-            )
-        }
-
-        val firstVisibleIndex = visibleItems.minOf { it.index }
-        val lastVisibleIndex = visibleItems.maxOf { it.index }
-        val offscreenEdges = offscreenConnectorEdges(
-            index = offscreenIndex,
-            firstVisibleIndex = firstVisibleIndex,
-            lastVisibleIndex = lastVisibleIndex
-        )
-        val connectorKeys = visibleBubbleGroups.keys + offscreenEdges.keys
-        connectorKeys.forEach { key ->
-            if (key.lane == ConnectorAvatarLane.GroupMember) return@forEach
-            val avatarSourceKey = avatarSourceKeys[key] ?: key
-            val avatarOffscreenEdge = if (avatarSourceKey.lane == ConnectorAvatarLane.Account) {
-                connectorState.accountAvatarEdgeFor(avatarSourceKey.targetId)
-            } else {
-                null
-            }
-            val avatarBounds = when (avatarSourceKey.lane) {
-                ConnectorAvatarLane.Session -> {
-                    if (
-                        selection.isGroupThread() &&
-                        avatarSourceKey.targetId == selection.groupConnectorId()
-                    ) {
-                        connectorState.groupThreadAvatar ?: connectorState.userAvatarFor(avatarSourceKey.targetId)
-                    } else if (
-                        selection is ChatThreadSelection.Private &&
-                        avatarSourceKey.targetId == selection.contactId
-                    ) {
-                        connectorState.privateThreadAvatarFor(avatarSourceKey.targetId)
-                            ?: connectorState.userAvatarFor(avatarSourceKey.targetId)
-                    } else {
-                        connectorState.userAvatarFor(avatarSourceKey.targetId)
-                    }
-                }
-                ConnectorAvatarLane.GroupMember -> {
-                    connectorState.groupMemberAvatars[avatarSourceKey.targetId]
-                }
-                ConnectorAvatarLane.Account -> {
-                    connectorState.accountAvatarFor(avatarSourceKey.targetId)
-                }
-            } ?: if (homeOverviewVisible) {
-                homeOverviewFallbackConnectorAvatarBounds(
-                    bubbleBounds = visibleBubbleGroups[key].orEmpty(),
-                    layerBounds = layerBounds,
-                    visibleRootBounds = messageViewportBounds,
-                    target = key.target
-                )
-            } else {
-                null
-            } ?: return@forEach
-
-            val edgeState = offscreenEdges[key] ?: ConnectorViewportEdgeState()
-            val bubbleBounds = visibleBubbleGroups[key].orEmpty()
-            val tree = createChatConnectorTree(
-                avatarBounds = avatarBounds,
-                bubbleBounds = bubbleBounds,
-                layerBounds = layerBounds,
-                visibleRootBounds = messageViewportBounds,
-                target = key.target,
-                hasMessagesAbove = edgeState.hasAbove,
-                hasMessagesBelow = edgeState.hasBelow,
-                avatarOffscreenEdge = avatarOffscreenEdge
-            ) ?: return@forEach
-
-            drawChatConnectorTree(tree, connectorTreeNativePaint, connectorTreeStroke)
-        }
-        directGroupMemberBranches.forEach { branch ->
-            drawChatConnectorBranch(branch, connectorNativePaint)
-        }
-    }
-}
-
-private fun Paint.configureConnectorPaint(cap: Paint.Cap) {
-    style = Paint.Style.STROKE
-    strokeWidth = imModuleConnectionLineStrokeWidthPx()
-    strokeCap = cap
-    strokeJoin = Paint.Join.ROUND
-    color = OverlayTokens.connectorLine.toArgb()
-    setShadowLayer(
-        imModuleConnectionLineShadowBlurPx(),
-        imModuleConnectionLineShadowOffsetXPx(),
-        imModuleConnectionLineShadowOffsetYPx(),
-        OverlayTokens.connectorLineShadow.toArgb()
-    )
-}
-
-private fun DrawScope.drawChatConnectorBranch(
-    branch: ChatConnectorBranch,
-    nativePaint: Paint
-) {
-    drawIntoCanvas { canvas ->
-        canvas.nativeCanvas.drawLine(
-            branch.start.x,
-            branch.start.y,
-            branch.end.x,
-            branch.end.y,
-            nativePaint
-        )
-    }
-    drawLine(
-        color = OverlayTokens.connectorLine,
-        start = branch.start,
-        end = branch.end,
-        strokeWidth = imModuleConnectionLineStrokeWidthPx(),
-        cap = StrokeCap.Round
-    )
-}
-
-private fun DrawScope.drawChatConnectorTree(
-    tree: ChatConnectorTree,
-    nativePaint: Paint,
-    stroke: Stroke
-) {
-    val connectorPath = tree.toPath()
-    drawIntoCanvas { canvas ->
-        canvas.nativeCanvas.drawPath(connectorPath.asAndroidPath(), nativePaint)
-    }
-    drawPath(
-        path = connectorPath,
-        color = OverlayTokens.connectorLine,
-        style = stroke
-    )
-}
-
-private fun DrawScope.drawGroupMemberConnectorTree(
-    connectorState: ConnectorCoordinateState,
-    memberBounds: List<Rect>,
-    layerBounds: Rect,
-    visibleRootBounds: Rect,
-    nativePaint: Paint,
-    stroke: Stroke
-) {
-    val groupAvatarBounds = connectorState.groupThreadAvatar ?: return
-    if (memberBounds.isEmpty()) return
-
-    val tree = createChatConnectorTree(
-        avatarBounds = groupAvatarBounds,
-        bubbleBounds = memberBounds,
-        layerBounds = layerBounds,
-        visibleRootBounds = visibleRootBounds,
-        target = FloatingChatConnectionTarget.User,
-        hasMessagesAbove = false,
-        hasMessagesBelow = false
-    ) ?: return
-    drawChatConnectorTree(tree, nativePaint, stroke)
-}
-
-@Composable
 internal fun VoiceMessageContent(message: FloatingChatMessage) {
     val context = LocalContext.current
     var playing by remember(message.id) { mutableStateOf(false) }
@@ -20478,11 +20239,11 @@ internal fun ChatThreadSelection.toPrototypeToolSelection(): FloatingChatPrototy
     }
 }
 
-private fun ChatThreadSelection.isGroupThread(): Boolean {
+internal fun ChatThreadSelection.isGroupThread(): Boolean {
     return this is ChatThreadSelection.Group || this is ChatThreadSelection.GroupChat
 }
 
-private fun ChatThreadSelection.groupConnectorId(): String {
+internal fun ChatThreadSelection.groupConnectorId(): String {
     return when (this) {
         ChatThreadSelection.Group -> GroupThreadId
         is ChatThreadSelection.GroupChat -> groupId.groupConnectorId()
@@ -21722,7 +21483,7 @@ private data class PanelTool(
     val label: String
 )
 
-private class ConnectorCoordinateState {
+internal class ConnectorCoordinateState {
     var version by mutableIntStateOf(0)
         private set
     val userAvatars = mutableMapOf<String, Rect>()
@@ -22060,7 +21821,7 @@ private fun MutableMap<String, Rect>.updateIfChanged(id: String, bounds: Rect): 
     return true
 }
 
-private data class ConnectorTargetKey(
+internal data class ConnectorTargetKey(
     val target: FloatingChatConnectionTarget,
     val targetId: String,
     val lane: ConnectorAvatarLane
@@ -22076,12 +21837,12 @@ private data class VoiceRecorderSession(
     }
 }
 
-private data class ConnectorViewportEdgeState(
+internal data class ConnectorViewportEdgeState(
     val hasAbove: Boolean = false,
     val hasBelow: Boolean = false
 )
 
-private data class ConnectorOffscreenIndex(
+internal data class ConnectorOffscreenIndex(
     val beforeByIndex: List<Set<ConnectorTargetKey>>,
     val afterByIndex: List<Set<ConnectorTargetKey>>
 ) {
@@ -22192,7 +21953,7 @@ internal fun homeOverviewFallbackConnectorAvatarBounds(
     }
 }
 
-private fun offscreenConnectorEdges(
+internal fun offscreenConnectorEdges(
     index: ConnectorOffscreenIndex,
     firstVisibleIndex: Int,
     lastVisibleIndex: Int
@@ -22207,7 +21968,7 @@ private fun offscreenConnectorEdges(
     return states
 }
 
-private fun FloatingChatMessage.toConnectorTargetKey(
+internal fun FloatingChatMessage.toConnectorTargetKey(
     selection: ChatThreadSelection,
     selectedAccountId: String,
     groupMemberAvatarsVisible: Boolean
@@ -22251,7 +22012,7 @@ private fun FloatingChatMessage.toConnectorTargetKey(
     )
 }
 
-private fun FloatingChatMessage.toHomeOverviewConnectorTargetKey(): ConnectorTargetKey? {
+internal fun FloatingChatMessage.toHomeOverviewConnectorTargetKey(): ConnectorTargetKey? {
     if (connectionTarget != FloatingChatConnectionTarget.User) return null
     return ConnectorTargetKey(
         target = FloatingChatConnectionTarget.User,
@@ -22260,7 +22021,7 @@ private fun FloatingChatMessage.toHomeOverviewConnectorTargetKey(): ConnectorTar
     )
 }
 
-private fun FloatingChatMessage.toHomeOverviewConnectorSourceKey(): ConnectorTargetKey? {
+internal fun FloatingChatMessage.toHomeOverviewConnectorSourceKey(): ConnectorTargetKey? {
     if (connectionTarget != FloatingChatConnectionTarget.User) return null
     return ConnectorTargetKey(
         target = FloatingChatConnectionTarget.User,
@@ -22290,43 +22051,6 @@ private fun FloatingChatMessage.toOffscreenConnectorTargetKey(
         )
     }
     return toConnectorTargetKey(selection, selectedAccountId, groupMemberAvatarsVisible)
-}
-
-private fun ChatConnectorLine.toPath(): Path {
-    return Path().apply {
-        moveTo(start.x, start.y)
-        lineTo(cornerStart.x, cornerStart.y)
-        lineTo(cornerEnd.x, cornerEnd.y)
-        lineTo(end.x, end.y)
-    }
-}
-
-private fun ChatConnectorTree.toPath(): Path {
-    val geometry = createChatConnectorBraceGeometry(this)
-    return Path().apply {
-        geometry.trunkSegments.forEach { segment ->
-            moveTo(segment.start.x, segment.start.y)
-            lineTo(segment.end.x, segment.end.y)
-        }
-        geometry.hooks.forEach { hook ->
-            braceHookSegment(hook)
-        }
-    }
-}
-
-private fun Path.braceHookSegment(hook: ChatConnectorBraceHook) {
-    val deltaX = hook.branchEnd.x - hook.center.x
-    if (abs(deltaX) <= 0.5f) return
-
-    val geometry = hook.roundedElbowGeometry()
-    moveTo(geometry.curveStart.x, geometry.curveStart.y)
-    quadraticTo(
-        geometry.curveControl.x,
-        geometry.curveControl.y,
-        geometry.horizontalStart.x,
-        geometry.horizontalStart.y
-    )
-    lineTo(geometry.branchEnd.x, geometry.branchEnd.y)
 }
 
 private const val SessionRailWidthDp = 56
