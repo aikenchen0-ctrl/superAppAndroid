@@ -43,6 +43,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.contract.FriendRequestUiS
 import com.paifa.ubikitouch.accessibility.floatingchat.message.*
 import com.paifa.ubikitouch.accessibility.floatingchat.media.*
 import com.paifa.ubikitouch.accessibility.floatingchat.moments.scrmCircleIdForMomentPostId
+import com.paifa.ubikitouch.accessibility.floatingchat.moments.scrmMomentAvatarColor
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -15228,11 +15229,6 @@ private fun scrmMomentDisplayTime(epochSecondsOrMillis: Long?): String {
 private fun scrmMomentCreatedAt(epochSecondsOrMillis: Long?): Long {
     val value = epochSecondsOrMillis ?: return System.currentTimeMillis()
     return if (value in 1L..9_999_999_999L) value * 1_000L else value
-}
-
-private fun scrmMomentAvatarColor(key: String): Color {
-    val palette = listOf(0xFF607699, 0xFF597D66, 0xFF8A6A42, 0xFF7B627D, 0xFF4F7F8D)
-    return Color(palette[(key.hashCode() and Int.MAX_VALUE) % palette.size])
 }
 
 @Composable
