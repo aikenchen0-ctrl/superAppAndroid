@@ -14983,10 +14983,6 @@ private fun AppMomentMedia.scrmMomentMimeType(): String {
     }
 }
 
-internal fun momentsTimelineUsesRemoteScrmSource(): Boolean = true
-
-internal fun momentsTimelineSeedsWechatSimulationPosts(): Boolean = false
-
 internal fun localScrmMomentPostForSubmittedDraft(
     clientRequestId: String,
     weChatId: String,
