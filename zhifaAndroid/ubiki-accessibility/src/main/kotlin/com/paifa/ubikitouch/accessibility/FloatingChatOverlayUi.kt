@@ -330,14 +330,7 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmInvalidResponseException
 import com.paifa.ubikitouch.accessibility.scrm.ScrmMediaUploadRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmMessageApi
 import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterial
-import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterialControlRequest
-import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterialCopyRequest
-import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterialCreateRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterialDetail
-import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterialQuery
-import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentAttachmentType
-import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentPostAttachment
-import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentPostPayload
 import com.paifa.ubikitouch.accessibility.scrm.ScrmQueuedMediaPayload
 import com.paifa.ubikitouch.accessibility.scrm.ScrmRequestException
 import com.paifa.ubikitouch.accessibility.scrm.ScrmRenameChatRoomRequest
@@ -351,12 +344,6 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskPollState
 import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskResult
 import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskSubmissionResult
 import com.paifa.ubikitouch.accessibility.scrm.resolveScrmTaskResult
-import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentTaskAwaitOutcome
-import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentTaskPollDelayMillis
-import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentTaskMaxPollAttempts
-import com.paifa.ubikitouch.accessibility.scrm.submitScrmMomentTaskAndAwait
-import com.paifa.ubikitouch.accessibility.scrm.ScrmUploadedMomentMedia
-import com.paifa.ubikitouch.accessibility.scrm.uploadScrmMomentMedia
 import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingAccountId
 import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingAccountRouteForContactId
 import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingContactId
