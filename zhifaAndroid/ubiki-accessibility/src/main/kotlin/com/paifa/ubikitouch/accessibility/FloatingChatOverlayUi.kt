@@ -8477,31 +8477,6 @@ private fun quickPhrasePrefs(context: Context): SharedPreferences {
     return context.applicationContext.getSharedPreferences(QUICK_PHRASE_PREFS, Context.MODE_PRIVATE)
 }
 
-private fun defaultMomentPosts(): List<AppMomentPost> {
-    return listOf(
-        AppMomentPost(
-            id = "moment-rain-1",
-            author = "周雨晴",
-            content = "今天把悬浮聊天里的图片、视频和消息气泡都对齐了，晚上继续看连接线细节。",
-            time = "12 分钟前",
-            likedBy = listOf("林舟", "知南")
-        ),
-        AppMomentPost(
-            id = "moment-chen-1",
-            author = "陈若川",
-            content = "深圳湾这边信号不错，位置消息和文件链接截图后也能继续访问。",
-            time = "38 分钟前",
-            comments = listOf(AppMomentComment("雨晴", "这个入口挺顺手。"))
-        ),
-        AppMomentPost(
-            id = "moment-lin-1",
-            author = "林舟",
-            content = "新的浮窗红包和转账先做成 App 内状态流，后面再接真实账户体系。",
-            time = "1 小时前"
-        )
-    )
-}
-
 private fun favoriteCollectionItems(
     messages: List<FloatingChatMessage>,
     favoriteMessageIds: Map<String, Boolean>,
