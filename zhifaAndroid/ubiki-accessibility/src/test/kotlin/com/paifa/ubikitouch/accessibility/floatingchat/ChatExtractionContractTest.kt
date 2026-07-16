@@ -220,6 +220,8 @@ class ChatExtractionContractTest {
         assertTrue(text.contains("fun ContactProfileScreen("))
         assertTrue(text.contains("state: ContactProfileUiState"))
         assertTrue(text.contains("onEvent: (ContactProfileUiEvent) -> Unit"))
+        assertTrue(text.contains("ContactSummary("))
+        assertTrue(text.contains("avatarUrl = avatarUrl"))
         assertFalse(text.contains("ScrmContact"))
         assertFalse(text.contains("FloatingChatContact"))
         assertFalse(text.contains("LocalContactProfile"))
@@ -228,6 +230,7 @@ class ChatExtractionContractTest {
 
         val contractText = contract.readText()
         assertTrue(contractText.contains("data class ContactProfileUiState"))
+        assertTrue(contractText.contains("val avatarUrl: String?"))
         assertTrue(contractText.contains("sealed interface ContactProfileUiEvent"))
         assertFalse(contractText.contains("import android."))
         assertFalse(contractText.contains("import androidx.compose."))

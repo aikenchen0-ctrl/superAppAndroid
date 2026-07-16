@@ -40,6 +40,7 @@ data class ContactProfileUiState(
     val displayName: String = "",
     val originalName: String = "",
     val initials: String = "",
+    val avatarUrl: String? = null,
     val avatarColor: Int = 0,
     val wechatId: String = "",
     val region: String = "",

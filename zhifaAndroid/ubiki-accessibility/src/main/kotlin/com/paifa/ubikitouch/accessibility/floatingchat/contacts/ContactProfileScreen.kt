@@ -33,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -46,6 +47,7 @@ import com.paifa.ubikitouch.accessibility.OverlayTokens
 import com.paifa.ubikitouch.accessibility.TextLabel
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactProfileUiEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactProfileUiState
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactSummary
 
 @Composable
 internal fun ContactProfileScreen(
@@ -278,6 +280,22 @@ private fun ProfileHeader(state: ContactProfileUiState) {
 
 @Composable
 private fun ContactAvatar(state: ContactProfileUiState, size: Dp) {
+    val avatarUrl = state.avatarUrl?.takeIf { it.isNotBlank() }
+    if (avatarUrl != null) {
+        Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+            Box(Modifier.scale(size.value / ContactAvatarBaseSize.value)) {
+                ContactAvatar(
+                    ContactSummary(
+                        id = state.contactId.orEmpty(),
+                        displayName = state.displayName,
+                        avatarUrl = avatarUrl,
+                        avatarColor = state.avatarColor
+                    )
+                )
+            }
+        }
+        return
+    }
     Box(
         Modifier.size(size).clip(RoundedCornerShape(8.dp)).background(Color(state.avatarColor)),
         contentAlignment = Alignment.Center
@@ -291,6 +309,8 @@ private fun ContactAvatar(state: ContactProfileUiState, size: Dp) {
         )
     }
 }
+
+private val ContactAvatarBaseSize = 42.dp
 
 @Composable
 private fun FriendProfileSectionTitle(title: String) {
