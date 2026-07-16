@@ -112,6 +112,20 @@ class ChatExtractionContractTest {
         assertFalse(text.contains("internal fun sessionRailItemKeysByLatestChatTime("))
     }
 
+    @Test
+    fun documentPreviewLivesInMediaPackage() {
+        val documentPreview = sourceFile("floatingchat/media/DocumentPreview.kt")
+        assertTrue("Missing extracted document preview", documentPreview.isFile)
+
+        val text = documentPreview.readText()
+        assertTrue(text.contains("fun FilePreviewContent("))
+        assertTrue(text.contains("fun fileBadgeLabelFor("))
+
+        val legacy = sourceFile("FloatingChatOverlayUi.kt").readText()
+        assertFalse(legacy.contains("internal fun FilePreviewContent("))
+        assertFalse(legacy.contains("internal fun fileBadgeLabelFor("))
+    }
+
     private fun sourceFile(relativePath: String): File {
         val moduleRelative = File(
             "src/main/kotlin/com/paifa/ubikitouch/accessibility",

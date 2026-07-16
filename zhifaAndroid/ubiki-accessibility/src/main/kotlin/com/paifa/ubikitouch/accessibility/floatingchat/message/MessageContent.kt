@@ -6,7 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.unit.dp
 import com.paifa.ubikitouch.accessibility.DraftBadge
-import com.paifa.ubikitouch.accessibility.FilePreviewContent
+import com.paifa.ubikitouch.accessibility.floatingchat.media.FilePreviewContent
 import com.paifa.ubikitouch.accessibility.ImageThumbnailContent
 import com.paifa.ubikitouch.accessibility.VideoPreviewContent
 import com.paifa.ubikitouch.accessibility.VoiceMessageContent
