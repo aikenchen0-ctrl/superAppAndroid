@@ -34,6 +34,43 @@ data class FriendRequestUiState(
     val enabled: Boolean = true
 )
 
+data class ContactProfileUiState(
+    val editing: Boolean = false,
+    val contactId: String? = null,
+    val displayName: String = "",
+    val originalName: String = "",
+    val initials: String = "",
+    val avatarColor: Int = 0,
+    val wechatId: String = "",
+    val region: String = "",
+    val description: String = "",
+    val remark: String = "",
+    val phone: String = "",
+    val tags: String = "",
+    val memo: String = "",
+    val friendCircleVisible: Boolean = true,
+    val onlyChat: Boolean = false,
+    val commonGroupCount: Int = 0,
+    val source: String = "",
+    val addedTime: String = "",
+    val loading: Boolean = false
+)
+
+sealed interface ContactProfileUiEvent {
+    data object BackRequested : ContactProfileUiEvent
+    data object EditRequested : ContactProfileUiEvent
+    data object MomentsRequested : ContactProfileUiEvent
+    data object MessageRequested : ContactProfileUiEvent
+    data object VideoCallRequested : ContactProfileUiEvent
+    data class RemarkChanged(val value: String) : ContactProfileUiEvent
+    data class TagsChanged(val value: String) : ContactProfileUiEvent
+    data class MemoChanged(val value: String) : ContactProfileUiEvent
+    data class FriendCircleVisibilityChanged(val visible: Boolean) : ContactProfileUiEvent
+    data class OnlyChatChanged(val enabled: Boolean) : ContactProfileUiEvent
+    data object DeleteRequested : ContactProfileUiEvent
+    data object DoneRequested : ContactProfileUiEvent
+}
+
 data class ContactsUiState(
     val query: String = "",
     val searchVisible: Boolean = false,

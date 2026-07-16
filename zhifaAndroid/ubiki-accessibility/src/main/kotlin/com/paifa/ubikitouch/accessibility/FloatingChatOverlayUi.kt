@@ -8,6 +8,9 @@ import com.paifa.ubikitouch.accessibility.floatingchat.chat.sessionRailItemsByLa
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.*
 import com.paifa.ubikitouch.accessibility.floatingchat.contacts.FriendRequestScreen
 import com.paifa.ubikitouch.accessibility.floatingchat.contacts.ContactsScreen
+import com.paifa.ubikitouch.accessibility.floatingchat.contacts.ContactProfileScreen
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactProfileUiEvent
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactProfileUiState
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactGroupSummary
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactSummary
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsScreenAction
@@ -9773,7 +9776,7 @@ private fun ContactEditOverlay(
             val activeFriendProfile = friendProfileTarget
             val activeGroupMember = selectedGroupMember
             when {
-                activeFriendProfile != null -> UserContactEditPanel(
+                activeFriendProfile != null -> ContactProfileEditorHost(
                     contact = activeFriendProfile,
                     profile = contactProfiles[contactProfileKey(accountId, activeFriendProfile.id)]
                         ?: defaultLocalContactProfileFor(
@@ -9818,7 +9821,7 @@ private fun ContactEditOverlay(
                     onMemberClick = { member -> selectedGroupMember = member },
                     onDismiss = onDismiss
                 )
-                target is ContactEditorTarget.User -> UserContactEditPanel(
+                target is ContactEditorTarget.User -> ContactProfileEditorHost(
                     contact = target.contact,
                     profile = contactProfiles[contactProfileKey(accountId, target.contact.id)]
                         ?: defaultLocalContactProfileFor(
@@ -11232,252 +11235,56 @@ private fun GroupInfoSectionGap() {
 }
 
 @Composable
-private fun UserContactEditPanel(
+private fun ContactProfileEditorHost(
     contact: FloatingChatContact,
     profile: LocalContactProfile,
     onProfileChange: (LocalContactProfile) -> Unit,
     onDeleteFriend: (FloatingChatContact) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var draftRemark by remember(profile.accountId, profile.contactId, profile.remark) {
-        mutableStateOf(profile.remark)
-    }
-    var draftTags by remember(profile.accountId, profile.contactId, profile.tags) {
-        mutableStateOf(profile.tags)
-    }
-    var draftMemo by remember(profile.accountId, profile.contactId, profile.memo) {
-        mutableStateOf(profile.memo.ifBlank { defaultFriendProfileMemo(contact) })
-    }
-    var friendCircleVisible by remember(profile.accountId, profile.contactId, profile.friendCircleVisible) {
-        mutableStateOf(profile.friendCircleVisible)
-    }
-    var onlyChat by remember(profile.accountId, profile.contactId, profile.onlyChat) {
-        mutableStateOf(profile.onlyChat)
-    }
-    fun persistProfile(
-        remark: String = draftRemark,
-        tags: String = draftTags,
-        memo: String = draftMemo,
-        nextFriendCircleVisible: Boolean = friendCircleVisible,
-        nextOnlyChat: Boolean = onlyChat
-    ) {
-        onProfileChange(
-            profile.copy(
-                remark = remark,
-                tags = tags,
-                memo = memo,
-                friendCircleVisible = nextFriendCircleVisible,
-                onlyChat = nextOnlyChat,
-                updatedAt = System.currentTimeMillis()
-            )
-        )
-    }
-
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(FriendProfilePageBackground),
-        contentPadding = PaddingValues(bottom = 12.dp)
-    ) {
-        item {
-            FriendProfileTopBar(onDismiss = onDismiss)
-        }
-        item {
-            FriendProfileHeader(
-                contact = contact,
-                displayName = draftRemark.ifBlank { contact.name },
-                wechatId = profile.contactId.replace("-", "_")
-            )
-        }
-        item {
-            FriendProfileSectionTitle("备注")
-        }
-        item {
-            FriendProfileSection {
-                FriendProfileEditableRow(
-                    label = "备注名",
-                    value = draftRemark,
-                    placeholder = "填写备注名",
-                    onValueChange = {
-                        draftRemark = it
-                        persistProfile(remark = it)
-                    }
-                )
-                FriendProfileDivider()
-                FriendProfileInfoRow(label = "电话", value = profile.phone.orEmpty())
-                FriendProfileDivider()
-                FriendProfileEditableRow(
-                    label = "标签",
-                    value = draftTags,
-                    placeholder = "添加标签",
-                    onValueChange = {
-                        draftTags = it
-                        persistProfile(tags = it)
-                    }
-                )
-                FriendProfileDivider()
-                FriendProfileEditableRow(
-                    label = "备注",
-                    value = draftMemo,
-                    placeholder = "添加描述",
-                    onValueChange = {
-                        draftMemo = it
-                        persistProfile(memo = it)
-                    },
-                    maxLines = 2,
-                    minHeight = 58.dp
-                )
-                FriendProfileDivider()
-                FriendProfilePhotosRow(contact = contact)
+    val state = ContactProfileUiState(
+        editing = true,
+        contactId = contact.id,
+        displayName = profile.remark.ifBlank { contact.name },
+        originalName = contact.name,
+        initials = contact.initials,
+        avatarColor = contact.avatarColor.toInt(),
+        wechatId = profile.contactId.replace("-", "_"),
+        description = contact.description,
+        remark = profile.remark,
+        phone = profile.phone.orEmpty(),
+        tags = profile.tags,
+        memo = profile.memo.ifBlank { defaultFriendProfileMemo(contact) },
+        friendCircleVisible = profile.friendCircleVisible,
+        onlyChat = profile.onlyChat,
+        commonGroupCount = profile.commonGroupCount ?: 0,
+        source = profile.source.orEmpty(),
+        addedTime = profile.addedTime.orEmpty()
+    )
+    ContactProfileScreen(
+        state = state,
+        onEvent = { event ->
+            val changedProfile = when (event) {
+                is ContactProfileUiEvent.RemarkChanged -> profile.copy(remark = event.value)
+                is ContactProfileUiEvent.TagsChanged -> profile.copy(tags = event.value)
+                is ContactProfileUiEvent.MemoChanged -> profile.copy(memo = event.value)
+                is ContactProfileUiEvent.FriendCircleVisibilityChanged -> {
+                    profile.copy(friendCircleVisible = event.visible)
+                }
+                is ContactProfileUiEvent.OnlyChatChanged -> profile.copy(onlyChat = event.enabled)
+                else -> null
+            }
+            if (changedProfile != null) {
+                onProfileChange(changedProfile.copy(updatedAt = System.currentTimeMillis()))
+            }
+            when (event) {
+                ContactProfileUiEvent.BackRequested,
+                ContactProfileUiEvent.DoneRequested -> onDismiss()
+                ContactProfileUiEvent.DeleteRequested -> onDeleteFriend(contact)
+                else -> Unit
             }
         }
-        item {
-            FriendProfileSectionTitle("朋友权限")
-        }
-        item {
-            FriendProfileSection {
-                FriendProfileSwitchRow(
-                    label = "朋友圈和状态",
-                    value = "允许他看我的朋友圈",
-                    checked = friendCircleVisible,
-                    onCheckedChange = { checked ->
-                        friendCircleVisible = checked
-                        persistProfile(nextFriendCircleVisible = checked)
-                    }
-                )
-                FriendProfileDivider()
-                FriendProfileSwitchRow(
-                    label = "仅聊天",
-                    value = "开启后不看彼此朋友圈",
-                    checked = onlyChat,
-                    onCheckedChange = { checked ->
-                        onlyChat = checked
-                        persistProfile(nextOnlyChat = checked)
-                    }
-                )
-            }
-        }
-        item {
-            FriendProfileSectionTitle("更多信息")
-        }
-        item {
-            FriendProfileSection {
-                FriendProfileInfoRow(label = "我和他的共同群聊", value = "${profile.commonGroupCount ?: 0} 个群聊")
-                FriendProfileDivider()
-                FriendProfileInfoRow(label = "来源", value = profile.source.orEmpty())
-                FriendProfileDivider()
-                FriendProfileInfoRow(label = "添加时间", value = profile.addedTime.orEmpty())
-            }
-        }
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                SmallChoiceButton(label = "删除", onClick = { onDeleteFriend(contact) })
-                SmallChoiceButton(label = "完成", onClick = onDismiss)
-            }
-        }
-    }
-}
-
-@Composable
-private fun FriendProfileTopBar(onDismiss: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(46.dp)
-            .background(FriendProfilePageBackground)
-    ) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 8.dp)
-                .size(36.dp)
-                .clip(CircleShape)
-                .clickable(onClick = onDismiss),
-            contentAlignment = Alignment.Center
-        ) {
-            TextLabel(
-                text = "‹",
-                size = 24.sp,
-                color = FriendProfilePrimaryText,
-                maxLines = 1
-            )
-        }
-        TextLabel(
-            text = "朋友资料",
-            size = 14.sp,
-            weight = FontWeight.SemiBold,
-            color = FriendProfilePrimaryText,
-            modifier = Modifier.align(Alignment.Center),
-            maxLines = 1
-        )
-    }
-}
-
-@Composable
-private fun FriendProfileHeader(
-    contact: FloatingChatContact,
-    displayName: String,
-    wechatId: String
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(FriendProfileCardBackground)
-            .padding(horizontal = 18.dp, vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(56.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(contact.avatarColor)),
-            contentAlignment = Alignment.Center
-        ) {
-            TextLabel(
-                text = contact.initials,
-                size = 14.sp,
-                weight = FontWeight.Bold,
-                color = OverlayTokens.primaryText,
-                maxLines = 1
-            )
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            TextLabel(
-                text = displayName,
-                size = 17.sp,
-                weight = FontWeight.SemiBold,
-                color = FriendProfilePrimaryText,
-                maxLines = 1
-            )
-            TextLabel(
-                text = "昵称：${contact.name}",
-                size = 11.sp,
-                color = FriendProfileSecondaryText,
-                maxLines = 1
-            )
-            TextLabel(
-                text = "微信号：$wechatId",
-                size = 11.sp,
-                color = FriendProfileSecondaryText,
-                maxLines = 1
-            )
-            TextLabel(
-                text = contact.description,
-                size = 11.sp,
-                color = FriendProfileSecondaryText,
-                maxLines = 1
-            )
-        }
-    }
+    )
 }
 
 @Composable
@@ -11616,68 +11423,10 @@ private fun FriendProfileSwitchRow(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            TextLabel(
-                text = label,
-                size = 13.sp,
-                color = FriendProfilePrimaryText,
-                maxLines = 1
-            )
-            TextLabel(
-                text = value,
-                size = 10.sp,
-                color = FriendProfileSecondaryText,
-                maxLines = 1
-            )
+            TextLabel(text = label, size = 13.sp, color = FriendProfilePrimaryText, maxLines = 1)
+            TextLabel(text = value, size = 10.sp, color = FriendProfileSecondaryText, maxLines = 1)
         }
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange
-        )
-    }
-}
-
-@Composable
-private fun FriendProfilePhotosRow(contact: FloatingChatContact) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 58.dp)
-            .padding(horizontal = 18.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        TextLabel(
-            text = "照片",
-            size = 13.sp,
-            color = FriendProfilePrimaryText,
-            modifier = Modifier.width(70.dp),
-            maxLines = 1
-        )
-        Row(
-            modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.End
-        ) {
-            repeat(3) { index ->
-                val color = friendProfilePhotoColor(contact, index)
-                Box(
-                    modifier = Modifier
-                        .padding(start = 5.dp)
-                        .size(38.dp)
-                        .clip(RoundedCornerShape(5.dp))
-                        .background(color),
-                    contentAlignment = Alignment.BottomEnd
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .padding(4.dp)
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.72f))
-                    )
-                }
-            }
-        }
-        Spacer(modifier = Modifier.width(6.dp))
-        FriendProfileChevron()
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
@@ -11758,12 +11507,6 @@ private fun friendProfilePhoneFor(seed: Int): String {
     val middle = 1000 + seed % 9000
     val suffix = 1000 + (seed / 7) % 9000
     return "1${FriendProfilePhonePrefixes[seed % FriendProfilePhonePrefixes.size]} $middle $suffix"
-}
-
-private fun friendProfilePhotoColor(contact: FloatingChatContact, index: Int): Color {
-    val base = Color(contact.avatarColor)
-    val alpha = listOf(0.86f, 0.68f, 0.52f)[index]
-    return base.copy(alpha = alpha)
 }
 
 private fun positiveContactSeed(id: String): Int {
@@ -13339,23 +13082,32 @@ private fun ScrmContactsPanel(
                     Toast.makeText(context, "$label 暂未接入", Toast.LENGTH_SHORT).show()
                 }
             )
-            WechatContactsPanelScreen.ContactIntro -> WechatContactIntroPanel(
-                contact = state.selectedContact,
-                loading = state.loading,
-                onBack = { panelScreen = WechatContactsPanelScreen.Contacts },
-                onOpenChat = {
-                    state.selectedContact?.let { contact -> onOpenPrivateChat(route, contact) }
-                },
-                onOpenVideoCall = {
-                    Toast.makeText(context, "音视频通话暂未接入", Toast.LENGTH_SHORT).show()
-                },
-                onOpenFriendProfile = {
-                    state.selectedContact?.let { contact -> onOpenFriendProfile(route, contact) }
-                },
-                onOpenMoments = {
-                    Toast.makeText(context, "朋友圈暂未接入", Toast.LENGTH_SHORT).show()
-                }
-            )
+            WechatContactsPanelScreen.ContactIntro -> {
+                val selectedContact = state.selectedContact
+                ContactProfileScreen(
+                    state = selectedContact.toContactIntroUiState(loading = state.loading),
+                    onEvent = { event ->
+                        when (event) {
+                            ContactProfileUiEvent.BackRequested -> {
+                                panelScreen = WechatContactsPanelScreen.Contacts
+                            }
+                            ContactProfileUiEvent.MessageRequested -> {
+                                selectedContact?.let { contact -> onOpenPrivateChat(route, contact) }
+                            }
+                            ContactProfileUiEvent.VideoCallRequested -> {
+                                Toast.makeText(context, "音视频通话暂未接入", Toast.LENGTH_SHORT).show()
+                            }
+                            ContactProfileUiEvent.EditRequested -> {
+                                selectedContact?.let { contact -> onOpenFriendProfile(route, contact) }
+                            }
+                            ContactProfileUiEvent.MomentsRequested -> {
+                                Toast.makeText(context, "朋友圈暂未接入", Toast.LENGTH_SHORT).show()
+                            }
+                            else -> Unit
+                        }
+                    }
+                )
+            }
             WechatContactsPanelScreen.FriendRequests -> {
                 val requestsById = state.friendRequests.associateBy { request -> request.id.toString() }
                 FriendRequestScreen(
@@ -13937,193 +13689,20 @@ private fun WechatContactAvatar(contact: ScrmContact, size: Dp = 42.dp) {
     }
 }
 
-@Composable
-private fun WechatContactIntroPanel(
-    contact: ScrmContact?,
-    loading: Boolean,
-    onBack: () -> Unit,
-    onOpenChat: () -> Unit,
-    onOpenVideoCall: () -> Unit,
-    onOpenFriendProfile: () -> Unit,
-    onOpenMoments: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(WechatContactsPageBackground)
-    ) {
-        WechatContactIntroTopBar(onBack = onBack)
-        if (contact == null) {
-            TextLabel(
-                text = "请选择联系人",
-                size = 13.sp,
-                color = WechatContactsSecondaryText,
-                modifier = Modifier.padding(18.dp),
-                maxLines = 1
-            )
-        } else {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(WechatContactsRowBackground)
-                    .padding(horizontal = 18.dp, vertical = 20.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                WechatContactAvatar(contact = contact, size = 64.dp)
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    TextLabel(
-                        text = contact.displayName,
-                        size = 21.sp,
-                        weight = FontWeight.Bold,
-                        color = WechatContactsPrimaryText,
-                        maxLines = 1
-                    )
-                    TextLabel(
-                        text = "微信号：${contact.wxid.orEmpty().ifBlank { contact.friendNo.orEmpty().ifBlank { "无" } }}",
-                        size = 13.sp,
-                        color = WechatContactsSecondaryText,
-                        maxLines = 1
-                    )
-                    TextLabel(
-                        text = "地区：${contact.sourceExt.orEmpty().ifBlank { contact.source.orEmpty().ifBlank { "未知" } }}",
-                        size = 13.sp,
-                        color = WechatContactsSecondaryText,
-                        maxLines = 1
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-            WechatContactIntroRow(
-                title = "朋友资料",
-                subtitle = "添加朋友的备注名、电话、标签、备忘、照片等，并设置朋友圈权限。",
-                onClick = onOpenFriendProfile
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            WechatContactIntroRow(title = "朋友圈", subtitle = null, onClick = onOpenMoments)
-            Spacer(modifier = Modifier.height(8.dp))
-            WechatContactIntroActionRow(
-                icon = Icons.Filled.Textsms,
-                label = "发消息",
-                enabled = !loading,
-                onClick = onOpenChat
-            )
-            WechatContactIntroActionRow(
-                icon = Icons.Filled.PhoneAndroid,
-                label = "音视频通话",
-                enabled = !loading,
-                onClick = onOpenVideoCall
-            )
-        }
-    }
+private fun ScrmContact?.toContactIntroUiState(loading: Boolean): ContactProfileUiState {
+    val contact = this
+    return ContactProfileUiState(
+        editing = false,
+        contactId = contact?.id?.toString(),
+        displayName = contact?.displayName.orEmpty(),
+        originalName = contact?.nickname.orEmpty(),
+        initials = contact?.displayName.orEmpty().take(2),
+        avatarColor = contact?.let(::wechatContactAvatarColor)?.toArgb() ?: 0xFF5B7CFA.toInt(),
+        wechatId = contact?.wxid.orEmpty().ifBlank { contact?.friendNo.orEmpty() },
+        region = contact?.sourceExt.orEmpty().ifBlank { contact?.source.orEmpty() },
+        loading = loading
+    )
 }
-
-@Composable
-private fun WechatContactIntroTopBar(onBack: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(WechatContactsRowBackground)
-            .padding(horizontal = 6.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        CompactInteractiveSize {
-            IconButton(onClick = onBack, modifier = Modifier.size(36.dp)) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "返回",
-                    tint = WechatContactsPrimaryText,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
-        Spacer(modifier = Modifier.weight(1f))
-        Icon(
-            imageVector = Icons.Filled.MoreHoriz,
-            contentDescription = null,
-            tint = WechatContactsPrimaryText,
-            modifier = Modifier
-                .padding(end = 8.dp)
-                .size(24.dp)
-        )
-    }
-}
-
-@Composable
-private fun WechatContactIntroRow(
-    title: String,
-    subtitle: String?,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(WechatContactsRowBackground)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextLabel(
-                text = title,
-                size = 15.sp,
-                weight = FontWeight.SemiBold,
-                color = WechatContactsPrimaryText,
-                maxLines = 1
-            )
-            if (subtitle != null) {
-                TextLabel(
-                    text = subtitle,
-                    size = 11.sp,
-                    color = WechatContactsSecondaryText,
-                    maxLines = 2
-                )
-            }
-        }
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = WechatContactsChevronText,
-            modifier = Modifier.size(22.dp)
-        )
-    }
-}
-
-@Composable
-private fun WechatContactIntroActionRow(
-    icon: ImageVector,
-    label: String,
-    enabled: Boolean,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(WechatContactsRowBackground)
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 15.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = Color(0xFF49679E),
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        TextLabel(
-            text = label,
-            size = 16.sp,
-            weight = FontWeight.SemiBold,
-            color = Color(0xFF49679E),
-            maxLines = 1
-        )
-    }
-}
-
 @Composable
 private fun WechatAddFriendPanel(
     query: String,

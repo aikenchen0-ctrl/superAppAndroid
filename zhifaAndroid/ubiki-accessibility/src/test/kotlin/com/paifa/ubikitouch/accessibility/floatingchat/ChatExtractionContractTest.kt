@@ -210,6 +210,37 @@ class ChatExtractionContractTest {
         assertFalse(legacy.contains("WechatContactsIndexText"))
     }
 
+    @Test
+    fun contactProfileScreenUsesPlatformIndependentStateAndEvents() {
+        val screen = sourceFile("floatingchat/contacts/ContactProfileScreen.kt")
+        val contract = sourceFile("floatingchat/contract/ContactsContract.kt")
+        assertTrue("Missing extracted contact profile screen", screen.isFile)
+
+        val text = screen.readText()
+        assertTrue(text.contains("fun ContactProfileScreen("))
+        assertTrue(text.contains("state: ContactProfileUiState"))
+        assertTrue(text.contains("onEvent: (ContactProfileUiEvent) -> Unit"))
+        assertFalse(text.contains("ScrmContact"))
+        assertFalse(text.contains("FloatingChatContact"))
+        assertFalse(text.contains("LocalContactProfile"))
+        assertFalse(text.contains("Context"))
+        assertFalse(text.contains("Activity"))
+
+        val contractText = contract.readText()
+        assertTrue(contractText.contains("data class ContactProfileUiState"))
+        assertTrue(contractText.contains("sealed interface ContactProfileUiEvent"))
+        assertFalse(contractText.contains("import android."))
+        assertFalse(contractText.contains("import androidx.compose."))
+
+        val legacy = sourceFile("FloatingChatOverlayUi.kt").readText()
+        assertFalse(legacy.contains("private fun WechatContactIntroPanel("))
+        assertFalse(legacy.contains("private fun WechatContactIntroTopBar("))
+        assertFalse(legacy.contains("private fun WechatContactIntroRow("))
+        assertFalse(legacy.contains("private fun WechatContactIntroActionRow("))
+        assertFalse(legacy.contains("private fun UserContactEditPanel("))
+        assertFalse(legacy.contains("private fun FriendProfileTopBar("))
+    }
+
     private fun sourceFile(relativePath: String): File {
         val moduleRelative = File(
             "src/main/kotlin/com/paifa/ubikitouch/accessibility",
