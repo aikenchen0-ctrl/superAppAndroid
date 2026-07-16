@@ -23,7 +23,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.paifa.ubikitouch.accessibility.OverlayTokens
 import com.paifa.ubikitouch.accessibility.TextLabel
-import com.paifa.ubikitouch.accessibility.mediaWatermarkText
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 import com.paifa.ubikitouch.core.model.FloatingChatThumbnailOrientation

@@ -18,7 +18,6 @@ import androidx.compose.ui.text.font.FontWeight
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import com.paifa.ubikitouch.accessibility.OverlayTokens
 import com.paifa.ubikitouch.accessibility.TextLabel
-import com.paifa.ubikitouch.accessibility.mediaWatermarkText
 
 @Composable
 internal fun FloatingChatMediaActionSheetHeader(message: FloatingChatMessage) {

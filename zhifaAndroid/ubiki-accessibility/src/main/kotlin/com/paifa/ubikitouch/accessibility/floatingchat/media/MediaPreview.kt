@@ -37,7 +37,6 @@ import com.paifa.ubikitouch.accessibility.OverlayTokens
 import com.paifa.ubikitouch.accessibility.TextLabel
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.rootBoundsFromPosition
 import com.paifa.ubikitouch.accessibility.floatingchat.message.fixedThumbnailHeightDp
-import com.paifa.ubikitouch.accessibility.mediaWatermarkText
 import com.paifa.ubikitouch.accessibility.standaloneMediaListMaxHeightDp
 import com.paifa.ubikitouch.accessibility.standaloneMediaListMaxWidthDp
 import com.paifa.ubikitouch.accessibility.standaloneMediaListMinHeightDp
