@@ -14,6 +14,11 @@ data class FriendRequestSummary(
     val avatarUrl: String? = null
 )
 
+data class FriendRequestUiState(
+    val requests: List<FriendRequestSummary> = emptyList(),
+    val enabled: Boolean = true
+)
+
 data class ContactsUiState(
     val query: String = "",
     val selectedContactId: String? = null,

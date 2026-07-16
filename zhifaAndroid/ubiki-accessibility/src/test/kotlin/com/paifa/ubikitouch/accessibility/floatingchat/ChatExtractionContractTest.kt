@@ -164,6 +164,23 @@ class ChatExtractionContractTest {
         assertFalse(legacy.contains("private fun decodeFileBitmapRespectingExif("))
     }
 
+    @Test
+    fun friendRequestScreenUsesContactContractEvents() {
+        val screen = sourceFile("floatingchat/contacts/FriendRequestScreen.kt")
+        assertTrue("Missing extracted friend request screen", screen.isFile)
+
+        val text = screen.readText()
+        assertTrue(text.contains("fun FriendRequestScreen("))
+        assertTrue(text.contains("state: FriendRequestUiState"))
+        assertTrue(text.contains("onEvent: (ContactsUiEvent) -> Unit"))
+        assertFalse(text.contains("ScrmFriendRequest"))
+        assertFalse(text.contains("Context"))
+
+        val legacy = sourceFile("FloatingChatOverlayUi.kt").readText()
+        assertFalse(legacy.contains("private fun WechatFriendRequestsPanel("))
+        assertFalse(legacy.contains("private fun ScrmFriendRequestList("))
+    }
+
     private fun sourceFile(relativePath: String): File {
         val moduleRelative = File(
             "src/main/kotlin/com/paifa/ubikitouch/accessibility",

@@ -6,6 +6,10 @@ import com.paifa.ubikitouch.accessibility.floatingchat.theme.FloatingChatLightCo
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.SessionRailItem
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.sessionRailItemsByLatestChatTime
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.*
+import com.paifa.ubikitouch.accessibility.floatingchat.contacts.FriendRequestScreen
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsUiEvent
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.FriendRequestSummary
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.FriendRequestUiState
 import com.paifa.ubikitouch.accessibility.floatingchat.message.*
 import com.paifa.ubikitouch.accessibility.floatingchat.media.*
 import android.content.ContentValues
@@ -13322,17 +13326,33 @@ private fun ScrmContactsPanel(
                     Toast.makeText(context, "朋友圈暂未接入", Toast.LENGTH_SHORT).show()
                 }
             )
-            WechatContactsPanelScreen.FriendRequests -> WechatFriendRequestsPanel(
-                requests = state.friendRequests,
-                loading = state.loading,
-                onBack = { panelScreen = WechatContactsPanelScreen.Contacts },
-                onAccept = { request ->
-                    handleFriendRequest(request, ScrmFriendRequestOperation.Accept)
-                },
-                onReject = { request ->
-                    handleFriendRequest(request, ScrmFriendRequestOperation.Reject)
-                }
-            )
+            WechatContactsPanelScreen.FriendRequests -> {
+                val requestsById = state.friendRequests.associateBy { request -> request.id.toString() }
+                FriendRequestScreen(
+                    state = FriendRequestUiState(
+                        requests = state.friendRequests.map { request -> request.toFriendRequestSummary() },
+                        enabled = !state.loading
+                    ),
+                    onEvent = { event ->
+                        when (event) {
+                            ContactsUiEvent.BackRequested -> {
+                                panelScreen = WechatContactsPanelScreen.Contacts
+                            }
+                            is ContactsUiEvent.AcceptRequest -> {
+                                requestsById[event.requestId]?.let { request ->
+                                    handleFriendRequest(request, ScrmFriendRequestOperation.Accept)
+                                }
+                            }
+                            is ContactsUiEvent.RejectRequest -> {
+                                requestsById[event.requestId]?.let { request ->
+                                    handleFriendRequest(request, ScrmFriendRequestOperation.Reject)
+                                }
+                            }
+                            else -> Unit
+                        }
+                    }
+                )
+            }
             WechatContactsPanelScreen.StartGroup -> WechatStartGroupPanel(
                 contacts = state.contacts,
                 selectedContactIds = startGroupSelectedContactIds,
@@ -14438,34 +14458,6 @@ private fun WechatAddFriendEntryRow(
     }
 }
 
-@Composable
-private fun WechatFriendRequestsPanel(
-    requests: List<ScrmFriendRequest>,
-    loading: Boolean,
-    onBack: () -> Unit,
-    onAccept: (ScrmFriendRequest) -> Unit,
-    onReject: (ScrmFriendRequest) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(WechatContactsRowBackground)
-            .padding(bottom = 12.dp)
-    ) {
-        WechatContactsTopBar(title = "新的朋友", showBack = true, onBack = onBack)
-        Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-            ScrmFriendRequestList(
-                requests = requests,
-                enabled = !loading,
-                modifier = Modifier.fillMaxWidth(),
-                onAccept = onAccept,
-                onReject = onReject
-            )
-        }
-    }
-}
-
 private fun wechatContactAvatarColor(contact: ScrmContact): Color {
     val palette = listOf(
         Color(0xFF5B8EB7),
@@ -14730,75 +14722,6 @@ private fun ScrmContactList(
 }
 
 @Composable
-private fun ScrmFriendRequestList(
-    requests: List<ScrmFriendRequest>,
-    enabled: Boolean,
-    modifier: Modifier,
-    onAccept: (ScrmFriendRequest) -> Unit,
-    onReject: (ScrmFriendRequest) -> Unit
-) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        TextLabel(
-            text = "好友申请",
-            size = 11.sp,
-            weight = FontWeight.Bold,
-            color = OverlayTokens.panelPrimaryText,
-            maxLines = 1
-        )
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 128.dp, max = 210.dp),
-            verticalArrangement = Arrangement.spacedBy(5.dp)
-        ) {
-            if (requests.isEmpty()) {
-                item {
-                    TextLabel(
-                        text = "暂无待处理申请",
-                        size = 10.sp,
-                        color = OverlayTokens.panelSecondaryText,
-                        modifier = Modifier.padding(vertical = 10.dp),
-                        maxLines = 1
-                    )
-                }
-            }
-            itemsIndexed(
-                items = requests,
-                key = { _, request -> request.id }
-            ) { _, request ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .border(1.dp, OverlayTokens.resourcePanelBorder, RoundedCornerShape(8.dp))
-                        .padding(horizontal = 8.dp, vertical = 7.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    TextLabel(
-                        text = request.displayName,
-                        size = 11.sp,
-                        weight = FontWeight.SemiBold,
-                        color = OverlayTokens.panelPrimaryText,
-                        maxLines = 1
-                    )
-                    TextLabel(
-                        text = request.requestMessage.orEmpty().ifBlank { request.requestWxid.orEmpty() },
-                        size = 9.sp,
-                        color = OverlayTokens.panelSecondaryText,
-                        maxLines = 2,
-                        lineHeight = 12.sp
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        ScrmPanelButton(label = "通过", enabled = enabled, accent = true, onClick = { onAccept(request) })
-                        ScrmPanelButton(label = "拒绝", enabled = enabled, onClick = { onReject(request) })
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun ScrmPanelButton(
     label: String,
     enabled: Boolean = true,
@@ -14851,6 +14774,16 @@ private data class ScrmContactsPanelLoadResult(
     val totalCount: Int,
     val friendRequests: List<ScrmFriendRequest>
 )
+
+private fun ScrmFriendRequest.toFriendRequestSummary(): FriendRequestSummary {
+    return FriendRequestSummary(
+        id = id.toString(),
+        displayName = displayName,
+        message = requestMessage?.takeIf { it.isNotBlank() }
+            ?: requestWxid?.takeIf { it.isNotBlank() },
+        avatarUrl = avatar?.takeIf { it.isNotBlank() }
+    )
+}
 
 internal data class ScrmFriendSearchProfile(
     val friendId: String,
