@@ -16,7 +16,7 @@ sealed interface PaymentUiEvent {
     data class AmountChanged(val value: String) : PaymentUiEvent
     data class NoteChanged(val value: String) : PaymentUiEvent
     data class RecipientSelected(val id: String) : PaymentUiEvent
-    data object ConfirmRequested : PaymentUiEvent
+    data class ConfirmRequested(val amount: String, val note: String, val recipientId: String?) : PaymentUiEvent
 }
 
 data class LocationUiState(
