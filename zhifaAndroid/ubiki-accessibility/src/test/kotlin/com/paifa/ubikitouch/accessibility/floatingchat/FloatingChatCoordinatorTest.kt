@@ -5,6 +5,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.contract.ChatUiState
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.FloatingChatShellEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.FloatingChatShellState
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.FloatingChatEffect
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.MediaPickerKind
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.MediaUiEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.FloatingChatCoordinator
 import org.junit.Assert.assertEquals
@@ -24,6 +25,28 @@ class FloatingChatCoordinatorTest {
 
         assertEquals(
             listOf(FloatingChatEffect.OpenDocument("message-42")),
+            effects
+        )
+    }
+
+    @Test
+    fun pickerCameraAndPreviewEventsRequestPlatformEffects() {
+        val effects = mutableListOf<FloatingChatEffect>()
+        val coordinator = FloatingChatCoordinator(
+            initialState = FloatingChatShellState(),
+            effectSink = effects::add
+        )
+
+        coordinator.onMediaEvent(MediaUiEvent.PickerClicked(MediaPickerKind.Video))
+        coordinator.onMediaEvent(MediaUiEvent.CameraClicked)
+        coordinator.onMediaEvent(MediaUiEvent.PreviewDismissed)
+
+        assertEquals(
+            listOf(
+                FloatingChatEffect.OpenMediaPicker(MediaPickerKind.Video),
+                FloatingChatEffect.OpenCamera,
+                FloatingChatEffect.CloseMediaPreview
+            ),
             effects
         )
     }

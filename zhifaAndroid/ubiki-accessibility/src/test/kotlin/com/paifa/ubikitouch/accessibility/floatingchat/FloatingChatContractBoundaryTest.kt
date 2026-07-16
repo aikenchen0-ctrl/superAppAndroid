@@ -63,6 +63,22 @@ class FloatingChatContractBoundaryTest {
         assertFalse(text.contains("Intent"))
     }
 
+    @Test
+    fun mediaEventsAndAndroidRuntimeAdapterCoverPlatformActions() {
+        val mediaContract = sourceFile("contract/MediaContract.kt")
+        val shellContract = sourceFile("contract/FloatingChatShellContract.kt")
+        val runtime = sourceFile("shell/AndroidFloatingChatRuntimePorts.kt")
+
+        assertTrue(mediaContract.readText().contains("data class PickerClicked"))
+        assertTrue(mediaContract.readText().contains("data object CameraClicked"))
+        assertTrue(mediaContract.readText().contains("data object PreviewDismissed"))
+        assertTrue(shellContract.readText().contains("data object OpenCamera"))
+        assertTrue(shellContract.readText().contains("data object CloseMediaPreview"))
+        assertTrue("Android runtime adapter source must exist", runtime.isFile)
+        assertTrue(runtime.readText().contains("class AndroidFloatingChatRuntimePorts"))
+        assertTrue(runtime.readText().contains("fun handle(effect: FloatingChatEffect)"))
+    }
+
     private fun sourceFile(relativePath: String): File {
         val moduleRelative = File(
             "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat",

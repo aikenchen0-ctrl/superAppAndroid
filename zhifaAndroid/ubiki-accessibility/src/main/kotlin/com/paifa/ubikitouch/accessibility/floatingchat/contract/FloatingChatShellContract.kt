@@ -29,6 +29,8 @@ sealed interface FloatingChatEffect {
     data class OpenDocument(val messageId: String) : FloatingChatEffect
     data class RequestPermission(val permission: PermissionKind) : FloatingChatEffect
     data class OpenMediaPicker(val kind: MediaPickerKind) : FloatingChatEffect
+    data object OpenCamera : FloatingChatEffect
+    data object CloseMediaPreview : FloatingChatEffect
     data class ShowMessage(val text: String) : FloatingChatEffect
 }
 

@@ -37,6 +37,15 @@ internal class FloatingChatCoordinator(
             is MediaUiEvent.DocumentClicked -> {
                 effectSink(FloatingChatEffect.OpenDocument(event.messageId))
             }
+            is MediaUiEvent.PickerClicked -> {
+                effectSink(FloatingChatEffect.OpenMediaPicker(event.kind))
+            }
+            MediaUiEvent.CameraClicked -> {
+                effectSink(FloatingChatEffect.OpenCamera)
+            }
+            MediaUiEvent.PreviewDismissed -> {
+                effectSink(FloatingChatEffect.CloseMediaPreview)
+            }
         }
     }
 }
