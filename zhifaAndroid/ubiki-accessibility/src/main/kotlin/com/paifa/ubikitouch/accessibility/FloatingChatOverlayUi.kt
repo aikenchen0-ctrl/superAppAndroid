@@ -10,10 +10,10 @@ import com.paifa.ubikitouch.accessibility.floatingchat.contacts.FriendRequestScr
 import com.paifa.ubikitouch.accessibility.floatingchat.contacts.ContactsScreen
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactGroupSummary
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactSummary
-import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsScreenUiState
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsScreenAction
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsShortcut
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsUiEvent
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsUiState
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.contactsScreenAction
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.FriendRequestSummary
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.FriendRequestUiState
@@ -13278,11 +13278,12 @@ private fun ScrmContactsPanel(
     Box(modifier = Modifier.fillMaxWidth()) {
         when (panelScreen) {
             WechatContactsPanelScreen.Contacts -> ContactsScreen(
-                state = ContactsScreenUiState(
+                state = ContactsUiState(
                     query = searchText,
                     searchVisible = contactsSearchVisible,
+                    contacts = contactGroups.flatMap { group -> group.contacts },
                     groups = contactGroups,
-                    friendRequestCount = state.friendRequests.size,
+                    friendRequests = state.friendRequests.map { request -> request.toFriendRequestSummary() },
                     loading = state.loading,
                     status = state.status,
                     error = state.error
@@ -14842,10 +14843,6 @@ internal fun wechatContactIntroInfoRowLabels(): List<String> {
 
 internal fun wechatContactIntroActionLabels(): List<String> {
     return listOf("发消息", "音视频通话")
-}
-
-internal fun wechatContactIndexLabels(): List<String> {
-    return listOf("☆") + ('A'..'Z').map(Char::toString) + "#"
 }
 
 internal fun filterWechatContacts(
@@ -21072,7 +21069,6 @@ private val WechatContactsPrimaryText = Color(0xFF202020)
 private val WechatContactsSecondaryText = Color(0xFF8B8B8B)
 private val WechatContactsHintText = Color(0xFFAAAAAA)
 private val WechatContactsChevronText = Color(0xFFC0C0C0)
-private val WechatContactsIndexText = Color(0xFF333333)
 private const val BottomInputIconButtonSizeDp = 32
 private const val BottomInputIconSizeDp = 18
 private const val BottomInputFieldMinHeightDp = 36

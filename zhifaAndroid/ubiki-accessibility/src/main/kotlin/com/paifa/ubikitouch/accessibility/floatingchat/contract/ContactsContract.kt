@@ -13,16 +13,6 @@ data class ContactGroupSummary(
     val contacts: List<ContactSummary>
 )
 
-data class ContactsScreenUiState(
-    val query: String = "",
-    val searchVisible: Boolean = false,
-    val groups: List<ContactGroupSummary> = emptyList(),
-    val friendRequestCount: Int = 0,
-    val loading: Boolean = false,
-    val status: String? = null,
-    val error: String? = null
-)
-
 enum class ContactsShortcut {
     NewFriends,
     Groups,
@@ -46,9 +36,14 @@ data class FriendRequestUiState(
 
 data class ContactsUiState(
     val query: String = "",
+    val searchVisible: Boolean = false,
     val selectedContactId: String? = null,
     val contacts: List<ContactSummary> = emptyList(),
+    val groups: List<ContactGroupSummary> = emptyList(),
     val friendRequests: List<FriendRequestSummary> = emptyList(),
+    val loading: Boolean = false,
+    val status: String? = null,
+    val error: String? = null,
     val operation: ContactOperationState = ContactOperationState.Idle
 )
 
@@ -114,7 +109,7 @@ fun reduceContactsState(
 ): ContactsUiState {
     return when (event) {
         is ContactsUiEvent.QueryChanged -> state.copy(query = event.value)
-        is ContactsUiEvent.SearchVisibilityChanged,
+        is ContactsUiEvent.SearchVisibilityChanged -> state.copy(searchVisible = event.visible)
         ContactsUiEvent.SearchSubmitted,
         ContactsUiEvent.SyncRequested,
         ContactsUiEvent.CloseRequested,

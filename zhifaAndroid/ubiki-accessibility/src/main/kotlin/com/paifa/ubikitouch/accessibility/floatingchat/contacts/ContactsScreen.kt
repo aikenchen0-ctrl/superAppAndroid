@@ -23,6 +23,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Home
@@ -48,13 +49,13 @@ import androidx.compose.ui.unit.sp
 import com.paifa.ubikitouch.accessibility.OverlayTokens
 import com.paifa.ubikitouch.accessibility.TextLabel
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactSummary
-import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsScreenUiState
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsShortcut
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsUiEvent
+import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsUiState
 
 @Composable
 internal fun ContactsScreen(
-    state: ContactsScreenUiState,
+    state: ContactsUiState,
     onEvent: (ContactsUiEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -65,6 +66,7 @@ internal fun ContactsScreen(
             .background(ContactsPageBackground)
     ) {
         ContactsTopBar(
+            onCloseClick = { onEvent(ContactsUiEvent.CloseRequested) },
             onSearchClick = {
                 onEvent(ContactsUiEvent.SearchVisibilityChanged(!state.searchVisible))
             },
@@ -86,7 +88,7 @@ internal fun ContactsScreen(
                         icon = Icons.Filled.PersonAdd,
                         iconColor = Color(0xFFFF9F2F),
                         title = "新的朋友",
-                        subtitle = state.friendRequestCount.takeIf { it > 0 }
+                        subtitle = state.friendRequests.size.takeIf { it > 0 }
                             ?.let { "$it 条待处理申请" },
                         onClick = {
                             onEvent(ContactsUiEvent.ShortcutSelected(ContactsShortcut.NewFriends))
@@ -177,6 +179,7 @@ internal fun ContactsScreen(
 
 @Composable
 private fun ContactsTopBar(
+    onCloseClick: () -> Unit,
     onSearchClick: () -> Unit,
     onPlusClick: () -> Unit
 ) {
@@ -188,6 +191,19 @@ private fun ContactsTopBar(
             .padding(horizontal = 8.dp),
         contentAlignment = Alignment.Center
     ) {
+        IconButton(
+            onClick = onCloseClick,
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .size(34.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Close,
+                contentDescription = "关闭通讯录",
+                tint = ContactsPrimaryText,
+                modifier = Modifier.size(21.dp)
+            )
+        }
         TextLabel(
             text = "通讯录",
             size = 16.sp,
@@ -222,7 +238,7 @@ private fun ContactsTopBar(
 
 @Composable
 private fun ContactsSearchRow(
-    state: ContactsScreenUiState,
+    state: ContactsUiState,
     onEvent: (ContactsUiEvent) -> Unit
 ) {
     Row(
@@ -250,7 +266,7 @@ private fun ContactsSearchRow(
 
 @Composable
 private fun ContactsStatusLine(
-    state: ContactsScreenUiState,
+    state: ContactsUiState,
     onEvent: (ContactsUiEvent) -> Unit
 ) {
     val message = state.error?.takeIf { it.isNotBlank() }
@@ -464,7 +480,7 @@ private fun ContactIndexRail(modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        (listOf("☆") + ('A'..'Z').map(Char::toString) + "#").forEach { label ->
+        contactIndexLabels().forEach { label ->
             TextLabel(
                 text = label,
                 size = 8.sp,
@@ -474,6 +490,10 @@ private fun ContactIndexRail(modifier: Modifier = Modifier) {
             )
         }
     }
+}
+
+internal fun contactIndexLabels(): List<String> {
+    return listOf("☆") + ('A'..'Z').map(Char::toString) + "#"
 }
 
 private val ContactsHeaderBackground = Color(0xFFF1F1F1)

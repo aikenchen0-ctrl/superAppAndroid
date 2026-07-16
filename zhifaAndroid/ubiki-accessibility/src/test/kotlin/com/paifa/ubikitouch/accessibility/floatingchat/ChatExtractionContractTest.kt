@@ -188,8 +188,12 @@ class ChatExtractionContractTest {
 
         val text = screen.readText()
         assertTrue(text.contains("fun ContactsScreen("))
-        assertTrue(text.contains("state: ContactsScreenUiState"))
+        assertTrue(text.contains("state: ContactsUiState"))
+        assertFalse(text.contains("ContactsScreenUiState"))
         assertTrue(text.contains("onEvent: (ContactsUiEvent) -> Unit"))
+        assertTrue(text.contains("Icons.Filled.Close"))
+        assertTrue(text.contains("contentDescription = \"关闭通讯录\""))
+        assertTrue(text.contains("onCloseClick = { onEvent(ContactsUiEvent.CloseRequested) }"))
         assertTrue(text.contains("ContactsUiEvent.QueryChanged"))
         assertTrue(text.contains("ContactsUiEvent.SearchSubmitted"))
         assertTrue(text.contains("ContactsUiEvent.SyncRequested"))
@@ -202,6 +206,8 @@ class ChatExtractionContractTest {
 
         val legacy = sourceFile("FloatingChatOverlayUi.kt").readText()
         assertFalse(legacy.contains("private fun WechatContactsBookPanel("))
+        assertFalse(legacy.contains("fun wechatContactIndexLabels("))
+        assertFalse(legacy.contains("WechatContactsIndexText"))
     }
 
     private fun sourceFile(relativePath: String): File {

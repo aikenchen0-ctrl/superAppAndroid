@@ -84,6 +84,18 @@ class ContactsReducerTest {
         }
     }
 
+    @Test
+    fun unifiedContactsStateOwnsSearchVisibility() {
+        val initial = ContactsUiState(searchVisible = false)
+
+        val visible = reduceContactsState(
+            initial,
+            ContactsUiEvent.SearchVisibilityChanged(true)
+        )
+
+        assertEquals(true, visible.searchVisible)
+    }
+
     private fun request(id: String): FriendRequestSummary {
         return FriendRequestSummary(id = id, displayName = id)
     }

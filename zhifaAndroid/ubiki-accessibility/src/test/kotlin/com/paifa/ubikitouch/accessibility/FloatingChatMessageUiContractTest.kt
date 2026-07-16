@@ -18,6 +18,7 @@ import com.paifa.ubikitouch.accessibility.data.LocalGroupProfile
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.sessionRailItemKeys
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.sessionRailItemKeysByLatestChatTime
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.*
+import com.paifa.ubikitouch.accessibility.floatingchat.contacts.contactIndexLabels
 import com.paifa.ubikitouch.accessibility.floatingchat.message.MessageHorizontalPlacement
 import com.paifa.ubikitouch.accessibility.floatingchat.message.fixedThumbnailHeightDp
 import com.paifa.ubikitouch.accessibility.floatingchat.message.messageHorizontalPlacement
@@ -3262,7 +3263,7 @@ class FloatingChatMessageUiContractTest {
         assertEquals(listOf("1", "3", "2"), summaries.flatMap { group -> group.contacts }.map { it.id })
         assertEquals("Alice", summaries.first().contacts.first().displayName)
         assertEquals(contacts[1], scrmContactsBySummaryId(contacts).getValue("2"))
-        assertEquals(listOf("☆", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "#"), wechatContactIndexLabels())
+        assertEquals(listOf("☆", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "#"), contactIndexLabels())
         assertEquals(listOf("朋友资料", "朋友圈"), wechatContactIntroInfoRowLabels())
         assertEquals(listOf("发消息", "音视频通话"), wechatContactIntroActionLabels())
     }
