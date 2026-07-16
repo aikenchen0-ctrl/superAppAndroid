@@ -18,6 +18,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.contract.contactProfileIn
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.reduceContactsState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ContactsReducerTest {
@@ -118,11 +119,16 @@ class ContactsReducerTest {
         cases.forEach { (event, expected) ->
             assertEquals(expected, contactProfileIntroAction(event))
         }
-        listOf(
+        val ignoredEvents = listOf(
             ContactProfileUiEvent.RemarkChanged("Alice"),
+            ContactProfileUiEvent.TagsChanged("VIP"),
+            ContactProfileUiEvent.MemoChanged("memo"),
+            ContactProfileUiEvent.FriendCircleVisibilityChanged(false),
+            ContactProfileUiEvent.OnlyChatChanged(true),
             ContactProfileUiEvent.DoneRequested,
             ContactProfileUiEvent.DeleteRequested
-        ).forEach { event ->
+        )
+        ignoredEvents.forEach { event ->
             assertEquals(ContactProfileIntroAction.Ignore, contactProfileIntroAction(event))
         }
     }
@@ -204,6 +210,25 @@ class ContactsReducerTest {
             val persisted = mergeContactProfileDraft(original, draft, action, updatedAt = 99L)
 
             assertEquals(expected, persisted)
+        }
+    }
+
+    @Test
+    fun nonEditingActionsDoNotPersistContactProfileDraft() {
+        val profile = LocalContactProfile(
+            accountId = "account-1",
+            contactId = "contact-1",
+            updatedAt = 1L
+        )
+        val draft = ContactProfileUiState(memo = "draft memo")
+
+        listOf(
+            ContactProfileEditorAction.Back,
+            ContactProfileEditorAction.Save,
+            ContactProfileEditorAction.Delete,
+            ContactProfileEditorAction.Ignore
+        ).forEach { action ->
+            assertNull(mergeContactProfileDraft(profile, draft, action, updatedAt = 99L))
         }
     }
 
