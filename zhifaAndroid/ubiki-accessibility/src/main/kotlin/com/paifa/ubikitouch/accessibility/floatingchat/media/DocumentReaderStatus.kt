@@ -6,8 +6,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
-import com.paifa.ubikitouch.accessibility.OverlayTokens
-import com.paifa.ubikitouch.accessibility.TextLabel
+import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
+import com.paifa.ubikitouch.accessibility.floatingchat.components.TextLabel
 
 @Composable
 internal fun DocumentReaderStatus(text: String, modifier: Modifier = Modifier) {

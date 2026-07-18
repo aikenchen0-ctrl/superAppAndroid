@@ -16,7 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.paifa.ubikitouch.accessibility.TextLabel
+import com.paifa.ubikitouch.accessibility.floatingchat.components.TextLabel
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.QuickPhraseUiEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.QuickPhraseUiState
 

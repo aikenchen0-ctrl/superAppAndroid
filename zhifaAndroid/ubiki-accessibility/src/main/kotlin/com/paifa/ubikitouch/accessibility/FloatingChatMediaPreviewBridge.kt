@@ -1,5 +1,6 @@
 package com.paifa.ubikitouch.accessibility
 
+import com.paifa.ubikitouch.accessibility.floatingchat.shell.FloatingChatOverlayRuntimeState
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 
 object FloatingChatMediaPreviewBridge {

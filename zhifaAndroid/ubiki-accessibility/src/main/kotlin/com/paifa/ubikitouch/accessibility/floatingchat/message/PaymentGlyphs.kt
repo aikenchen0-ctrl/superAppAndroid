@@ -16,8 +16,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.nativeCanvas
-import com.paifa.ubikitouch.accessibility.OverlayTokens
+import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 
 @Composable
 internal fun RedPacketPaymentGlyph(modifier: Modifier = Modifier) {
@@ -27,7 +26,7 @@ internal fun RedPacketPaymentGlyph(modifier: Modifier = Modifier) {
         drawRoundRect(Color(0xFFDE3441), topLeft = Offset(0f, size.height * 0.44f), size = Size(size.width, size.height * 0.56f), cornerRadius = CornerRadius(radius, radius))
         drawPath(Path().apply { moveTo(0f, size.height * 0.44f); quadraticTo(size.width * 0.5f, size.height * 0.62f, size.width, size.height * 0.44f); lineTo(size.width, size.height * 0.56f); quadraticTo(size.width * 0.5f, size.height * 0.75f, 0f, size.height * 0.56f); close() }, Color(0xFFE1474A))
         drawCircle(Color(0xFFFFD553), size.minDimension * 0.17f, Offset(size.width * 0.5f, size.height * 0.47f))
-        drawContext.canvas.nativeCanvas.drawText("楼", size.width * 0.5f, size.height * 0.52f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color(0xFFD89123).toArgb(); textAlign = Paint.Align.CENTER; textSize = size.minDimension * 0.22f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD) })
+        drawContext.canvas.nativeCanvas.drawText("¥", size.width * 0.5f, size.height * 0.52f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color(0xFFD89123).toArgb(); textAlign = Paint.Align.CENTER; textSize = size.minDimension * 0.22f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD) })
     }
 }
 

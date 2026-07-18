@@ -19,7 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color as ComposeColor
 import com.paifa.ubikitouch.accessibility.FloatingChatMediaPreviewBridge
-import com.paifa.ubikitouch.accessibility.FloatingChatMediaPreviewHost
+import com.paifa.ubikitouch.accessibility.floatingchat.media.FloatingChatMediaPreviewHost
 
 class FloatingChatMediaPreviewActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

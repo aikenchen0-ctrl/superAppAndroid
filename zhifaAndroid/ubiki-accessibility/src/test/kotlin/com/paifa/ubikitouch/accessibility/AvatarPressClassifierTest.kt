@@ -1,5 +1,7 @@
 package com.paifa.ubikitouch.accessibility
 
+import com.paifa.ubikitouch.accessibility.floatingchat.components.AvatarPressResult
+import com.paifa.ubikitouch.accessibility.floatingchat.components.classifyAvatarPress
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

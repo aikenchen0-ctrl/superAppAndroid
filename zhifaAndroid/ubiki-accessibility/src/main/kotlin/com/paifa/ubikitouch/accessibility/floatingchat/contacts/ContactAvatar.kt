@@ -17,7 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.paifa.ubikitouch.accessibility.TextLabel
+import com.paifa.ubikitouch.accessibility.floatingchat.components.TextLabel
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactSummary
 import com.paifa.ubikitouch.accessibility.floatingchat.media.rememberAsyncImageThumbnailBitmap
 

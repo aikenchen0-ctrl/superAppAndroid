@@ -30,8 +30,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.paifa.ubikitouch.accessibility.OverlayTokens
-import com.paifa.ubikitouch.accessibility.TextLabel
+import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
+import com.paifa.ubikitouch.accessibility.floatingchat.components.TextLabel
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactsUiEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.FriendRequestSummary
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.FriendRequestUiState

@@ -11,7 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.paifa.ubikitouch.accessibility.TextLabel
+import com.paifa.ubikitouch.accessibility.floatingchat.components.TextLabel
 
 data class FavoriteUiItem(val id: String, val title: String, val subtitle: String = "")
 

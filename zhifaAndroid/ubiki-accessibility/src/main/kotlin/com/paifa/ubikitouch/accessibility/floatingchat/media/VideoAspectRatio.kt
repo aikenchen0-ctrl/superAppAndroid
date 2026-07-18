@@ -17,3 +17,12 @@ internal fun videoAspectRatioFromDimensions(
         null
     }
 }
+
+/** Compatibility entry point retained for existing UI contract tests. */
+internal fun mediaAspectRatioFromDimensions(
+    width: Int,
+    height: Int,
+    rotationDegrees: Int = 0
+): Float? {
+    return videoAspectRatioFromDimensions(width, height, rotationDegrees)
+}

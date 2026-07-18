@@ -78,14 +78,19 @@ class FloatingChatThemeContractTest {
     }
 
     @Test
-    fun legacyOverlayTokensDelegateCommonSemanticsToTheme() {
-        val source = legacyOverlaySource()
+    fun overlayTokensLiveInThemePackageAndDelegateCommonSemanticsToTheme() {
+        val tokens = sourceFile("theme/OverlayTokens.kt")
+        assertTrue("Missing extracted overlay tokens", tokens.isFile)
+        val source = tokens.readText()
 
         assertTrue(source.contains("FloatingChatLightColors.primaryText"))
         assertTrue(source.contains("FloatingChatLightColors.secondaryText"))
         assertTrue(source.contains("FloatingChatLightColors.accent"))
         assertTrue(source.contains("FloatingChatLightColors.error"))
         assertTrue(source.contains("FloatingChatLightColors.outline"))
+
+        val legacy = legacyOverlaySource()
+        assertFalse(legacy.contains("internal object OverlayTokens"))
     }
 
     private fun sourceFile(relativePath: String): File {

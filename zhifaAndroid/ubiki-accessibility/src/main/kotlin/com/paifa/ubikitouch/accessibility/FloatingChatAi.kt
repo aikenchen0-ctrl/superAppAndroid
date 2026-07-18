@@ -1,5 +1,6 @@
 package com.paifa.ubikitouch.accessibility
 
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
 import android.content.Context
 import android.content.SharedPreferences
 import com.paifa.ubikitouch.core.model.FloatingChatConnectionTarget
@@ -23,7 +24,7 @@ private const val AiPrefsSystemPrompt = "system_prompt"
 private const val AiPrefsTemperature = "temperature"
 private const val AiPrefsMaxTokens = "max_tokens"
 private const val DefaultAiBaseUrl = "https://cc2.cx/v1"
-private const val DefaultAiApiKey = "sk-jwdArLBwIENRVm6itUAfMMqIVAdWN6J6CbGWstNknvtRmurk"
+private const val DefaultAiApiKey = ""
 private const val DefaultAiModel = "gpt-5.6-luna"
 private const val LegacyOpenAiBaseUrl = "https://api.openai.com/v1"
 private const val LegacyOpenAiModel = "gpt-4.1-mini"

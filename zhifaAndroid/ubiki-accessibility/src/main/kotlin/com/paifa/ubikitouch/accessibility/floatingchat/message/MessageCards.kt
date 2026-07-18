@@ -29,14 +29,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.paifa.ubikitouch.accessibility.AccountCardPreviewContent
-import com.paifa.ubikitouch.accessibility.LocationGlyph
-import com.paifa.ubikitouch.accessibility.OverlayTokens
-import com.paifa.ubikitouch.accessibility.PaymentCardContent
-import com.paifa.ubikitouch.accessibility.SquareAvatarChip
-import com.paifa.ubikitouch.accessibility.TextLabel
-import com.paifa.ubikitouch.accessibility.isPaymentCardMessage
-import com.paifa.ubikitouch.accessibility.locationMapPreviewHeightDp
+import com.paifa.ubikitouch.accessibility.floatingchat.account.AccountCardPreviewContent
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingChatLocationGlyph
+import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
+import com.paifa.ubikitouch.accessibility.floatingchat.components.SquareAvatarChip
+import com.paifa.ubikitouch.accessibility.floatingchat.components.TextLabel
 import com.paifa.ubikitouch.core.model.FloatingChatContactCardKind
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 
@@ -120,7 +117,7 @@ internal fun InlineLocationContent(message: FloatingChatMessage) {
             .height(28.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        LocationGlyph(modifier = Modifier.size(24.dp))
+        FloatingChatLocationGlyph(modifier = Modifier.size(24.dp))
         Spacer(modifier = Modifier.width(7.dp))
         Column(modifier = Modifier.weight(1f)) {
             TextLabel(
@@ -198,18 +195,6 @@ internal fun MiniProgramLinkContent(
             ResourceUrlLine(message.resourceUrl)
         }
     }
-}
-
-@Composable
-private fun ResourceUrlLine(url: String?) {
-    if (url.isNullOrBlank()) return
-    TextLabel(
-        text = url,
-        size = 8.sp,
-        color = OverlayTokens.linkText,
-        maxLines = 1,
-        shadow = OverlayTokens.imModuleTextShadow
-    )
 }
 
 @Composable

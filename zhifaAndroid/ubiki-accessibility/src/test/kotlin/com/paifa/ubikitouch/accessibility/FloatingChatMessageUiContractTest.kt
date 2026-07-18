@@ -15,10 +15,15 @@ import com.paifa.ubikitouch.core.model.FloatingChatContactCardKind
 import com.paifa.ubikitouch.core.model.GestureAction
 import com.paifa.ubikitouch.core.model.gestureMappingOrder
 import com.paifa.ubikitouch.accessibility.data.LocalGroupProfile
+import com.paifa.ubikitouch.accessibility.floatingchat.account.*
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.sessionRailItemKeys
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.sessionRailItemKeysByLatestChatTime
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.*
-import com.paifa.ubikitouch.accessibility.floatingchat.contacts.contactIndexLabels
+import com.paifa.ubikitouch.accessibility.floatingchat.components.avatarTextTagsVisible
+import com.paifa.ubikitouch.accessibility.floatingchat.components.resolvedAvatarImageUri
+import com.paifa.ubikitouch.accessibility.floatingchat.contacts.*
+import com.paifa.ubikitouch.accessibility.floatingchat.group.*
+import com.paifa.ubikitouch.accessibility.floatingchat.input.*
 import com.paifa.ubikitouch.accessibility.floatingchat.message.MessageHorizontalPlacement
 import com.paifa.ubikitouch.accessibility.floatingchat.message.fixedThumbnailHeightDp
 import com.paifa.ubikitouch.accessibility.floatingchat.message.messageHorizontalPlacement
@@ -26,9 +31,14 @@ import com.paifa.ubikitouch.accessibility.floatingchat.message.messageListInitia
 import com.paifa.ubikitouch.accessibility.floatingchat.message.messageListReusableContentType
 import com.paifa.ubikitouch.accessibility.floatingchat.message.messageListViewportKey
 import com.paifa.ubikitouch.accessibility.floatingchat.message.messageUsesBubbleChrome
+import com.paifa.ubikitouch.accessibility.floatingchat.message.*
 import com.paifa.ubikitouch.accessibility.floatingchat.message.scrmSendStatusTextFor
 import com.paifa.ubikitouch.accessibility.floatingchat.message.shouldRetargetMessageList
 import com.paifa.ubikitouch.accessibility.floatingchat.media.*
+import com.paifa.ubikitouch.accessibility.floatingchat.moments.*
+import com.paifa.ubikitouch.accessibility.floatingchat.shell.FloatingChatOverlayRuntimeState
+import com.paifa.ubikitouch.accessibility.floatingchat.shell.*
+import com.paifa.ubikitouch.accessibility.floatingchat.tools.*
 import com.paifa.ubikitouch.accessibility.scrm.ScrmRecentTaskResults
 import com.paifa.ubikitouch.accessibility.scrm.ScrmRequestException
 import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskApi
@@ -37,6 +47,9 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskSubmissionResult
 import com.paifa.ubikitouch.accessibility.scrm.ScrmFloatingAccountRoute
 import com.paifa.ubikitouch.accessibility.scrm.ScrmContact
 import com.paifa.ubikitouch.accessibility.scrm.ScrmDevice
+import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.*
+import com.paifa.ubikitouch.accessibility.scrm.scrmContactsPanelRouteForSelectedAccount
+import com.paifa.ubikitouch.accessibility.scrm.scrmRouteCurrentDeviceMismatchMessage
 import androidx.compose.ui.geometry.Offset
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -217,6 +230,23 @@ class FloatingChatMessageUiContractTest {
                 floatingChatExpanded = false
             )
         )
+    }
+
+    @Test
+    fun keyboardAlwaysSuspendsNativeTouchExplorationToPreventTypingSpeech() {
+        val eligibility = NativeTouchInteractionEligibility(
+            sdkInt = 34,
+            requestedMode = GestureInputMode.Auto,
+            runtimeFailed = false,
+            globalEnabled = true,
+            screenInteractive = true,
+            packageBlocked = false,
+            paused = false,
+            landscapeDisabled = false,
+            keyboardDisabled = true
+        )
+
+        assertEquals(false, shouldRequestNativeTouchInteraction(eligibility, floatingChatExpanded = true))
     }
 
     @Test
@@ -2379,9 +2409,12 @@ class FloatingChatMessageUiContractTest {
 
     @Test
     fun rightRailToolsMatchWechatStyleFirstPass() {
+        val aiVoiceAction = enumValueOf<FloatingChatToolAction>("AiVoice")
+
         assertEquals(
             listOf(
                 FloatingChatToolAction.Assistant,
+                aiVoiceAction,
                 FloatingChatToolAction.Contacts,
                 FloatingChatToolAction.Blink,
                 FloatingChatToolAction.Gallery,
@@ -2410,8 +2443,11 @@ class FloatingChatMessageUiContractTest {
         assertEquals("朋友圈", toolActionLabel(FloatingChatToolAction.Moments))
         assertEquals("朋友圈素材", toolActionLabel(FloatingChatToolAction.MomentMaterials))
         assertEquals("快捷语", toolActionLabel(FloatingChatToolAction.QuickPhrase))
+        assertEquals("AI语音", toolActionLabel(aiVoiceAction))
         assertEquals(true, toolActionOpensBottomPanel(FloatingChatToolAction.MomentMaterials))
         assertEquals("MomentMaterials", toolActionBottomPanelModeName(FloatingChatToolAction.MomentMaterials))
+        assertEquals(true, toolActionOpensBottomPanel(aiVoiceAction))
+        assertEquals("AiVoice", toolActionBottomPanelModeName(aiVoiceAction))
         assertEquals(true, rightRailToolButtonsUseMaterialIcons())
         assertEquals(true, rightRailToolButtonsShowTextLabels())
         assertEquals(true, rightRailToolButtonsSupportLongPressReorder())
@@ -2518,6 +2554,24 @@ class FloatingChatMessageUiContractTest {
         assertEquals(0, toolReorderTargetIndex(1, -25f, 48f, 3))
         assertEquals(2, toolReorderTargetIndex(1, 64f, 48f, 3))
         assertEquals(2, toolReorderTargetIndex(2, 99f, 48f, 3))
+        assertEquals(
+            listOf(
+                FloatingChatToolAction.Assistant,
+                aiVoiceAction,
+                FloatingChatToolAction.Contacts
+            ),
+            mergeToolActionOrder(
+                storedActions = listOf(
+                    FloatingChatToolAction.Assistant,
+                    FloatingChatToolAction.Contacts
+                ),
+                fallbackActions = listOf(
+                    FloatingChatToolAction.Assistant,
+                    aiVoiceAction,
+                    FloatingChatToolAction.Contacts
+                )
+            )
+        )
     }
 
     @Test

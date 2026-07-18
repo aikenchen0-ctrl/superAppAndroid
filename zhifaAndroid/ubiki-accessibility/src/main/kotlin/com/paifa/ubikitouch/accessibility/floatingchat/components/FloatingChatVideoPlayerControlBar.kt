@@ -15,8 +15,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.paifa.ubikitouch.accessibility.TextLabel
-import com.paifa.ubikitouch.accessibility.formatVideoTimecode
+import com.paifa.ubikitouch.accessibility.floatingchat.media.formatVideoTimecode
 import androidx.compose.ui.text.font.FontWeight
 
 @Composable

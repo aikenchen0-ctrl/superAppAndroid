@@ -173,6 +173,7 @@ enum class FloatingChatConnectionTarget {
 
 enum class FloatingChatToolAction {
     Assistant,
+    AiVoice,
     Contacts,
     Blink,
     Gallery,

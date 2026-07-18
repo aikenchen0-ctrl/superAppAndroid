@@ -1,5 +1,6 @@
 package com.paifa.ubikitouch.accessibility
 
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
 import com.paifa.ubikitouch.core.model.FloatingChatConnectionTarget
 import com.paifa.ubikitouch.core.model.FloatingChatInlineTokenType
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
@@ -19,9 +20,9 @@ class FloatingChatAiContractTest {
         val config = defaultFloatingChatAiConfig()
 
         assertEquals("https://cc2.cx/v1", config.baseUrl)
-        assertEquals("sk-jwdArLBwIENRVm6itUAfMMqIVAdWN6J6CbGWstNknvtRmurk", config.apiKey)
+        assertEquals("", config.apiKey)
         assertEquals("gpt-5.6-luna", config.model)
-        assertTrue(config.isConfigured)
+        assertFalse(config.isConfigured)
     }
 
     @Test
@@ -30,7 +31,7 @@ class FloatingChatAiContractTest {
         assertEquals("https://cc2.cx/v1", floatingChatAiBaseUrlOrDefault("https://api.openai.com/v1"))
         assertEquals("https://custom.example.com/v1", floatingChatAiBaseUrlOrDefault(" https://custom.example.com/v1 "))
 
-        assertEquals("sk-jwdArLBwIENRVm6itUAfMMqIVAdWN6J6CbGWstNknvtRmurk", floatingChatAiApiKeyOrDefault(""))
+        assertEquals("", floatingChatAiApiKeyOrDefault(""))
         assertEquals("sk-custom", floatingChatAiApiKeyOrDefault(" sk-custom "))
 
         assertEquals("gpt-5.6-luna", floatingChatAiModelOrDefault(""))

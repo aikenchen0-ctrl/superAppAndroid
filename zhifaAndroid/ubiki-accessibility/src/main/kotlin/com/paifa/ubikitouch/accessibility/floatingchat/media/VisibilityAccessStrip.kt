@@ -8,9 +8,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.paifa.ubikitouch.core.model.FloatingChatAccessState
 import com.paifa.ubikitouch.core.model.FloatingChatVisibilityScope
-import com.paifa.ubikitouch.accessibility.OverlayTokens
-import com.paifa.ubikitouch.accessibility.accessStateColor
+import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingChatTinyChip
+import com.paifa.ubikitouch.accessibility.floatingchat.message.accessStateColor
 
 @Composable
 internal fun VisibilityAccessStrip(visibility: FloatingChatVisibilityScope?, accessState: FloatingChatAccessState?, modifier: Modifier = Modifier) {

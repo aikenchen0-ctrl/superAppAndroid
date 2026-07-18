@@ -1,6 +1,7 @@
 package com.paifa.ubikitouch.accessibility
 
 import com.paifa.ubikitouch.accessibility.data.LocalContactProfile
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.*
 import com.paifa.ubikitouch.core.model.FloatingChatConnectionTarget
 import com.paifa.ubikitouch.core.model.FloatingChatPrototype
 import org.junit.Assert.assertEquals

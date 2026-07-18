@@ -1,7 +1,7 @@
 package com.paifa.ubikitouch.accessibility.floatingchat
 
 import com.paifa.ubikitouch.accessibility.data.LocalContactProfile
-import com.paifa.ubikitouch.accessibility.mergeContactProfileDraft
+import com.paifa.ubikitouch.accessibility.floatingchat.contacts.mergeContactProfileDraft
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactOperationState
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactProfileEditorAction
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactProfileIntroAction

@@ -18,8 +18,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.asImageBitmap
-import com.paifa.ubikitouch.accessibility.OverlayTokens
-import com.paifa.ubikitouch.accessibility.TextLabel
+import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
+import com.paifa.ubikitouch.accessibility.floatingchat.components.TextLabel
 import com.paifa.ubikitouch.accessibility.FloatingChatDocumentReaderContent
 
 @Composable

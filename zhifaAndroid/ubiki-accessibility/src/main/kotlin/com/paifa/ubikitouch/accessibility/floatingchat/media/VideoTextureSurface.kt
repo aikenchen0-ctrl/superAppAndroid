@@ -6,7 +6,6 @@ import android.view.TextureView
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
-import com.paifa.ubikitouch.accessibility.applyTextureViewAspectFitTransform
 
 @Composable
 internal fun VideoTextureSurface(videoAspectRatio: Float?, modifier: Modifier = Modifier, onSurfaceAvailable: (SurfaceTexture) -> Unit, onSurfaceDestroyed: () -> Unit) {

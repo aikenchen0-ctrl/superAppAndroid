@@ -2,8 +2,8 @@ package com.paifa.ubikitouch.accessibility.floatingchat.message
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.sp
-import com.paifa.ubikitouch.accessibility.OverlayTokens
-import com.paifa.ubikitouch.accessibility.TextLabel
+import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
+import com.paifa.ubikitouch.accessibility.floatingchat.components.TextLabel
 
 @Composable
 internal fun ResourceUrlLine(url: String?) {

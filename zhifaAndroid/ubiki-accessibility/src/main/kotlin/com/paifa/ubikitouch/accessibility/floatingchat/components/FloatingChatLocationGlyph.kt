@@ -7,7 +7,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
-import com.paifa.ubikitouch.accessibility.OverlayTokens
+import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 
 @Composable
 internal fun FloatingChatLocationGlyph(modifier: Modifier = Modifier) {

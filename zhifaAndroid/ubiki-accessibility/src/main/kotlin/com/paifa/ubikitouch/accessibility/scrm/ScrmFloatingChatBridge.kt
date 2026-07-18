@@ -1,6 +1,6 @@
 package com.paifa.ubikitouch.accessibility.scrm
 
-import com.paifa.ubikitouch.accessibility.normalizedRemoteImageUri
+import com.paifa.ubikitouch.accessibility.floatingchat.media.normalizedRemoteImageUri
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatConversation
 import java.net.URLDecoder

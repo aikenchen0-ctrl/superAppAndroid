@@ -14,7 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.unit.dp
-import com.paifa.ubikitouch.accessibility.CompactInteractiveSize
+import com.paifa.ubikitouch.accessibility.floatingchat.components.CompactInteractiveSize
 
 @Composable
 internal fun FloatingChatVideoTimelineSlider(value: Float, maxValue: Float, onValueChange: (Float) -> Unit, onValueChangeFinished: () -> Unit, modifier: Modifier = Modifier) {

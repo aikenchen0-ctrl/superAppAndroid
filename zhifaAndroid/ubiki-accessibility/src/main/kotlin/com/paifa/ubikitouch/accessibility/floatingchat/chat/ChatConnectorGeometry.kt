@@ -2,13 +2,6 @@ package com.paifa.ubikitouch.accessibility.floatingchat.chat
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import com.paifa.ubikitouch.accessibility.chatConnectorHookTrunkOverlapPx
-import com.paifa.ubikitouch.accessibility.connectorRoundedElbowRadiusPx
-import com.paifa.ubikitouch.accessibility.imModuleConnectionLineBubbleGapPx
-import com.paifa.ubikitouch.accessibility.imModuleConnectionLineBubbleOverlapPx
-import com.paifa.ubikitouch.accessibility.imModuleConnectionLineCornerRadiusPx
-import com.paifa.ubikitouch.accessibility.imModuleConnectionLineHorizontalOffsetPx
-import com.paifa.ubikitouch.accessibility.imModuleConnectionLineMinimumBranchPx
 import com.paifa.ubikitouch.core.model.FloatingChatConnectionTarget
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import kotlin.math.abs

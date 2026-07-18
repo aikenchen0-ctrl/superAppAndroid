@@ -70,7 +70,7 @@ class WeightedLruCacheTest {
 
     private fun imageDecodeSampleSize(width: Int, height: Int, maxSize: Int): Int {
         val method = runCatching {
-            Class.forName("com.paifa.ubikitouch.accessibility.FloatingChatOverlayUiKt")
+            Class.forName("com.paifa.ubikitouch.accessibility.floatingchat.media.MediaUriPolicyKt")
                 .getDeclaredMethod(
                     "imageDecodeSampleSize",
                     Int::class.javaPrimitiveType,

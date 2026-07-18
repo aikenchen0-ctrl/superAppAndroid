@@ -19,7 +19,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.paifa.ubikitouch.accessibility.BottomGestureBarGestureType
-import com.paifa.ubikitouch.accessibility.OverlayTokens
+import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.accessibility.defaultBottomGestureBarWidthDp
 import com.paifa.ubikitouch.accessibility.resolveBottomGestureBarGestureType
 import com.paifa.ubikitouch.core.model.GestureData

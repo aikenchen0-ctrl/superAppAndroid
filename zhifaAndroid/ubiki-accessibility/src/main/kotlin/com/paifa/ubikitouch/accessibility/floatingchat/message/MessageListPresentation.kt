@@ -1,7 +1,9 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.message
 
-import com.paifa.ubikitouch.accessibility.ChatThreadSelection
-import com.paifa.ubikitouch.accessibility.toLocalThreadId
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
+import com.paifa.ubikitouch.accessibility.floatingchat.input.BottomInputBarBottomPaddingDp
+import com.paifa.ubikitouch.accessibility.floatingchat.input.BottomInputBarMaxHeightDp
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.toLocalThreadId
 import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 
 internal data class MessageListViewportKey(
@@ -43,3 +45,17 @@ internal fun messageListReusableContentType(messageType: FloatingChatMessageType
 }
 
 private const val ReusableMessageRowContentType = "floating-chat-message-row"
+
+internal fun messageListBottomClearanceDp(): Int {
+    return BottomInputBarMaxHeightDp + BottomInputBarBottomPaddingDp + MessageListBottomExtraClearanceDp
+}
+
+internal fun messageListUsesKeyboardInsets(): Boolean = true
+
+internal fun messageListAutoScrollsDuringInput(): Boolean = true
+
+internal fun messageListAutoScrollsOnInputFocus(): Boolean = true
+
+internal fun messageListAutoScrollsOnImeInsetChange(): Boolean = true
+
+private const val MessageListBottomExtraClearanceDp = 22

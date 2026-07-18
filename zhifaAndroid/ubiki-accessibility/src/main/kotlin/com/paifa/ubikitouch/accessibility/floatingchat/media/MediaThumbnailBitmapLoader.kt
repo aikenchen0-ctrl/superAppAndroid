@@ -15,16 +15,6 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.platform.LocalContext
 import androidx.exifinterface.media.ExifInterface
 import com.paifa.ubikitouch.accessibility.WeightedLruCache
-import com.paifa.ubikitouch.accessibility.imageDecodeSampleSize
-import com.paifa.ubikitouch.accessibility.isLocalMediaUri
-import com.paifa.ubikitouch.accessibility.isRemoteImageUri
-import com.paifa.ubikitouch.accessibility.normalizedRemoteImageUri
-import com.paifa.ubikitouch.accessibility.remoteAvatarMaxConcurrentLoads
-import com.paifa.ubikitouch.accessibility.remoteImageConnectTimeoutMillis
-import com.paifa.ubikitouch.accessibility.remoteImageFailureRetryDelayMillis
-import com.paifa.ubikitouch.accessibility.remoteImageMaxBytes
-import com.paifa.ubikitouch.accessibility.remoteImageReadTimeoutMillis
-import com.paifa.ubikitouch.accessibility.remoteImageRetrySuppressedByRecentFailure
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 import java.io.ByteArrayOutputStream

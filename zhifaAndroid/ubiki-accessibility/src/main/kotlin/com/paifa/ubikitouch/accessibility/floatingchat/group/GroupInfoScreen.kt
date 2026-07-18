@@ -39,8 +39,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.paifa.ubikitouch.accessibility.OverlayTokens
-import com.paifa.ubikitouch.accessibility.TextLabel
+import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
+import com.paifa.ubikitouch.accessibility.floatingchat.components.TextLabel
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoMemberUiState
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoUiEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoUiState
@@ -73,27 +73,27 @@ internal fun GroupInfoScreen(
                 Divider()
                 GroupInfoQrRow { onEvent(GroupInfoUiEvent.QrCodeRequested) }
                 Divider()
-                GroupInfoEditableRow("缇ゅ叕鍛?", state.announcement, "鏈缃?", {
+                GroupInfoEditableRow("群公告", state.announcement, "未设置", {
                     onEvent(GroupInfoUiEvent.AnnouncementChanged(it))
-                }, maxLines = 2, actionLabel = "鍙戝竷", actionEnabled = !state.loading && state.announcement.isNotBlank()) {
+                }, maxLines = 2, actionLabel = "发布", actionEnabled = !state.loading && state.announcement.isNotBlank()) {
                     onEvent(GroupInfoUiEvent.PublishAnnouncementRequested)
                 }
                 Divider()
-                GroupInfoEditableRow("澶囨敞", state.remark, "娣诲姞澶囨敞", {
+                GroupInfoEditableRow("备注", state.remark, "添加备注", {
                     onEvent(GroupInfoUiEvent.RemarkChanged(it))
                 })
             }
         }
         item { GroupInfoSectionGap() }
-        item { Section { InfoRow("鏌ユ壘鑱婂ぉ璁板綍") { onEvent(GroupInfoUiEvent.SearchChatHistoryRequested) } } }
+        item { Section { InfoRow("查找聊天记录") { onEvent(GroupInfoUiEvent.SearchChatHistoryRequested) } } }
         item { GroupInfoSectionGap() }
         item {
             Section {
-                SwitchRow("娑堟伅鍏嶆墦鎵?", state.muted) { onEvent(GroupInfoUiEvent.MutedChanged(it)) }
+                SwitchRow("消息免打扰", state.muted) { onEvent(GroupInfoUiEvent.MutedChanged(it)) }
                 Divider()
-                SwitchRow("缃《鑱婂ぉ", state.pinned) { onEvent(GroupInfoUiEvent.PinnedChanged(it)) }
+                SwitchRow("置顶聊天", state.pinned) { onEvent(GroupInfoUiEvent.PinnedChanged(it)) }
                 Divider()
-                SwitchRow("淇濆瓨鍒伴€氳褰?", state.savedToContacts) {
+                SwitchRow("保存到通讯录", state.savedToContacts) {
                     onEvent(GroupInfoUiEvent.SavedToContactsChanged(it))
                 }
             }
@@ -101,15 +101,15 @@ internal fun GroupInfoScreen(
         item { GroupInfoSectionGap() }
         item {
             Section {
-                GroupInfoEditableRow("鎴戝湪缇ら噷鐨勬樀绉?", state.myNickname, "濉啓鏄电О", {
+                GroupInfoEditableRow("我在群里的昵称", state.myNickname, "濉啓鏄电О", {
                     onEvent(GroupInfoUiEvent.MyNicknameChanged(it))
                 })
                 Divider()
-                SwitchRow("鏄剧ず缇ゆ垚鍛樻樀绉?", state.memberNicknamesVisible) {
+                SwitchRow("显示群成员昵称", state.memberNicknamesVisible) {
                     onEvent(GroupInfoUiEvent.MemberNicknamesVisibleChanged(it))
                 }
                 Divider()
-                SwitchRow("鏄剧ず缇ゆ垚鍛樺ご鍍?", state.memberAvatarsVisible) {
+                SwitchRow("显示群成员头像", state.memberAvatarsVisible) {
                     onEvent(GroupInfoUiEvent.MemberAvatarsVisibleChanged(it))
                 }
             }
@@ -117,11 +117,11 @@ internal fun GroupInfoScreen(
         item { GroupInfoSectionGap() }
         item {
             Section {
-                GroupInfoEditableRow("璁剧疆褰撳墠鑱婂ぉ鑳屾櫙", state.backgroundLabel, "榛樿鑳屾櫙", {
+                GroupInfoEditableRow("设置当前聊天背景", state.backgroundLabel, "榛樿鑳屾櫙", {
                     onEvent(GroupInfoUiEvent.BackgroundChanged(it))
                 })
                 Divider()
-                InfoRow("娓呯┖鑱婂ぉ璁板綍") { onEvent(GroupInfoUiEvent.ClearChatHistoryRequested) }
+                InfoRow("清空聊天记录") { onEvent(GroupInfoUiEvent.ClearChatHistoryRequested) }
                 Divider()
                 InfoRow("鎶曡瘔") { onEvent(GroupInfoUiEvent.ReportRequested) }
             }
@@ -145,7 +145,7 @@ private fun GroupInfoTopBar(memberCount: Int, onBack: () -> Unit) {
         IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "杩斿洖", tint = PrimaryText)
         }
-        TextLabel("鑱婂ぉ淇℃伅($memberCount)", 15.sp, modifier = Modifier.align(Alignment.Center),
+        TextLabel("聊天信息($memberCount)", 15.sp, modifier = Modifier.align(Alignment.Center),
             weight = FontWeight.SemiBold, color = PrimaryText, maxLines = 1)
     }
 }
@@ -202,7 +202,7 @@ private fun GroupInfoAddMemberCell(enabled: Boolean, modifier: Modifier, onClick
             Icon(if (enabled) Icons.Filled.Add else Icons.Filled.Remove, null, tint = SecondaryText)
         }
         Spacer(Modifier.height(4.dp))
-        TextLabel(if (enabled) "娣诲姞" else "绉诲嚭", 10.sp, color = SecondaryText, maxLines = 1)
+        TextLabel(if (enabled) "添加" else "移出", 10.sp, color = SecondaryText, maxLines = 1)
     }
 }
 
@@ -210,8 +210,8 @@ private fun GroupInfoAddMemberCell(enabled: Boolean, modifier: Modifier, onClick
 private fun GroupInfoQrRow(onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().heightIn(min = 44.dp).clickable(onClick = onClick)
         .padding(horizontal = 18.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-        TextLabel("缇や簩缁寸爜", 13.sp, color = PrimaryText, modifier = Modifier.weight(1f), maxLines = 1)
-        TextLabel("鈻?", 19.sp, color = SecondaryText, maxLines = 1)
+        TextLabel("群二维码", 13.sp, color = PrimaryText, modifier = Modifier.weight(1f), maxLines = 1)
+        TextLabel("›", 19.sp, color = SecondaryText, maxLines = 1)
         Spacer(Modifier.width(6.dp)); Chevron()
     }
 }
@@ -270,7 +270,7 @@ private fun SwitchRow(label: String, checked: Boolean, onCheckedChange: (Boolean
 private fun DestructiveRow(onClick: () -> Unit) {
     Box(Modifier.fillMaxWidth().background(CardBackground).clickable(onClick = onClick).padding(vertical = 17.dp),
         contentAlignment = Alignment.Center) {
-        TextLabel("閫€鍑虹兢鑱?", 14.sp, weight = FontWeight.SemiBold, color = Color(0xFFE95A5A), maxLines = 1)
+        TextLabel("退出群聊", 14.sp, weight = FontWeight.SemiBold, color = Color(0xFFE95A5A), maxLines = 1)
     }
 }
 

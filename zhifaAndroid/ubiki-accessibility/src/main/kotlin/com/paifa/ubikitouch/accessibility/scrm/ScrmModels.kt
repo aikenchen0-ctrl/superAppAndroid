@@ -580,8 +580,8 @@ internal data class ScrmChatRoomQuery(
     val includeDeleted: Boolean = false
 ) {
     init {
-        require(page > 0) { "page 蹇呴』澶т簬 0" }
-        require(pageSize in 1..200) { "pageSize 蹇呴』鍦?1 鍒?200 涔嬮棿" }
+        require(page > 0) { "page 必须大于 0" }
+        require(pageSize in 1..200) { "pageSize 必须在 1 到 200 之间" }
         require(weChatId == null || weChatId.isNotBlank()) { "weChatId 涓嶈兘涓虹┖" }
         require(search == null || search.isNotBlank()) { "search 涓嶈兘涓虹┖" }
     }

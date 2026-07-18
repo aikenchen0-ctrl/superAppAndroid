@@ -39,6 +39,16 @@ android {
         debug {
             buildConfigField(
                 "String",
+                "AI_VOICE_GATEWAY_BASE_URL",
+                buildConfigString(localOrEnv("ai.voice.gatewayBaseUrl", "AI_VOICE_GATEWAY_BASE_URL"))
+            )
+            buildConfigField(
+                "String",
+                "AI_VOICE_SESSION_TOKEN",
+                buildConfigString(localOrEnv("ai.voice.sessionToken", "AI_VOICE_SESSION_TOKEN"))
+            )
+            buildConfigField(
+                "String",
                 "SCRM_AUTO_BASE_URL",
                 buildConfigString(localOrEnv("scrm.auto.baseUrl", "SCRM_AUTO_BASE_URL"))
             )
@@ -54,6 +64,8 @@ android {
             )
         }
         release {
+            buildConfigField("String", "AI_VOICE_GATEWAY_BASE_URL", buildConfigString(""))
+            buildConfigField("String", "AI_VOICE_SESSION_TOKEN", buildConfigString(""))
             buildConfigField("String", "SCRM_AUTO_BASE_URL", buildConfigString(""))
             buildConfigField("String", "SCRM_AUTO_USERNAME", buildConfigString(""))
             buildConfigField("String", "SCRM_AUTO_PASSWORD", buildConfigString(""))
@@ -98,6 +110,7 @@ dependencies {
     implementation("androidx.savedstate:savedstate:1.2.1")
     implementation("com.google.zxing:core:3.5.3")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.16.1")
     testImplementation("org.xerial:sqlite-jdbc:3.53.2.0")
