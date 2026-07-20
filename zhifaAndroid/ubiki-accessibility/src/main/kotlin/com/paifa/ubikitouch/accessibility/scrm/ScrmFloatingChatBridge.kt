@@ -3,6 +3,9 @@ package com.paifa.ubikitouch.accessibility.scrm
 import com.paifa.ubikitouch.accessibility.floatingchat.media.normalizedRemoteImageUri
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatConversation
+import com.paifa.ubikitouch.core.model.FloatingChatConnectionTarget
+import com.paifa.ubikitouch.core.model.FloatingChatMessage
+import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 import java.net.URLDecoder
 import java.net.URLEncoder
 
@@ -138,21 +141,55 @@ internal fun scrmFloatingChatConversation(
     )
     val selectedAccount = floatingAccounts.firstOrNull { account -> account.selected }
         ?: floatingAccounts.firstOrNull()
+    val scopedContacts = scrmFloatingScopedContacts(
+        fallbackContacts = contacts,
+        accountConversations = accountConversations,
+        selectedDeviceUuid = selectedDeviceUuid,
+        selectedWeChatId = selectedWeChatId
+    )
+    val scopedGroups = scrmFloatingScopedChatRooms(accountConversations)
 
     return base.copy(
         peerName = "SCRM Contacts",
         accountName = selectedAccount?.name ?: selectedWeChatId.ifBlank { base.accountName },
-        contacts = scrmFloatingScopedContacts(
-            fallbackContacts = contacts,
-            accountConversations = accountConversations,
-            selectedDeviceUuid = selectedDeviceUuid,
-            selectedWeChatId = selectedWeChatId
-        ),
+        contacts = scopedContacts,
         accountContacts = floatingAccounts,
         messages = emptyList(),
-        groupContacts = scrmFloatingScopedChatRooms(accountConversations)
+        homeUnreadDemoMessages = scrmUnreadDemoMessages(scopedContacts, scopedGroups),
+        groupContacts = scopedGroups
     )
 }
+
+private fun scrmUnreadDemoMessages(
+    contacts: List<FloatingChatContact>,
+    groups: List<FloatingChatContact>
+): List<FloatingChatMessage> {
+    val routes = contacts.take(10) + groups.take(4)
+    if (routes.isEmpty()) return emptyList()
+    val texts = listOf(
+        "我把今天的内容整理好了，方便时帮我看一下。",
+        "这个细节想和你确认一下，确认后我就继续处理。",
+        "对方还在等回复，你看到后回我一句就行。",
+        "刚补充了一点说明，麻烦确认是否需要调整。",
+        "后续安排我先预留着，等你确认后再通知大家。"
+    )
+    return (0 until ScrmUnreadDemoMessageCount).map { index ->
+        val route = routes[index % routes.size]
+        FloatingChatMessage(
+            id = "scrm-unread-demo-${route.id}-$index",
+            type = FloatingChatMessageType.Text,
+            text = texts[index % texts.size],
+            fromMe = false,
+            senderName = route.name,
+            time = "${10 + index / 15}:${((index * 4 + 7) % 60).toString().padStart(2, '0')}",
+            connectionTarget = FloatingChatConnectionTarget.User,
+            connectionTargetId = route.id,
+            threadContactId = route.id
+        )
+    }
+}
+
+private const val ScrmUnreadDemoMessageCount = 30
 
 private fun scrmFloatingScopedContacts(
     fallbackContacts: List<ScrmContact>,

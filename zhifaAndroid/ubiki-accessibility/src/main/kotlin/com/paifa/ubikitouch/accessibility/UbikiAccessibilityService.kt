@@ -614,6 +614,7 @@ class UbikiAccessibilityService : AccessibilityService() {
         if (!edgeGestureOverlayWindowsAllowed(floatingChatExpanded, floatingChatExternalActivityVisible)) {
             removeEdgeGestureOverlays()
             syncBottomGestureBar()
+            applyServiceRuntimeConfig()
             val (screenWidth, screenHeight) = currentDisplaySize()
             if (resolvedGestureInputMode() == ResolvedGestureInputMode.NativeTouchInteraction &&
                 startNativeEdgeGestures(screenWidth, screenHeight)

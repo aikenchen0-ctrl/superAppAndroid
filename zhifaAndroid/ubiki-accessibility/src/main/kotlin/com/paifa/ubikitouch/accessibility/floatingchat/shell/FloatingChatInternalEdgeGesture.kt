@@ -143,7 +143,7 @@ internal fun floatingChatOverlayEdgeGestureConsumesPlainTaps(): Boolean = false
 
 internal fun floatingChatInternalEdgeGestureObservesInitialPointerPass(): Boolean = false
 
-internal fun floatingChatInternalEdgeGestureTouchTargetDp(): Int = 8
+internal fun floatingChatInternalEdgeGestureTouchTargetDp(): Int = 24
 
 internal fun floatingChatInternalEdgeGestureCoversSideRails(): Boolean {
     return floatingChatInternalEdgeGestureTouchTargetDp() >= leftRailTouchableWidthDp() &&

@@ -54,6 +54,7 @@ internal class ConnectorCoordinateState {
     var version by mutableIntStateOf(0)
         private set
     val userAvatars = mutableMapOf<String, Rect>()
+    val homeOverviewAvatars = mutableMapOf<String, Rect>()
     val groupMemberAvatars = mutableMapOf<String, Rect>()
     val accountAvatars = mutableMapOf<String, Rect>()
     val messageBubbles = mutableMapOf<String, Rect>()
@@ -83,6 +84,16 @@ internal class ConnectorCoordinateState {
     fun removeUserAvatar(id: String) {
         if (userAvatars.remove(id) != null) invalidate()
     }
+
+    fun updateHomeOverviewAvatar(id: String, bounds: Rect) {
+        if (homeOverviewAvatars.updateIfChanged(id, bounds)) invalidate()
+    }
+
+    fun removeHomeOverviewAvatar(id: String) {
+        if (homeOverviewAvatars.remove(id) != null) invalidate()
+    }
+
+    fun homeOverviewAvatarFor(id: String): Rect? = homeOverviewAvatars[id]
 
     fun updateVirtualUserAvatars(
         sessionIds: List<String>,
@@ -565,11 +576,13 @@ internal fun FloatingChatMessage.toConnectorTargetKey(
     )
 }
 
-internal fun FloatingChatMessage.toHomeOverviewConnectorTargetKey(): ConnectorTargetKey? {
+internal fun FloatingChatMessage.toHomeOverviewConnectorTargetKey(
+    connectorGroupId: String? = null
+): ConnectorTargetKey? {
     if (connectionTarget != FloatingChatConnectionTarget.User) return null
     return ConnectorTargetKey(
         target = FloatingChatConnectionTarget.User,
-        targetId = homeOverviewConnectorKeyDebugId(this) ?: return null,
+        targetId = connectorGroupId ?: homeOverviewConnectorKeyDebugId(this) ?: return null,
         lane = ConnectorAvatarLane.Session
     )
 }

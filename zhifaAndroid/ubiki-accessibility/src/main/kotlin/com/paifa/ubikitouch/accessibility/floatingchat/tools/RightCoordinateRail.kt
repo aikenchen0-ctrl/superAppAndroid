@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.PointerInputScope
@@ -81,6 +82,7 @@ internal fun RightCoordinateRail(
     accounts: List<FloatingChatContact>,
     accountProfiles: Map<String, FloatingChatAccountProfile>,
     selectedAccountId: String?,
+    highlightedAccountColors: Map<String, Long> = emptyMap(),
     actions: List<FloatingChatToolAction>,
     connectorState: ConnectorCoordinateState,
     onToolAction: (FloatingChatToolAction) -> Unit,
@@ -307,6 +309,7 @@ internal fun RightCoordinateRail(
                         account = account,
                         profile = accountProfiles[account.id],
                         selectedAccountId = selectedAccountId,
+                        highlightColor = highlightedAccountColors[account.id],
                         connectorState = connectorState,
                         onAccountAvatarClick = onAccountAvatarClick,
                         onAccountAvatarLongClick = onAccountAvatarLongClick,
@@ -407,6 +410,7 @@ private fun AccountRailAvatarItem(
     account: FloatingChatContact,
     profile: FloatingChatAccountProfile?,
     selectedAccountId: String?,
+    highlightColor: Long? = null,
     connectorState: ConnectorCoordinateState,
     onAccountAvatarClick: (FloatingChatContact) -> Unit,
     onAccountAvatarLongClick: (FloatingChatContact) -> Unit,
@@ -421,6 +425,7 @@ private fun AccountRailAvatarItem(
                 selected = account.id == selectedAccountId
             ),
             role = AvatarRole.Account,
+            highlightColor = highlightColor?.let(::Color),
             imageUri = profile?.avatarImageUri,
             onClick = {
                 currentAccountBounds?.let { bounds ->

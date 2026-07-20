@@ -81,17 +81,33 @@ internal fun CoordinateChatBody(
             activeAccountId = activeAccountId
         )
     }
-    val homeUnreadSummaries = remember(homeOverviewConversations) {
+    val homeUnreadSummaries = remember(homeOverviewConversations, conversation.homeUnreadDemoMessages) {
         if (shouldBuildAllAccountHomeOverview(homeOverviewVisible)) {
-            homeUnreadThreadSummaries(
-                accountConversations = homeOverviewConversations
-            )
+            homeUnreadThreadSummaries(accountConversations = homeOverviewConversations) +
+                homeUnreadDemoThreadSummaries(conversation)
         } else {
             emptyList()
         }
     }
     val homeUnreadSummaryByMessageId = remember(homeUnreadSummaries) {
         homeUnreadSummaries.associateBy { summary -> summary.message.id }
+    }
+    val homeUnreadAvatarContacts = remember(homeUnreadSummaries) {
+        homeUnreadSummaries.map { summary -> summary.avatarContact }.distinctBy { contact -> contact.id }
+    }
+    val homeUnreadAccountIds = remember(homeUnreadSummaries) {
+        homeUnreadSummaries.map { summary -> summary.accountId }.toSet()
+    }
+    val homeUnreadColorsByAccountId = remember(conversation.accountContacts) {
+        homeOverviewAccountColorsById(conversation.accountContacts)
+    }
+    val homeUnreadAccountColors = remember(homeUnreadSummaries, homeUnreadColorsByAccountId) {
+        homeUnreadSummaries.associate { summary ->
+            summary.message.id to (homeUnreadColorsByAccountId[summary.accountId] ?: 0xFF00A6FB)
+        }
+    }
+    val homeUnreadAccountIdsByMessageId = remember(homeUnreadSummaries) {
+        homeUnreadSummaries.associate { summary -> summary.message.id to summary.accountId }
     }
     val threadMessages = remember(conversation, selectedThread, selectedAccount.id) {
         visibleMessagesForThread(
@@ -105,6 +121,30 @@ internal fun CoordinateChatBody(
             homeUnreadSummaries.map { summary -> summary.message }
         } else {
             threadMessages
+        }
+    }
+    val homeOverviewConnectorGroupIds = remember(
+        homeOverviewVisible,
+        visibleMessages,
+        homeUnreadAccountIdsByMessageId
+    ) {
+        if (homeOverviewVisible) {
+            homeOverviewMessageGroups(visibleMessages, homeUnreadAccountIdsByMessageId)
+                .flatMap { group -> group.messages.map { message -> message.id to group.connectorId } }
+                .toMap()
+        } else {
+            emptyMap()
+        }
+    }
+    val homeOverviewMessageGroups = remember(
+        homeOverviewVisible,
+        visibleMessages,
+        homeUnreadAccountIdsByMessageId
+    ) {
+        if (homeOverviewVisible) {
+            homeOverviewMessageGroups(visibleMessages, homeUnreadAccountIdsByMessageId)
+        } else {
+            emptyList()
         }
     }
     val viewportKey = remember(selectedThread, selectedAccount.id, homeOverviewVisible) {
@@ -174,6 +214,9 @@ internal fun CoordinateChatBody(
             selectedThread = selectedThread,
             homeOverviewVisible = homeOverviewVisible,
             contactsById = contactsById,
+            homeOverviewAccountColors = homeUnreadAccountColors,
+            homeOverviewAccountIdsByMessageId = homeUnreadAccountIdsByMessageId,
+            homeOverviewMessageGroups = homeOverviewMessageGroups,
             groupMemberAvatarsVisible = groupMemberAvatarsVisible,
             listState = messageListState,
             connectorState = connectorState,
@@ -210,7 +253,7 @@ internal fun CoordinateChatBody(
                     end = FloatingContentSideInset + EdgeGestureSafeInset
                 )
         )
-        ChatSessionRail(
+        if (!homeOverviewVisible) ChatSessionRail(
             groups = conversation.groupContacts,
             contacts = conversation.contacts,
             conversation = conversation,
@@ -225,6 +268,18 @@ internal fun CoordinateChatBody(
                 .align(Alignment.CenterStart)
                 .fillMaxHeight()
                 .width(leftRailFollowTextLayerWidthDp().dp)
+            .zIndex(leftRailLayerZIndex())
+        )
+        if (homeOverviewVisible) HomeOverviewAvatarRail(
+            groups = homeOverviewMessageGroups,
+            contactsById = contactsById,
+            listState = messageListState,
+            connectorState = connectorState,
+            onAvatarLongClick = onContactAvatarLongClick,
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .fillMaxHeight()
+                .width(leftRailTouchableWidthDp().dp)
                 .zIndex(leftRailLayerZIndex())
         )
         RightCoordinateRail(
@@ -232,6 +287,11 @@ internal fun CoordinateChatBody(
             accountProfiles = accountProfiles,
             selectedAccountId = selectedAccount.id,
             actions = conversation.toolActions,
+            highlightedAccountColors = if (homeOverviewVisible) {
+                homeUnreadColorsByAccountId.filterKeys(homeUnreadAccountIds::contains)
+            } else {
+                emptyMap()
+            },
             connectorState = connectorState,
             onToolAction = onToolAction,
             onAccountAvatarClick = onAccountAvatarClick,
@@ -246,6 +306,8 @@ internal fun CoordinateChatBody(
             selection = selectedThread,
             selectedAccountId = selectedAccount.id,
             homeOverviewVisible = homeOverviewVisible,
+            homeOverviewConnectorGroupIds = homeOverviewConnectorGroupIds,
+            homeOverviewMessageGroups = homeOverviewMessageGroups,
             groupMemberAvatarsVisible = groupMemberAvatarsVisible,
             listState = messageListState,
             offscreenIndex = offscreenConnectorIndex,

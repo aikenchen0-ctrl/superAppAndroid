@@ -438,8 +438,52 @@ internal data class HomeUnreadThreadSummary(
     val threadId: String,
     val selection: ChatThreadSelection,
     val message: FloatingChatMessage,
-    val unreadCount: Int
+    val unreadCount: Int,
+    val avatarContact: FloatingChatContact
 )
+
+internal data class HomeOverviewMessageGroup(
+    val avatarContactId: String?,
+    val accountId: String,
+    val connectorId: String,
+    val messages: List<FloatingChatMessage>
+) {
+    val key: String = messages.firstOrNull()?.id ?: "home-overview-empty"
+}
+
+internal fun homeOverviewMessageGroups(
+    messages: List<FloatingChatMessage>,
+    accountIdsByMessageId: Map<String, String> = emptyMap()
+): List<HomeOverviewMessageGroup> {
+    val groupsByContactAndAccount = linkedMapOf<Pair<String?, String>, HomeOverviewMessageGroup>()
+    messages.forEach { message ->
+        val avatarContactId = message.connectionTargetId
+        val accountId = accountIdsByMessageId[message.id].orEmpty()
+        val groupKey = avatarContactId to accountId
+        val existing = groupsByContactAndAccount[groupKey]
+        groupsByContactAndAccount[groupKey] = if (existing == null) {
+            HomeOverviewMessageGroup(
+                avatarContactId = avatarContactId,
+                accountId = accountId,
+                connectorId = "home-group:${accountId}:${avatarContactId}:${message.id}",
+                messages = listOf(message)
+            )
+        } else {
+            existing.copy(messages = existing.messages + message)
+        }
+    }
+    return groupsByContactAndAccount.values.toList()
+}
+
+internal fun homeOverviewMessagesForVisibleGroup(
+    groups: List<HomeOverviewMessageGroup>,
+    groupIndex: Int
+): List<FloatingChatMessage> = groups.getOrNull(groupIndex)?.messages.orEmpty()
+
+internal fun homeOverviewVisibleGroups(
+    groups: List<HomeOverviewMessageGroup>,
+    visibleGroupIndexes: Set<Int>
+): List<HomeOverviewMessageGroup> = groups.filterIndexed { index, _ -> index in visibleGroupIndexes }
 
 internal fun defaultHomeUnreadThreadIds(conversation: FloatingChatConversation): Set<String> {
     return defaultHomeUnreadTextSelections(conversation)
@@ -575,6 +619,31 @@ internal fun homeUnreadThreadSummaries(
     }
 }
 
+internal fun homeUnreadDemoThreadSummaries(
+    conversation: FloatingChatConversation
+): List<HomeUnreadThreadSummary> {
+    val contactIds = conversation.contacts.map { contact -> contact.id }.toSet()
+    val groupIds = conversation.groupContacts.map { group -> group.id }.toSet()
+    val fallbackAccountId = conversation.accountContacts.firstOrNull { account -> account.selected }?.id
+        ?: conversation.accountContacts.firstOrNull()?.id
+        ?: ""
+    return conversation.homeUnreadDemoMessages.mapNotNull { message ->
+            val resolvedThreadId = message.threadContactId?.takeIf { id -> id.isNotBlank() }
+                ?: return@mapNotNull null
+            val selection = when {
+                resolvedThreadId in groupIds -> ChatThreadSelection.GroupChat(resolvedThreadId)
+                resolvedThreadId in contactIds -> ChatThreadSelection.Private(resolvedThreadId)
+                else -> return@mapNotNull null
+            }
+            homeUnreadThreadSummary(
+                accountId = accountIdForScopedThreadId(resolvedThreadId) ?: fallbackAccountId,
+                conversation = conversation,
+                selection = selection,
+                unrepliedMessages = listOf(message).homeUnrepliedTextMessages()
+            )
+        }
+}
+
 private fun homeUnreadThreadSummariesForAccount(
     accountId: String,
     conversation: FloatingChatConversation
@@ -588,28 +657,64 @@ private fun homeUnreadThreadSummariesForAccount(
             selectedAccountId = selectedAccountId
         )
         val unrepliedMessages = threadMessages.homeUnrepliedTextMessages()
-        val latest = unrepliedMessages.lastOrNull() ?: return@mapNotNull null
-        val contact = contactForSelection(conversation, selection) ?: return@mapNotNull null
-        val unrepliedCount = unrepliedMessages.size.coerceAtLeast(1)
-        HomeUnreadThreadSummary(
+        homeUnreadThreadSummary(
             accountId = accountId,
-            threadId = threadId,
+            conversation = conversation,
             selection = selection,
-            unreadCount = unrepliedCount,
-            message = latest.copy(
-                id = "home-unread-${threadId}-${latest.id}",
-                fromMe = false,
-                senderName = if (unrepliedCount > 1) {
-                    "${contact.name} - $unrepliedCount 条未回 - ${conversation.accountName}"
-                } else {
-                    "${contact.name} - 未回 - ${conversation.accountName}"
-                },
-                connectionTarget = FloatingChatConnectionTarget.User,
-                connectionTargetId = selection.homeConnectorTargetId(),
-                threadContactId = selection.threadContactIdForHome()
-            )
+            unrepliedMessages = unrepliedMessages
         )
     }
+}
+
+private fun homeUnreadThreadSummary(
+    accountId: String,
+    conversation: FloatingChatConversation,
+    selection: ChatThreadSelection,
+    unrepliedMessages: List<FloatingChatMessage>
+): HomeUnreadThreadSummary? {
+    val latest = unrepliedMessages.lastOrNull() ?: return null
+    val contact = contactForSelection(conversation, selection) ?: return null
+    val groupMember = if (selection.isGroupThread()) {
+        latest.connectionTargetId
+            ?.let { targetId -> conversation.contacts.firstOrNull { candidate -> candidate.id == targetId } }
+    } else {
+        null
+    }
+    val avatarContact = groupMember ?: contact
+    val unreadCount = unrepliedMessages.size.coerceAtLeast(1)
+    val threadId = selection.toLocalThreadId()
+    return HomeUnreadThreadSummary(
+        accountId = accountId,
+        threadId = threadId,
+        selection = selection,
+        unreadCount = unreadCount,
+        avatarContact = avatarContact,
+        message = latest.copy(
+            id = "home-unread-${threadId}-${latest.id}",
+            fromMe = false,
+            senderName = homeUnreadSenderLabel(
+                contact = contact,
+                groupMember = groupMember,
+                accountName = conversation.accountName
+            ),
+            connectionTarget = FloatingChatConnectionTarget.User,
+            connectionTargetId = avatarContact.id,
+            threadContactId = selection.threadContactIdForHome()
+        )
+    )
+}
+
+private fun homeUnreadSenderLabel(
+    contact: FloatingChatContact,
+    groupMember: FloatingChatContact?,
+    accountName: String
+): String {
+    val prefix = if (groupMember == null) {
+        contact.name
+    } else {
+        "${contact.name} · ${groupMember.name}"
+    }
+    return "$prefix - $accountName"
 }
 
 internal fun unreadThreadIdsAfterOpeningHomeUnreadBubble(
@@ -659,6 +764,29 @@ internal fun homeUnreadOverviewKeepsConnectorLines(): Boolean = true
 internal fun homeUnreadAvatarGreenDotReflectsThreadState(): Boolean = true
 
 internal fun homeUnreadOverviewUsesSourceScopedConnectorLines(): Boolean = true
+
+internal fun homeOverviewUsesMessageAttachedAvatars(): Boolean = true
+
+internal fun homeOverviewConnectorLayerIsIndependentFromMessageList(): Boolean = true
+
+internal fun homeOverviewAvatarUsesSessionRailLayout(): Boolean = true
+
+internal fun homeOverviewAvatarSizeDp(): Int = leftRailAvatarSizeDp()
+
+private val HomeOverviewAccountPalette = listOf(
+    0xFFFF3B5C, 0xFFFF8A00, 0xFFFFD60A, 0xFF35C759,
+    0xFF00C7BE, 0xFF00A6FB, 0xFF3A86FF, 0xFF7B61FF,
+    0xFFB845FF, 0xFFFF4FA3, 0xFF9ADE00, 0xFF00D1FF
+)
+
+internal fun homeOverviewAccountColorsById(
+    accounts: List<FloatingChatContact>
+): Map<String, Long> = accounts.mapIndexed { index, account ->
+    account.id to HomeOverviewAccountPalette[index % HomeOverviewAccountPalette.size]
+}.toMap()
+
+internal fun homeOverviewUsesTwelveColorAccountPalette(): Boolean =
+    HomeOverviewAccountPalette.size == 12
 
 internal fun homeUnreadOverviewUsesMessageScopedConnectorLines(): Boolean = false
 

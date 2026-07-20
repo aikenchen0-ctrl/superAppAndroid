@@ -10,6 +10,7 @@ data class FloatingChatConversation(
     val accountContacts: List<FloatingChatContact>,
     val messages: List<FloatingChatMessage>,
     val toolActions: List<FloatingChatToolAction>,
+    val homeUnreadDemoMessages: List<FloatingChatMessage> = emptyList(),
     val groupContacts: List<FloatingChatContact> = emptyList()
 )
 

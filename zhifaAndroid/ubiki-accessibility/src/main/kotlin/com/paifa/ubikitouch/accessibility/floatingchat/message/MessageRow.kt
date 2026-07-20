@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -26,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.text.font.FontWeight
@@ -50,7 +52,9 @@ internal fun MessageRow(
     index: Int,
     selectedThread: ChatThreadSelection,
     homeOverviewVisible: Boolean,
+    showAttachedAvatar: Boolean = true,
     contactsById: Map<String, FloatingChatContact>,
+    homeOverviewAccountColor: Long?,
     groupMemberAvatarsVisible: Boolean,
     onPreviewMedia: (FloatingChatMessage) -> Unit,
     onOpenMediaActions: (FloatingChatMessage) -> Unit,
@@ -80,7 +84,7 @@ internal fun MessageRow(
             homeOverviewVisible = homeOverviewVisible,
             contactsById = contactsById,
             groupMemberAvatarsVisible = groupMemberAvatarsVisible
-        )
+        )?.takeIf { showAttachedAvatar }
     }
     val placement = messageHorizontalPlacement(message.presentation, message.fromMe)
     LaunchedEffect(groupMemberContact) {
@@ -134,6 +138,8 @@ internal fun MessageRow(
             onToggleSelection = onToggleSelection,
             onClick = onClick,
             onBubbleBoundsChanged = onBubbleBoundsChanged,
+            homeOverviewVisible = homeOverviewVisible,
+            homeOverviewAccountColor = homeOverviewAccountColor,
             modifier = if (groupMemberContact != null && placement == MessageHorizontalPlacement.Start) {
                 Modifier.weight(1f, fill = false)
             } else {
@@ -166,6 +172,8 @@ internal fun MessageBlock(
     onToggleSelection: () -> Unit,
     onClick: () -> Unit,
     onBubbleBoundsChanged: (Rect) -> Unit,
+    homeOverviewVisible: Boolean = false,
+    homeOverviewAccountColor: Long? = null,
     modifier: Modifier = Modifier
 ) {
     val bubbleClickSource = remember { MutableInteractionSource() }
@@ -265,6 +273,16 @@ internal fun MessageBlock(
                             claimed = claimed
                         )
                     }
+                    if (homeOverviewVisible && homeOverviewAccountColor != null) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .offset(x = 4.dp)
+                                .size(8.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(Color(homeOverviewAccountColor))
+                        )
+                    }
                 } else {
                     Box(
                         modifier = Modifier.combinedClickable(
@@ -325,6 +343,7 @@ internal fun MessageBlock(
         }
     }
 }
+
 
 @Composable
 private fun ScrmSendStatusLabel(

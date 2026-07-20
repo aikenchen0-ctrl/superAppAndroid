@@ -124,6 +124,7 @@ internal fun CompactAvatar(
     role: AvatarRole,
     sizeDp: Int = DefaultAvatarSizeDp,
     imageUri: String? = null,
+    highlightColor: Color? = null,
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
     onBoundsChanged: (Rect) -> Unit,
@@ -132,8 +133,16 @@ internal fun CompactAvatar(
 ) {
     val shape = RoundedCornerShape(10.dp)
     val avatarColor = Color(contact.avatarColor)
-    val border = if (contact.selected) OverlayTokens.accent else OverlayTokens.hairline
-    val borderWidth = if (contact.selected) railSelectedAvatarHighlightStrokeDp().dp else 1.dp
+    val border = when {
+        highlightColor != null -> highlightColor
+        contact.selected -> OverlayTokens.accent
+        else -> OverlayTokens.hairline
+    }
+    val borderWidth = if (contact.selected || highlightColor != null) {
+        railSelectedAvatarHighlightStrokeDp().dp
+    } else {
+        1.dp
+    }
     val avatarBitmap = rememberAsyncAvatarBitmap(
         resolvedAvatarImageUri(
             localImageUri = imageUri,
@@ -159,7 +168,7 @@ internal fun CompactAvatar(
         },
         shape = shape,
         color = avatarColor,
-        shadowElevation = if (contact.selected) 7.dp else 3.dp,
+        shadowElevation = if (contact.selected || highlightColor != null) 7.dp else 3.dp,
         border = BorderStroke(borderWidth, border)
     ) {
         Box(

@@ -33,6 +33,8 @@ internal fun ChatConnectorLayer(
     selection: ChatThreadSelection,
     selectedAccountId: String,
     homeOverviewVisible: Boolean,
+    homeOverviewConnectorGroupIds: Map<String, String>,
+    homeOverviewMessageGroups: List<HomeOverviewMessageGroup>,
     groupMemberAvatarsVisible: Boolean,
     listState: LazyListState,
     offscreenIndex: ConnectorOffscreenIndex,
@@ -75,34 +77,36 @@ internal fun ChatConnectorLayer(
         val directGroupMemberBranches = mutableListOf<ChatConnectorBranch>()
         val visibleGroupMemberBounds = mutableListOf<Rect>()
         visibleItems.forEach { itemInfo ->
-            val message = messages.getOrNull(itemInfo.index) ?: return@forEach
-            val key = if (homeOverviewVisible) {
-                message.toHomeOverviewConnectorTargetKey()
+            val itemMessages = if (homeOverviewVisible) {
+                homeOverviewMessagesForVisibleGroup(homeOverviewMessageGroups, itemInfo.index)
             } else {
-                message.toConnectorTargetKey(
-                    selection = selection,
-                    selectedAccountId = selectedAccountId,
-                    groupMemberAvatarsVisible = groupMemberAvatarsVisible
-                )
-            } ?: return@forEach
-
-            val bubbleBounds = connectorState.messageBubbles[message.id] ?: return@forEach
-            avatarSourceKeys[key] = if (homeOverviewVisible) {
-                message.toHomeOverviewConnectorSourceKey() ?: key
-            } else {
-                key
+                listOfNotNull(messages.getOrNull(itemInfo.index))
             }
-            if (key.lane == ConnectorAvatarLane.GroupMember) {
-                connectorState.groupMemberAvatars[key.targetId]?.let { bounds ->
-                    visibleGroupMemberBounds += bounds
-                    directGroupMemberBranches += createGroupMemberMessageConnectorBranch(
-                        avatarBounds = bounds,
-                        bubbleBounds = bubbleBounds,
-                        layerBounds = layerBounds
+            itemMessages.forEach messageLoop@ { message ->
+                val key = if (homeOverviewVisible) {
+                    message.toHomeOverviewConnectorTargetKey(homeOverviewConnectorGroupIds[message.id])
+                } else {
+                    message.toConnectorTargetKey(
+                        selection = selection,
+                        selectedAccountId = selectedAccountId,
+                        groupMemberAvatarsVisible = groupMemberAvatarsVisible
                     )
+                } ?: return@messageLoop
+
+                val bubbleBounds = connectorState.messageBubbles[message.id] ?: return@messageLoop
+                avatarSourceKeys[key] = key
+                if (key.lane == ConnectorAvatarLane.GroupMember) {
+                    connectorState.groupMemberAvatars[key.targetId]?.let { bounds ->
+                        visibleGroupMemberBounds += bounds
+                        directGroupMemberBranches += createGroupMemberMessageConnectorBranch(
+                            avatarBounds = bounds,
+                            bubbleBounds = bubbleBounds,
+                            layerBounds = layerBounds
+                        )
+                    }
                 }
+                visibleBubbleGroups.getOrPut(key) { mutableListOf() }.add(bubbleBounds)
             }
-            visibleBubbleGroups.getOrPut(key) { mutableListOf() }.add(bubbleBounds)
         }
 
         if (selection.isGroupThread() && groupMemberAvatarsVisible) {
@@ -118,11 +122,15 @@ internal fun ChatConnectorLayer(
 
         val firstVisibleIndex = visibleItems.minOf { it.index }
         val lastVisibleIndex = visibleItems.maxOf { it.index }
-        val offscreenEdges = offscreenConnectorEdges(
-            index = offscreenIndex,
-            firstVisibleIndex = firstVisibleIndex,
-            lastVisibleIndex = lastVisibleIndex
-        )
+        val offscreenEdges = if (homeOverviewVisible) {
+            emptyMap()
+        } else {
+            offscreenConnectorEdges(
+                index = offscreenIndex,
+                firstVisibleIndex = firstVisibleIndex,
+                lastVisibleIndex = lastVisibleIndex
+            )
+        }
         val connectorKeys = visibleBubbleGroups.keys + offscreenEdges.keys
         connectorKeys.forEach { key ->
             if (key.lane == ConnectorAvatarLane.GroupMember) return@forEach
@@ -134,7 +142,9 @@ internal fun ChatConnectorLayer(
             }
             val avatarBounds = when (avatarSourceKey.lane) {
                 ConnectorAvatarLane.Session -> {
-                    if (
+                    if (homeOverviewVisible) {
+                        connectorState.homeOverviewAvatarFor(avatarSourceKey.targetId)
+                    } else if (
                         selection.isGroupThread() &&
                         avatarSourceKey.targetId == selection.groupConnectorId()
                     ) {
@@ -151,15 +161,6 @@ internal fun ChatConnectorLayer(
                 }
                 ConnectorAvatarLane.GroupMember -> connectorState.groupMemberAvatars[avatarSourceKey.targetId]
                 ConnectorAvatarLane.Account -> connectorState.accountAvatarFor(avatarSourceKey.targetId)
-            } ?: if (homeOverviewVisible) {
-                homeOverviewFallbackConnectorAvatarBounds(
-                    bubbleBounds = visibleBubbleGroups[key].orEmpty(),
-                    layerBounds = layerBounds,
-                    visibleRootBounds = messageViewportBounds,
-                    target = key.target
-                )
-            } else {
-                null
             } ?: return@forEach
 
             val edgeState = offscreenEdges[key] ?: ConnectorViewportEdgeState()

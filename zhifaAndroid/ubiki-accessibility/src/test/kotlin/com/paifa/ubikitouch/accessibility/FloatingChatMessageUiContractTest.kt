@@ -58,6 +58,96 @@ import org.junit.Test
 
 class FloatingChatMessageUiContractTest {
     @Test
+    fun homeOverviewGroupsAllMessagesFromOneContactAndAccountUnderOneAvatar() {
+        val messages = listOf(
+            FloatingChatMessage(id = "a-1", type = FloatingChatMessageType.Text, text = "one", fromMe = false, senderName = "A", time = "10:00", connectionTargetId = "a"),
+            FloatingChatMessage(id = "a-2", type = FloatingChatMessageType.Text, text = "two", fromMe = false, senderName = "A", time = "10:01", connectionTargetId = "a"),
+            FloatingChatMessage(id = "b-1", type = FloatingChatMessageType.Text, text = "three", fromMe = false, senderName = "B", time = "10:02", connectionTargetId = "b"),
+            FloatingChatMessage(id = "a-3", type = FloatingChatMessageType.Text, text = "four", fromMe = false, senderName = "A", time = "10:03", connectionTargetId = "a")
+        )
+
+        assertEquals(
+            listOf(listOf("a-1", "a-2", "a-3"), listOf("b-1")),
+            homeOverviewMessageGroups(messages).map { group -> group.messages.map { message -> message.id } }
+        )
+        assertEquals(true, homeOverviewUsesMessageAttachedAvatars())
+        assertEquals(true, homeOverviewConnectorLayerIsIndependentFromMessageList())
+        assertEquals(true, homeOverviewAvatarUsesSessionRailLayout())
+        assertEquals(leftRailAvatarSizeDp(), homeOverviewAvatarSizeDp())
+    }
+
+    @Test
+    fun homeOverviewUsesOneConnectorTreePerConsecutiveContactAndAccountGroup() {
+        val messages = listOf(
+            FloatingChatMessage(id = "a-main-1", type = FloatingChatMessageType.Text, text = "one", fromMe = false, senderName = "A", time = "10:00", connectionTargetId = "a"),
+            FloatingChatMessage(id = "a-main-2", type = FloatingChatMessageType.Text, text = "two", fromMe = false, senderName = "A", time = "10:01", connectionTargetId = "a"),
+            FloatingChatMessage(id = "a-work-1", type = FloatingChatMessageType.Text, text = "three", fromMe = false, senderName = "A", time = "10:02", connectionTargetId = "a")
+        )
+
+        val groups = homeOverviewMessageGroups(
+            messages = messages,
+            accountIdsByMessageId = mapOf(
+                "a-main-1" to "account-main",
+                "a-main-2" to "account-main",
+                "a-work-1" to "account-work"
+            )
+        )
+
+        assertEquals(listOf(2, 1), groups.map { group -> group.messages.size })
+        assertEquals(2, groups.map { group -> group.connectorId }.distinct().size)
+        assertEquals("a", groups.first().avatarContactId)
+        assertEquals("account-main", groups.first().accountId)
+    }
+
+    @Test
+    fun homeOverviewConnectorExpandsEveryBubbleInTheVisibleMessageGroup() {
+        val messages = listOf(
+            FloatingChatMessage(id = "a-1", type = FloatingChatMessageType.Text, text = "one", fromMe = false, senderName = "A", time = "10:00", connectionTargetId = "a"),
+            FloatingChatMessage(id = "b-1", type = FloatingChatMessageType.Text, text = "two", fromMe = false, senderName = "B", time = "10:01", connectionTargetId = "b"),
+            FloatingChatMessage(id = "a-2", type = FloatingChatMessageType.Text, text = "three", fromMe = false, senderName = "A", time = "10:02", connectionTargetId = "a")
+        )
+        val groups = homeOverviewMessageGroups(messages)
+
+        assertEquals(
+            listOf("a-1", "a-2"),
+            homeOverviewMessagesForVisibleGroup(groups, groupIndex = 0).map { message -> message.id }
+        )
+    }
+
+    @Test
+    fun homeOverviewAssignsMatchingDistinctPaletteColorsToAccounts() {
+        val accounts = (1..13).map { index ->
+            FloatingChatContact(
+                id = "account-$index",
+                name = "Account $index",
+                initials = "A$index",
+                description = "Account",
+                avatarColor = 0xFF3A86FF
+            )
+        }
+
+        val colors = homeOverviewAccountColorsById(accounts)
+
+        assertEquals(12, colors.values.take(12).distinct().size)
+        assertEquals(colors.getValue("account-1"), colors.getValue("account-13"))
+        assertEquals(true, homeOverviewUsesTwelveColorAccountPalette())
+    }
+
+    @Test
+    fun homeOverviewRendersAvatarsOnlyForVisibleMessageGroups() {
+        val groups = listOf(
+            HomeOverviewMessageGroup("a", "account", "group-a", emptyList()),
+            HomeOverviewMessageGroup("b", "account", "group-b", emptyList()),
+            HomeOverviewMessageGroup("c", "account", "group-c", emptyList())
+        )
+
+        assertEquals(
+            listOf("group-b"),
+            homeOverviewVisibleGroups(groups, visibleGroupIndexes = setOf(1)).map { group -> group.connectorId }
+        )
+    }
+
+    @Test
     fun thumbnailHeightsUseFixedDpValues() {
         assertEquals(120, fixedThumbnailHeightDp(FloatingChatThumbnailOrientation.Vertical))
         assertEquals(56, fixedThumbnailHeightDp(FloatingChatThumbnailOrientation.Horizontal))
@@ -198,6 +288,19 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
+    fun explicitNativeGestureModeStillUsesNativeTouchInteraction() {
+        assertEquals(
+            ResolvedGestureInputMode.NativeTouchInteraction,
+            resolveGestureInputMode(
+                requestedMode = GestureInputMode.NativeTouchInteraction,
+                sdkInt = 34,
+                nativeTouchInteractionAvailable = true,
+                secureTakeoverApplied = false
+            )
+        )
+    }
+
+    @Test
     fun nativeTouchInteractionModeDoesNotCreateEdgeOverlayWindows() {
         assertEquals(false, shouldCreateGestureOverlayWindows(ResolvedGestureInputMode.NativeTouchInteraction))
         assertEquals(true, shouldCreateGestureOverlayWindows(ResolvedGestureInputMode.SecureSlimOverlay))
@@ -205,7 +308,7 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
-    fun nativeTouchExplorationKeepsSystemEdgeGesturesWhileFloatingChatIsExpanded() {
+    fun nativeTouchExplorationRemainsActiveWhileFloatingChatIsExpanded() {
         val enabled = NativeTouchInteractionEligibility(
             sdkInt = 34,
             requestedMode = GestureInputMode.Auto,
@@ -286,6 +389,24 @@ class FloatingChatMessageUiContractTest {
                 externalActivityVisible = false
             )
         )
+    }
+
+    @Test
+    fun autoModeRequestsNativeTouchWhileExpandedChatIsVisible() {
+        val eligibility = NativeTouchInteractionEligibility(
+            sdkInt = 34,
+            requestedMode = GestureInputMode.Auto,
+            runtimeFailed = false,
+            globalEnabled = true,
+            screenInteractive = true,
+            packageBlocked = false,
+            paused = false,
+            landscapeDisabled = false,
+            keyboardDisabled = false
+        )
+
+        assertEquals(true, shouldRequestNativeTouchInteraction(eligibility, floatingChatExpanded = false))
+        assertEquals(true, shouldRequestNativeTouchInteraction(eligibility, floatingChatExpanded = true))
     }
 
     @Test
@@ -1747,10 +1868,14 @@ class FloatingChatMessageUiContractTest {
         assertEquals(true, summaries.all { it.message.presentation == FloatingChatMessagePresentation.Bubble })
         assertEquals(true, summaries.all { !it.message.fromMe })
         assertEquals(true, summaries.all { it.message.text.isNotBlank() })
-        assertEquals(true, summaries.all { it.message.senderName.contains("未回") })
+        assertEquals(true, summaries.all { !it.message.senderName.contains("未回") })
         assertEquals(true, summaries.any { it.unreadCount >= 3 })
         assertEquals(true, summaries.any { it.selection is ChatThreadSelection.GroupChat })
         assertEquals(true, summaries.any { it.selection is ChatThreadSelection.Private })
+        val groupSummary = summaries.first { it.selection is ChatThreadSelection.GroupChat }
+        val groupSelection = groupSummary.selection as ChatThreadSelection.GroupChat
+        assertEquals(false, groupSummary.avatarContact.id == groupSelection.groupId)
+        assertEquals(true, groupSummary.message.senderName.contains(" · "))
         assertEquals(true, summaries.map { it.accountId }.distinct().size > 1)
         assertEquals(first.accountId, accountIdForScopedThreadSelection(first.selection))
         assertEquals(true, homeUnreadOverviewShowsAllAccounts())
@@ -1767,7 +1892,7 @@ class FloatingChatMessageUiContractTest {
         )
 
         assertEquals(true, summaries.size > 5)
-        assertEquals(true, summaries.all { it.message.senderName.contains("未回") })
+        assertEquals(true, summaries.all { !it.message.senderName.contains("未回") })
     }
 
     @Test
@@ -1829,7 +1954,7 @@ class FloatingChatMessageUiContractTest {
         assertEquals(true, homeUnreadOverviewUsesUnrepliedMessagesAfterLastSelfReply())
         assertEquals(2, summary.unreadCount)
         assertEquals("needs-reply-2", summary.message.id.removePrefix("home-unread-${summary.threadId}-"))
-        assertEquals("Customer - 2 条未回 - Me", summary.message.senderName)
+        assertEquals("Customer - Me", summary.message.senderName)
     }
 
     @Test
@@ -3152,8 +3277,7 @@ class FloatingChatMessageUiContractTest {
         assertEquals(true, floatingChatOverlayHandlesOwnEdgeGestures())
         assertEquals(false, floatingChatOverlayEdgeGestureConsumesPlainTaps())
         assertEquals(false, floatingChatInternalEdgeGestureObservesInitialPointerPass())
-        assertEquals(8, floatingChatInternalEdgeGestureTouchTargetDp())
-        assertEquals(gestureOverlayTouchTargetDp(1), floatingChatInternalEdgeGestureTouchTargetDp())
+        assertEquals(24, floatingChatInternalEdgeGestureTouchTargetDp())
         assertEquals(false, floatingChatInternalEdgeGestureCoversSideRails())
         assertEquals(false, floatingChatInternalEdgeGestureUsesEarlyHorizontalLock())
         assertEquals(true, floatingChatExpandedBottomGestureHandledInsideOverlay())

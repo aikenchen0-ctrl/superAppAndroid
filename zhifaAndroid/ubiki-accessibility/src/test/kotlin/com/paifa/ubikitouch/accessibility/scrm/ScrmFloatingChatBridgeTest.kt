@@ -1,6 +1,10 @@
 package com.paifa.ubikitouch.accessibility.scrm
 
 import com.paifa.ubikitouch.core.model.FloatingChatPrototype
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.accountScopedConversations
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.homeUnreadDemoThreadSummaries
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.homeUnreadThreadSummaries
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -67,6 +71,11 @@ class ScrmFloatingChatBridgeTest {
         assertFalse(conversation.contacts.any { contact -> contact.id == "li-si" })
         assertEquals(emptyList<Any>(), conversation.groupContacts)
         assertEquals(emptyList<Any>(), conversation.messages)
+        assertEquals(30, conversation.homeUnreadDemoMessages.size)
+        assertEquals(true, conversation.homeUnreadDemoMessages.all { message ->
+            message.type == com.paifa.ubikitouch.core.model.FloatingChatMessageType.Text && !message.fromMe
+        })
+        assertEquals(true, conversation.homeUnreadDemoMessages.any { message -> message.threadContactId == conversation.contacts.first().id })
 
         val accountIds = conversation.accountContacts.map { account -> account.id }
         assertEquals(
@@ -173,6 +182,12 @@ class ScrmFloatingChatBridgeTest {
         )
         assertEquals("https://mmbiz.qpic.cn/member-1.png", conversation.accountContacts.first().avatarUrl)
         assertEquals("room_a@chatroom", scrmFloatingContactConversationId(conversation.groupContacts.single().id))
+        assertEquals(30, conversation.homeUnreadDemoMessages.size)
+        assertEquals(true, conversation.homeUnreadDemoMessages.any { message -> message.threadContactId == conversation.groupContacts.single().id })
+        val summaries = homeUnreadDemoThreadSummaries(conversation)
+        assertEquals(30, summaries.size)
+        assertEquals(true, summaries.any { summary -> summary.selection is ChatThreadSelection.Private })
+        assertEquals(true, summaries.any { summary -> summary.selection is ChatThreadSelection.GroupChat })
     }
 
     @Test
