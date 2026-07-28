@@ -121,6 +121,12 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
+    fun unrepliedOverviewUsesExplicitEmptyState() {
+        assertEquals("所有消息均已回复", unrepliedOverviewEmptyText(emptyList<String>()))
+        assertEquals(null, unrepliedOverviewEmptyText(listOf("item")))
+    }
+
+    @Test
     fun homeOverviewGroupsAllMessagesFromOneContactAndAccountUnderOneAvatar() {
         val messages = listOf(
             FloatingChatMessage(id = "a-1", type = FloatingChatMessageType.Text, text = "one", fromMe = false, senderName = "A", time = "10:00", connectionTargetId = "a"),

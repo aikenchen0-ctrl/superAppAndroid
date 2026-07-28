@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -31,6 +32,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
 import com.paifa.ubikitouch.accessibility.floatingchat.message.MessageRow
@@ -38,6 +40,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.components.AvatarRole
 import com.paifa.ubikitouch.accessibility.floatingchat.components.CompactAvatar
 import com.paifa.ubikitouch.accessibility.floatingchat.message.messageListBottomClearanceDp
 import com.paifa.ubikitouch.accessibility.floatingchat.message.messageListReusableContentType
+import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 
@@ -166,6 +169,16 @@ internal fun MessageCoordinatePane(
                     }
                     )
                 }
+            }
+        }
+        if (homeOverviewVisible) {
+            unrepliedOverviewEmptyText(homeOverviewMessageGroups)?.let { emptyText ->
+                Text(
+                    text = emptyText,
+                    color = OverlayTokens.secondaryText,
+                    fontSize = 13.sp,
+                    modifier = Modifier.align(Alignment.Center)
+                )
             }
         }
         if (homeOverviewVisible && unrepliedOverviewState.draftMode == UnrepliedDraftMode.Bottom) {

@@ -88,3 +88,7 @@ internal fun UnrepliedOverviewState.afterDraftSend(
 ): UnrepliedOverviewState {
     return if (succeeded) copy(drafts = drafts - key) else this
 }
+
+internal fun unrepliedOverviewEmptyText(items: List<*>): String? {
+    return if (items.isEmpty()) "所有消息均已回复" else null
+}
