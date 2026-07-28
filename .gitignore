@@ -33,6 +33,7 @@ captures/
 # Local agent/runtime files
 .agents/
 .git-backups/
+.worktrees/
 task_plan.md
 findings.md
 progress.md
