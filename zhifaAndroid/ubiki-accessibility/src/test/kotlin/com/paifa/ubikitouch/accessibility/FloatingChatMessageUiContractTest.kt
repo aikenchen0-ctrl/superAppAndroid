@@ -217,6 +217,100 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
+    fun homeOverviewMessageWithoutAccountCreatesOnlySessionConnectorTarget() {
+        val message = FloatingChatMessage(
+            id = "message-1",
+            type = FloatingChatMessageType.Text,
+            text = "incoming",
+            fromMe = false,
+            senderName = "Contact",
+            time = "10:00",
+            connectionTarget = FloatingChatConnectionTarget.User,
+            connectionTargetId = "contact-1"
+        )
+
+        assertEquals(
+            listOf(
+                ConnectorTargetKey(
+                    target = FloatingChatConnectionTarget.User,
+                    targetId = "home-group:contact-1",
+                    lane = ConnectorAvatarLane.Session
+                )
+            ),
+            message.toHomeOverviewConnectorTargetKeys(
+                connectorGroupId = "home-group:contact-1",
+                accountId = null
+            )
+        )
+    }
+
+    @Test
+    fun homeOverviewMessageWithoutResolvableSessionCreatesNoConnectorTargets() {
+        val message = FloatingChatMessage(
+            id = "message-1",
+            type = FloatingChatMessageType.Text,
+            text = "incoming",
+            fromMe = false,
+            senderName = "Contact",
+            time = "10:00",
+            connectionTarget = FloatingChatConnectionTarget.User,
+            connectionTargetId = null
+        )
+
+        assertEquals(
+            emptyList<ConnectorTargetKey>(),
+            message.toHomeOverviewConnectorTargetKeys(
+                connectorGroupId = null,
+                accountId = "account-1"
+            )
+        )
+    }
+
+    @Test
+    fun homeOverviewNonUserMessageCreatesNoConnectorTargets() {
+        val message = FloatingChatMessage(
+            id = "message-1",
+            type = FloatingChatMessageType.Text,
+            text = "outgoing",
+            fromMe = true,
+            senderName = "Account",
+            time = "10:00",
+            connectionTarget = FloatingChatConnectionTarget.Account,
+            connectionTargetId = "account-1"
+        )
+
+        assertEquals(
+            emptyList<ConnectorTargetKey>(),
+            message.toHomeOverviewConnectorTargetKeys(
+                connectorGroupId = "home-group:account-1:contact-1:message-1",
+                accountId = "account-1"
+            )
+        )
+    }
+
+    @Test
+    fun homeOverviewMessageRejectsBlankConnectorGroupId() {
+        val message = FloatingChatMessage(
+            id = "message-1",
+            type = FloatingChatMessageType.Text,
+            text = "incoming",
+            fromMe = false,
+            senderName = "Contact",
+            time = "10:00",
+            connectionTarget = FloatingChatConnectionTarget.User,
+            connectionTargetId = "contact-1"
+        )
+
+        assertEquals(
+            emptyList<ConnectorTargetKey>(),
+            message.toHomeOverviewConnectorTargetKeys(
+                connectorGroupId = "   ",
+                accountId = "account-1"
+            )
+        )
+    }
+
+    @Test
     fun homeOverviewAssignsMatchingDistinctPaletteColorsToAccounts() {
         val accounts = (1..13).map { index ->
             FloatingChatContact(

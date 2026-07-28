@@ -592,8 +592,10 @@ internal fun FloatingChatMessage.toHomeOverviewConnectorTargetKeys(
     accountId: String?
 ): List<ConnectorTargetKey> {
     if (connectionTarget != FloatingChatConnectionTarget.User) return emptyList()
+    if (connectorGroupId?.isBlank() == true) return emptyList()
+    val sessionKey = toHomeOverviewConnectorTargetKey(connectorGroupId) ?: return emptyList()
     return buildList {
-        toHomeOverviewConnectorTargetKey(connectorGroupId)?.let(::add)
+        add(sessionKey)
         accountId?.takeIf { it.isNotBlank() }?.let { resolvedAccountId ->
             add(
                 ConnectorTargetKey(
