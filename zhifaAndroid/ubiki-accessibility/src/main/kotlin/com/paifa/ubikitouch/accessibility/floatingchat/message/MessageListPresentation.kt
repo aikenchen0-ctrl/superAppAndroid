@@ -42,6 +42,39 @@ internal fun shouldRetargetMessageList(
     return previous != next
 }
 
+internal data class MessageListRetargetPosition(
+    val index: Int,
+    val scrollOffset: Int
+)
+
+internal fun messageListRetargetPosition(
+    previous: MessageListViewportKey,
+    next: MessageListViewportKey,
+    messageCount: Int,
+    savedOverviewIndex: Int,
+    savedOverviewScrollOffset: Int
+): MessageListRetargetPosition {
+    if (!next.homeOverviewVisible) {
+        return MessageListRetargetPosition(
+            index = messageListInitialFirstVisibleItemIndex(
+                messageCount = messageCount,
+                homeOverviewVisible = false
+            ),
+            scrollOffset = 0
+        )
+    }
+    if (previous.homeOverviewVisible && previous.accountFilterId != next.accountFilterId) {
+        return MessageListRetargetPosition(index = 0, scrollOffset = 0)
+    }
+    if (messageCount == 0) return MessageListRetargetPosition(index = 0, scrollOffset = 0)
+
+    val index = savedOverviewIndex.coerceIn(0, messageCount - 1)
+    return MessageListRetargetPosition(
+        index = index,
+        scrollOffset = savedOverviewScrollOffset.takeIf { index == savedOverviewIndex } ?: 0
+    )
+}
+
 @Suppress("UNUSED_PARAMETER")
 internal fun messageListReusableContentType(messageType: FloatingChatMessageType): String {
     return ReusableMessageRowContentType

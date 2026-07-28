@@ -25,6 +25,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.account.FloatingChatAccou
 import com.paifa.ubikitouch.accessibility.floatingchat.message.MessageListViewportKey
 import com.paifa.ubikitouch.accessibility.floatingchat.message.isPaymentCardMessage
 import com.paifa.ubikitouch.accessibility.floatingchat.message.messageListInitialFirstVisibleItemIndex
+import com.paifa.ubikitouch.accessibility.floatingchat.message.messageListRetargetPosition
 import com.paifa.ubikitouch.accessibility.floatingchat.message.messageListViewportKey
 import com.paifa.ubikitouch.accessibility.floatingchat.message.shouldRetargetMessageList
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.RightCoordinateRail
@@ -196,11 +197,16 @@ internal fun CoordinateChatBody(
         MessageListViewportTracker(viewportKey, visibleMessages.size)
     }
     if (shouldRetargetMessageList(viewportTracker.viewportKey, viewportKey)) {
+        val target = messageListRetargetPosition(
+            previous = viewportTracker.viewportKey,
+            next = viewportKey,
+            messageCount = visibleMessages.size,
+            savedOverviewIndex = unrepliedOverviewState.firstVisibleItemIndex,
+            savedOverviewScrollOffset = unrepliedOverviewState.firstVisibleItemScrollOffset
+        )
         messageListState.requestScrollToItem(
-            index = messageListInitialFirstVisibleItemIndex(
-                messageCount = visibleMessages.size,
-                homeOverviewVisible = homeOverviewVisible
-            )
+            index = target.index,
+            scrollOffset = target.scrollOffset
         )
         viewportTracker.viewportKey = viewportKey
         viewportTracker.messageCount = visibleMessages.size

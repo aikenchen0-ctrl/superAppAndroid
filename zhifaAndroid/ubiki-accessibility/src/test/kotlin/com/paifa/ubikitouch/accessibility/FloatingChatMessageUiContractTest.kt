@@ -486,6 +486,43 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
+    fun returningToOverviewRestoresPositionWhileFilteringStartsAtTop() {
+        val conversation = messageListViewportKey(
+            selection = ChatThreadSelection.Private("contact-a"),
+            selectedAccountId = "account-a",
+            homeOverviewVisible = false
+        )
+        val allAccounts = messageListViewportKey(
+            selection = ChatThreadSelection.Private("contact-a"),
+            selectedAccountId = "account-a",
+            homeOverviewVisible = true,
+            accountFilterId = null
+        )
+        val filtered = allAccounts.copy(accountFilterId = "account-b")
+
+        assertEquals(
+            MessageListRetargetPosition(index = 4, scrollOffset = 36),
+            messageListRetargetPosition(
+                previous = conversation,
+                next = allAccounts,
+                messageCount = 8,
+                savedOverviewIndex = 4,
+                savedOverviewScrollOffset = 36
+            )
+        )
+        assertEquals(
+            MessageListRetargetPosition(index = 0, scrollOffset = 0),
+            messageListRetargetPosition(
+                previous = allAccounts,
+                next = filtered,
+                messageCount = 3,
+                savedOverviewIndex = 4,
+                savedOverviewScrollOffset = 36
+            )
+        )
+    }
+
+    @Test
     fun gestureOverlayUsesConfiguredTriggerBarWidth() {
         assertEquals(1, gestureOverlayThicknessDp(0))
         assertEquals(1, gestureOverlayThicknessDp(1))
