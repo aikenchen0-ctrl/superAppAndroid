@@ -108,6 +108,23 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
+    fun overviewPreservesAccountFilteringAndRecipientIndicators() {
+        val summaries = homeUnreadThreadSummaries(
+            accountConversations = accountScopedConversations(FloatingChatPrototype.sampleConversation())
+        )
+        val accountId = summaries.first().accountId
+        val filtered = filterHomeUnreadSummaries(summaries, accountFilterId = accountId)
+        val indicators = UnrepliedRecipientIndicators(
+            watermarkVisible = true,
+            colorDotVisible = false
+        )
+
+        assertEquals(setOf(accountId), filtered.map { summary -> summary.accountId }.toSet())
+        assertEquals(true, shouldRenderRecipientWatermark(indicators))
+        assertEquals(false, shouldRenderRecipientColorDot(indicators))
+    }
+
+    @Test
     fun unrepliedOverviewUsesExplicitEmptyState() {
         assertEquals("所有消息均已回复", unrepliedOverviewEmptyText(emptyList<String>()))
         assertEquals(null, unrepliedOverviewEmptyText(listOf("item")))
