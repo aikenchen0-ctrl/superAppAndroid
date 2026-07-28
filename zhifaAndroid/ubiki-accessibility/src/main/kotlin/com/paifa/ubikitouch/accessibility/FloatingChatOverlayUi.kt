@@ -507,13 +507,16 @@ internal fun FloatingChatOverlay(
     var selectedThread by remember {
         mutableStateOf(initialChatThreadSelection(contactProfiledConversation, runtimeState.selectedThread))
     }
-    var homeOverviewVisible by remember { mutableStateOf(false) }
+    var unrepliedOverviewState by remember { mutableStateOf(UnrepliedOverviewState()) }
+    val homeOverviewVisible = unrepliedOverviewState.visible
     val unreadThreadIds = remember { mutableStateMapOf<String, Boolean>() }
     val chatNavigationActions = ChatNavigationActions(
         unreadThreadIds = unreadThreadIds,
         onActiveAccountIdChanged = { accountId -> activeAccountId = accountId },
         onSelectedThreadChanged = { thread -> selectedThread = thread },
-        onHomeOverviewVisibleChanged = { visible -> homeOverviewVisible = visible }
+        onHomeOverviewVisibleChanged = { visible ->
+            unrepliedOverviewState = unrepliedOverviewState.copy(visible = visible)
+        }
     )
     val localMessages = remember(liveConversation, initialLocalMessages) {
         mutableStateListOf<FloatingChatMessage>().apply {
@@ -545,7 +548,6 @@ internal fun FloatingChatOverlay(
         )
     }
     val accountScopedDisplayConversations = remember(
-        homeOverviewVisible,
         profiledConversation,
         contactProfileList,
         groupProfileList,
@@ -553,9 +555,6 @@ internal fun FloatingChatOverlay(
         localMessageVersion,
         hiddenMessageIds.size
     ) {
-        if (!shouldBuildAllAccountHomeOverview(homeOverviewVisible)) {
-            return@remember emptyList<AccountScopedConversation>()
-        }
         val visibleLocalMessages = localMessages.filter { message -> hiddenMessageIds[message.id] != true }
         accountScopedConversations(profiledConversation).map { scoped ->
             val groupAppliedConversation = applyGroupProfilesToConversation(
@@ -588,6 +587,13 @@ internal fun FloatingChatOverlay(
                 accountConversations = accountScopedDisplayConversations
             )
         }
+    }
+    val currentHomeUnreadSummaries = remember(
+        accountScopedDisplayConversations,
+        homeDisplayConversation.homeUnreadDemoMessages
+    ) {
+        homeUnreadThreadSummaries(accountScopedDisplayConversations) +
+            homeUnreadDemoThreadSummaries(homeDisplayConversation)
     }
     val activeGroupProfilesById = remember(groupProfileList, activeAccountId) {
         groupProfileList
@@ -650,7 +656,9 @@ internal fun FloatingChatOverlay(
         onLiveConversationChanged = { nextConversation -> liveConversation = nextConversation },
         onActiveAccountIdChanged = { accountId -> activeAccountId = accountId },
         onSelectedThreadChanged = { thread -> selectedThread = thread },
-        onHomeOverviewVisibleChanged = { visible -> homeOverviewVisible = visible },
+        onHomeOverviewVisibleChanged = { visible ->
+            unrepliedOverviewState = unrepliedOverviewState.copy(visible = visible)
+        },
         onLocalMessagesReplaced = { messages ->
             localMessages.clear()
             localMessages.addAll(messages)
@@ -970,7 +978,7 @@ internal fun FloatingChatOverlay(
                     currentThread = selectedThread
                 )
                 activeAccountId = nextAccountId
-                homeOverviewVisible = false
+                unrepliedOverviewState = unrepliedOverviewState.copy(visible = false)
                 bottomPanelMode = BottomPanelMode.None
             },
             onAccountAvatarLongClick = { account ->
@@ -1022,8 +1030,54 @@ internal fun FloatingChatOverlay(
                     hideKeyboardFromBlankArea()
                 }
             },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 44.dp)
         )
+            val filteredSummaryCount = unrepliedOverviewState.accountFilterId?.let { accountId ->
+                currentHomeUnreadSummaries.count { summary -> summary.accountId == accountId }
+            } ?: currentHomeUnreadSummaries.size
+            UnrepliedOverviewHeader(
+                overviewState = unrepliedOverviewState,
+                accountFilterName = unrepliedOverviewState.accountFilterId?.let { accountId ->
+                    profiledConversation.accountContacts.firstOrNull { account -> account.id == accountId }?.name
+                },
+                conversationTitle = when (val thread = selectedThread) {
+                    ChatThreadSelection.Group -> displayConversation.peerName
+                    is ChatThreadSelection.GroupChat -> displayConversation.groupContacts
+                        .firstOrNull { group -> group.id == thread.groupId }
+                        ?.name
+                        ?: displayConversation.peerName
+                    is ChatThreadSelection.Private -> displayConversation.contacts
+                        .firstOrNull { contact -> contact.id == thread.contactId }
+                        ?.name
+                        ?: displayConversation.peerName
+                },
+                itemCount = filteredSummaryCount,
+                onOpenOverview = {
+                    unrepliedOverviewState = restoreUnrepliedOverviewState(
+                        saved = unrepliedOverviewState,
+                        availableAccountIds = profiledConversation.accountContacts.map { account -> account.id }.toSet(),
+                        availableItemIds = currentHomeUnreadSummaries.map { summary -> summary.itemId }
+                    )
+                    bottomPanelMode = BottomPanelMode.None
+                },
+                onBackToAllAccounts = {
+                    unrepliedOverviewState = unrepliedOverviewState.copy(
+                        visible = true,
+                        accountFilterId = null
+                    )
+                },
+                onDraftModeChanged = { mode ->
+                    unrepliedOverviewState = unrepliedOverviewState.copy(draftMode = mode)
+                },
+                onIndicatorsChanged = { indicators ->
+                    unrepliedOverviewState = unrepliedOverviewState.copy(indicators = indicators)
+                },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .zIndex(40f)
+            )
         },
         panelContent = {
         if (bottomPanelMode != BottomPanelMode.None) {
@@ -1375,7 +1429,7 @@ internal fun FloatingChatOverlay(
                     onPanelModeChange = { bottomPanelMode = it },
                     onSend = { inputMessageActions.sendInputMessage() },
                     onHome = {
-                        homeOverviewVisible = true
+                        unrepliedOverviewState = unrepliedOverviewState.copy(visible = true)
                         bottomPanelMode = BottomPanelMode.None
                     },
                     onAssistantPredict = { aiDraftGenerationActions.generate() },

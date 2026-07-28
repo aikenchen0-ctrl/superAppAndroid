@@ -58,6 +58,49 @@ import org.junit.Test
 
 class FloatingChatMessageUiContractTest {
     @Test
+    fun unrepliedHeaderShowsEntryOnlyOutsideAllAccountOverview() {
+        assertEquals(
+            UnrepliedHeaderLeadingAction.OpenOverview,
+            unrepliedHeaderLeadingAction(overviewVisible = false, accountFilterId = null)
+        )
+        assertEquals(
+            UnrepliedHeaderLeadingAction.None,
+            unrepliedHeaderLeadingAction(overviewVisible = true, accountFilterId = null)
+        )
+        assertEquals(
+            UnrepliedHeaderLeadingAction.BackToAllAccounts,
+            unrepliedHeaderLeadingAction(overviewVisible = true, accountFilterId = "account-a")
+        )
+        assertEquals(
+            "全部账号 · 12 项",
+            unrepliedHeaderTitle(
+                overviewVisible = true,
+                accountFilterName = null,
+                conversationTitle = "Customer",
+                itemCount = 12
+            )
+        )
+        assertEquals(
+            "主账号 · 3 项",
+            unrepliedHeaderTitle(
+                overviewVisible = true,
+                accountFilterName = "主账号",
+                conversationTitle = "Customer",
+                itemCount = 3
+            )
+        )
+        assertEquals(
+            "Customer",
+            unrepliedHeaderTitle(
+                overviewVisible = false,
+                accountFilterName = null,
+                conversationTitle = "Customer",
+                itemCount = 0
+            )
+        )
+    }
+
+    @Test
     fun homeOverviewGroupsAllMessagesFromOneContactAndAccountUnderOneAvatar() {
         val messages = listOf(
             FloatingChatMessage(id = "a-1", type = FloatingChatMessageType.Text, text = "one", fromMe = false, senderName = "A", time = "10:00", connectionTargetId = "a"),
