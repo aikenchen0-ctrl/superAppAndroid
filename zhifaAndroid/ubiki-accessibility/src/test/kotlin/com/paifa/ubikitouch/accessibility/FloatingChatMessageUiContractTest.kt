@@ -184,6 +184,39 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
+    fun homeOverviewMessageCreatesSessionAndAccountConnectorTargets() {
+        val message = FloatingChatMessage(
+            id = "message-1",
+            type = FloatingChatMessageType.Text,
+            text = "incoming",
+            fromMe = false,
+            senderName = "Contact",
+            time = "10:00",
+            connectionTarget = FloatingChatConnectionTarget.User,
+            connectionTargetId = "contact-1"
+        )
+
+        assertEquals(
+            listOf(
+                ConnectorTargetKey(
+                    target = FloatingChatConnectionTarget.User,
+                    targetId = "home-group:account-1:contact-1:message-1",
+                    lane = ConnectorAvatarLane.Session
+                ),
+                ConnectorTargetKey(
+                    target = FloatingChatConnectionTarget.Account,
+                    targetId = "account-1",
+                    lane = ConnectorAvatarLane.Account
+                )
+            ),
+            message.toHomeOverviewConnectorTargetKeys(
+                connectorGroupId = "home-group:account-1:contact-1:message-1",
+                accountId = "account-1"
+            )
+        )
+    }
+
+    @Test
     fun homeOverviewAssignsMatchingDistinctPaletteColorsToAccounts() {
         val accounts = (1..13).map { index ->
             FloatingChatContact(

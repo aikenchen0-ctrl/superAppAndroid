@@ -587,6 +587,25 @@ internal fun FloatingChatMessage.toHomeOverviewConnectorTargetKey(
     )
 }
 
+internal fun FloatingChatMessage.toHomeOverviewConnectorTargetKeys(
+    connectorGroupId: String?,
+    accountId: String?
+): List<ConnectorTargetKey> {
+    if (connectionTarget != FloatingChatConnectionTarget.User) return emptyList()
+    return buildList {
+        toHomeOverviewConnectorTargetKey(connectorGroupId)?.let(::add)
+        accountId?.takeIf { it.isNotBlank() }?.let { resolvedAccountId ->
+            add(
+                ConnectorTargetKey(
+                    target = FloatingChatConnectionTarget.Account,
+                    targetId = resolvedAccountId,
+                    lane = ConnectorAvatarLane.Account
+                )
+            )
+        }
+    }
+}
+
 internal fun FloatingChatMessage.toHomeOverviewConnectorSourceKey(): ConnectorTargetKey? {
     if (connectionTarget != FloatingChatConnectionTarget.User) return null
     return ConnectorTargetKey(
