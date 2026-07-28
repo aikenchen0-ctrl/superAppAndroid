@@ -244,7 +244,10 @@ internal fun allAccountHomeConversation(
         peerName = "All accounts",
         contacts = accountConversations.flatMap { scoped -> scoped.conversation.contacts },
         groupContacts = accountConversations.flatMap { scoped -> scoped.conversation.groupContacts },
-        messages = accountConversations.flatMap { scoped -> scoped.conversation.messages }
+        messages = accountConversations.flatMap { scoped -> scoped.conversation.messages },
+        homeUnreadDemoMessages = accountConversations.flatMap { scoped ->
+            scoped.conversation.homeUnreadDemoMessages
+        }
     )
 }
 
@@ -631,9 +634,10 @@ internal fun homeUnreadDemoThreadSummaries(
     val fallbackAccountId = conversation.accountContacts.firstOrNull { account -> account.selected }?.id
         ?: conversation.accountContacts.firstOrNull()?.id
         ?: ""
-    return conversation.homeUnreadDemoMessages.mapNotNull { message ->
-            val resolvedThreadId = message.threadContactId?.takeIf { id -> id.isNotBlank() }
-                ?: return@mapNotNull null
+    return conversation.homeUnreadDemoMessages
+        .groupBy { message -> message.threadContactId?.takeIf { id -> id.isNotBlank() } }
+        .mapNotNull { (resolvedThreadId, threadMessages) ->
+            resolvedThreadId ?: return@mapNotNull null
             val selection = when {
                 resolvedThreadId in groupIds -> ChatThreadSelection.GroupChat(resolvedThreadId)
                 resolvedThreadId in contactIds -> ChatThreadSelection.Private(resolvedThreadId)
@@ -643,7 +647,7 @@ internal fun homeUnreadDemoThreadSummaries(
                 accountId = accountIdForScopedThreadId(resolvedThreadId) ?: fallbackAccountId,
                 conversation = conversation,
                 selection = selection,
-                unrepliedMessages = listOf(message).homeUnrepliedTextMessages()
+                unrepliedMessages = threadMessages.homeUnrepliedTextMessages()
             )
         }
 }

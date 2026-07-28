@@ -2,9 +2,15 @@ package com.paifa.ubikitouch.accessibility.scrm
 
 import com.paifa.ubikitouch.core.model.FloatingChatPrototype
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.accountScopedConversations
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.AccountScopedConversation
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.allAccountHomeConversation
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.homeUnreadDemoThreadSummaries
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.homeUnreadThreadSummaries
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
+import com.paifa.ubikitouch.core.model.FloatingChatConnectionTarget
+import com.paifa.ubikitouch.core.model.FloatingChatMessageKind
+import com.paifa.ubikitouch.core.model.FloatingChatMessagePresentation
+import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -182,12 +188,97 @@ class ScrmFloatingChatBridgeTest {
         )
         assertEquals("https://mmbiz.qpic.cn/member-1.png", conversation.accountContacts.first().avatarUrl)
         assertEquals("room_a@chatroom", scrmFloatingContactConversationId(conversation.groupContacts.single().id))
-        assertEquals(30, conversation.homeUnreadDemoMessages.size)
+        assertEquals(true, conversation.homeUnreadDemoMessages.size > 30)
         assertEquals(true, conversation.homeUnreadDemoMessages.any { message -> message.threadContactId == conversation.groupContacts.single().id })
         val summaries = homeUnreadDemoThreadSummaries(conversation)
-        assertEquals(30, summaries.size)
         assertEquals(true, summaries.any { summary -> summary.selection is ChatThreadSelection.Private })
         assertEquals(true, summaries.any { summary -> summary.selection is ChatThreadSelection.GroupChat })
+        assertEquals(
+            summaries.map { summary -> summary.threadId }.distinct(),
+            summaries.map { summary -> summary.threadId }
+        )
+    }
+
+    @Test
+    fun debugGroupFixturesCoverPositiveBoundariesAndExcludedMessageKinds() {
+        val group = FloatingChatPrototype.sampleConversation().groupContacts.first()
+
+        val messages = scrmGroupUnrepliedDebugMessages(listOf(group))
+        val scenarioIds = messages.map { message -> message.id }.toSet()
+
+        assertEquals(true, scenarioIds.any { id -> id.contains("single-incoming") })
+        assertEquals(true, scenarioIds.any { id -> id.contains("same-member-sequence") })
+        assertEquals(true, scenarioIds.any { id -> id.contains("alternating-members") })
+        assertEquals(true, scenarioIds.any { id -> id.contains("self-reply-boundary") })
+        assertEquals(true, scenarioIds.any { id -> id.contains("mention-me") })
+        assertEquals(true, scenarioIds.any { id -> id.contains("mention-all") })
+        assertEquals(true, scenarioIds.any { id -> id.contains("long-text") })
+        assertEquals(true, scenarioIds.any { id -> id.contains("emoji-mixed") })
+        assertEquals(true, scenarioIds.any { id -> id.contains("blank-text") })
+        assertEquals(FloatingChatMessageType.entries.toSet(), messages.map { message -> message.type }.toSet())
+        assertEquals(true, messages.any { message -> message.presentation == FloatingChatMessagePresentation.System })
+        assertEquals(true, messages.any { message -> message.presentation == FloatingChatMessagePresentation.SpecialCard })
+        assertEquals(true, messages.any { message -> message.kind == FloatingChatMessageKind.AiDraft })
+        assertEquals(true, messages.any { message -> message.fromMe })
+        assertEquals(true, messages.all { message -> message.threadContactId == group.id })
+        assertEquals(messages.size, messages.map { message -> message.id }.distinct().size)
+        assertEquals(
+            1,
+            messages.filter { message -> message.id.contains("same-time-") }
+                .map { message -> message.time }
+                .distinct()
+                .size
+        )
+    }
+
+    @Test
+    fun debugGroupFixturesAggregateByThreadAndKeepOnlyMessagesAfterLastSelfReply() {
+        val base = FloatingChatPrototype.sampleConversation()
+        val group = base.groupContacts.first()
+        val messages = scrmGroupUnrepliedDebugMessages(listOf(group))
+        val conversation = base.copy(
+            contacts = (base.contacts + group.groupMemberContacts).distinctBy { contact -> contact.id },
+            groupContacts = listOf(group),
+            homeUnreadDemoMessages = messages
+        )
+
+        val summary = homeUnreadDemoThreadSummaries(conversation).single()
+        val expected = messages.drop(messages.indexOfLast { message ->
+            message.fromMe &&
+                message.kind != FloatingChatMessageKind.AiDraft &&
+                message.presentation != FloatingChatMessagePresentation.System
+        } + 1).filter { message ->
+            !message.fromMe &&
+                message.type == FloatingChatMessageType.Text &&
+                message.presentation == FloatingChatMessagePresentation.Bubble &&
+                message.connectionTarget == FloatingChatConnectionTarget.User &&
+                message.text.isNotBlank()
+        }
+
+        assertEquals(expected.size, summary.unreadCount)
+        assertEquals(expected.map { message -> message.text }, summary.unrepliedMessages.map { message -> message.text })
+        assertEquals(true, summary.message.text.contains("[场景:"))
+    }
+
+    @Test
+    fun allAccountHomeConversationIncludesDemoMessagesFromEveryAccount() {
+        val base = FloatingChatPrototype.sampleConversation()
+        val fixtures = scrmGroupUnrepliedDebugMessages(base.groupContacts)
+        val first = base.copy(homeUnreadDemoMessages = fixtures.take(1))
+        val second = base.copy(homeUnreadDemoMessages = fixtures.drop(1).take(2))
+
+        val combined = allAccountHomeConversation(
+            baseConversation = base.copy(homeUnreadDemoMessages = emptyList()),
+            accountConversations = listOf(
+                AccountScopedConversation("account-1", first),
+                AccountScopedConversation("account-2", second)
+            )
+        )
+
+        assertEquals(
+            first.homeUnreadDemoMessages + second.homeUnreadDemoMessages,
+            combined.homeUnreadDemoMessages
+        )
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.paifa.ubikitouch.accessibility.scrm
 
+import com.paifa.ubikitouch.accessibility.BuildConfig
 import com.paifa.ubikitouch.accessibility.floatingchat.media.normalizedRemoteImageUri
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatConversation
@@ -155,16 +156,16 @@ internal fun scrmFloatingChatConversation(
         contacts = scopedContacts,
         accountContacts = floatingAccounts,
         messages = emptyList(),
-        homeUnreadDemoMessages = scrmUnreadDemoMessages(scopedContacts, scopedGroups),
+        homeUnreadDemoMessages = scrmUnreadDemoMessages(scopedContacts) +
+            if (BuildConfig.DEBUG) scrmGroupUnrepliedDebugMessages(scopedGroups) else emptyList(),
         groupContacts = scopedGroups
     )
 }
 
 private fun scrmUnreadDemoMessages(
-    contacts: List<FloatingChatContact>,
-    groups: List<FloatingChatContact>
+    contacts: List<FloatingChatContact>
 ): List<FloatingChatMessage> {
-    val routes = contacts.take(10) + groups.take(4)
+    val routes = contacts.take(10)
     if (routes.isEmpty()) return emptyList()
     val texts = listOf(
         "我把今天的内容整理好了，方便时帮我看一下。",
