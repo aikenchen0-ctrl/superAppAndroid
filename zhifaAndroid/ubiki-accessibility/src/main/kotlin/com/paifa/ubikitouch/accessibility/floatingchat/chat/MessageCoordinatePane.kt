@@ -50,8 +50,12 @@ internal fun MessageCoordinatePane(
     homeOverviewAccountColors: Map<String, Long>,
     homeOverviewAccountIdsByMessageId: Map<String, String>,
     homeOverviewMessageGroups: List<HomeOverviewMessageGroup>,
+    homeOverviewSummariesByMessageId: Map<String, HomeUnreadThreadSummary>,
     homeOverviewAccountContacts: Map<String, FloatingChatContact>,
     unrepliedRecipientIndicators: UnrepliedRecipientIndicators,
+    unrepliedOverviewState: UnrepliedOverviewState,
+    onUnrepliedOverviewStateChanged: (UnrepliedOverviewState) -> Unit,
+    onSendUnrepliedDraft: (HomeUnreadThreadSummary, String) -> Unit,
     groupMemberAvatarsVisible: Boolean,
     listState: LazyListState,
     connectorState: ConnectorCoordinateState,
@@ -105,6 +109,10 @@ internal fun MessageCoordinatePane(
                         homeOverviewAccountIdsByMessageId = homeOverviewAccountIdsByMessageId,
                         homeOverviewAccountContacts = homeOverviewAccountContacts,
                         unrepliedRecipientIndicators = unrepliedRecipientIndicators,
+                        summary = group.messages.firstOrNull()?.id?.let(homeOverviewSummariesByMessageId::get),
+                        unrepliedOverviewState = unrepliedOverviewState,
+                        onUnrepliedOverviewStateChanged = onUnrepliedOverviewStateChanged,
+                        onSendUnrepliedDraft = onSendUnrepliedDraft,
                         groupMemberAvatarsVisible = groupMemberAvatarsVisible,
                         onPreviewMedia = onPreviewMedia,
                         onOpenMediaActions = onOpenMediaActions,
@@ -160,6 +168,27 @@ internal fun MessageCoordinatePane(
                 }
             }
         }
+        if (homeOverviewVisible && unrepliedOverviewState.draftMode == UnrepliedDraftMode.Bottom) {
+            val selectedSummary = homeOverviewSummariesByMessageId.values
+                .distinctBy { summary -> summary.itemId }
+                .firstOrNull { summary -> summary.itemId == unrepliedOverviewState.selectedItemId }
+            selectedSummary?.let { summary ->
+                val draftKey = UnrepliedDraftKey(summary.accountId, summary.threadId)
+                val draftText = unrepliedOverviewState.drafts[draftKey]
+                    ?: summary.suggestedDraftText.orEmpty()
+                UnrepliedBottomDraft(
+                    text = draftText,
+                    onTextChanged = { text ->
+                        onUnrepliedOverviewStateChanged(unrepliedOverviewState.updateDraft(draftKey, text))
+                    },
+                    onSend = { onSendUnrepliedDraft(summary, draftText) },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(start = 8.dp, end = 8.dp, bottom = 76.dp)
+                        .zIndex(8f)
+                )
+            }
+        }
     }
 }
 
@@ -173,6 +202,10 @@ private fun HomeOverviewMessageGroupRow(
     homeOverviewAccountIdsByMessageId: Map<String, String>,
     homeOverviewAccountContacts: Map<String, FloatingChatContact>,
     unrepliedRecipientIndicators: UnrepliedRecipientIndicators,
+    summary: HomeUnreadThreadSummary?,
+    unrepliedOverviewState: UnrepliedOverviewState,
+    onUnrepliedOverviewStateChanged: (UnrepliedOverviewState) -> Unit,
+    onSendUnrepliedDraft: (HomeUnreadThreadSummary, String) -> Unit,
     groupMemberAvatarsVisible: Boolean,
     onPreviewMedia: (FloatingChatMessage) -> Unit,
     onOpenMediaActions: (FloatingChatMessage) -> Unit,
@@ -216,6 +249,29 @@ private fun HomeOverviewMessageGroupRow(
                     onBubbleBoundsChanged = { bounds -> connectorState.updateMessageBubble(message.id, bounds) },
                     onGroupMemberAvatarBoundsChanged = {},
                     onGroupMemberAvatarRemoved = {}
+                )
+            }
+        }
+        summary?.let { item ->
+            val draftKey = UnrepliedDraftKey(item.accountId, item.threadId)
+            val draftText = unrepliedOverviewState.drafts[draftKey]
+                ?: item.suggestedDraftText.orEmpty()
+            when (unrepliedOverviewState.draftMode) {
+                UnrepliedDraftMode.Inline -> UnrepliedInlineDraft(
+                    text = draftText,
+                    onTextChanged = { text ->
+                        onUnrepliedOverviewStateChanged(unrepliedOverviewState.updateDraft(draftKey, text))
+                    },
+                    onSend = { onSendUnrepliedDraft(item, draftText) }
+                )
+                UnrepliedDraftMode.Bottom -> SelectUnrepliedBottomDraftButton(
+                    selected = unrepliedOverviewState.selectedItemId == item.itemId,
+                    onClick = {
+                        onUnrepliedOverviewStateChanged(
+                            unrepliedOverviewState.copy(selectedItemId = item.itemId)
+                        )
+                    },
+                    modifier = Modifier.align(Alignment.End)
                 )
             }
         }

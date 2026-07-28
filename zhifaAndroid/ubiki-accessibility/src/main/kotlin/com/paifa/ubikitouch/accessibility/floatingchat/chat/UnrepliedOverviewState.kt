@@ -69,3 +69,22 @@ internal fun shouldRenderRecipientWatermark(indicators: UnrepliedRecipientIndica
 internal fun shouldRenderRecipientColorDot(indicators: UnrepliedRecipientIndicators): Boolean {
     return indicators.colorDotVisible
 }
+
+internal fun UnrepliedOverviewState.updateDraft(
+    key: UnrepliedDraftKey,
+    text: String
+): UnrepliedOverviewState {
+    val updatedDrafts = if (text.isEmpty()) {
+        drafts - key
+    } else {
+        drafts + (key to text)
+    }
+    return copy(drafts = updatedDrafts)
+}
+
+internal fun UnrepliedOverviewState.afterDraftSend(
+    key: UnrepliedDraftKey,
+    succeeded: Boolean
+): UnrepliedOverviewState {
+    return if (succeeded) copy(drafts = drafts - key) else this
+}

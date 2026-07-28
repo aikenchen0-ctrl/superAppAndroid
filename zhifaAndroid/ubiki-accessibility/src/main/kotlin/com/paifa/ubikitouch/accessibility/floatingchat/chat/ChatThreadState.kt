@@ -440,7 +440,8 @@ internal data class HomeUnreadThreadSummary(
     val message: FloatingChatMessage,
     val unreadCount: Int,
     val avatarContact: FloatingChatContact,
-    val unrepliedMessages: List<FloatingChatMessage> = listOf(message)
+    val unrepliedMessages: List<FloatingChatMessage> = listOf(message),
+    val suggestedDraftText: String? = null
 ) {
     val itemId: String = "$accountId::$threadId"
 }
@@ -664,16 +665,36 @@ private fun homeUnreadThreadSummariesForAccount(
             accountId = accountId,
             conversation = conversation,
             selection = selection,
-            unrepliedMessages = unrepliedMessages
+            unrepliedMessages = unrepliedMessages,
+            suggestedDraftText = latestAiDraftTextForSelection(
+                conversation = conversation,
+                selection = selection,
+                accountId = selectedAccountId
+            )
         )
     }
+}
+
+private fun latestAiDraftTextForSelection(
+    conversation: FloatingChatConversation,
+    selection: ChatThreadSelection,
+    accountId: String
+): String? {
+    val threadContactId = selection.threadContactIdForHome()
+    return conversation.messages.lastOrNull { message ->
+        message.kind == FloatingChatMessageKind.AiDraft &&
+            message.text.isNotBlank() &&
+            message.threadContactId == threadContactId &&
+            (message.connectionTargetId == null || message.connectionTargetId == accountId)
+    }?.text
 }
 
 private fun homeUnreadThreadSummary(
     accountId: String,
     conversation: FloatingChatConversation,
     selection: ChatThreadSelection,
-    unrepliedMessages: List<FloatingChatMessage>
+    unrepliedMessages: List<FloatingChatMessage>,
+    suggestedDraftText: String? = null
 ): HomeUnreadThreadSummary? {
     val latest = unrepliedMessages.lastOrNull() ?: return null
     val contact = contactForSelection(conversation, selection) ?: return null
@@ -716,7 +737,8 @@ private fun homeUnreadThreadSummary(
         unreadCount = unreadCount,
         avatarContact = avatarContact,
         message = displayMessages.last(),
-        unrepliedMessages = displayMessages
+        unrepliedMessages = displayMessages,
+        suggestedDraftText = suggestedDraftText
     )
 }
 

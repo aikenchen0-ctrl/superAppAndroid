@@ -8,6 +8,7 @@ import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatConversation
 import com.paifa.ubikitouch.core.model.FloatingChatFileFormat
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
+import com.paifa.ubikitouch.core.model.FloatingChatMessageKind
 import com.paifa.ubikitouch.core.model.FloatingChatMessagePresentation
 import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 import com.paifa.ubikitouch.core.model.FloatingChatSendState
@@ -2004,6 +2005,17 @@ class FloatingChatMessageUiContractTest {
                     time = "10:03",
                     connectionTargetId = "customer",
                     threadContactId = "customer"
+                ),
+                FloatingChatMessage(
+                    id = "ai-draft",
+                    type = FloatingChatMessageType.Text,
+                    text = "AI suggested reply",
+                    fromMe = true,
+                    senderName = "AI",
+                    time = "10:04",
+                    kind = FloatingChatMessageKind.AiDraft,
+                    connectionTargetId = "account",
+                    threadContactId = "customer"
                 )
             ),
             toolActions = emptyList()
@@ -2017,6 +2029,7 @@ class FloatingChatMessageUiContractTest {
         assertEquals(2, summary.unreadCount)
         assertEquals("needs-reply-2", summary.message.id.removePrefix("home-unread-${summary.threadId}-"))
         assertEquals("Customer - Me", summary.message.senderName)
+        assertEquals("AI suggested reply", summary.suggestedDraftText)
     }
 
     @Test

@@ -968,6 +968,47 @@ internal fun FloatingChatOverlay(
                 )
                 chatNavigationActions.openHomeUnread(summary)
             },
+            onSendUnrepliedDraft = { summary, draftText ->
+                val outgoingText = draftText.trim()
+                if (outgoingText.isNotEmpty()) {
+                    runCatching {
+                        val scopedConversation = accountScopedDisplayConversations
+                            .firstOrNull { scoped -> scoped.accountId == summary.accountId }
+                            ?.conversation
+                            ?: error("未找到待回复事项所属账号")
+                        val targetAccount = scopedConversation.accountContacts
+                            .firstOrNull { account -> account.id == summary.accountId }
+                            ?: error("未找到待回复事项所属账号资料")
+                        OutgoingMessageActions(
+                            conversation = scopedConversation,
+                            selectedThread = summary.selection,
+                            selectedAccount = targetAccount,
+                            nextSequence = {
+                                localMessageSequence += 1
+                                localMessageSequence
+                            },
+                            prepareOutgoingMessage = onPrepareOutgoingMessage,
+                            onOutgoingMessageCreated = { message, threadId ->
+                                localMessages += message
+                                syncLocalMessageState()
+                                onPersistLocalMessage(message, threadId)
+                            }
+                        ).addTextMessage(outgoingText, quotedMessage = null)
+                    }.onSuccess {
+                        val draftKey = UnrepliedDraftKey(summary.accountId, summary.threadId)
+                        unrepliedOverviewState = unrepliedOverviewState.afterDraftSend(
+                            key = draftKey,
+                            succeeded = true
+                        )
+                    }.onFailure { error ->
+                        Toast.makeText(
+                            context,
+                            error.message ?: "未回消息发送失败",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            },
             onToolAction = { action -> toolMessageActions.sendToolMessage(action) },
             onGroupAvatarLongClick = { group ->
                 contactEditorTarget = ContactEditorTarget.Group(group)
