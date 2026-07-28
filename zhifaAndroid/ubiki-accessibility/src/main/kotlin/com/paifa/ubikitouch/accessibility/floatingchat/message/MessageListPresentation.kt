@@ -9,18 +9,21 @@ import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 internal data class MessageListViewportKey(
     val threadId: String,
     val selectedAccountId: String,
-    val homeOverviewVisible: Boolean
+    val homeOverviewVisible: Boolean,
+    val accountFilterId: String?
 )
 
 internal fun messageListViewportKey(
     selection: ChatThreadSelection,
     selectedAccountId: String,
-    homeOverviewVisible: Boolean
+    homeOverviewVisible: Boolean,
+    accountFilterId: String? = null
 ): MessageListViewportKey {
     return MessageListViewportKey(
         threadId = selection.toLocalThreadId(),
         selectedAccountId = selectedAccountId,
-        homeOverviewVisible = homeOverviewVisible
+        homeOverviewVisible = homeOverviewVisible,
+        accountFilterId = accountFilterId
     )
 }
 

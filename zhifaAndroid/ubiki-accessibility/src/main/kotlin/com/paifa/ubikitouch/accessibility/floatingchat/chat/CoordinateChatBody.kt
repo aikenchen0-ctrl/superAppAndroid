@@ -163,11 +163,17 @@ internal fun CoordinateChatBody(
             emptyList()
         }
     }
-    val viewportKey = remember(selectedThread, selectedAccount.id, homeOverviewVisible) {
+    val viewportKey = remember(
+        selectedThread,
+        selectedAccount.id,
+        homeOverviewVisible,
+        unrepliedOverviewState.accountFilterId
+    ) {
         messageListViewportKey(
             selection = selectedThread,
             selectedAccountId = selectedAccount.id,
-            homeOverviewVisible = homeOverviewVisible
+            homeOverviewVisible = homeOverviewVisible,
+            accountFilterId = unrepliedOverviewState.accountFilterId.takeIf { homeOverviewVisible }
         )
     }
     val messageListState = rememberLazyListState(
