@@ -757,9 +757,9 @@ private fun homeUnreadSenderLabel(
 
 internal fun unreadThreadIdsAfterOpeningHomeUnreadBubble(
     unreadThreadIds: Set<String>,
-    summary: HomeUnreadThreadSummary
+    @Suppress("UNUSED_PARAMETER") summary: HomeUnreadThreadSummary
 ): Set<String> {
-    return unreadThreadIds - summary.threadId
+    return unreadThreadIds
 }
 
 private fun contactForSelection(
@@ -795,7 +795,7 @@ internal fun homeUnreadOverviewUsesUnrepliedMessagesAfterLastSelfReply(): Boolea
 
 internal fun homeUnreadOverviewBubblesJumpToThread(): Boolean = true
 
-internal fun homeUnreadOverviewClearsUnreadAfterOpen(): Boolean = true
+internal fun homeUnreadOverviewClearsUnreadAfterOpen(): Boolean = false
 
 internal fun homeUnreadOverviewKeepsConnectorLines(): Boolean = true
 

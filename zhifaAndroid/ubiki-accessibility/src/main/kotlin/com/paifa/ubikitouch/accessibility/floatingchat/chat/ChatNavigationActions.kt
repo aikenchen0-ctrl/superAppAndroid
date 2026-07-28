@@ -19,6 +19,5 @@ internal class ChatNavigationActions(
         onActiveAccountIdChanged(summary.accountId)
         onSelectedThreadChanged(summary.selection)
         onHomeOverviewVisibleChanged(false)
-        unreadThreadIds.remove(summary.threadId)
     }
 }

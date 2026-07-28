@@ -2092,7 +2092,7 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
-    fun homeUnreadOverviewShowsLatestUnreadPerThreadAndClearsOnOpen() {
+    fun openingHomeUnreadKeepsTheItemUntilARealReply() {
         val conversation = FloatingChatPrototype.sampleConversation()
         val accountConversations = accountScopedConversations(conversation)
         val summaries = homeUnreadThreadSummaries(
@@ -2107,13 +2107,13 @@ class FloatingChatMessageUiContractTest {
 
         assertEquals(true, homeUnreadOverviewUsesLatestMessagePerThread())
         assertEquals(true, homeUnreadOverviewBubblesJumpToThread())
-        assertEquals(true, homeUnreadOverviewClearsUnreadAfterOpen())
+        assertEquals(false, homeUnreadOverviewClearsUnreadAfterOpen())
         assertEquals(true, homeUnreadOverviewKeepsConnectorLines())
         assertEquals(true, homeUnreadAvatarGreenDotReflectsThreadState())
         assertEquals(true, homeUnreadOverviewUsesSourceScopedConnectorLines())
         assertEquals(summaries.map { summary -> summary.threadId }.toSet(), unreadThreadIds)
         assertEquals(summaries.map { it.threadId }.distinct(), summaries.map { it.threadId })
-        assertEquals(false, afterOpen.contains(first.threadId))
+        assertEquals(unreadThreadIds, afterOpen)
         assertEquals(true, summaries.all { it.message.type == FloatingChatMessageType.Text })
         assertEquals(true, summaries.all { it.message.presentation == FloatingChatMessagePresentation.Bubble })
         assertEquals(true, summaries.all { !it.message.fromMe })
