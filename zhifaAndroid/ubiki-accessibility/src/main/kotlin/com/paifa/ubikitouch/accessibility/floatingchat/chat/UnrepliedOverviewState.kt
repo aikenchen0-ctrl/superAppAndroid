@@ -49,6 +49,18 @@ internal fun restoreUnrepliedOverviewState(
     )
 }
 
+internal fun openAllAccountsUnrepliedOverview(
+    saved: UnrepliedOverviewState,
+    availableAccountIds: Set<String>,
+    availableItemIds: List<String>
+): UnrepliedOverviewState {
+    return restoreUnrepliedOverviewState(
+        saved = saved,
+        availableAccountIds = availableAccountIds,
+        availableItemIds = availableItemIds
+    ).copy(accountFilterId = null)
+}
+
 internal fun filterHomeUnreadSummaries(
     summaries: List<HomeUnreadThreadSummary>,
     accountFilterId: String?

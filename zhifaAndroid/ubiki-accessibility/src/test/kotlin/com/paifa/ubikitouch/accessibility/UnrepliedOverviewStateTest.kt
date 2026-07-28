@@ -4,6 +4,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.chat.UnrepliedDraftKey
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.UnrepliedDraftMode
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.UnrepliedOverviewState
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.UnrepliedRecipientIndicators
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.openAllAccountsUnrepliedOverview
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.restoreUnrepliedOverviewState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -12,6 +13,39 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UnrepliedOverviewStateTest {
+    @Test
+    fun bottomHomeOpensAllAccountsWhilePreservingValidOverviewState() {
+        val draftKey = UnrepliedDraftKey("account-a", "thread-a")
+        val saved = UnrepliedOverviewState(
+            accountFilterId = "account-a",
+            selectedItemId = "account-a::thread-a",
+            firstVisibleItemIndex = 1,
+            firstVisibleItemScrollOffset = 24,
+            draftMode = UnrepliedDraftMode.Inline,
+            drafts = mapOf(draftKey to "reply"),
+            indicators = UnrepliedRecipientIndicators(
+                watermarkVisible = false,
+                colorDotVisible = true
+            )
+        )
+
+        val opened = openAllAccountsUnrepliedOverview(
+            saved = saved,
+            availableAccountIds = setOf("account-a", "account-b"),
+            availableItemIds = listOf("account-a::thread-a", "account-b::thread-b")
+        )
+
+        assertTrue(opened.visible)
+        assertNull(opened.accountFilterId)
+        assertEquals("account-a::thread-a", opened.selectedItemId)
+        assertEquals(1, opened.firstVisibleItemIndex)
+        assertEquals(24, opened.firstVisibleItemScrollOffset)
+        assertEquals(UnrepliedDraftMode.Inline, opened.draftMode)
+        assertEquals("reply", opened.drafts[draftKey])
+        assertFalse(opened.indicators.watermarkVisible)
+        assertTrue(opened.indicators.colorDotVisible)
+    }
+
     @Test
     fun restoreKeepsValidUiStateButUsesLatestItems() {
         val draftKey = UnrepliedDraftKey("account-a", "thread-a")

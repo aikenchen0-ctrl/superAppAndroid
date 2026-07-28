@@ -1487,7 +1487,14 @@ internal fun FloatingChatOverlay(
                     onPanelModeChange = { bottomPanelMode = it },
                     onSend = { inputMessageActions.sendInputMessage() },
                     onHome = {
-                        unrepliedOverviewState = unrepliedOverviewState.copy(visible = true)
+                        unrepliedOverviewState = openAllAccountsUnrepliedOverview(
+                            saved = unrepliedOverviewState,
+                            availableAccountIds = profiledConversation.accountContacts
+                                .map { account -> account.id }
+                                .toSet(),
+                            availableItemIds = currentHomeUnreadSummaries
+                                .map { summary -> summary.itemId }
+                        )
                         bottomPanelMode = BottomPanelMode.None
                     },
                     onAssistantPredict = { aiDraftGenerationActions.generate() },
