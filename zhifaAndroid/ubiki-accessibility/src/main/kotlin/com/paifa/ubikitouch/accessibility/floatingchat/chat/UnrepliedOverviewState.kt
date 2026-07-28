@@ -48,3 +48,24 @@ internal fun restoreUnrepliedOverviewState(
         firstVisibleItemIndex = saved.firstVisibleItemIndex.coerceIn(0, availableItemIds.lastIndex)
     )
 }
+
+internal fun filterHomeUnreadSummaries(
+    summaries: List<HomeUnreadThreadSummary>,
+    accountFilterId: String?
+): List<HomeUnreadThreadSummary> {
+    return accountFilterId?.let { id ->
+        summaries.filter { summary -> summary.accountId == id }
+    } ?: summaries
+}
+
+internal fun shouldRenderChatConnectorLayer(homeOverviewVisible: Boolean): Boolean {
+    return !homeOverviewVisible
+}
+
+internal fun shouldRenderRecipientWatermark(indicators: UnrepliedRecipientIndicators): Boolean {
+    return indicators.watermarkVisible
+}
+
+internal fun shouldRenderRecipientColorDot(indicators: UnrepliedRecipientIndicators): Boolean {
+    return indicators.colorDotVisible
+}

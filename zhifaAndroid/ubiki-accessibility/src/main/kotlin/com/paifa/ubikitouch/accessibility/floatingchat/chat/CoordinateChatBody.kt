@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -34,6 +35,7 @@ import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import com.paifa.ubikitouch.core.model.FloatingChatMessageKind
 import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 import com.paifa.ubikitouch.core.model.FloatingChatToolAction
+import kotlinx.coroutines.flow.collectLatest
 private val FloatingContentSideInset = 58.dp
 private val EdgeGestureSafeInset = 8.dp
 @Composable
@@ -44,6 +46,8 @@ internal fun CoordinateChatBody(
     activeAccountId: String,
     selectedThread: ChatThreadSelection,
     homeOverviewVisible: Boolean,
+    unrepliedOverviewState: UnrepliedOverviewState,
+    onUnrepliedOverviewStateChanged: (UnrepliedOverviewState) -> Unit,
     unreadThreadIds: Set<String>,
     inputText: String,
     inputFocused: Boolean,
@@ -81,7 +85,7 @@ internal fun CoordinateChatBody(
             activeAccountId = activeAccountId
         )
     }
-    val homeUnreadSummaries = remember(homeOverviewConversations, conversation.homeUnreadDemoMessages) {
+    val allHomeUnreadSummaries = remember(homeOverviewConversations, conversation.homeUnreadDemoMessages) {
         if (shouldBuildAllAccountHomeOverview(homeOverviewVisible)) {
             homeUnreadThreadSummaries(accountConversations = homeOverviewConversations) +
                 homeUnreadDemoThreadSummaries(conversation)
@@ -89,8 +93,16 @@ internal fun CoordinateChatBody(
             emptyList()
         }
     }
+    val homeUnreadSummaries = remember(allHomeUnreadSummaries, unrepliedOverviewState.accountFilterId) {
+        filterHomeUnreadSummaries(
+            summaries = allHomeUnreadSummaries,
+            accountFilterId = unrepliedOverviewState.accountFilterId
+        )
+    }
     val homeUnreadSummaryByMessageId = remember(homeUnreadSummaries) {
-        homeUnreadSummaries.associateBy { summary -> summary.message.id }
+        homeUnreadSummaries.flatMap { summary ->
+            summary.unrepliedMessages.map { message -> message.id to summary }
+        }.toMap()
     }
     val homeUnreadAvatarContacts = remember(homeUnreadSummaries) {
         homeUnreadSummaries.map { summary -> summary.avatarContact }.distinctBy { contact -> contact.id }
@@ -102,12 +114,15 @@ internal fun CoordinateChatBody(
         homeOverviewAccountColorsById(conversation.accountContacts)
     }
     val homeUnreadAccountColors = remember(homeUnreadSummaries, homeUnreadColorsByAccountId) {
-        homeUnreadSummaries.associate { summary ->
-            summary.message.id to (homeUnreadColorsByAccountId[summary.accountId] ?: 0xFF00A6FB)
-        }
+        homeUnreadSummaries.flatMap { summary ->
+            val color = homeUnreadColorsByAccountId[summary.accountId] ?: 0xFF00A6FB
+            summary.unrepliedMessages.map { message -> message.id to color }
+        }.toMap()
     }
     val homeUnreadAccountIdsByMessageId = remember(homeUnreadSummaries) {
-        homeUnreadSummaries.associate { summary -> summary.message.id to summary.accountId }
+        homeUnreadSummaries.flatMap { summary ->
+            summary.unrepliedMessages.map { message -> message.id to summary.accountId }
+        }.toMap()
     }
     val threadMessages = remember(conversation, selectedThread, selectedAccount.id) {
         visibleMessagesForThread(
@@ -118,7 +133,7 @@ internal fun CoordinateChatBody(
     }
     val visibleMessages = remember(homeOverviewVisible, homeUnreadSummaries, threadMessages) {
         if (homeOverviewVisible) {
-            homeUnreadSummaries.map { summary -> summary.message }
+            homeUnreadSummaries.flatMap { summary -> summary.unrepliedMessages }
         } else {
             threadMessages
         }
@@ -155,10 +170,19 @@ internal fun CoordinateChatBody(
         )
     }
     val messageListState = rememberLazyListState(
-        initialFirstVisibleItemIndex = messageListInitialFirstVisibleItemIndex(
-            messageCount = visibleMessages.size,
-            homeOverviewVisible = homeOverviewVisible
-        )
+        initialFirstVisibleItemIndex = if (homeOverviewVisible) {
+            unrepliedOverviewState.firstVisibleItemIndex.coerceIn(0, visibleMessages.lastIndex.coerceAtLeast(0))
+        } else {
+            messageListInitialFirstVisibleItemIndex(
+                messageCount = visibleMessages.size,
+                homeOverviewVisible = false
+            )
+        },
+        initialFirstVisibleItemScrollOffset = if (homeOverviewVisible) {
+            unrepliedOverviewState.firstVisibleItemScrollOffset
+        } else {
+            0
+        }
     )
     val viewportTracker = remember {
         MessageListViewportTracker(viewportKey, visibleMessages.size)
@@ -208,6 +232,24 @@ internal fun CoordinateChatBody(
             messageListState.animateScrollToItem(visibleMessages.lastIndex)
         }
     }
+    LaunchedEffect(homeOverviewVisible, messageListState) {
+        if (!homeOverviewVisible) return@LaunchedEffect
+        snapshotFlow {
+            messageListState.firstVisibleItemIndex to messageListState.firstVisibleItemScrollOffset
+        }.collectLatest { (index, offset) ->
+            if (
+                index != unrepliedOverviewState.firstVisibleItemIndex ||
+                offset != unrepliedOverviewState.firstVisibleItemScrollOffset
+            ) {
+                onUnrepliedOverviewStateChanged(
+                    unrepliedOverviewState.copy(
+                        firstVisibleItemIndex = index,
+                        firstVisibleItemScrollOffset = offset
+                    )
+                )
+            }
+        }
+    }
     Box(modifier = modifier.fillMaxWidth()) {
         MessageCoordinatePane(
             messages = visibleMessages,
@@ -217,6 +259,8 @@ internal fun CoordinateChatBody(
             homeOverviewAccountColors = homeUnreadAccountColors,
             homeOverviewAccountIdsByMessageId = homeUnreadAccountIdsByMessageId,
             homeOverviewMessageGroups = homeOverviewMessageGroups,
+            homeOverviewAccountContacts = conversation.accountContacts.associateBy { account -> account.id },
+            unrepliedRecipientIndicators = unrepliedOverviewState.indicators,
             groupMemberAvatarsVisible = groupMemberAvatarsVisible,
             listState = messageListState,
             connectorState = connectorState,
@@ -301,7 +345,7 @@ internal fun CoordinateChatBody(
                 .fillMaxHeight()
                 .width(rightRailWidthDp().dp)
         )
-        ChatConnectorLayer(
+        if (shouldRenderChatConnectorLayer(homeOverviewVisible)) ChatConnectorLayer(
             messages = visibleMessages,
             selection = selectedThread,
             selectedAccountId = selectedAccount.id,

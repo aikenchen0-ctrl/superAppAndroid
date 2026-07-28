@@ -954,12 +954,20 @@ internal fun FloatingChatOverlay(
             activeAccountId = selectedAccount.id,
             selectedThread = selectedThread,
             homeOverviewVisible = homeOverviewVisible,
+            unrepliedOverviewState = unrepliedOverviewState,
+            onUnrepliedOverviewStateChanged = { state -> unrepliedOverviewState = state },
             unreadThreadIds = unreadThreadIds.filterValues { unread -> unread }.keys.toSet(),
             inputText = inputText,
             inputFocused = inputFocused,
             groupMemberAvatarsVisible = currentGroupMemberAvatarsVisible,
             onThreadSelected = { thread -> chatNavigationActions.openChatThread(thread) },
-            onHomeUnreadSelected = { summary -> chatNavigationActions.openHomeUnread(summary) },
+            onHomeUnreadSelected = { summary ->
+                unrepliedOverviewState = unrepliedOverviewState.copy(
+                    visible = false,
+                    selectedItemId = summary.itemId
+                )
+                chatNavigationActions.openHomeUnread(summary)
+            },
             onToolAction = { action -> toolMessageActions.sendToolMessage(action) },
             onGroupAvatarLongClick = { group ->
                 contactEditorTarget = ContactEditorTarget.Group(group)
@@ -968,6 +976,15 @@ internal fun FloatingChatOverlay(
                 contactEditorTarget = ContactEditorTarget.User(contact)
             },
             onAccountAvatarClick = { account ->
+                if (homeOverviewVisible) {
+                    unrepliedOverviewState = unrepliedOverviewState.copy(
+                        visible = true,
+                        accountFilterId = account.id,
+                        firstVisibleItemIndex = 0,
+                        firstVisibleItemScrollOffset = 0
+                    )
+                    return@CoordinateChatBody
+                }
                 val nextAccountId = selectedAccountIdAfterAccountAvatarClick(
                     currentAccountId = activeAccountId,
                     clickedAccountId = account.id
