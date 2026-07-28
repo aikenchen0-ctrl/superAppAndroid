@@ -480,6 +480,12 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
+    fun overviewAccountClickSkipsSelectedAccountCoordinateInvalidation() {
+        assertEquals(false, shouldUpdateSelectedAccountBoundsOnClick(homeOverviewVisible = true))
+        assertEquals(true, shouldUpdateSelectedAccountBoundsOnClick(homeOverviewVisible = false))
+    }
+
+    @Test
     fun gestureOverlayUsesConfiguredTriggerBarWidth() {
         assertEquals(1, gestureOverlayThicknessDp(0))
         assertEquals(1, gestureOverlayThicknessDp(1))

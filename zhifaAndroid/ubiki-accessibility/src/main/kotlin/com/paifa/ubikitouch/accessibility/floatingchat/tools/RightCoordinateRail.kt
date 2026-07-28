@@ -76,6 +76,11 @@ import com.paifa.ubikitouch.core.model.FloatingChatToolAction
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.sqrt
+
+internal fun shouldUpdateSelectedAccountBoundsOnClick(homeOverviewVisible: Boolean): Boolean {
+    return !homeOverviewVisible
+}
+
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
 internal fun RightCoordinateRail(
@@ -85,6 +90,7 @@ internal fun RightCoordinateRail(
     highlightedAccountColors: Map<String, Long> = emptyMap(),
     actions: List<FloatingChatToolAction>,
     connectorState: ConnectorCoordinateState,
+    updateSelectedBoundsOnClick: Boolean,
     onToolAction: (FloatingChatToolAction) -> Unit,
     onAccountAvatarClick: (FloatingChatContact) -> Unit,
     onAccountAvatarLongClick: (FloatingChatContact) -> Unit,
@@ -311,6 +317,7 @@ internal fun RightCoordinateRail(
                         selectedAccountId = selectedAccountId,
                         highlightColor = highlightedAccountColors[account.id],
                         connectorState = connectorState,
+                        updateSelectedBoundsOnClick = updateSelectedBoundsOnClick,
                         onAccountAvatarClick = onAccountAvatarClick,
                         onAccountAvatarLongClick = onAccountAvatarLongClick,
                         removeBoundsOnDispose = true,
@@ -325,6 +332,7 @@ internal fun RightCoordinateRail(
                     profile = accountProfiles[selectedAccount.id],
                     selectedAccountId = selectedAccountId,
                     connectorState = connectorState,
+                    updateSelectedBoundsOnClick = updateSelectedBoundsOnClick,
                     onAccountAvatarClick = onAccountAvatarClick,
                     onAccountAvatarLongClick = onAccountAvatarLongClick,
                     removeBoundsOnDispose = false,
@@ -412,6 +420,7 @@ private fun AccountRailAvatarItem(
     selectedAccountId: String?,
     highlightColor: Long? = null,
     connectorState: ConnectorCoordinateState,
+    updateSelectedBoundsOnClick: Boolean,
     onAccountAvatarClick: (FloatingChatContact) -> Unit,
     onAccountAvatarLongClick: (FloatingChatContact) -> Unit,
     removeBoundsOnDispose: Boolean,
@@ -428,8 +437,10 @@ private fun AccountRailAvatarItem(
             highlightColor = highlightColor?.let(::Color),
             imageUri = profile?.avatarImageUri,
             onClick = {
-                currentAccountBounds?.let { bounds ->
-                    connectorState.updateSelectedAccountAvatar(account.id, bounds)
+                if (updateSelectedBoundsOnClick) {
+                    currentAccountBounds?.let { bounds ->
+                        connectorState.updateSelectedAccountAvatar(account.id, bounds)
+                    }
                 }
                 onAccountAvatarClick(account)
             },
