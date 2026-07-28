@@ -34,6 +34,7 @@ internal fun ChatConnectorLayer(
     selectedAccountId: String,
     homeOverviewVisible: Boolean,
     homeOverviewConnectorGroupIds: Map<String, String>,
+    homeOverviewAccountIdsByMessageId: Map<String, String>,
     homeOverviewMessageGroups: List<HomeOverviewMessageGroup>,
     groupMemberAvatarsVisible: Boolean,
     listState: LazyListState,

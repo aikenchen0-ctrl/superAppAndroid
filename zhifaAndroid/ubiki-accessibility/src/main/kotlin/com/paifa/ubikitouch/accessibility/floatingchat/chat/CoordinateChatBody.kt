@@ -356,6 +356,7 @@ internal fun CoordinateChatBody(
             selectedAccountId = selectedAccount.id,
             homeOverviewVisible = homeOverviewVisible,
             homeOverviewConnectorGroupIds = homeOverviewConnectorGroupIds,
+            homeOverviewAccountIdsByMessageId = homeUnreadAccountIdsByMessageId,
             homeOverviewMessageGroups = homeOverviewMessageGroups,
             groupMemberAvatarsVisible = groupMemberAvatarsVisible,
             listState = messageListState,

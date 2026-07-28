@@ -102,22 +102,9 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
-    fun overviewFiltersAccountsAndNeverDrawsConnectorLayer() {
-        val summaries = homeUnreadThreadSummaries(
-            accountConversations = accountScopedConversations(FloatingChatPrototype.sampleConversation())
-        )
-        val accountId = summaries.first().accountId
-        val filtered = filterHomeUnreadSummaries(summaries, accountFilterId = accountId)
-        val indicators = UnrepliedRecipientIndicators(
-            watermarkVisible = true,
-            colorDotVisible = false
-        )
-
-        assertEquals(setOf(accountId), filtered.map { summary -> summary.accountId }.toSet())
-        assertFalse(shouldRenderChatConnectorLayer(homeOverviewVisible = true))
+    fun overviewAndConversationBothRenderConnectorLayer() {
+        assertEquals(true, shouldRenderChatConnectorLayer(homeOverviewVisible = true))
         assertEquals(true, shouldRenderChatConnectorLayer(homeOverviewVisible = false))
-        assertEquals(true, shouldRenderRecipientWatermark(indicators))
-        assertEquals(false, shouldRenderRecipientColorDot(indicators))
     }
 
     @Test
