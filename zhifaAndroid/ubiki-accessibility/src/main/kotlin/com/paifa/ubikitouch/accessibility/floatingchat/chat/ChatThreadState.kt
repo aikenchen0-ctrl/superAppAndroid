@@ -439,8 +439,11 @@ internal data class HomeUnreadThreadSummary(
     val selection: ChatThreadSelection,
     val message: FloatingChatMessage,
     val unreadCount: Int,
-    val avatarContact: FloatingChatContact
-)
+    val avatarContact: FloatingChatContact,
+    val unrepliedMessages: List<FloatingChatMessage> = listOf(message)
+) {
+    val itemId: String = "$accountId::$threadId"
+}
 
 internal data class HomeOverviewMessageGroup(
     val avatarContactId: String?,
@@ -683,24 +686,37 @@ private fun homeUnreadThreadSummary(
     val avatarContact = groupMember ?: contact
     val unreadCount = unrepliedMessages.size.coerceAtLeast(1)
     val threadId = selection.toLocalThreadId()
+    val displayMessages = unrepliedMessages.map { message ->
+        message.copy(
+            id = "home-unread-${threadId}-${message.id}",
+            fromMe = false,
+            senderName = homeUnreadSenderLabel(
+                contact = contact,
+                groupMember = if (selection.isGroupThread()) {
+                    message.connectionTargetId
+                        ?.let { targetId -> conversation.contacts.firstOrNull { candidate -> candidate.id == targetId } }
+                } else {
+                    null
+                },
+                accountName = conversation.accountName
+            ),
+            connectionTarget = FloatingChatConnectionTarget.User,
+            connectionTargetId = if (selection.isGroupThread()) {
+                message.connectionTargetId ?: avatarContact.id
+            } else {
+                avatarContact.id
+            },
+            threadContactId = selection.threadContactIdForHome()
+        )
+    }
     return HomeUnreadThreadSummary(
         accountId = accountId,
         threadId = threadId,
         selection = selection,
         unreadCount = unreadCount,
         avatarContact = avatarContact,
-        message = latest.copy(
-            id = "home-unread-${threadId}-${latest.id}",
-            fromMe = false,
-            senderName = homeUnreadSenderLabel(
-                contact = contact,
-                groupMember = groupMember,
-                accountName = conversation.accountName
-            ),
-            connectionTarget = FloatingChatConnectionTarget.User,
-            connectionTargetId = avatarContact.id,
-            threadContactId = selection.threadContactIdForHome()
-        )
+        message = displayMessages.last(),
+        unrepliedMessages = displayMessages
     )
 }
 

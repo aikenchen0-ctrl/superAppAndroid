@@ -1958,6 +1958,61 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
+    fun homeOverviewSummaryKeepsEveryConsecutiveUnrepliedMessage() {
+        val conversation = FloatingChatConversation(
+            peerName = "Test",
+            accountName = "Me",
+            contacts = listOf(FloatingChatContact("customer", "Customer", "C", "Customer", 0xFF1B9AAA)),
+            accountContacts = listOf(FloatingChatContact("account", "Me", "M", "Account", 0xFF3A86FF, selected = true)),
+            messages = listOf(
+                FloatingChatMessage(
+                    id = "my-reply",
+                    type = FloatingChatMessageType.Text,
+                    text = "my reply",
+                    fromMe = true,
+                    senderName = "Me",
+                    time = "10:01",
+                    connectionTargetId = "account",
+                    threadContactId = "customer"
+                ),
+                FloatingChatMessage(
+                    id = "needs-reply-1",
+                    type = FloatingChatMessageType.Text,
+                    text = "needs reply one",
+                    fromMe = false,
+                    senderName = "Customer",
+                    time = "10:02",
+                    connectionTargetId = "customer",
+                    threadContactId = "customer"
+                ),
+                FloatingChatMessage(
+                    id = "needs-reply-2",
+                    type = FloatingChatMessageType.Text,
+                    text = "needs reply two",
+                    fromMe = false,
+                    senderName = "Customer",
+                    time = "10:03",
+                    connectionTargetId = "customer",
+                    threadContactId = "customer"
+                )
+            ),
+            toolActions = emptyList()
+        )
+
+        val summary = homeUnreadThreadSummaries(conversation).single()
+
+        assertEquals("account::private:customer", summary.itemId)
+        assertEquals(2, summary.unrepliedMessages.size)
+        assertEquals(
+            listOf("needs-reply-1", "needs-reply-2"),
+            summary.unrepliedMessages.map { message ->
+                message.id.removePrefix("home-unread-${summary.threadId}-")
+            }
+        )
+        assertEquals(summary.unrepliedMessages.last(), summary.message)
+    }
+
+    @Test
     fun homeUnreadOverviewConnectorLinesDoNotUseGroupMemberAvatars() {
         val contact = FloatingChatPrototype.sampleConversation().contacts.first()
         val message = FloatingChatMessage(
