@@ -196,6 +196,21 @@ class ChatExtractionContractTest {
     }
 
     @Test
+    fun homeOverviewVisibilityInvalidatesUnreadSummaryCache() {
+        val text = sourceFile("floatingchat/chat/CoordinateChatBody.kt").readText()
+
+        assertTrue(
+            text.contains(
+                "remember(\n" +
+                    "        homeOverviewVisible,\n" +
+                    "        homeOverviewConversations,\n" +
+                    "        conversation.homeUnreadDemoMessages\n" +
+                    "    )"
+            )
+        )
+    }
+
+    @Test
     fun chatThreadSelectionLivesInChatPackage() {
         val selection = sourceFile("floatingchat/chat/ChatThreadSelection.kt")
         assertTrue("Missing extracted chat thread selection", selection.isFile)

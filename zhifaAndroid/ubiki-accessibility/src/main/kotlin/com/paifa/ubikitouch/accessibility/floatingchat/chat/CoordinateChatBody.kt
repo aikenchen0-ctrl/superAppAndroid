@@ -88,7 +88,11 @@ internal fun CoordinateChatBody(
             activeAccountId = activeAccountId
         )
     }
-    val allHomeUnreadSummaries = remember(homeOverviewConversations, conversation.homeUnreadDemoMessages) {
+    val allHomeUnreadSummaries = remember(
+        homeOverviewVisible,
+        homeOverviewConversations,
+        conversation.homeUnreadDemoMessages
+    ) {
         if (shouldBuildAllAccountHomeOverview(homeOverviewVisible)) {
             homeUnreadThreadSummaries(accountConversations = homeOverviewConversations) +
                 homeUnreadDemoThreadSummaries(conversation)
