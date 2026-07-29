@@ -12,7 +12,6 @@ internal class ChatNavigationActions(
         }
         onSelectedThreadChanged(thread)
         onHomeOverviewVisibleChanged(false)
-        unreadThreadIds.remove(thread.toLocalThreadId())
     }
 
     fun openHomeUnread(summary: HomeUnreadThreadSummary) {

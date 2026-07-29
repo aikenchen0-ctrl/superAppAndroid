@@ -187,7 +187,7 @@ class ChatExtractionContractTest {
         assertTrue(text.contains("class ChatNavigationActions("))
         assertTrue(text.contains("fun openChatThread("))
         assertTrue(text.contains("fun openHomeUnread("))
-        assertTrue(text.contains("unreadThreadIds.remove(thread.toLocalThreadId())"))
+        assertFalse(text.contains("unreadThreadIds.remove("))
         assertFalse(text.contains("import androidx.compose."))
 
         val legacy = sourceFile("FloatingChatOverlayUi.kt").readText()
