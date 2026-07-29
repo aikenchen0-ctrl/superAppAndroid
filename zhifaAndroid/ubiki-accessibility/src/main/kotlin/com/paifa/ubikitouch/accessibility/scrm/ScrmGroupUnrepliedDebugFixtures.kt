@@ -1,5 +1,6 @@
 package com.paifa.ubikitouch.accessibility.scrm
 
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.accountIdForScopedThreadId
 import com.paifa.ubikitouch.core.model.FloatingChatConnectionTarget
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
@@ -8,16 +9,27 @@ import com.paifa.ubikitouch.core.model.FloatingChatMessagePresentation
 import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 
 internal fun scrmGroupUnrepliedDebugMessages(
-    groups: List<FloatingChatContact>
+    groups: List<FloatingChatContact>,
+    accounts: List<FloatingChatContact>
 ): List<FloatingChatMessage> {
     return groups.flatMapIndexed { groupIndex, group ->
-        groupUnrepliedScenarioMessages(group = group, groupIndex = groupIndex)
+        val accountId = accountIdForScopedThreadId(group.id)
+        val accountName = accounts.firstOrNull { account -> account.id == accountId }?.name
+            ?: accounts.firstOrNull { account -> account.selected }?.name
+            ?: accounts.firstOrNull()?.name
+            ?: "当前用户"
+        groupUnrepliedScenarioMessages(
+            group = group,
+            groupIndex = groupIndex,
+            accountName = accountName
+        )
     }
 }
 
 private fun groupUnrepliedScenarioMessages(
     group: FloatingChatContact,
-    groupIndex: Int
+    groupIndex: Int,
+    accountName: String
 ): List<FloatingChatMessage> {
     val members = group.groupMemberContacts.ifEmpty { listOf(group) }
     val firstMember = members.first()
@@ -94,26 +106,25 @@ private fun groupUnrepliedScenarioMessages(
         )
         add(message("self-reply-boundary", "[场景:回复边界] 我方已经回复", fromMe = true))
         add(message("single-incoming", "[场景:单条未回] 请确认今天的群内安排"))
-        add(message("same-member-sequence-1", "[场景:同成员连续] 第一条补充说明"))
-        add(message("same-member-sequence-2", "[场景:同成员连续] 第二条补充说明"))
-        add(message("same-member-sequence-3", "[场景:同成员连续] 第三条，请以此为准"))
-        add(message("alternating-members-1", "[场景:多成员交替] 成员一提出问题", member = firstMember))
-        add(message("alternating-members-2", "[场景:多成员交替] 成员二补充信息", member = secondMember))
-        add(message("alternating-members-3", "[场景:多成员交替] 成员一继续追问", member = firstMember))
-        add(message("mention-me", "[场景:@我] @我 请确认报价和交付时间"))
+        add(message("same-member-sequence", "[场景:同成员连续] 请补充本周安排"))
+        add(message("alternating-members", "[场景:多成员交替] 成员二补充信息", member = secondMember))
+        add(message("mention-me", "[场景:@用户名] @$accountName 请确认报价和交付时间"))
+        add(message("account-name", "[场景:用户名] $accountName 请查看群内最新方案"))
         add(message("mention-all", "[场景:@所有人] @所有人 明早十点前反馈"))
+        add(message("pending-reply", "[场景:待回复] 这个事项待回复，请给出处理结果"))
         add(message("pending-confirmation", "[场景:待确认] 这个事项待确认，请核对后处理"))
-        add(message("reply-request", "[场景:请回复] 看到后请回复最新处理结果"))
         add(
             message(
-                "long-text",
-                "[场景:长文本] 这是用于验证长文本换行、气泡高度、滚动位置和返回恢复的一段测试内容。" +
-                    "请依次核对需求、排期、负责人、风险、验收标准和后续动作，确认无误后在群里统一回复。".repeat(3)
-            )
+                "same-time-a-emoji-mixed",
+                "[场景:混合字符] 已收到 ✅ 测试 A/B、中文 English、￥100、#标签、括号()[]{}"
+            ).copy(time = "23:59")
         )
-        add(message("emoji-mixed", "[场景:混合字符] 已收到 ✅ 测试 A/B、中文 English、￥100、#标签、括号()[]{}"))
-        add(message("same-time-a", "[场景:相同时间] 第一条同时间消息").copy(time = "23:59"))
-        add(message("same-time-b", "[场景:相同时间] 第二条同时间消息").copy(time = "23:59"))
-        add(message("latest-incoming", "[场景:最新未回] 这是该群当前最后一条有效未回消息").copy(time = "23:59"))
+        add(
+            message(
+                "same-time-b-long-text-latest-incoming",
+                "[场景:长文本/最新未回] 这是用于验证长文本换行、滚动位置和返回恢复的最新普通消息。" +
+                    "请依次核对需求、排期、负责人、风险和验收标准。".repeat(2)
+            ).copy(time = "23:59")
+        )
     }
 }

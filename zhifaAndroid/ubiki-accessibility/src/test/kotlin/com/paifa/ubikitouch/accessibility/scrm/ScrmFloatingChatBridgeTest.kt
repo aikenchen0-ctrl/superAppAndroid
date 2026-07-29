@@ -202,9 +202,10 @@ class ScrmFloatingChatBridgeTest {
 
     @Test
     fun debugGroupFixturesCoverPositiveBoundariesAndExcludedMessageKinds() {
-        val group = FloatingChatPrototype.sampleConversation().groupContacts.first()
+        val sample = FloatingChatPrototype.sampleConversation()
+        val group = sample.groupContacts.first()
 
-        val messages = scrmGroupUnrepliedDebugMessages(listOf(group))
+        val messages = scrmGroupUnrepliedDebugMessages(listOf(group), sample.accountContacts)
         val scenarioIds = messages.map { message -> message.id }.toSet()
 
         assertEquals(true, scenarioIds.any { id -> id.contains("single-incoming") })
@@ -223,6 +224,27 @@ class ScrmFloatingChatBridgeTest {
         assertEquals(true, messages.any { message -> message.fromMe })
         assertEquals(true, messages.all { message -> message.threadContactId == group.id })
         assertEquals(messages.size, messages.map { message -> message.id }.distinct().size)
+        val validUnrepliedMessages = messages.drop(messages.indexOfLast { message ->
+            message.fromMe &&
+                message.kind != FloatingChatMessageKind.AiDraft &&
+                message.presentation != FloatingChatMessagePresentation.System
+        } + 1).filter { message ->
+            !message.fromMe &&
+                message.type == FloatingChatMessageType.Text &&
+                message.presentation == FloatingChatMessagePresentation.Bubble &&
+                message.connectionTarget == FloatingChatConnectionTarget.User &&
+                message.text.isNotBlank()
+        }
+        assertEquals(10, validUnrepliedMessages.size)
+        assertEquals(true, validUnrepliedMessages.any { message -> message.text.contains("@${sample.accountName}") })
+        assertEquals(
+            true,
+            validUnrepliedMessages.any { message ->
+                message.text.contains(sample.accountName) && !message.text.contains("@${sample.accountName}")
+            }
+        )
+        assertEquals(true, validUnrepliedMessages.any { message -> message.text.contains("待回复") })
+        assertEquals(true, validUnrepliedMessages.any { message -> message.text.contains("待确认") })
         assertEquals(
             1,
             messages.filter { message -> message.id.contains("same-time-") }
@@ -236,7 +258,7 @@ class ScrmFloatingChatBridgeTest {
     fun debugGroupFixturesAggregateByThreadAndKeepOnlyMessagesAfterLastSelfReply() {
         val base = FloatingChatPrototype.sampleConversation()
         val group = base.groupContacts.first()
-        val messages = scrmGroupUnrepliedDebugMessages(listOf(group))
+        val messages = scrmGroupUnrepliedDebugMessages(listOf(group), base.accountContacts)
         val conversation = base.copy(
             contacts = (base.contacts + group.groupMemberContacts).distinctBy { contact -> contact.id },
             groupContacts = listOf(group),
@@ -268,7 +290,7 @@ class ScrmFloatingChatBridgeTest {
     @Test
     fun allAccountHomeConversationIncludesDemoMessagesFromEveryAccount() {
         val base = FloatingChatPrototype.sampleConversation()
-        val fixtures = scrmGroupUnrepliedDebugMessages(base.groupContacts)
+        val fixtures = scrmGroupUnrepliedDebugMessages(base.groupContacts, base.accountContacts)
         val first = base.copy(homeUnreadDemoMessages = fixtures.take(1))
         val second = base.copy(homeUnreadDemoMessages = fixtures.drop(1).take(2))
 

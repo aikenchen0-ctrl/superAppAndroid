@@ -157,7 +157,11 @@ internal fun scrmFloatingChatConversation(
         accountContacts = floatingAccounts,
         messages = emptyList(),
         homeUnreadDemoMessages = scrmUnreadDemoMessages(scopedContacts) +
-            if (BuildConfig.DEBUG) scrmGroupUnrepliedDebugMessages(scopedGroups) else emptyList(),
+            if (BuildConfig.DEBUG) {
+                scrmGroupUnrepliedDebugMessages(scopedGroups, floatingAccounts)
+            } else {
+                emptyList()
+            },
         groupContacts = scopedGroups
     )
 }
