@@ -1926,6 +1926,19 @@ class ChatExtractionContractTest {
         assertFalse(legacy.contains("private fun Throwable.toScrmContactsPanelMessage("))
     }
 
+    @Test
+    fun unrepliedModeUsesInitialChatLayoutWithoutDedicatedOverlayLayers() {
+        val overlay = sourceFile("FloatingChatOverlayUi.kt").readText()
+        val body = sourceFile("floatingchat/chat/CoordinateChatBody.kt").readText()
+
+        assertFalse(overlay.contains("UnrepliedOverviewHeader("))
+        assertFalse(body.contains("onSendUnrepliedDraft:"))
+        assertFalse(body.contains("homeOverviewSummariesByMessageId"))
+        assertTrue(overlay.contains("unrepliedOverviewState"))
+        assertTrue(overlay.contains("openAllAccountsUnrepliedOverview("))
+        assertTrue(overlay.contains("restoreUnrepliedOverviewState("))
+    }
+
     private fun sourceFile(relativePath: String): File {
         val moduleRelative = File(
             "src/main/kotlin/com/paifa/ubikitouch/accessibility",
