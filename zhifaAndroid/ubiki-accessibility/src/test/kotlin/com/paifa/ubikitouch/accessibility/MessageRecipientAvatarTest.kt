@@ -4,6 +4,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.messageRecipientContact
 import com.paifa.ubikitouch.accessibility.floatingchat.components.AvatarRole
 import com.paifa.ubikitouch.accessibility.floatingchat.components.avatarRoleUsesSelectionHighlight
+import com.paifa.ubikitouch.accessibility.floatingchat.message.recipientAvatarMarkerColor
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import com.paifa.ubikitouch.core.model.FloatingChatMessagePresentation
@@ -21,6 +22,15 @@ class MessageRecipientAvatarTest {
     fun recipientAvatarDoesNotReuseRailSelectionHighlight() {
         assertEquals(false, avatarRoleUsesSelectionHighlight(AvatarRole.Recipient))
         assertEquals(true, avatarRoleUsesSelectionHighlight(AvatarRole.Account))
+    }
+
+    @Test
+    fun unrepliedRecipientAvatarUsesItsAccountColorMarker() {
+        val accountColor = 0xFF27AE60
+
+        assertEquals(accountColor, recipientAvatarMarkerColor(true, accountColor))
+        assertNull(recipientAvatarMarkerColor(false, accountColor))
+        assertNull(recipientAvatarMarkerColor(true, null))
     }
 
     @Test

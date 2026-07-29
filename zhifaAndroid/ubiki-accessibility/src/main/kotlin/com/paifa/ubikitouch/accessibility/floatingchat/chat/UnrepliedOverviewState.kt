@@ -70,7 +70,9 @@ internal fun filterHomeUnreadSummaries(
     } ?: summaries
 }
 
-internal fun shouldRenderChatConnectorLayer(homeOverviewVisible: Boolean): Boolean = !homeOverviewVisible
+internal fun shouldRenderChatConnectorLayer(
+    @Suppress("UNUSED_PARAMETER") homeOverviewVisible: Boolean
+): Boolean = true
 
 internal fun shouldRenderRecipientWatermark(indicators: UnrepliedRecipientIndicators): Boolean {
     return indicators.watermarkVisible

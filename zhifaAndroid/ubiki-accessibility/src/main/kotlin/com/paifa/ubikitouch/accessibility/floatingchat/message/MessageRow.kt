@@ -210,6 +210,10 @@ internal fun MessageBlock(
                         contact = recipientContact,
                         role = AvatarRole.Recipient,
                         sizeDp = recipientAvatarSizeDp(),
+                        highlightColor = recipientAvatarMarkerColor(
+                            homeOverviewVisible = homeOverviewVisible,
+                            accountColor = homeOverviewAccountColor
+                        )?.let(::Color),
                         onClick = {},
                         onLongClick = {},
                         onBoundsChanged = {},
@@ -294,16 +298,6 @@ internal fun MessageBlock(
                             claimed = claimed
                         )
                     }
-                    if (homeOverviewVisible && homeOverviewAccountColor != null) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.CenterEnd)
-                                .offset(x = 4.dp)
-                                .size(8.dp)
-                                .clip(RoundedCornerShape(50))
-                                .background(Color(homeOverviewAccountColor))
-                        )
-                    }
                 } else {
                     Box(
                         modifier = Modifier.combinedClickable(
@@ -370,6 +364,11 @@ internal fun recipientAvatarSizeDp(): Int = 22
 internal fun recipientAvatarOffsetDp(): Int = 8
 
 internal fun recipientAvatarLayerZIndex(): Float = -1f
+
+internal fun recipientAvatarMarkerColor(
+    homeOverviewVisible: Boolean,
+    accountColor: Long?
+): Long? = accountColor.takeIf { homeOverviewVisible }
 
 
 @Composable

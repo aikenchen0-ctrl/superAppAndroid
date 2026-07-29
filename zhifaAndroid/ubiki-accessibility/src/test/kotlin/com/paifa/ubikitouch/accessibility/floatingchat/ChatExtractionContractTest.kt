@@ -1948,6 +1948,7 @@ class ChatExtractionContractTest {
         assertTrue(row.contains("Alignment.BottomEnd"))
         assertTrue(row.contains("recipientAvatarLayerZIndex()"))
         assertTrue(row.contains("recipientAvatarOffsetDp()"))
+        assertTrue(row.contains("highlightColor = recipientAvatarMarkerColor("))
     }
 
     private fun sourceFile(relativePath: String): File {

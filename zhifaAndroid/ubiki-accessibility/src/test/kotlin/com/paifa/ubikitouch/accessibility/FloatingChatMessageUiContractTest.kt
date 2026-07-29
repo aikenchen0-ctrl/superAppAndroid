@@ -102,8 +102,8 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
-    fun onlyConversationRendersConnectorLayer() {
-        assertEquals(false, shouldRenderChatConnectorLayer(homeOverviewVisible = true))
+    fun conversationAndUnrepliedOverviewRenderConnectorLayer() {
+        assertEquals(true, shouldRenderChatConnectorLayer(homeOverviewVisible = true))
         assertEquals(true, shouldRenderChatConnectorLayer(homeOverviewVisible = false))
     }
 
