@@ -30,7 +30,6 @@ import com.paifa.ubikitouch.accessibility.floatingchat.message.messageListViewpo
 import com.paifa.ubikitouch.accessibility.floatingchat.message.shouldRetargetMessageList
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.RightCoordinateRail
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.rightRailWidthDp
-import com.paifa.ubikitouch.accessibility.floatingchat.tools.shouldUpdateSelectedAccountBoundsOnClick
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatConversation
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
@@ -56,7 +55,6 @@ internal fun CoordinateChatBody(
     groupMemberAvatarsVisible: Boolean,
     onThreadSelected: (ChatThreadSelection) -> Unit,
     onHomeUnreadSelected: (HomeUnreadThreadSummary) -> Unit,
-    onSendUnrepliedDraft: (HomeUnreadThreadSummary, String) -> Unit,
     onToolAction: (FloatingChatToolAction) -> Unit,
     onGroupAvatarLongClick: (FloatingChatContact) -> Unit,
     onContactAvatarLongClick: (FloatingChatContact) -> Unit,
@@ -277,12 +275,6 @@ internal fun CoordinateChatBody(
             homeOverviewAccountColors = homeUnreadAccountColors,
             homeOverviewAccountIdsByMessageId = homeUnreadAccountIdsByMessageId,
             homeOverviewMessageGroups = homeOverviewMessageGroups,
-            homeOverviewSummariesByMessageId = homeUnreadSummaryByMessageId,
-            homeOverviewAccountContacts = conversation.accountContacts.associateBy { account -> account.id },
-            unrepliedRecipientIndicators = unrepliedOverviewState.indicators,
-            unrepliedOverviewState = unrepliedOverviewState,
-            onUnrepliedOverviewStateChanged = onUnrepliedOverviewStateChanged,
-            onSendUnrepliedDraft = onSendUnrepliedDraft,
             groupMemberAvatarsVisible = groupMemberAvatarsVisible,
             listState = messageListState,
             connectorState = connectorState,
@@ -359,7 +351,6 @@ internal fun CoordinateChatBody(
                 emptyMap()
             },
             connectorState = connectorState,
-            updateSelectedBoundsOnClick = shouldUpdateSelectedAccountBoundsOnClick(homeOverviewVisible),
             onToolAction = onToolAction,
             onAccountAvatarClick = onAccountAvatarClick,
             onAccountAvatarLongClick = onAccountAvatarLongClick,
@@ -374,7 +365,6 @@ internal fun CoordinateChatBody(
             selectedAccountId = selectedAccount.id,
             homeOverviewVisible = homeOverviewVisible,
             homeOverviewConnectorGroupIds = homeOverviewConnectorGroupIds,
-            homeOverviewAccountIdsByMessageId = homeUnreadAccountIdsByMessageId,
             homeOverviewMessageGroups = homeOverviewMessageGroups,
             groupMemberAvatarsVisible = groupMemberAvatarsVisible,
             listState = messageListState,

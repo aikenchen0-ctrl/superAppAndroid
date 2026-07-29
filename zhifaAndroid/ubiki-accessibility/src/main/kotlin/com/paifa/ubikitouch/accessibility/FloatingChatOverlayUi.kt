@@ -968,47 +968,6 @@ internal fun FloatingChatOverlay(
                 )
                 chatNavigationActions.openHomeUnread(summary)
             },
-            onSendUnrepliedDraft = { summary, draftText ->
-                val outgoingText = draftText.trim()
-                if (outgoingText.isNotEmpty()) {
-                    runCatching {
-                        val scopedConversation = accountScopedDisplayConversations
-                            .firstOrNull { scoped -> scoped.accountId == summary.accountId }
-                            ?.conversation
-                            ?: error("未找到待回复事项所属账号")
-                        val targetAccount = scopedConversation.accountContacts
-                            .firstOrNull { account -> account.id == summary.accountId }
-                            ?: error("未找到待回复事项所属账号资料")
-                        OutgoingMessageActions(
-                            conversation = scopedConversation,
-                            selectedThread = summary.selection,
-                            selectedAccount = targetAccount,
-                            nextSequence = {
-                                localMessageSequence += 1
-                                localMessageSequence
-                            },
-                            prepareOutgoingMessage = onPrepareOutgoingMessage,
-                            onOutgoingMessageCreated = { message, threadId ->
-                                localMessages += message
-                                syncLocalMessageState()
-                                onPersistLocalMessage(message, threadId)
-                            }
-                        ).addTextMessage(outgoingText, quotedMessage = null)
-                    }.onSuccess {
-                        val draftKey = UnrepliedDraftKey(summary.accountId, summary.threadId)
-                        unrepliedOverviewState = unrepliedOverviewState.afterDraftSend(
-                            key = draftKey,
-                            succeeded = true
-                        )
-                    }.onFailure { error ->
-                        Toast.makeText(
-                            context,
-                            error.message ?: "未回消息发送失败",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                }
-            },
             onToolAction = { action -> toolMessageActions.sendToolMessage(action) },
             onGroupAvatarLongClick = { group ->
                 contactEditorTarget = ContactEditorTarget.Group(group)
@@ -1088,30 +1047,10 @@ internal fun FloatingChatOverlay(
                     hideKeyboardFromBlankArea()
                 }
             },
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 44.dp)
+            modifier = Modifier.fillMaxSize()
         )
-            val filteredSummaryCount = unrepliedOverviewState.accountFilterId?.let { accountId ->
-                currentHomeUnreadSummaries.count { summary -> summary.accountId == accountId }
-            } ?: currentHomeUnreadSummaries.size
-            UnrepliedOverviewHeader(
+            UnrepliedOverviewButton(
                 overviewState = unrepliedOverviewState,
-                accountFilterName = unrepliedOverviewState.accountFilterId?.let { accountId ->
-                    profiledConversation.accountContacts.firstOrNull { account -> account.id == accountId }?.name
-                },
-                conversationTitle = when (val thread = selectedThread) {
-                    ChatThreadSelection.Group -> displayConversation.peerName
-                    is ChatThreadSelection.GroupChat -> displayConversation.groupContacts
-                        .firstOrNull { group -> group.id == thread.groupId }
-                        ?.name
-                        ?: displayConversation.peerName
-                    is ChatThreadSelection.Private -> displayConversation.contacts
-                        .firstOrNull { contact -> contact.id == thread.contactId }
-                        ?.name
-                        ?: displayConversation.peerName
-                },
-                itemCount = filteredSummaryCount,
                 onOpenOverview = {
                     unrepliedOverviewState = restoreUnrepliedOverviewState(
                         saved = unrepliedOverviewState,
@@ -1126,14 +1065,8 @@ internal fun FloatingChatOverlay(
                         accountFilterId = null
                     )
                 },
-                onDraftModeChanged = { mode ->
-                    unrepliedOverviewState = unrepliedOverviewState.copy(draftMode = mode)
-                },
-                onIndicatorsChanged = { indicators ->
-                    unrepliedOverviewState = unrepliedOverviewState.copy(indicators = indicators)
-                },
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
+                    .align(Alignment.TopStart)
                     .zIndex(40f)
             )
         },

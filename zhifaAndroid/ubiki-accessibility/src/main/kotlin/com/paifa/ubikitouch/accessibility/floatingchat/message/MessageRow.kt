@@ -26,7 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -43,9 +42,6 @@ import com.paifa.ubikitouch.accessibility.floatingchat.chat.groupMemberContactFo
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.groupMemberAvatarBubbleCenterOffsetDp
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.groupMemberAvatarSizeDp
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.rootBoundsFromPosition
-import com.paifa.ubikitouch.accessibility.floatingchat.chat.UnrepliedRecipientIndicators
-import com.paifa.ubikitouch.accessibility.floatingchat.chat.shouldRenderRecipientColorDot
-import com.paifa.ubikitouch.accessibility.floatingchat.chat.shouldRenderRecipientWatermark
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import com.paifa.ubikitouch.core.model.FloatingChatMessagePresentation
@@ -59,8 +55,6 @@ internal fun MessageRow(
     showAttachedAvatar: Boolean = true,
     contactsById: Map<String, FloatingChatContact>,
     homeOverviewAccountColor: Long?,
-    homeOverviewAccountContact: FloatingChatContact? = null,
-    unrepliedRecipientIndicators: UnrepliedRecipientIndicators = UnrepliedRecipientIndicators(),
     groupMemberAvatarsVisible: Boolean,
     onPreviewMedia: (FloatingChatMessage) -> Unit,
     onOpenMediaActions: (FloatingChatMessage) -> Unit,
@@ -146,8 +140,6 @@ internal fun MessageRow(
             onBubbleBoundsChanged = onBubbleBoundsChanged,
             homeOverviewVisible = homeOverviewVisible,
             homeOverviewAccountColor = homeOverviewAccountColor,
-            homeOverviewAccountContact = homeOverviewAccountContact,
-            unrepliedRecipientIndicators = unrepliedRecipientIndicators,
             modifier = if (groupMemberContact != null && placement == MessageHorizontalPlacement.Start) {
                 Modifier.weight(1f, fill = false)
             } else {
@@ -182,8 +174,6 @@ internal fun MessageBlock(
     onBubbleBoundsChanged: (Rect) -> Unit,
     homeOverviewVisible: Boolean = false,
     homeOverviewAccountColor: Long? = null,
-    homeOverviewAccountContact: FloatingChatContact? = null,
-    unrepliedRecipientIndicators: UnrepliedRecipientIndicators = UnrepliedRecipientIndicators(),
     modifier: Modifier = Modifier
 ) {
     val bubbleClickSource = remember { MutableInteractionSource() }
@@ -201,9 +191,6 @@ internal fun MessageBlock(
     val bubbleBorderColor = messageBubbleBorderColor(message, claimed)
     val aiDraftDashedBubble = aiDraftMessageUsesGreenDashedBubble(message)
     val usesDemoBubble = messageTypeUsesImModuleBubble(message.type) && !isSystem
-    val showRecipientWatermark = homeOverviewVisible &&
-        homeOverviewAccountContact != null &&
-        shouldRenderRecipientWatermark(unrepliedRecipientIndicators)
     Column(
         modifier = modifier,
         horizontalAlignment = when {
@@ -275,45 +262,18 @@ internal fun MessageBlock(
                                 }
                             )
                     ) {
-                        Box {
-                            Box(
-                                modifier = if (showRecipientWatermark) {
-                                    Modifier.padding(end = 20.dp)
-                                } else {
-                                    Modifier
-                                }
-                            ) {
-                                MessageContent(
-                                    message = message,
-                                    index = index,
-                                    onPreviewMedia = onPreviewMedia,
-                                    onOpenMediaActions = onOpenMediaActions,
-                                    onLongPressMessage = onLongPressMessage,
-                                    multiSelectMode = multiSelectMode,
-                                    onToggleSelection = onToggleSelection,
-                                    claimed = claimed
-                                )
-                            }
-                            if (showRecipientWatermark) {
-                                CompactAvatar(
-                                    contact = requireNotNull(homeOverviewAccountContact),
-                                    role = AvatarRole.Account,
-                                    sizeDp = 18,
-                                    onClick = {},
-                                    onLongClick = {},
-                                    onBoundsChanged = {},
-                                    modifier = Modifier
-                                        .align(Alignment.BottomEnd)
-                                        .alpha(0.34f)
-                                )
-                            }
-                        }
+                        MessageContent(
+                            message = message,
+                            index = index,
+                            onPreviewMedia = onPreviewMedia,
+                            onOpenMediaActions = onOpenMediaActions,
+                            onLongPressMessage = onLongPressMessage,
+                            multiSelectMode = multiSelectMode,
+                            onToggleSelection = onToggleSelection,
+                            claimed = claimed
+                        )
                     }
-                    if (
-                        homeOverviewVisible &&
-                        homeOverviewAccountColor != null &&
-                        shouldRenderRecipientColorDot(unrepliedRecipientIndicators)
-                    ) {
+                    if (homeOverviewVisible && homeOverviewAccountColor != null) {
                         Box(
                             modifier = Modifier
                                 .align(Alignment.CenterEnd)

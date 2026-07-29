@@ -27,32 +27,6 @@ import com.paifa.ubikitouch.core.model.FloatingChatConnectionTarget
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import kotlin.math.abs
 
-internal fun homeOverviewConnectorTargetsByMessageId(
-    messageIds: List<String>,
-    connectorGroupIds: Map<String, String>,
-    accountIds: Map<String, String>
-): Map<ConnectorTargetKey, List<String>> {
-    val grouped = linkedMapOf<ConnectorTargetKey, MutableList<String>>()
-    messageIds.forEach { messageId ->
-        val connectorGroupId = connectorGroupIds[messageId] ?: return@forEach
-        val sessionKey = ConnectorTargetKey(
-            target = FloatingChatConnectionTarget.User,
-            targetId = connectorGroupId,
-            lane = ConnectorAvatarLane.Session
-        )
-        grouped.getOrPut(sessionKey) { mutableListOf() }.add(messageId)
-        accountIds[messageId]?.takeIf { it.isNotBlank() }?.let { accountId ->
-            val accountKey = ConnectorTargetKey(
-                target = FloatingChatConnectionTarget.Account,
-                targetId = accountId,
-                lane = ConnectorAvatarLane.Account
-            )
-            grouped.getOrPut(accountKey) { mutableListOf() }.add(messageId)
-        }
-    }
-    return grouped
-}
-
 @Composable
 internal fun ChatConnectorLayer(
     messages: List<FloatingChatMessage>,
@@ -60,7 +34,6 @@ internal fun ChatConnectorLayer(
     selectedAccountId: String,
     homeOverviewVisible: Boolean,
     homeOverviewConnectorGroupIds: Map<String, String>,
-    homeOverviewAccountIdsByMessageId: Map<String, String>,
     homeOverviewMessageGroups: List<HomeOverviewMessageGroup>,
     groupMemberAvatarsVisible: Boolean,
     listState: LazyListState,
@@ -110,37 +83,29 @@ internal fun ChatConnectorLayer(
                 listOfNotNull(messages.getOrNull(itemInfo.index))
             }
             itemMessages.forEach messageLoop@ { message ->
-                val keys = if (homeOverviewVisible) {
-                    message.toHomeOverviewConnectorTargetKeys(
-                        connectorGroupId = homeOverviewConnectorGroupIds[message.id],
-                        accountId = homeOverviewAccountIdsByMessageId[message.id]
-                    )
+                val key = if (homeOverviewVisible) {
+                    message.toHomeOverviewConnectorTargetKey(homeOverviewConnectorGroupIds[message.id])
                 } else {
-                    listOfNotNull(
-                        message.toConnectorTargetKey(
-                            selection = selection,
-                            selectedAccountId = selectedAccountId,
-                            groupMemberAvatarsVisible = groupMemberAvatarsVisible
-                        )
+                    message.toConnectorTargetKey(
+                        selection = selection,
+                        selectedAccountId = selectedAccountId,
+                        groupMemberAvatarsVisible = groupMemberAvatarsVisible
                     )
-                }
-                if (keys.isEmpty()) return@messageLoop
+                } ?: return@messageLoop
 
                 val bubbleBounds = connectorState.messageBubbles[message.id] ?: return@messageLoop
-                keys.forEach { key ->
-                    avatarSourceKeys[key] = key
-                    if (key.lane == ConnectorAvatarLane.GroupMember) {
-                        connectorState.groupMemberAvatars[key.targetId]?.let { bounds ->
-                            visibleGroupMemberBounds += bounds
-                            directGroupMemberBranches += createGroupMemberMessageConnectorBranch(
-                                avatarBounds = bounds,
-                                bubbleBounds = bubbleBounds,
-                                layerBounds = layerBounds
-                            )
-                        }
+                avatarSourceKeys[key] = key
+                if (key.lane == ConnectorAvatarLane.GroupMember) {
+                    connectorState.groupMemberAvatars[key.targetId]?.let { bounds ->
+                        visibleGroupMemberBounds += bounds
+                        directGroupMemberBranches += createGroupMemberMessageConnectorBranch(
+                            avatarBounds = bounds,
+                            bubbleBounds = bubbleBounds,
+                            layerBounds = layerBounds
+                        )
                     }
-                    visibleBubbleGroups.getOrPut(key) { mutableListOf() }.add(bubbleBounds)
                 }
+                visibleBubbleGroups.getOrPut(key) { mutableListOf() }.add(bubbleBounds)
             }
         }
 

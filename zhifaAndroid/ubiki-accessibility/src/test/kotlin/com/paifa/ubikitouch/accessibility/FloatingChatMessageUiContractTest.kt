@@ -102,8 +102,8 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
-    fun overviewAndConversationBothRenderConnectorLayer() {
-        assertEquals(true, shouldRenderChatConnectorLayer(homeOverviewVisible = true))
+    fun onlyConversationRendersConnectorLayer() {
+        assertEquals(false, shouldRenderChatConnectorLayer(homeOverviewVisible = true))
         assertEquals(true, shouldRenderChatConnectorLayer(homeOverviewVisible = false))
     }
 
@@ -217,32 +217,6 @@ class FloatingChatMessageUiContractTest {
                 connectorGroupId = "home-group:account-1:contact-1:message-1",
                 accountId = "account-1"
             )
-        )
-    }
-
-    @Test
-    fun homeOverviewGroupsVisibleBubblesIntoSessionAndAccountTrees() {
-        val targets = homeOverviewConnectorTargetsByMessageId(
-            messageIds = listOf("message-1", "message-2"),
-            connectorGroupIds = mapOf(
-                "message-1" to "group-1",
-                "message-2" to "group-1"
-            ),
-            accountIds = mapOf(
-                "message-1" to "account-1",
-                "message-2" to "account-1"
-            )
-        )
-
-        assertEquals(2, targets.size)
-        assertEquals(setOf("group-1", "account-1"), targets.keys.map { it.targetId }.toSet())
-        assertEquals(
-            setOf("message-1", "message-2"),
-            targets.values.flatten().toSet()
-        )
-        assertEquals(
-            setOf(ConnectorAvatarLane.Session, ConnectorAvatarLane.Account),
-            targets.keys.map { it.lane }.toSet()
         )
     }
 
@@ -477,12 +451,6 @@ class FloatingChatMessageUiContractTest {
         )
 
         assertEquals(true, shouldRetargetMessageList(allAccounts, filtered))
-    }
-
-    @Test
-    fun overviewAccountClickSkipsSelectedAccountCoordinateInvalidation() {
-        assertEquals(false, shouldUpdateSelectedAccountBoundsOnClick(homeOverviewVisible = true))
-        assertEquals(true, shouldUpdateSelectedAccountBoundsOnClick(homeOverviewVisible = false))
     }
 
     @Test

@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -32,7 +31,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
 import com.paifa.ubikitouch.accessibility.floatingchat.message.MessageRow
@@ -40,7 +38,6 @@ import com.paifa.ubikitouch.accessibility.floatingchat.components.AvatarRole
 import com.paifa.ubikitouch.accessibility.floatingchat.components.CompactAvatar
 import com.paifa.ubikitouch.accessibility.floatingchat.message.messageListBottomClearanceDp
 import com.paifa.ubikitouch.accessibility.floatingchat.message.messageListReusableContentType
-import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 
@@ -53,12 +50,6 @@ internal fun MessageCoordinatePane(
     homeOverviewAccountColors: Map<String, Long>,
     homeOverviewAccountIdsByMessageId: Map<String, String>,
     homeOverviewMessageGroups: List<HomeOverviewMessageGroup>,
-    homeOverviewSummariesByMessageId: Map<String, HomeUnreadThreadSummary>,
-    homeOverviewAccountContacts: Map<String, FloatingChatContact>,
-    unrepliedRecipientIndicators: UnrepliedRecipientIndicators,
-    unrepliedOverviewState: UnrepliedOverviewState,
-    onUnrepliedOverviewStateChanged: (UnrepliedOverviewState) -> Unit,
-    onSendUnrepliedDraft: (HomeUnreadThreadSummary, String) -> Unit,
     groupMemberAvatarsVisible: Boolean,
     listState: LazyListState,
     connectorState: ConnectorCoordinateState,
@@ -109,13 +100,6 @@ internal fun MessageCoordinatePane(
                         selectedThread = selectedThread,
                         contactsById = contactsById,
                         homeOverviewAccountColors = homeOverviewAccountColors,
-                        homeOverviewAccountIdsByMessageId = homeOverviewAccountIdsByMessageId,
-                        homeOverviewAccountContacts = homeOverviewAccountContacts,
-                        unrepliedRecipientIndicators = unrepliedRecipientIndicators,
-                        summary = group.messages.firstOrNull()?.id?.let(homeOverviewSummariesByMessageId::get),
-                        unrepliedOverviewState = unrepliedOverviewState,
-                        onUnrepliedOverviewStateChanged = onUnrepliedOverviewStateChanged,
-                        onSendUnrepliedDraft = onSendUnrepliedDraft,
                         groupMemberAvatarsVisible = groupMemberAvatarsVisible,
                         onPreviewMedia = onPreviewMedia,
                         onOpenMediaActions = onOpenMediaActions,
@@ -144,8 +128,6 @@ internal fun MessageCoordinatePane(
                     homeOverviewVisible = homeOverviewVisible,
                     contactsById = contactsById,
                     homeOverviewAccountColor = homeOverviewAccountColors[message.id],
-                    homeOverviewAccountContact = null,
-                    unrepliedRecipientIndicators = unrepliedRecipientIndicators,
                     groupMemberAvatarsVisible = groupMemberAvatarsVisible,
                     onPreviewMedia = onPreviewMedia,
                     onOpenMediaActions = onOpenMediaActions,
@@ -171,37 +153,6 @@ internal fun MessageCoordinatePane(
                 }
             }
         }
-        if (homeOverviewVisible) {
-            unrepliedOverviewEmptyText(homeOverviewMessageGroups)?.let { emptyText ->
-                Text(
-                    text = emptyText,
-                    color = OverlayTokens.secondaryText,
-                    fontSize = 13.sp,
-                    modifier = Modifier.align(Alignment.Center)
-                )
-            }
-        }
-        if (homeOverviewVisible && unrepliedOverviewState.draftMode == UnrepliedDraftMode.Bottom) {
-            val selectedSummary = homeOverviewSummariesByMessageId.values
-                .distinctBy { summary -> summary.itemId }
-                .firstOrNull { summary -> summary.itemId == unrepliedOverviewState.selectedItemId }
-            selectedSummary?.let { summary ->
-                val draftKey = UnrepliedDraftKey(summary.accountId, summary.threadId)
-                val draftText = unrepliedOverviewState.drafts[draftKey]
-                    ?: summary.suggestedDraftText.orEmpty()
-                UnrepliedBottomDraft(
-                    text = draftText,
-                    onTextChanged = { text ->
-                        onUnrepliedOverviewStateChanged(unrepliedOverviewState.updateDraft(draftKey, text))
-                    },
-                    onSend = { onSendUnrepliedDraft(summary, draftText) },
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(start = 8.dp, end = 8.dp, bottom = 76.dp)
-                        .zIndex(8f)
-                )
-            }
-        }
     }
 }
 
@@ -212,13 +163,6 @@ private fun HomeOverviewMessageGroupRow(
     selectedThread: ChatThreadSelection,
     contactsById: Map<String, FloatingChatContact>,
     homeOverviewAccountColors: Map<String, Long>,
-    homeOverviewAccountIdsByMessageId: Map<String, String>,
-    homeOverviewAccountContacts: Map<String, FloatingChatContact>,
-    unrepliedRecipientIndicators: UnrepliedRecipientIndicators,
-    summary: HomeUnreadThreadSummary?,
-    unrepliedOverviewState: UnrepliedOverviewState,
-    onUnrepliedOverviewStateChanged: (UnrepliedOverviewState) -> Unit,
-    onSendUnrepliedDraft: (HomeUnreadThreadSummary, String) -> Unit,
     groupMemberAvatarsVisible: Boolean,
     onPreviewMedia: (FloatingChatMessage) -> Unit,
     onOpenMediaActions: (FloatingChatMessage) -> Unit,
@@ -244,9 +188,6 @@ private fun HomeOverviewMessageGroupRow(
                     showAttachedAvatar = false,
                     contactsById = contactsById,
                     homeOverviewAccountColor = homeOverviewAccountColors[message.id],
-                    homeOverviewAccountContact = homeOverviewAccountIdsByMessageId[message.id]
-                        ?.let(homeOverviewAccountContacts::get),
-                    unrepliedRecipientIndicators = unrepliedRecipientIndicators,
                     groupMemberAvatarsVisible = groupMemberAvatarsVisible,
                     onPreviewMedia = onPreviewMedia,
                     onOpenMediaActions = onOpenMediaActions,
@@ -262,29 +203,6 @@ private fun HomeOverviewMessageGroupRow(
                     onBubbleBoundsChanged = { bounds -> connectorState.updateMessageBubble(message.id, bounds) },
                     onGroupMemberAvatarBoundsChanged = {},
                     onGroupMemberAvatarRemoved = {}
-                )
-            }
-        }
-        summary?.let { item ->
-            val draftKey = UnrepliedDraftKey(item.accountId, item.threadId)
-            val draftText = unrepliedOverviewState.drafts[draftKey]
-                ?: item.suggestedDraftText.orEmpty()
-            when (unrepliedOverviewState.draftMode) {
-                UnrepliedDraftMode.Inline -> UnrepliedInlineDraft(
-                    text = draftText,
-                    onTextChanged = { text ->
-                        onUnrepliedOverviewStateChanged(unrepliedOverviewState.updateDraft(draftKey, text))
-                    },
-                    onSend = { onSendUnrepliedDraft(item, draftText) }
-                )
-                UnrepliedDraftMode.Bottom -> SelectUnrepliedBottomDraftButton(
-                    selected = unrepliedOverviewState.selectedItemId == item.itemId,
-                    onClick = {
-                        onUnrepliedOverviewStateChanged(
-                            unrepliedOverviewState.copy(selectedItemId = item.itemId)
-                        )
-                    },
-                    modifier = Modifier.align(Alignment.End)
                 )
             }
         }
