@@ -234,6 +234,34 @@ internal fun CoordinateChatBody(
     val contactsById = remember(conversation.groupContacts, conversation.contacts) {
         (conversation.groupContacts + conversation.contacts).associateBy { contact -> contact.id }
     }
+    val accountContactsById = remember(conversation.accountContacts) {
+        conversation.accountContacts.associateBy { account -> account.id }
+    }
+    val recipientContactsByMessageId = remember(
+        visibleMessages,
+        homeOverviewVisible,
+        homeUnreadAccountIdsByMessageId,
+        accountContactsById,
+        selectedThread,
+        selectedAccount,
+        conversation.groupContacts,
+        conversation.contacts
+    ) {
+        visibleMessages.mapNotNull { message ->
+            val recipient = if (homeOverviewVisible) {
+                homeUnreadAccountIdsByMessageId[message.id]?.let(accountContactsById::get)
+            } else {
+                messageRecipientContact(
+                    message = message,
+                    selection = selectedThread,
+                    selectedAccount = selectedAccount,
+                    groups = conversation.groupContacts,
+                    contacts = conversation.contacts
+                )
+            }
+            recipient?.let { contact -> message.id to contact }
+        }.toMap()
+    }
     LaunchedEffect(visibleMessageIds) {
         connectorState.retainMessageBounds(visibleMessageIds)
     }
@@ -275,6 +303,7 @@ internal fun CoordinateChatBody(
             homeOverviewAccountColors = homeUnreadAccountColors,
             homeOverviewAccountIdsByMessageId = homeUnreadAccountIdsByMessageId,
             homeOverviewMessageGroups = homeOverviewMessageGroups,
+            recipientContactsByMessageId = recipientContactsByMessageId,
             groupMemberAvatarsVisible = groupMemberAvatarsVisible,
             listState = messageListState,
             connectorState = connectorState,

@@ -1939,6 +1939,17 @@ class ChatExtractionContractTest {
         assertTrue(overlay.contains("restoreUnrepliedOverviewState("))
     }
 
+    @Test
+    fun messageBubbleRendersRecipientAvatarOnTheLayerBehindItsBottomRightCorner() {
+        val row = sourceFile("floatingchat/message/MessageRow.kt").readText()
+
+        assertTrue(row.contains("recipientContact: FloatingChatContact?"))
+        assertTrue(row.contains("AvatarRole.Recipient"))
+        assertTrue(row.contains("Alignment.BottomEnd"))
+        assertTrue(row.contains("recipientAvatarLayerZIndex()"))
+        assertTrue(row.contains("recipientAvatarOffsetDp()"))
+    }
+
     private fun sourceFile(relativePath: String): File {
         val moduleRelative = File(
             "src/main/kotlin/com/paifa/ubikitouch/accessibility",

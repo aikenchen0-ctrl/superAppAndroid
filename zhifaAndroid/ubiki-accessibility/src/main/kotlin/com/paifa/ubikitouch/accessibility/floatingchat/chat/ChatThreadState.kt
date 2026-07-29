@@ -411,6 +411,22 @@ internal fun selectedAccountForCoordinateBody(
     )
 }
 
+internal fun messageRecipientContact(
+    message: FloatingChatMessage,
+    selection: ChatThreadSelection,
+    selectedAccount: FloatingChatContact,
+    groups: List<FloatingChatContact>,
+    contacts: List<FloatingChatContact>
+): FloatingChatContact? {
+    if (message.presentation == FloatingChatMessagePresentation.System) return null
+    if (!message.fromMe) return selectedAccount
+    return when (selection) {
+        ChatThreadSelection.Group -> groups.firstOrNull()
+        is ChatThreadSelection.GroupChat -> groups.firstOrNull { group -> group.id == selection.groupId }
+        is ChatThreadSelection.Private -> contacts.firstOrNull { contact -> contact.id == selection.contactId }
+    }
+}
+
 internal fun visibleMessagesForThread(
     conversation: FloatingChatConversation,
     selection: ChatThreadSelection,

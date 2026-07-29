@@ -108,8 +108,11 @@ internal fun SquareAvatarChip(
 internal enum class AvatarRole {
     Session,
     GroupMember,
-    Account
+    Account,
+    Recipient
 }
+
+internal fun avatarRoleUsesSelectionHighlight(role: AvatarRole): Boolean = role != AvatarRole.Recipient
 internal fun resolvedAvatarImageUri(
     localImageUri: String?,
     remoteAvatarUrl: String?
@@ -133,12 +136,13 @@ internal fun CompactAvatar(
 ) {
     val shape = RoundedCornerShape(10.dp)
     val avatarColor = Color(contact.avatarColor)
+    val selectionHighlighted = contact.selected && avatarRoleUsesSelectionHighlight(role)
     val border = when {
         highlightColor != null -> highlightColor
-        contact.selected -> OverlayTokens.accent
+        selectionHighlighted -> OverlayTokens.accent
         else -> OverlayTokens.hairline
     }
-    val borderWidth = if (contact.selected || highlightColor != null) {
+    val borderWidth = if (selectionHighlighted || highlightColor != null) {
         railSelectedAvatarHighlightStrokeDp().dp
     } else {
         1.dp
@@ -168,7 +172,7 @@ internal fun CompactAvatar(
         },
         shape = shape,
         color = avatarColor,
-        shadowElevation = if (contact.selected || highlightColor != null) 7.dp else 3.dp,
+        shadowElevation = if (selectionHighlighted || highlightColor != null) 7.dp else 3.dp,
         border = BorderStroke(borderWidth, border)
     ) {
         Box(

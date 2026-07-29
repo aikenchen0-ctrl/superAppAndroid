@@ -33,6 +33,7 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.paifa.ubikitouch.accessibility.floatingchat.components.AvatarRole
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
 import com.paifa.ubikitouch.accessibility.floatingchat.components.CompactAvatar
@@ -55,6 +56,7 @@ internal fun MessageRow(
     showAttachedAvatar: Boolean = true,
     contactsById: Map<String, FloatingChatContact>,
     homeOverviewAccountColor: Long?,
+    recipientContact: FloatingChatContact?,
     groupMemberAvatarsVisible: Boolean,
     onPreviewMedia: (FloatingChatMessage) -> Unit,
     onOpenMediaActions: (FloatingChatMessage) -> Unit,
@@ -140,6 +142,7 @@ internal fun MessageRow(
             onBubbleBoundsChanged = onBubbleBoundsChanged,
             homeOverviewVisible = homeOverviewVisible,
             homeOverviewAccountColor = homeOverviewAccountColor,
+            recipientContact = recipientContact,
             modifier = if (groupMemberContact != null && placement == MessageHorizontalPlacement.Start) {
                 Modifier.weight(1f, fill = false)
             } else {
@@ -174,6 +177,7 @@ internal fun MessageBlock(
     onBubbleBoundsChanged: (Rect) -> Unit,
     homeOverviewVisible: Boolean = false,
     homeOverviewAccountColor: Long? = null,
+    recipientContact: FloatingChatContact? = null,
     modifier: Modifier = Modifier
 ) {
     val bubbleClickSource = remember { MutableInteractionSource() }
@@ -201,6 +205,23 @@ internal fun MessageBlock(
     ) {
         Column(horizontalAlignment = Alignment.Start) {
             Box(modifier = Modifier.padding(top = if (isSystem) 0.dp else 8.dp)) {
+                if (usesBubbleChrome && recipientContact != null) {
+                    CompactAvatar(
+                        contact = recipientContact,
+                        role = AvatarRole.Recipient,
+                        sizeDp = recipientAvatarSizeDp(),
+                        onClick = {},
+                        onLongClick = {},
+                        onBoundsChanged = {},
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .offset(
+                                x = recipientAvatarOffsetDp().dp,
+                                y = recipientAvatarOffsetDp().dp
+                            )
+                            .zIndex(recipientAvatarLayerZIndex())
+                    )
+                }
                 if (usesBubbleChrome) {
                     Box(
                         modifier = Modifier
@@ -343,6 +364,12 @@ internal fun MessageBlock(
         }
     }
 }
+
+internal fun recipientAvatarSizeDp(): Int = 22
+
+internal fun recipientAvatarOffsetDp(): Int = 8
+
+internal fun recipientAvatarLayerZIndex(): Float = -1f
 
 
 @Composable
