@@ -643,11 +643,16 @@ internal fun homeUnreadDemoThreadSummaries(
                 resolvedThreadId in contactIds -> ChatThreadSelection.Private(resolvedThreadId)
                 else -> return@mapNotNull null
             }
+            val resolvedAccountId = accountIdForScopedThreadId(resolvedThreadId) ?: fallbackAccountId
             homeUnreadThreadSummary(
-                accountId = accountIdForScopedThreadId(resolvedThreadId) ?: fallbackAccountId,
+                accountId = resolvedAccountId,
                 conversation = conversation,
                 selection = selection,
-                unrepliedMessages = threadMessages.homeUnrepliedTextMessages()
+                unrepliedMessages = threadMessages.homeUnrepliedTextMessages(),
+                accountName = conversation.accountContacts
+                    .firstOrNull { account -> account.id == resolvedAccountId }
+                    ?.name
+                    ?: conversation.accountName
             )
         }
 }
@@ -698,9 +703,18 @@ private fun homeUnreadThreadSummary(
     conversation: FloatingChatConversation,
     selection: ChatThreadSelection,
     unrepliedMessages: List<FloatingChatMessage>,
-    suggestedDraftText: String? = null
+    suggestedDraftText: String? = null,
+    accountName: String = conversation.accountName
 ): HomeUnreadThreadSummary? {
-    val latest = unrepliedMessages.lastOrNull() ?: return null
+    val displaySourceMessages = if (selection.isGroupThread()) {
+        groupUnrepliedDisplayMessages(
+            messages = unrepliedMessages,
+            accountName = accountName
+        )
+    } else {
+        unrepliedMessages
+    }
+    val latest = displaySourceMessages.lastOrNull() ?: return null
     val contact = contactForSelection(conversation, selection) ?: return null
     val groupMember = if (selection.isGroupThread()) {
         latest.connectionTargetId
@@ -711,7 +725,7 @@ private fun homeUnreadThreadSummary(
     val avatarContact = groupMember ?: contact
     val unreadCount = unrepliedMessages.size.coerceAtLeast(1)
     val threadId = selection.toLocalThreadId()
-    val displayMessages = unrepliedMessages.map { message ->
+    val displayMessages = displaySourceMessages.map { message ->
         message.copy(
             id = "home-unread-${threadId}-${message.id}",
             fromMe = false,
@@ -745,6 +759,27 @@ private fun homeUnreadThreadSummary(
         suggestedDraftText = suggestedDraftText
     )
 }
+
+internal fun groupUnrepliedDisplayMessages(
+    messages: List<FloatingChatMessage>,
+    accountName: String
+): List<FloatingChatMessage> {
+    val normalizedAccountName = accountName.trim()
+    val priorityMessages = messages.filter { message ->
+        val text = message.text
+        val mentionsAccount = normalizedAccountName.isNotEmpty() &&
+            text.contains("@$normalizedAccountName", ignoreCase = true)
+        val containsAccountName = normalizedAccountName.isNotEmpty() &&
+            text.contains(normalizedAccountName, ignoreCase = true)
+        mentionsAccount ||
+            containsAccountName ||
+            text.contains("待确认") ||
+            text.contains("回复")
+    }
+    return priorityMessages.ifEmpty { messages.takeLast(GroupUnrepliedFallbackMessageCount) }
+}
+
+private const val GroupUnrepliedFallbackMessageCount = 3
 
 private fun homeUnreadSenderLabel(
     contact: FloatingChatContact,

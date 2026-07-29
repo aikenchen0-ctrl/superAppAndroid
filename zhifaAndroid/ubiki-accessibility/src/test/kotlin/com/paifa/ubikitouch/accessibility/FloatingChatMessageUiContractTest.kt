@@ -2312,6 +2312,156 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
+    fun groupHomeOverviewShowsAllPriorityMessagesInOriginalOrder() {
+        val account = FloatingChatContact("account", "Alice", "AL", "Account", 0xFF3A86FF, selected = true)
+        val member = FloatingChatContact("member", "Bob", "BO", "Member", 0xFF1B9AAA)
+        val group = FloatingChatContact("group", "Project Group", "PG", "Group", 0xFF8E7DBE)
+        val texts = listOf(
+            "普通消息一",
+            "@Alice 请看一下",
+            "普通消息二",
+            "Alice 这个方案可以吗",
+            "这个事项待确认",
+            "看到后请回复",
+            "普通消息三"
+        )
+        val conversation = FloatingChatConversation(
+            peerName = "Test",
+            accountName = account.name,
+            contacts = listOf(member),
+            accountContacts = listOf(account),
+            groupContacts = listOf(group),
+            messages = texts.mapIndexed { index, text ->
+                FloatingChatMessage(
+                    id = "group-message-$index",
+                    type = FloatingChatMessageType.Text,
+                    text = text,
+                    fromMe = false,
+                    senderName = member.name,
+                    time = "10:0$index",
+                    connectionTargetId = member.id,
+                    threadContactId = group.id
+                )
+            },
+            toolActions = emptyList()
+        )
+
+        val summary = homeUnreadThreadSummaries(conversation).single()
+
+        assertEquals(7, summary.unreadCount)
+        assertEquals(
+            listOf("@Alice 请看一下", "Alice 这个方案可以吗", "这个事项待确认", "看到后请回复"),
+            summary.unrepliedMessages.map { message -> message.text }
+        )
+        assertEquals("看到后请回复", summary.message.text)
+    }
+
+    @Test
+    fun groupHomeOverviewFallsBackToLatestThreeWhenNoPriorityMessageExists() {
+        val account = FloatingChatContact("account", "Alice", "AL", "Account", 0xFF3A86FF, selected = true)
+        val member = FloatingChatContact("member", "Bob", "BO", "Member", 0xFF1B9AAA)
+        val group = FloatingChatContact("group", "Project Group", "PG", "Group", 0xFF8E7DBE)
+        val conversation = FloatingChatConversation(
+            peerName = "Test",
+            accountName = account.name,
+            contacts = listOf(member),
+            accountContacts = listOf(account),
+            groupContacts = listOf(group),
+            messages = (1..5).map { index ->
+                FloatingChatMessage(
+                    id = "ordinary-$index",
+                    type = FloatingChatMessageType.Text,
+                    text = "普通消息$index",
+                    fromMe = false,
+                    senderName = member.name,
+                    time = "10:0$index",
+                    connectionTargetId = member.id,
+                    threadContactId = group.id
+                )
+            },
+            toolActions = emptyList()
+        )
+
+        val summary = homeUnreadThreadSummaries(conversation).single()
+
+        assertEquals(5, summary.unreadCount)
+        assertEquals(
+            listOf("普通消息3", "普通消息4", "普通消息5"),
+            summary.unrepliedMessages.map { message -> message.text }
+        )
+    }
+
+    @Test
+    fun demoGroupPriorityUsesTheOwningAccountName() {
+        val mainAccount = FloatingChatContact("account-a", "Main Account", "MA", "Account", 0xFF3A86FF, selected = true)
+        val workAccount = FloatingChatContact("account-b", "Work Account", "WA", "Account", 0xFF2A9D8F)
+        val member = FloatingChatContact("account-b__member", "Bob", "BO", "Member", 0xFF1B9AAA)
+        val group = FloatingChatContact("account-b__group", "Work Group", "WG", "Group", 0xFF8E7DBE)
+        val texts = listOf(
+            "@Work Account 请处理",
+            "普通消息一",
+            "普通消息二",
+            "普通消息三"
+        )
+        val conversation = FloatingChatConversation(
+            peerName = "All accounts",
+            accountName = mainAccount.name,
+            contacts = listOf(member),
+            accountContacts = listOf(mainAccount, workAccount),
+            groupContacts = listOf(group),
+            messages = emptyList(),
+            homeUnreadDemoMessages = texts.mapIndexed { index, text ->
+                FloatingChatMessage(
+                    id = "demo-$index",
+                    type = FloatingChatMessageType.Text,
+                    text = text,
+                    fromMe = false,
+                    senderName = member.name,
+                    time = "10:0$index",
+                    connectionTargetId = member.id,
+                    threadContactId = group.id
+                )
+            },
+            toolActions = emptyList()
+        )
+
+        val summary = homeUnreadDemoThreadSummaries(conversation).single()
+
+        assertEquals("account-b", summary.accountId)
+        assertEquals(listOf("@Work Account 请处理"), summary.unrepliedMessages.map { message -> message.text })
+    }
+
+    @Test
+    fun privateHomeOverviewStillShowsEveryUnrepliedMessage() {
+        val account = FloatingChatContact("account", "Alice", "AL", "Account", 0xFF3A86FF, selected = true)
+        val contact = FloatingChatContact("contact", "Bob", "BO", "Contact", 0xFF1B9AAA)
+        val conversation = FloatingChatConversation(
+            peerName = "Test",
+            accountName = account.name,
+            contacts = listOf(contact),
+            accountContacts = listOf(account),
+            messages = (1..5).map { index ->
+                FloatingChatMessage(
+                    id = "private-$index",
+                    type = FloatingChatMessageType.Text,
+                    text = "普通消息$index",
+                    fromMe = false,
+                    senderName = contact.name,
+                    time = "10:0$index",
+                    connectionTargetId = contact.id,
+                    threadContactId = contact.id
+                )
+            },
+            toolActions = emptyList()
+        )
+
+        val summary = homeUnreadThreadSummaries(conversation).single()
+
+        assertEquals(5, summary.unreadCount)
+        assertEquals(5, summary.unrepliedMessages.size)
+    }
+
+    @Test
     fun homeUnreadOverviewConnectorLinesDoNotUseGroupMemberAvatars() {
         val contact = FloatingChatPrototype.sampleConversation().contacts.first()
         val message = FloatingChatMessage(

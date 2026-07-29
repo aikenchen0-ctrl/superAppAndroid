@@ -6,6 +6,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.chat.AccountScopedConvers
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.allAccountHomeConversation
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.homeUnreadDemoThreadSummaries
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.homeUnreadThreadSummaries
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.groupUnrepliedDisplayMessages
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
 import com.paifa.ubikitouch.core.model.FloatingChatConnectionTarget
 import com.paifa.ubikitouch.core.model.FloatingChatMessageKind
@@ -254,9 +255,13 @@ class ScrmFloatingChatBridgeTest {
                 message.connectionTarget == FloatingChatConnectionTarget.User &&
                 message.text.isNotBlank()
         }
+        val expectedDisplay = groupUnrepliedDisplayMessages(expected, conversation.accountName)
 
         assertEquals(expected.size, summary.unreadCount)
-        assertEquals(expected.map { message -> message.text }, summary.unrepliedMessages.map { message -> message.text })
+        assertEquals(
+            expectedDisplay.map { message -> message.text },
+            summary.unrepliedMessages.map { message -> message.text }
+        )
         assertEquals(true, summary.message.text.contains("[场景:"))
     }
 

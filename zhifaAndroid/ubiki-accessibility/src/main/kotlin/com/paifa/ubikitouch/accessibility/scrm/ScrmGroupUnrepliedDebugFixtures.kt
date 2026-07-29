@@ -102,6 +102,8 @@ private fun groupUnrepliedScenarioMessages(
         add(message("alternating-members-3", "[场景:多成员交替] 成员一继续追问", member = firstMember))
         add(message("mention-me", "[场景:@我] @我 请确认报价和交付时间"))
         add(message("mention-all", "[场景:@所有人] @所有人 明早十点前反馈"))
+        add(message("pending-confirmation", "[场景:待确认] 这个事项待确认，请核对后处理"))
+        add(message("reply-request", "[场景:请回复] 看到后请回复最新处理结果"))
         add(
             message(
                 "long-text",
