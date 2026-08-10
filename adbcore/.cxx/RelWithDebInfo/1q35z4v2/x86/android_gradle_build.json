@@ -1,0 +1,45 @@
+{
+  "buildFiles": [
+    "C:\\WorkSpace\\UbikiTouch\\adbcore\\src\\main\\jni\\CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "C:\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe",
+      "-C",
+      "C:\\WorkSpace\\UbikiTouch\\adbcore\\.cxx\\RelWithDebInfo\\1q35z4v2\\x86",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "C:\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe",
+    "-C",
+    "C:\\WorkSpace\\UbikiTouch\\adbcore\\.cxx\\RelWithDebInfo\\1q35z4v2\\x86",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "adb::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "x86",
+      "artifactName": "adb",
+      "output": "C:\\WorkSpace\\UbikiTouch\\adbcore\\build\\intermediates\\cxx\\RelWithDebInfo\\1q35z4v2\\obj\\x86\\libadb.so",
+      "runtimeFiles": []
+    },
+    "libadbcore.so::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "x86",
+      "artifactName": "libadbcore.so",
+      "output": "C:\\WorkSpace\\UbikiTouch\\adbcore\\build\\intermediates\\cxx\\RelWithDebInfo\\1q35z4v2\\obj\\x86\\libadbcore.so",
+      "runtimeFiles": []
+    }
+  },
+  "toolchains": {
+    "toolchain": {
+      "cCompilerExecutable": "C:\\Android\\Sdk\\ndk\\28.2.13676358\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang.exe",
+      "cppCompilerExecutable": "C:\\Android\\Sdk\\ndk\\28.2.13676358\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe"
+    }
+  },
+  "cFileExtensions": [],
+  "cppFileExtensions": [
+    "cpp"
+  ]
+}

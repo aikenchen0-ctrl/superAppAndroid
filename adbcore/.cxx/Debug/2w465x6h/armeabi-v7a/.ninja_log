@@ -1,0 +1,9 @@
+# ninja log v5
+34	1226	8080323026694391	CMakeFiles/libadbcore.so.dir/android.cpp.o	ae2ab757b7080b87
+25	1281	8080323026862446	CMakeFiles/libadbcore.so.dir/cgroup.cpp.o	ed0fad616b190d3f
+9	1397	8080323028489647	CMakeFiles/libadbcore.so.dir/misc.cpp.o	f58410a2534f7359
+17	1444	8080323028702967	CMakeFiles/libadbcore.so.dir/selinux.cpp.o	dfc924cf2130133f
+42	2403	8080323038306219	CMakeFiles/adb.dir/adb_pairing.cpp.o	2e86e14ceb0a70b8
+2407	2926	8080323043457805	C:/WorkSpace/UbikiTouch/adbcore/build/intermediates/cxx/Debug/2w465x6h/obj/armeabi-v7a/libadb.so	297d0d8e40478021
+1	3349	8080323047916035	CMakeFiles/libadbcore.so.dir/starter.cpp.o	b584708d264f08d8
+3352	3744	8080323051982759	C:/WorkSpace/UbikiTouch/adbcore/build/intermediates/cxx/Debug/2w465x6h/obj/armeabi-v7a/libadbcore.so	70277db98d532749

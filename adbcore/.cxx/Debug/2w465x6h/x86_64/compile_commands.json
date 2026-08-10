@@ -1,0 +1,32 @@
+[
+{
+  "directory": "C:/WorkSpace/UbikiTouch/adbcore/.cxx/Debug/2w465x6h/x86_64",
+  "command": "C:\\Android\\Sdk\\ndk\\28.2.13676358\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe --target=x86_64-none-linux-android26 --sysroot=C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot -DDEBUG -isystem C:/Users/Administrator/.gradle/caches/8.10.2/transforms/b0ebb6f8d6d3bb0005bb4c0188fa1a7d/transformed/libcxx-27.0.12077973/prefab/modules/cxx/include -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security -nostdinc++  -fno-limit-debug-info  -fPIE -Werror=format -fdata-sections -ffunction-sections -fno-exceptions -fno-rtti -fno-threadsafe-statics -o CMakeFiles\\libadbcore.so.dir\\starter.cpp.o -c C:\\WorkSpace\\UbikiTouch\\adbcore\\src\\main\\jni\\starter.cpp",
+  "file": "C:\\WorkSpace\\UbikiTouch\\adbcore\\src\\main\\jni\\starter.cpp"
+},
+{
+  "directory": "C:/WorkSpace/UbikiTouch/adbcore/.cxx/Debug/2w465x6h/x86_64",
+  "command": "C:\\Android\\Sdk\\ndk\\28.2.13676358\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe --target=x86_64-none-linux-android26 --sysroot=C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot -DDEBUG -isystem C:/Users/Administrator/.gradle/caches/8.10.2/transforms/b0ebb6f8d6d3bb0005bb4c0188fa1a7d/transformed/libcxx-27.0.12077973/prefab/modules/cxx/include -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security -nostdinc++  -fno-limit-debug-info  -fPIE -Werror=format -fdata-sections -ffunction-sections -fno-exceptions -fno-rtti -fno-threadsafe-statics -o CMakeFiles\\libadbcore.so.dir\\misc.cpp.o -c C:\\WorkSpace\\UbikiTouch\\adbcore\\src\\main\\jni\\misc.cpp",
+  "file": "C:\\WorkSpace\\UbikiTouch\\adbcore\\src\\main\\jni\\misc.cpp"
+},
+{
+  "directory": "C:/WorkSpace/UbikiTouch/adbcore/.cxx/Debug/2w465x6h/x86_64",
+  "command": "C:\\Android\\Sdk\\ndk\\28.2.13676358\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe --target=x86_64-none-linux-android26 --sysroot=C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot -DDEBUG -isystem C:/Users/Administrator/.gradle/caches/8.10.2/transforms/b0ebb6f8d6d3bb0005bb4c0188fa1a7d/transformed/libcxx-27.0.12077973/prefab/modules/cxx/include -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security -nostdinc++  -fno-limit-debug-info  -fPIE -Werror=format -fdata-sections -ffunction-sections -fno-exceptions -fno-rtti -fno-threadsafe-statics -o CMakeFiles\\libadbcore.so.dir\\selinux.cpp.o -c C:\\WorkSpace\\UbikiTouch\\adbcore\\src\\main\\jni\\selinux.cpp",
+  "file": "C:\\WorkSpace\\UbikiTouch\\adbcore\\src\\main\\jni\\selinux.cpp"
+},
+{
+  "directory": "C:/WorkSpace/UbikiTouch/adbcore/.cxx/Debug/2w465x6h/x86_64",
+  "command": "C:\\Android\\Sdk\\ndk\\28.2.13676358\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe --target=x86_64-none-linux-android26 --sysroot=C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot -DDEBUG -isystem C:/Users/Administrator/.gradle/caches/8.10.2/transforms/b0ebb6f8d6d3bb0005bb4c0188fa1a7d/transformed/libcxx-27.0.12077973/prefab/modules/cxx/include -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security -nostdinc++  -fno-limit-debug-info  -fPIE -Werror=format -fdata-sections -ffunction-sections -fno-exceptions -fno-rtti -fno-threadsafe-statics -o CMakeFiles\\libadbcore.so.dir\\cgroup.cpp.o -c C:\\WorkSpace\\UbikiTouch\\adbcore\\src\\main\\jni\\cgroup.cpp",
+  "file": "C:\\WorkSpace\\UbikiTouch\\adbcore\\src\\main\\jni\\cgroup.cpp"
+},
+{
+  "directory": "C:/WorkSpace/UbikiTouch/adbcore/.cxx/Debug/2w465x6h/x86_64",
+  "command": "C:\\Android\\Sdk\\ndk\\28.2.13676358\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe --target=x86_64-none-linux-android26 --sysroot=C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot -DDEBUG -isystem C:/Users/Administrator/.gradle/caches/8.10.2/transforms/b0ebb6f8d6d3bb0005bb4c0188fa1a7d/transformed/libcxx-27.0.12077973/prefab/modules/cxx/include -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security -nostdinc++  -fno-limit-debug-info  -fPIE -Werror=format -fdata-sections -ffunction-sections -fno-exceptions -fno-rtti -fno-threadsafe-statics -o CMakeFiles\\libadbcore.so.dir\\android.cpp.o -c C:\\WorkSpace\\UbikiTouch\\adbcore\\src\\main\\jni\\android.cpp",
+  "file": "C:\\WorkSpace\\UbikiTouch\\adbcore\\src\\main\\jni\\android.cpp"
+},
+{
+  "directory": "C:/WorkSpace/UbikiTouch/adbcore/.cxx/Debug/2w465x6h/x86_64",
+  "command": "C:\\Android\\Sdk\\ndk\\28.2.13676358\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe --target=x86_64-none-linux-android26 --sysroot=C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot -DDEBUG -Dadb_EXPORTS -isystem C:/Users/Administrator/.gradle/caches/8.10.2/transforms/2abdab746be775484ab3fb8cc17f2284/transformed/boringssl-20250114/prefab/modules/crypto_static/include -isystem C:/Users/Administrator/.gradle/caches/8.10.2/transforms/b0ebb6f8d6d3bb0005bb4c0188fa1a7d/transformed/libcxx-27.0.12077973/prefab/modules/cxx/include -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security -nostdinc++  -fno-limit-debug-info  -fPIC -Werror=format -fdata-sections -ffunction-sections -fno-exceptions -fno-rtti -fno-threadsafe-statics -o CMakeFiles\\adb.dir\\adb_pairing.cpp.o -c C:\\WorkSpace\\UbikiTouch\\adbcore\\src\\main\\jni\\adb_pairing.cpp",
+  "file": "C:\\WorkSpace\\UbikiTouch\\adbcore\\src\\main\\jni\\adb_pairing.cpp"
+}
+]

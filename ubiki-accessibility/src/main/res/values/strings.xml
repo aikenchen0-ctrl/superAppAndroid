@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ubiki_accessibility_service_label">ubikiTouch Edge Bars</string>
+    <string name="ubiki_accessibility_service_description">Detects user gestures from transparent screen edge bars and runs configured navigation actions.</string>
+    <string name="ubiki_accessibility_service_summary">Shows touchable edge zones while the accessibility service is enabled.</string>
+    <string name="ubiki_launch_app_failed">Target app could not be launched.</string>
+    <string name="ubiki_persistent_channel_name">Gesture persistence</string>
+    <string name="ubiki_persistent_notification_title">ICON gestures are active</string>
+    <string name="ubiki_persistent_notification_text">Keeps edge gestures alive while accessibility is enabled.</string>
+    <string name="ubiki_recovery_notification_title">Enable ICON gesture persistence</string>
+    <string name="ubiki_recovery_notification_text">If gestures did not return after boot or cleanup, reopen accessibility and battery settings.</string>
+    <string name="ubiki_recovery_notification_action_accessibility">Accessibility settings</string>
+    <string name="ubiki_recovery_notification_action_app_settings">App settings</string>
+    <string name="ubiki_video_demo_title">Video preview</string>
+    <string name="ubiki_video_demo_status">Down swipe detected</string>
+    <string name="ubiki_video_demo_close">Close video preview</string>
+    <string name="ubiki_video_demo_accessibility_description">Short video demo. Swipe vertically to change videos, double tap to like, and use the action rail.</string>
+    <string name="ubiki_video_demo_tab_recommended">Recommended</string>
+    <string name="ubiki_video_demo_tab_following">Following</string>
+    <string name="ubiki_video_demo_tab_nearby">Nearby</string>
+    <string name="ubiki_video_demo_search_hint">Search is available in this demo.</string>
+    <string name="ubiki_video_demo_followed">Following creator</string>
+    <string name="ubiki_video_demo_unfollowed">Creator unfollowed</string>
+    <string name="ubiki_video_demo_saved">Saved to demo collection</string>
+    <string name="ubiki_video_demo_unsaved">Removed from demo collection</string>
+    <string name="ubiki_video_demo_share_hint">Share is simulated in this demo.</string>
+    <string name="ubiki_video_demo_comments">Comments</string>
+    <string name="ubiki_video_demo_comments_closed">Comments closed</string>
+    <string name="ubiki_video_demo_comments_demo">Demo comment: this local feed is ready to explore.</string>
+    <string name="ubiki_video_demo_comments_second">Swipe up or down to keep browsing.</string>
+    <string name="ubiki_video_demo_feed_end">You are at the last demo video.</string>
+    <string name="ubiki_video_demo_feed_start">You are at the first demo video.</string>
+    <string name="ubiki_video_demo_playing">Video playing</string>
+    <string name="ubiki_video_demo_paused">Video paused</string>
+    <string name="ubiki_video_demo_liked">Liked</string>
+    <string name="ubiki_video_demo_like_count">1.2K</string>
+    <string name="ubiki_video_demo_comment_count">86</string>
+    <string name="ubiki_video_demo_save_label">Save</string>
+    <string name="ubiki_video_demo_share_label">Share</string>
+    <string name="ubiki_video_demo_local_badge">LOCAL DEMO VIDEO</string>
+    <string name="ubiki_video_demo_loading">Loading video...</string>
+    <string name="ubiki_video_demo_load_failed">Video failed to load</string>
+</resources>

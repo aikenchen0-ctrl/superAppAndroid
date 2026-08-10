@@ -1,0 +1,69 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"jsonFile" : "directory-.-Debug-d0094a50bb2071803777.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.10.0"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "adbcore",
+					"targetIndexes" : 
+					[
+						0,
+						1
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "adb::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-adb-Debug-b47dbcf1e8fec9614c66.json",
+					"name" : "adb",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "libadbcore.so::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-libadbcore.so-Debug-46e9ff49077b58802ccc.json",
+					"name" : "libadbcore.so",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "C:/WorkSpace/UbikiTouch/adbcore/.cxx/Debug/2w465x6h/arm64-v8a",
+		"source" : "C:/WorkSpace/UbikiTouch/adbcore/src/main/jni"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 3
+	}
+}

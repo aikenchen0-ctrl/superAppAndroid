@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ubiki_accessibility_service_label">ubikiTouch 边缘触摸条</string>
+    <string name="ubiki_accessibility_service_description">通过透明屏幕边缘触摸条识别用户手势，并执行已配置的导航动作。</string>
+    <string name="ubiki_accessibility_service_summary">启用无障碍服务后显示可触摸的边缘区域。</string>
+    <string name="ubiki_launch_app_failed">无法启动目标应用。</string>
+    <string name="ubiki_persistent_channel_name">手势保活</string>
+    <string name="ubiki_persistent_notification_title">ICON 手势正在生效</string>
+    <string name="ubiki_persistent_notification_text">无障碍开启时保持边缘手势常驻运行。</string>
+    <string name="ubiki_recovery_notification_title">开启 ICON 手势保活</string>
+    <string name="ubiki_recovery_notification_text">如果重启或清理后台后手势未恢复，请重新确认无障碍和电池后台设置。</string>
+    <string name="ubiki_recovery_notification_action_accessibility">无障碍设置</string>
+    <string name="ubiki_recovery_notification_action_app_settings">应用设置</string>
+    <string name="ubiki_video_demo_title">视频预览</string>
+    <string name="ubiki_video_demo_status">下滑动作已触发</string>
+    <string name="ubiki_video_demo_close">关闭视频预览</string>
+    <string name="ubiki_video_demo_accessibility_description">短视频演示。上下滑动切换视频，双击点赞，右侧操作栏提供更多功能。</string>
+    <string name="ubiki_video_demo_tab_recommended">推荐</string>
+    <string name="ubiki_video_demo_tab_following">关注</string>
+    <string name="ubiki_video_demo_tab_nearby">同城</string>
+    <string name="ubiki_video_demo_search_hint">搜索功能仅用于演示。</string>
+    <string name="ubiki_video_demo_followed">已关注作者</string>
+    <string name="ubiki_video_demo_unfollowed">已取消关注</string>
+    <string name="ubiki_video_demo_saved">已收藏到演示列表</string>
+    <string name="ubiki_video_demo_unsaved">已取消收藏</string>
+    <string name="ubiki_video_demo_share_hint">分享功能仅用于演示。</string>
+    <string name="ubiki_video_demo_comments">评论</string>
+    <string name="ubiki_video_demo_comments_closed">已关闭评论</string>
+    <string name="ubiki_video_demo_comments_demo">演示评论：本地视频流可以继续浏览。</string>
+    <string name="ubiki_video_demo_comments_second">上下滑动即可切换下一条内容。</string>
+    <string name="ubiki_video_demo_feed_end">已经是最后一条演示视频。</string>
+    <string name="ubiki_video_demo_feed_start">已经是第一条演示视频。</string>
+    <string name="ubiki_video_demo_playing">视频播放中</string>
+    <string name="ubiki_video_demo_paused">视频已暂停</string>
+    <string name="ubiki_video_demo_liked">已点赞</string>
+    <string name="ubiki_video_demo_like_count">1.2K</string>
+    <string name="ubiki_video_demo_comment_count">86</string>
+    <string name="ubiki_video_demo_save_label">收藏</string>
+    <string name="ubiki_video_demo_share_label">分享</string>
+    <string name="ubiki_video_demo_local_badge">本地演示视频</string>
+    <string name="ubiki_video_demo_loading">视频加载中...</string>
+    <string name="ubiki_video_demo_load_failed">视频加载失败</string>
+</resources>

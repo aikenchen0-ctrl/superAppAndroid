@@ -1,0 +1,4 @@
+C:/WorkSpace/UbikiTouch/adbcore/.cxx/Debug/2w465x6h/x86_64/CMakeFiles/libadbcore.so.dir
+C:/WorkSpace/UbikiTouch/adbcore/.cxx/Debug/2w465x6h/x86_64/CMakeFiles/adb.dir
+C:/WorkSpace/UbikiTouch/adbcore/.cxx/Debug/2w465x6h/x86_64/CMakeFiles/edit_cache.dir
+C:/WorkSpace/UbikiTouch/adbcore/.cxx/Debug/2w465x6h/x86_64/CMakeFiles/rebuild_cache.dir

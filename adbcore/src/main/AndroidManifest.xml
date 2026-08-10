@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission
+        android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
+
+    <application android:directBootAware="true">
+
+        <receiver
+            android:name=".AdbBootReceiver"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!--
+            Receives the binder sent by adbcore_server (uid 2000) on startup.
+            authorities = "${applicationId}.adbcore" — auto-bound to host app.
+            exported = true is required because the caller is uid SHELL,
+            which differs from the host app's uid.
+        -->
+        <provider
+            android:name=".AdbCoreProvider"
+            android:authorities="${applicationId}.adbcore"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="true"
+            android:multiprocess="false"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
+        <!--
+            No-UI keep-alive service. Started periodically by adbcore_server with
+            `am startservice` — this brings the host App process up without
+            showing any UI. Manifest merger pulls this declaration into every
+            host App that depends on :adbcore, so consumers don't have to
+            declare anything themselves.
+
+            exported is left at the default (false). ADB shell uid (2000) can
+            still start it via `am startservice` because shell is a privileged
+            uid and bypasses the exported check, mirroring how Shizuku starts
+            its own service.
+        -->
+        <service
+            android:name=".AdbKeepAliveService"
+            android:directBootAware="true"
+            android:enabled="true" />
+    </application>
+
+</manifest>

@@ -1,0 +1,9 @@
+.gradle/
+.idea/
+.kotlin/
+.superpowers
+.vscode
+build/
+*/build/
+local.properties
+*.iml
