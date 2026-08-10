@@ -13,6 +13,51 @@ import org.junit.Test
 
 class ScrmFloatingChatBridgeTest {
     @Test
+    fun floatingChatMapsReadOnlyHistoryMessagesToConversationThreads() {
+        val conversation = scrmFloatingChatConversation(
+            base = FloatingChatPrototype.sampleConversation(),
+            contacts = listOf(
+                ScrmContact(id = 1, wxid = "wxid_friend", nickname = "Friend")
+            ),
+            accountConversations = listOf(
+                ScrmFloatingAccountConversation(
+                    deviceUuid = "device-1",
+                    weChatId = "wxid_account",
+                    contacts = listOf(
+                        ScrmContact(id = 1, wxid = "wxid_friend", nickname = "Friend")
+                    ),
+                    messagesByConversation = mapOf(
+                        "wxid_friend" to listOf(
+                            ScrmChatMessage(
+                                messageId = 101,
+                                senderWxid = "wxid_friend",
+                                receiverWxid = "wxid_account",
+                                content = "来自真实历史",
+                                createdAt = "2026-08-10T10:05:00Z"
+                            )
+                        )
+                    )
+                )
+            ),
+            accounts = listOf(ScrmWechatAccount("wxid_account", "Account", "device-1")),
+            devices = listOf(device("device-1", "wxid_account", online = true)),
+            selectedDeviceUuid = "device-1",
+            selectedWeChatId = "wxid_account"
+        )
+
+        assertEquals(1, conversation.messages.size)
+        assertEquals("来自真实历史", conversation.messages.single().text)
+        assertEquals(
+            scrmFloatingScopedThreadId(
+                scrmFloatingAccountId("device-1", "wxid_account"),
+                scrmFloatingContactId("wxid_friend")
+            ),
+            conversation.messages.single().threadContactId
+        )
+        assertFalse(conversation.messages.single().fromMe)
+    }
+
+    @Test
     fun floatingChatMapsAvatarAliasesForContactsGroupsMembersAndAccounts() {
         val conversation = scrmFloatingChatConversation(
             base = FloatingChatPrototype.sampleConversation(),

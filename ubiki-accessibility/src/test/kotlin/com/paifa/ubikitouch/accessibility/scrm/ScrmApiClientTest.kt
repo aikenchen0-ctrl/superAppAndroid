@@ -64,6 +64,326 @@ class ScrmApiClientTest {
     }
 
     @Test
+    fun getChatHistoryRetriesWithBackendIdAndParsesMessages() {
+        val transport = QueueTransport(
+            ScrmHttpResponse(statusCode = 404, body = "{\"message\":\"conversation not found\"}"),
+            ok(
+                """
+                {
+                  "hasMore": true,
+                  "nextCursor": "cursor-2",
+                  "items": [
+                    {
+                      "messageId": 99,
+                      "senderWxid": "wxid_friend",
+                      "receiverWxid": "wxid_account",
+                      "chatType": 1,
+                      "messageType": 1,
+                      "content": "hello",
+                      "direction": 0,
+                      "createdAt": "2026-08-10T10:00:00Z"
+                    }
+                  ]
+                }
+                """.trimIndent()
+            )
+        )
+
+        val result = ScrmApiClient(config, transport).getChatHistory(
+            deviceUuid = "device-1",
+            weChatId = "wxid_account",
+            conversationWxid = "wxid_friend",
+            conversationId = 7L,
+            cursor = "cursor-1",
+            pageSize = 50
+        )
+
+        assertTrue(result.hasMore)
+        assertEquals("cursor-2", result.nextCursor)
+        assertEquals(99L, result.messages.single().messageId)
+        assertEquals("hello", result.messages.single().content)
+        assertEquals(
+            listOf(
+                "https://api.example.com/openapi/v1/chat/history?deviceUuid=device-1&weChatId=wxid_account&conversationId=wxid_friend&pageSize=50&cursor=cursor-1",
+                "https://api.example.com/openapi/v1/chat/history?deviceUuid=device-1&weChatId=wxid_account&conversationId=7&pageSize=50&cursor=cursor-1"
+            ),
+            transport.requests.map { it.url }
+        )
+    }
+
+    @Test
+    fun getChatChangesParsesSequenceAndNestedMessages() {
+        val transport = RecordingTransport(
+            ok(
+                """
+                {
+                  "afterSequence": 42,
+                  "nextSequence": 44,
+                  "headSequence": 44,
+                  "minAvailableSequence": 10,
+                  "hasMore": false,
+                  "items": [
+                    {
+                      "sequence": 43,
+                      "message": {
+                        "messageId": 101,
+                        "conversationId": 7,
+                        "senderWxid": "wxid_friend",
+                        "receiverWxid": "wxid_account",
+                        "content": "新增消息"
+                      }
+                    }
+                  ]
+                }
+                """.trimIndent()
+            )
+        )
+
+        val result = ScrmApiClient(config, transport).getChatChanges(
+            deviceUuid = "device-1",
+            weChatId = "wxid_account",
+            afterSequence = 42L,
+            limit = 200
+        )
+
+        assertEquals(44L, result.nextSequence)
+        assertFalse(result.hasMore)
+        assertEquals(101L, result.items.single().message?.messageId)
+        assertEquals(
+            "https://api.example.com/openapi/v1/messages/changes?deviceUuid=device-1&weChatId=wxid_account&afterSequence=42&limit=200",
+            transport.lastRequest?.url
+        )
+    }
+
+    @Test
+    fun getCustomerProfileUsesContactRouteAndParsesProfileFields() {
+        val transport = RecordingTransport(
+            ok(
+                """
+                {
+                  "id": 12,
+                  "contactId": 7,
+                  "ownerWxid": "wxid_account",
+                  "friendWxid": "wxid_friend",
+                  "displayName": "Test Friend",
+                  "customerLevel": "VIP",
+                  "sourceChannel": "referral",
+                  "sourceDetail": "summer campaign",
+                  "profileKey": "crm-1001",
+                  "purchaseHistory": "order-42",
+                  "socialAccounts": "telegram:test",
+                  "faceImageUrl": "https://cdn.example/profile.png",
+                  "notes": "follow up Friday",
+                  "mappedLabelIds": [3, 9],
+                  "mappedLabelNames": ["Priority", "Returning"],
+                  "phone": "13800138000",
+                  "updatedAt": "2026-08-10T12:00:00Z"
+                }
+                """.trimIndent()
+            )
+        )
+
+        val result = ScrmApiClient(config, transport).getCustomerProfile(
+            contactId = 7,
+            weChatId = "wxid_account"
+        )
+
+        assertEquals(12, result.id)
+        assertEquals("VIP", result.customerLevel)
+        assertEquals("referral", result.sourceChannel)
+        assertEquals("summer campaign", result.sourceDetail)
+        assertEquals("crm-1001", result.profileKey)
+        assertEquals("order-42", result.purchaseHistory)
+        assertEquals("telegram:test", result.socialAccounts)
+        assertEquals("https://cdn.example/profile.png", result.faceImageUrl)
+        assertEquals("follow up Friday", result.notes)
+        assertEquals(listOf(3, 9), result.mappedLabelIds)
+        assertEquals(listOf("Priority", "Returning"), result.mappedLabelNames)
+        assertEquals("13800138000", result.phone)
+        assertEquals(
+            "https://api.example.com/openapi/v1/contacts/7/customer-profile?weChatId=wxid_account",
+            transport.lastRequest?.url
+        )
+        assertEquals("GET", transport.lastRequest?.method)
+    }
+
+    @Test
+    fun getContactDetailUsesReadOnlyLimitsAndParsesAggregateSnapshots() {
+        val transport = RecordingTransport(
+            ok(
+                """
+                {
+                  "contact": {
+                    "id": 7,
+                    "wxid": "wxid_friend",
+                    "nickname": "Test Friend"
+                  },
+                  "customerProfile": {
+                    "contactId": 7,
+                    "level": "A",
+                    "source": "campaign",
+                    "notes": "follow up"
+                  },
+                  "labels": [
+                    { "id": 3, "labelId": 9, "tagName": "Priority", "tagColor": "#FF0000" }
+                  ],
+                  "commonChatRooms": [
+                    { "id": 8, "chatRoomId": "room@chatroom", "name": "Test Room", "memberCount": 12 }
+                  ],
+                  "relationLogs": [
+                    { "id": 10, "contactId": 7, "changeType": "friend_added", "actionText": "Friend added" }
+                  ]
+                }
+                """.trimIndent()
+            )
+        )
+
+        val result = ScrmApiClient(config, transport).getContactDetail(
+            contactId = 7,
+            commonChatRoomLimit = 20,
+            relationLogLimit = 20
+        )
+
+        assertEquals("wxid_friend", result.contact?.wxid)
+        assertEquals("A", result.customerProfile?.customerLevel)
+        assertEquals("campaign", result.customerProfile?.sourceChannel)
+        assertEquals("Priority", result.labels.single().tagName)
+        assertEquals("room@chatroom", result.commonChatRooms.single().chatRoomId)
+        assertEquals("friend_added", result.relationLogs.single().changeType)
+        assertEquals(
+            "https://api.example.com/openapi/v1/contacts/7/detail" +
+                "?commonChatRoomLimit=20&relationLogLimit=20",
+            transport.lastRequest?.url
+        )
+        assertEquals("GET", transport.lastRequest?.method)
+    }
+
+    @Test
+    fun getCommonChatRoomsUsesFriendRouteAndParsesPagedResults() {
+        val transport = RecordingTransport(
+            ok(
+                """
+                {
+                  "items": [
+                    {
+                      "id": 8,
+                      "friendWxid": "wxid_friend",
+                      "chatRoomId": "room@chatroom",
+                      "name": "Test Room",
+                      "memberCount": 12,
+                      "friendDisplayName": "Test Friend",
+                      "friendMemberRole": 2,
+                      "friendIsAdmin": true
+                    }
+                  ],
+                  "totalCount": 1,
+                  "page": 2,
+                  "pageSize": 50
+                }
+                """.trimIndent()
+            )
+        )
+
+        val result = ScrmApiClient(config, transport).getCommonChatRooms(
+            friendId = "wxid_friend",
+            query = ScrmCommonChatRoomQuery(
+                weChatId = "wxid_account",
+                page = 2,
+                pageSize = 50,
+                search = "Test",
+                includeDeleted = false
+            )
+        )
+
+        assertEquals(1, result.totalCount)
+        assertEquals(2, result.page)
+        assertEquals("room@chatroom", result.items.single().chatRoomId)
+        assertEquals(2, result.items.single().friendMemberRole)
+        assertTrue(result.items.single().friendIsAdmin)
+        assertEquals(
+            "https://api.example.com/openapi/v1/contacts/wxid_friend/common-chatrooms" +
+                "?weChatId=wxid_account&page=2&pageSize=50&search=Test&includeDeleted=false",
+            transport.lastRequest?.url
+        )
+        assertEquals("GET", transport.lastRequest?.method)
+    }
+
+    @Test
+    fun getContactLabelsUsesReadOnlyFiltersAndParsesLabelDictionary() {
+        val transport = RecordingTransport(
+            ok(
+                """
+                [
+                  {
+                    "id": 3,
+                    "ownerWxid": "wxid_account",
+                    "labelId": 9,
+                    "tagName": "Priority",
+                    "tagColor": "#FF0000",
+                    "tagDescription": "High intent",
+                    "customerProfileCount": 2,
+                    "contactCount": 5
+                  }
+                ]
+                """.trimIndent()
+            )
+        )
+
+        val result = ScrmApiClient(config, transport).getContactLabels(
+            weChatId = "wxid_account",
+            includeDeleted = false
+        )
+
+        assertEquals(9, result.single().labelId)
+        assertEquals("Priority", result.single().tagName)
+        assertEquals("#FF0000", result.single().tagColor)
+        assertEquals(2, result.single().customerProfileCount)
+        assertEquals(
+            "https://api.example.com/openapi/v1/contact-labels" +
+                "?weChatId=wxid_account&includeDeleted=false",
+            transport.lastRequest?.url
+        )
+        assertEquals("GET", transport.lastRequest?.method)
+    }
+
+    @Test
+    fun getContactWxidsUsesProfileFiltersAndParsesDirectWxidList() {
+        val transport = RecordingTransport(
+            ok(
+                """
+                {
+                  "weChatId": "wxid_account",
+                  "wxids": ["wxid_friend_1", "wxid_friend_2"],
+                  "count": 2
+                }
+                """.trimIndent()
+            )
+        )
+
+        val result = ScrmApiClient(config, transport).getContactWxids(
+            ScrmContactWxidQuery(
+                weChatId = "wxid_account",
+                includeDeleted = false,
+                onlyFriends = true,
+                labelIds = "3,9",
+                customerLevel = "VIP",
+                profileOnly = true
+            )
+        )
+
+        assertEquals("wxid_account", result.weChatId)
+        assertEquals(listOf("wxid_friend_1", "wxid_friend_2"), result.wxids)
+        assertEquals(2, result.count)
+        assertEquals(
+            "https://api.example.com/openapi/v1/contacts/wxids" +
+                "?weChatId=wxid_account&includeDeleted=false&onlyFriends=true" +
+                "&labelIds=3%2C9&customerLevel=VIP&profileOnly=true",
+            transport.lastRequest?.url
+        )
+        assertEquals("GET", transport.lastRequest?.method)
+    }
+
+    @Test
     fun getMeInjectsApiKeyAndParsesIdentity() {
         val transport = RecordingTransport(
             ScrmHttpResponse(
@@ -1309,6 +1629,17 @@ class ScrmApiClientTest {
         override fun execute(request: ScrmHttpRequest): ScrmHttpResponse {
             lastRequest = request
             return response
+        }
+    }
+
+    private class QueueTransport(
+        private vararg val responses: ScrmHttpResponse
+    ) : ScrmHttpTransport {
+        val requests = mutableListOf<ScrmHttpRequest>()
+
+        override fun execute(request: ScrmHttpRequest): ScrmHttpResponse {
+            requests += request
+            return responses[requests.lastIndex]
         }
     }
 

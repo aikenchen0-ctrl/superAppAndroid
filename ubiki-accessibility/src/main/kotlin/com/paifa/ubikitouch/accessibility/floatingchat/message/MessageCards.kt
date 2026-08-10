@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -89,7 +90,11 @@ internal fun InlineContactContent(message: FloatingChatMessage) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(28.dp),
+            .heightIn(min = 42.dp)
+            .clip(RoundedCornerShape(7.dp))
+            .background(OverlayTokens.contactCard)
+            .border(1.dp, OverlayTokens.contactCardBorder, RoundedCornerShape(7.dp))
+            .padding(horizontal = 8.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         SquareAvatarChip(
@@ -114,7 +119,11 @@ internal fun InlineLocationContent(message: FloatingChatMessage) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(28.dp),
+            .heightIn(min = 42.dp)
+            .clip(RoundedCornerShape(7.dp))
+            .background(OverlayTokens.locationCard)
+            .border(1.dp, OverlayTokens.locationCardBorder, RoundedCornerShape(7.dp))
+            .padding(horizontal = 8.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         FloatingChatLocationGlyph(modifier = Modifier.size(24.dp))

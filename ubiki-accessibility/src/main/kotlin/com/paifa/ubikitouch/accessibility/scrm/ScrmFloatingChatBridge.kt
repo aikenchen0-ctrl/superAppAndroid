@@ -18,16 +18,14 @@ private const val ScrmChatRoomMemberOwnerRole = 1
 private const val ScrmChatRoomMemberAdminRole = 2
 
 private val ScrmAvatarPalette = longArrayOf(
-    0xFF1B9AAA,
-    0xFFE07A5F,
-    0xFF8E7DBE,
-    0xFF2A9D8F,
-    0xFFB56576,
-    0xFFEF476F,
-    0xFFFFB703,
-    0xFF457B9D,
-    0xFF118AB2,
-    0xFF3A86FF
+    0xFFFFB4AB,
+    0xFFFFB77D,
+    0xFFF8D67E,
+    0xFFD7ED8E,
+    0xFFA4E8B2,
+    0xFF8EE6DD,
+    0xFF9ECAFF,
+    0xFFCBB8FF
 )
 
 internal data class ScrmFloatingAccountRoute(
@@ -45,7 +43,10 @@ internal data class ScrmFloatingAccountConversation(
     val weChatId: String,
     val contacts: List<ScrmContact>,
     val chatRooms: List<ScrmChatRoom> = emptyList(),
-    val chatRoomMembers: Map<String, List<ScrmChatRoomMember>> = emptyMap()
+    val chatRoomMembers: Map<String, List<ScrmChatRoomMember>> = emptyMap(),
+    val messagesByConversation: Map<String, List<ScrmChatMessage>> = emptyMap(),
+    val conversationWxidByBackendId: Map<Long, String> = emptyMap(),
+    val nextSequence: Long = 0L
 ) {
     init {
         require(deviceUuid.isNotBlank()) { "deviceUuid cannot be blank" }
@@ -132,32 +133,78 @@ internal fun scrmFloatingChatConversation(
     selectedDeviceUuid: String,
     selectedWeChatId: String
 ): FloatingChatConversation {
-    val floatingAccounts = scrmFloatingAccountContacts(
+    val rawFloatingAccounts = scrmFloatingAccountContacts(
         accounts = accounts,
         devices = devices,
         accountConversations = accountConversations,
         selectedDeviceUuid = selectedDeviceUuid,
         selectedWeChatId = selectedWeChatId
     )
+    val rawGroups = scrmFloatingScopedChatRooms(accountConversations)
+    val scopedGroups = scrmApplyAvatarPalette(rawGroups)
+    val scopedContacts = scrmApplyAvatarPalette(
+        contacts = scrmFloatingScopedContacts(
+            fallbackContacts = contacts,
+            accountConversations = accountConversations,
+            selectedDeviceUuid = selectedDeviceUuid,
+            selectedWeChatId = selectedWeChatId
+        ),
+        startPosition = scrmAvatarVisibleEntryCount(scopedGroups)
+    )
+    val floatingAccounts = scrmApplyAvatarPalette(
+        contacts = rawFloatingAccounts,
+        startPosition = scrmAvatarVisibleEntryCount(scopedGroups) +
+            scrmAvatarVisibleEntryCount(scopedContacts)
+    )
     val selectedAccount = floatingAccounts.firstOrNull { account -> account.selected }
         ?: floatingAccounts.firstOrNull()
-    val scopedContacts = scrmFloatingScopedContacts(
-        fallbackContacts = contacts,
-        accountConversations = accountConversations,
-        selectedDeviceUuid = selectedDeviceUuid,
-        selectedWeChatId = selectedWeChatId
-    )
-    val scopedGroups = scrmFloatingScopedChatRooms(accountConversations)
+    val historyMessages = scrmFloatingHistoryMessages(accountConversations)
 
     return base.copy(
         peerName = "SCRM Contacts",
         accountName = selectedAccount?.name ?: selectedWeChatId.ifBlank { base.accountName },
         contacts = scopedContacts,
         accountContacts = floatingAccounts,
-        messages = emptyList(),
+        messages = historyMessages,
         homeUnreadDemoMessages = scrmUnreadDemoMessages(scopedContacts, scopedGroups),
         groupContacts = scopedGroups
     )
+}
+
+private fun scrmFloatingHistoryMessages(
+    accountConversations: List<ScrmFloatingAccountConversation>
+): List<FloatingChatMessage> {
+    return accountConversations.flatMap { account ->
+        val accountId = scrmFloatingAccountId(account.deviceUuid, account.weChatId)
+        account.messagesByConversation.flatMap { (conversationWxid, messages) ->
+            val isGroup = conversationWxid.endsWith("@chatroom", ignoreCase = true)
+            val threadId = scrmFloatingScopedThreadId(
+                accountId,
+                if (isGroup) scrmFloatingGroupId(conversationWxid)
+                else scrmFloatingContactId(conversationWxid)
+            )
+            messages.mapNotNull { message ->
+                val remoteId = message.messageId.takeIf { it > 0L }?.toString()
+                    ?: message.messageServerId?.toString()
+                    ?: message.clientMessageId
+                    ?: message.localMessageId
+                    ?: return@mapNotNull null
+                val fromMe = message.direction == 1 || message.senderWxid == account.weChatId
+                FloatingChatMessage(
+                    id = "scrm-message:$accountId:$remoteId",
+                    type = FloatingChatMessageType.Text,
+                    text = message.content,
+                    fromMe = fromMe,
+                    senderName = if (fromMe) account.weChatId else message.senderWxid.orEmpty().ifBlank { conversationWxid },
+                    time = message.createdAt.orEmpty().substringAfter('T').take(5),
+                    connectionTarget = if (fromMe) FloatingChatConnectionTarget.Account else FloatingChatConnectionTarget.User,
+                    connectionTargetId = threadId,
+                    threadContactId = threadId,
+                    remoteMessageServerId = message.messageServerId?.toString()
+                )
+            }
+        }
+    }
 }
 
 private fun scrmUnreadDemoMessages(
@@ -460,9 +507,35 @@ private fun scrmAccountDescription(display: ScrmFloatingAccountDisplay): String 
     return "$onlineText / $statusText / ${display.route.weChatId}"
 }
 
+/**
+ * SCRM 返回的联系人顺序就是悬浮聊天的展示顺序，按顺序轮换可避免相邻初始头像撞色。
+ * 真实头像加载成功后会覆盖此填充色，因此这里只影响无头像或加载失败的兜底显示。
+ */
+private fun scrmApplyAvatarPalette(
+    contacts: List<FloatingChatContact>,
+    startPosition: Int = 0
+): List<FloatingChatContact> {
+    var memberPosition = startPosition + contacts.size
+    return contacts.mapIndexed { index, contact ->
+        val color = scrmAvatarColorForPosition(startPosition + index)
+        val members = contact.groupMemberContacts.map { member ->
+            member.copy(avatarColor = scrmAvatarColorForPosition(memberPosition++))
+        }
+        contact.copy(avatarColor = color, groupMemberContacts = members)
+    }
+}
+
+private fun scrmAvatarVisibleEntryCount(contacts: List<FloatingChatContact>): Int {
+    return contacts.size
+}
+
+internal fun scrmAvatarColorForPosition(position: Int): Long {
+    return ScrmAvatarPalette[Math.floorMod(position, ScrmAvatarPalette.size)]
+}
+
 private fun scrmStableColor(key: String): Long {
-    val index = ((key.hashCode().toLong() and 0x7fffffff) % ScrmAvatarPalette.size).toInt()
-    return ScrmAvatarPalette[index]
+    val position = (key.hashCode().toLong() and 0x7fffffff).toInt()
+    return scrmAvatarColorForPosition(position)
 }
 
 private fun scrmEncodeIdPart(value: String): String {

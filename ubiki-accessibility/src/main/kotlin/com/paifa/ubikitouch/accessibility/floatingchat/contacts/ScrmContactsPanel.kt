@@ -94,6 +94,8 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmAddFriendsByPhoneRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmAdminBootstrapResult
 import com.paifa.ubikitouch.accessibility.scrm.ScrmAuthenticationException
 import com.paifa.ubikitouch.accessibility.scrm.ScrmContact
+import com.paifa.ubikitouch.accessibility.scrm.ScrmContactDetail
+import com.paifa.ubikitouch.accessibility.scrm.ScrmCustomerProfile
 import com.paifa.ubikitouch.accessibility.scrm.ScrmContactQuery
 import com.paifa.ubikitouch.accessibility.scrm.ScrmContactTaskRunner
 import com.paifa.ubikitouch.accessibility.scrm.ScrmCreateChatRoomRequest
@@ -290,6 +292,37 @@ internal fun ScrmContactsPanel(
 
     fun selectedRemoteId(contact: ScrmContact): String? {
         return scrmContactPrimaryConversationId(contact)
+    }
+
+    fun loadSelectedContactDetail(contact: ScrmContact) {
+        scope.launch {
+            state = state.copy(detailLoading = true, error = null, status = "正在读取客户画像")
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    ContactDetailLoadResult(
+                        // UI test: open Contacts -> select one contact -> wait for this GET result.
+                        // Do not replace this with a write task; verify the rendered profile/labels only.
+                        detail = session.contactApi.getContactDetail(contactId = contact.id),
+                        // UI test: compare this read-only profile with the detail card's level/source/notes.
+                        customerProfile = session.contactApi.getCustomerProfile(
+                            contactId = contact.id,
+                            weChatId = route.weChatId
+                        )
+                    )
+                }
+            }.onSuccess { result ->
+                state = state.copy(
+                    detailLoading = false,
+                    selectedContactDetail = result.detail,
+                    selectedCustomerProfile = result.customerProfile,
+                    status = "客户画像已刷新",
+                    error = null
+                )
+            }.onFailure { error ->
+                state = state.copy(detailLoading = false, selectedContactDetail = null, selectedCustomerProfile = null, status = null, error = error.toScrmContactsPanelMessage())
+            }
+        }
     }
 
     fun syncContacts() {
@@ -560,10 +593,11 @@ internal fun ScrmContactsPanel(
                         }
                         is ContactsScreenAction.OpenContact -> {
                             contactsById[action.contactId]?.let { contact ->
-                                state = state.copy(selectedContact = contact, error = null)
+                                state = state.copy(selectedContact = contact, selectedContactDetail = null, selectedCustomerProfile = null, error = null)
                                 addWxidText = contact.wxid.orEmpty()
                                 panelScreen = WechatContactsPanelScreen.ContactIntro
                                 showPlusMenu = false
+                                loadSelectedContactDetail(contact)
                             }
                         }
                         ContactsScreenAction.Ignore -> Unit
@@ -590,6 +624,20 @@ internal fun ScrmContactsPanel(
             )
             WechatContactsPanelScreen.ContactIntro -> {
                 val selectedContact = state.selectedContact
+                if (selectedContact != null) {
+                    ScrmContactProfilePanel(
+                        contact = selectedContact,
+                        detail = state.selectedContactDetail,
+                        customerProfile = state.selectedCustomerProfile,
+                        loading = state.detailLoading,
+                        status = state.status,
+                        error = state.error,
+                        onBack = { panelScreen = WechatContactsPanelScreen.Contacts },
+                        onRefresh = { loadSelectedContactDetail(selectedContact) },
+                        onOpenChat = { onOpenPrivateChat(route, selectedContact) },
+                        onWritePreview = { message -> state = state.copy(status = message, error = null) }
+                    )
+                } else {
                 ContactProfileScreen(
                     state = selectedContact.toContactIntroUiState(loading = state.loading),
                     onEvent = { event ->
@@ -616,6 +664,7 @@ internal fun ScrmContactsPanel(
                         }
                     }
                 )
+                }
             }
             WechatContactsPanelScreen.FriendRequests -> {
                 val requestsById = state.friendRequests.associateBy { request -> request.id.toString() }
@@ -1689,9 +1738,17 @@ private data class ScrmContactsPanelState(
     val totalCount: Int = 0,
     val friendRequests: List<ScrmFriendRequest> = emptyList(),
     val selectedContact: ScrmContact? = null,
+    val selectedContactDetail: ScrmContactDetail? = null,
+    val selectedCustomerProfile: ScrmCustomerProfile? = null,
+    val detailLoading: Boolean = false,
     val friendSearchProfile: ScrmFriendSearchProfile? = null,
     val status: String? = null,
     val error: String? = null
+)
+
+private data class ContactDetailLoadResult(
+    val detail: ScrmContactDetail,
+    val customerProfile: ScrmCustomerProfile
 )
 
 private data class ScrmContactsPanelLoadResult(

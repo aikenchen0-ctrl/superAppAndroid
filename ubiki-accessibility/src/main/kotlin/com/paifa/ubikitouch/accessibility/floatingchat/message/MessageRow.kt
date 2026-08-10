@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.paifa.ubikitouch.accessibility.floatingchat.components.AvatarRole
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.isGroupThread
 import com.paifa.ubikitouch.accessibility.floatingchat.components.CompactAvatar
 import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.accessibility.floatingchat.components.TextLabel
@@ -87,6 +88,23 @@ internal fun MessageRow(
         )?.takeIf { showAttachedAvatar }
     }
     val placement = messageHorizontalPlacement(message.presentation, message.fromMe)
+    val showSenderNickname = shouldShowMessageSenderNickname(
+        isGroupChat = selectedThread.isGroupThread(),
+        fromMe = message.fromMe,
+        isSystem = message.presentation == FloatingChatMessagePresentation.System
+    )
+    val senderNickname = remember(message, groupMemberContact, contactsById) {
+        val resolvedNickname = groupMemberContact?.name
+            ?: message.threadContactId?.let { threadId -> contactsById[threadId]?.name }
+            ?: contactsById.values.firstOrNull { contact ->
+                message.senderName.isNotBlank() && contact.description.contains(message.senderName)
+            }?.name
+        chatBubbleDisplaySenderName(
+            fromMe = message.fromMe,
+            rawSenderName = message.senderName,
+            resolvedNickname = resolvedNickname
+        )
+    }
     LaunchedEffect(groupMemberContact) {
         if (groupMemberContact == null) {
             onGroupMemberAvatarRemoved()
@@ -140,6 +158,8 @@ internal fun MessageRow(
             onBubbleBoundsChanged = onBubbleBoundsChanged,
             homeOverviewVisible = homeOverviewVisible,
             homeOverviewAccountColor = homeOverviewAccountColor,
+            senderNickname = senderNickname,
+            showSenderNickname = showSenderNickname,
             modifier = if (groupMemberContact != null && placement == MessageHorizontalPlacement.Start) {
                 Modifier.weight(1f, fill = false)
             } else {
@@ -174,6 +194,8 @@ internal fun MessageBlock(
     onBubbleBoundsChanged: (Rect) -> Unit,
     homeOverviewVisible: Boolean = false,
     homeOverviewAccountColor: Long? = null,
+    senderNickname: String,
+    showSenderNickname: Boolean,
     modifier: Modifier = Modifier
 ) {
     val bubbleClickSource = remember { MutableInteractionSource() }
@@ -185,8 +207,23 @@ internal fun MessageBlock(
     val isSystem = message.presentation == FloatingChatMessagePresentation.System
     val isSpecialCard = message.presentation == FloatingChatMessagePresentation.SpecialCard
     val isPaymentCard = message.isPaymentCardMessage()
-    val usesBubbleChrome = messageUsesBubbleChrome(message.presentation)
-    val bubbleShape = RoundedCornerShape(if (isSpecialCard) 7.dp else 8.dp)
+    val displayGroup = messageDisplayGroupFor(message)
+    val usesBubbleChrome = messageDisplayGroupUsesBubbleChrome(displayGroup)
+    val bubbleShape = when {
+        isSpecialCard -> RoundedCornerShape(7.dp)
+        message.fromMe -> RoundedCornerShape(
+            topStart = 10.dp,
+            topEnd = 10.dp,
+            bottomStart = 10.dp,
+            bottomEnd = 3.dp
+        )
+        else -> RoundedCornerShape(
+            topStart = 10.dp,
+            topEnd = 10.dp,
+            bottomStart = 3.dp,
+            bottomEnd = 10.dp
+        )
+    }
     val bubbleColor = messageBubbleColor(message, claimed)
     val bubbleBorderColor = messageBubbleBorderColor(message, claimed)
     val aiDraftDashedBubble = aiDraftMessageUsesGreenDashedBubble(message)
@@ -205,11 +242,7 @@ internal fun MessageBlock(
                     Box(
                         modifier = Modifier
                             .shadow(
-                                elevation = if (usesDemoBubble && message.fromMe) {
-                                    imModuleSelfBubbleShadowBlurDp().dp
-                                } else {
-                                    3.dp
-                                },
+                                elevation = if (usesDemoBubble) 1.dp else 2.dp,
                                 shape = bubbleShape,
                                 ambientColor = OverlayTokens.glassShadow,
                                 spotColor = OverlayTokens.glassShadow
@@ -285,18 +318,28 @@ internal fun MessageBlock(
                     }
                 } else {
                     Box(
-                        modifier = Modifier.combinedClickable(
-                            interactionSource = bubbleClickSource,
-                            indication = null,
-                            onClick = {
-                                if (multiSelectMode) {
-                                    onToggleSelection()
-                                } else {
-                                    onClick()
-                                }
-                            },
-                            onLongClick = { onLongPressMessage(message, currentBounds) }
-                        )
+                        modifier = Modifier
+                            .onGloballyPositioned { coordinates ->
+                                updateCurrentBounds(
+                                    rootBoundsFromPosition(
+                                        positionInRoot = coordinates.positionInRoot(),
+                                        width = coordinates.size.width,
+                                        height = coordinates.size.height
+                                    )
+                                )
+                            }
+                            .combinedClickable(
+                                interactionSource = bubbleClickSource,
+                                indication = null,
+                                onClick = {
+                                    if (multiSelectMode) {
+                                        onToggleSelection()
+                                    } else {
+                                        onClick()
+                                    }
+                                },
+                                onLongClick = { onLongPressMessage(message, currentBounds) }
+                            )
                     ) {
                         MessageContent(
                             message = message,
@@ -320,14 +363,14 @@ internal fun MessageBlock(
                             .offset(x = (-2).dp, y = 4.dp)
                     )
                 }
-                if (!isSystem) {
+                if (showSenderNickname) {
                     TextLabel(
-                        text = message.senderName,
+                        text = senderNickname,
                         size = 10.sp,
                         modifier = Modifier
                             .align(Alignment.TopStart)
                             .offset(x = 16.dp, y = (-6).dp),
-                        weight = FontWeight.Bold,
+                        weight = FontWeight.Medium,
                         color = OverlayTokens.bubbleNameText,
                         maxLines = 1,
                         shadow = OverlayTokens.imModuleTextShadow

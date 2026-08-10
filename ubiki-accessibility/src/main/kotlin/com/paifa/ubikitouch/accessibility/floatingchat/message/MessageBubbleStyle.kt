@@ -137,26 +137,26 @@ internal fun imModuleBubbleTextColorArgb(): Int = OverlayTokens.bubbleText.toArg
 
 internal fun imModuleBubbleShadowColorArgb(): Int = OverlayTokens.imModuleTextShadow.color.toArgb()
 
-internal fun imModuleBubbleUsesDemoGlassEffect(): Boolean = true
+internal fun imModuleBubbleUsesDemoGlassEffect(): Boolean = false
 
-internal fun imModuleSelfBubbleBackdropBlurDp(): Int = 20
+internal fun imModuleSelfBubbleBackdropBlurDp(): Int = 0
 
-internal fun imModuleSelfBubbleShadowOffsetYDp(): Int = 8
+internal fun imModuleSelfBubbleShadowOffsetYDp(): Int = 0
 
-internal fun imModuleSelfBubbleShadowBlurDp(): Int = 32
+internal fun imModuleSelfBubbleShadowBlurDp(): Int = 0
 
 internal fun imModuleOtherBubbleIsTransparentWithHalfBorder(): Boolean {
     return OverlayTokens.otherBubble == Color.Transparent &&
         OverlayTokens.otherBubbleBorder.alpha in 0.45f..0.55f
 }
 
-internal fun cardMessageTextUsesImModuleShadow(): Boolean = true
+internal fun cardMessageTextUsesImModuleShadow(): Boolean = false
 
-internal fun resourceUrlTextUsesImModuleShadow(): Boolean = true
+internal fun resourceUrlTextUsesImModuleShadow(): Boolean = false
 
-internal fun chipTextUsesImModuleShadow(): Boolean = true
+internal fun chipTextUsesImModuleShadow(): Boolean = false
 
-internal fun inlineCardTextUsesImModuleShadow(): Boolean = true
+internal fun inlineCardTextUsesImModuleShadow(): Boolean = false
 
 internal fun systemPromptMessageUsesTextOnly(): Boolean {
     return !messageUsesBubbleChrome(FloatingChatMessagePresentation.System)

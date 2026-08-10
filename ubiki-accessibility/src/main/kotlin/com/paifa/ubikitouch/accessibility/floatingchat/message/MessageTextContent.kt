@@ -39,12 +39,13 @@ import com.paifa.ubikitouch.core.model.FloatingChatMessagePresentation
 @Composable
 internal fun SimpleTextMessageContent(message: FloatingChatMessage, index: Int) {
     val isSystem = message.presentation == FloatingChatMessagePresentation.System
+    val displayText = remember(message.text) { chatBubbleDisplayText(message.text) }
     TextLabel(
-        text = message.text,
-        size = if (isSystem) 9.sp else 11.sp,
-        weight = if (isSystem) FontWeight.Normal else FontWeight.Bold,
+        text = displayText,
+        size = if (isSystem) 9.sp else 14.sp,
+        weight = if (isSystem) FontWeight.Normal else FontWeight.Normal,
         color = if (isSystem) OverlayTokens.systemPromptText else OverlayTokens.bubbleText,
-        lineHeight = if (isSystem) 13.sp else 15.sp,
+        lineHeight = if (isSystem) 13.sp else 20.sp,
         maxLines = if (isSystem) 2 else if (index < 2) 3 else 4,
         shadow = OverlayTokens.imModuleTextShadow
     )
@@ -66,7 +67,7 @@ internal fun SimpleTextMessageContent(message: FloatingChatMessage, index: Int) 
 internal fun MixedTextMessageContent(message: FloatingChatMessage) {
     val text = remember(message.inlineTokens, message.text) {
         if (message.inlineTokens.isEmpty()) {
-            AnnotatedString(message.text)
+            AnnotatedString(chatBubbleDisplayText(message.text))
         } else {
             buildAnnotatedString {
                 message.inlineTokens.forEach { token ->
@@ -104,9 +105,9 @@ internal fun MixedTextMessageContent(message: FloatingChatMessage) {
 internal fun QuoteMessageContent(message: FloatingChatMessage) {
     QuoteBlock(message)
     TextLabel(
-        text = message.text,
-        size = 11.sp,
-        weight = FontWeight.Bold,
+        text = chatBubbleDisplayText(message.text),
+        size = 14.sp,
+        weight = FontWeight.Normal,
         color = OverlayTokens.bubbleText,
         lineHeight = 15.sp,
         maxLines = 4,

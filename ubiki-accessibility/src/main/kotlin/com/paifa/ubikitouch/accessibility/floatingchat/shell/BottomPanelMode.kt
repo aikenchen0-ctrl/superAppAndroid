@@ -17,6 +17,10 @@ internal enum class BottomPanelMode {
     RedPacket,
     Transfer,
     Location,
+    ScrmEmoji,
+    ScrmWeAppCard,
+    ScrmCardTemplates,
+    ScrmBatchSend,
     More
 }
 
@@ -31,5 +35,13 @@ internal fun BottomPanelMode.isCenteredToolFeaturePanel(): Boolean {
         this == BottomPanelMode.Favorite ||
         this == BottomPanelMode.RedPacket ||
         this == BottomPanelMode.Transfer ||
-        this == BottomPanelMode.Location
+        this == BottomPanelMode.Location ||
+        this == BottomPanelMode.ScrmEmoji ||
+        this == BottomPanelMode.ScrmWeAppCard ||
+        this == BottomPanelMode.ScrmCardTemplates ||
+        this == BottomPanelMode.ScrmBatchSend
+}
+
+internal fun BottomPanelMode.isBottomComposerDrawer(): Boolean {
+    return this == BottomPanelMode.Emoji || this == BottomPanelMode.More
 }

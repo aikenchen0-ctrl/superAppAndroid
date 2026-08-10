@@ -159,7 +159,7 @@ private fun rightRailNormalizeAccountWeight(weight: Float): Float {
 }
 
 private const val RightRailWidthDp = 58
-private const val RailScreenEdgeInsetPx = 8
+private const val RailScreenEdgeInsetPx = 12
 private const val RailToolButtonWidthDp = 42
 private const val RailAvatarSizeDp = 46
 private const val RailToolButtonHeightDp = 42

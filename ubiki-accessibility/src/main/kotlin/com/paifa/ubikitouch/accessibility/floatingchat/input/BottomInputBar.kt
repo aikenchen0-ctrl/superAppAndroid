@@ -58,18 +58,19 @@ internal enum class BottomInputAction {
     Send
 }
 
-internal const val BottomInputBarMinHeightDp = 52
-internal const val BottomInputBarMaxHeightDp = 136
-internal const val BottomInputBarBottomPaddingDp = 34
-internal const val BottomInputBarHorizontalClearanceDp = 60
+internal const val BottomInputBarMinHeightDp = 84
+internal const val BottomInputBarMaxHeightDp = 174
+internal const val BottomInputBarBottomPaddingDp = 30
+internal const val BottomInputBarHorizontalClearanceDp = 12
+internal const val BottomGestureTouchClearanceDp = 30
 internal const val BottomEmojiPanelHeightDp = 300
 
-internal const val BottomInputIconButtonSizeDp = 36
-internal const val BottomInputIconSizeDp = 20
-private const val BottomInputFieldMinHeightDp = 40
-private const val BottomInputFieldMaxHeightDp = 124
-private const val BottomInputTextSizeSp = 11
-private const val BottomInputPlaceholderTextSizeSp = 11
+internal const val BottomInputIconButtonSizeDp = 40
+internal const val BottomInputIconSizeDp = 24
+private const val BottomInputFieldMinHeightDp = 46
+private const val BottomInputFieldMaxHeightDp = 128
+private const val BottomInputTextSizeSp = 13
+private const val BottomInputPlaceholderTextSizeSp = 13
 private const val BottomInputMinLines = 1
 private const val BottomInputMaxLines = 4
 
@@ -111,9 +112,9 @@ internal fun bottomInputMaxLines(): Int = BottomInputMaxLines
 
 internal fun bottomInputActionOrder(): List<BottomInputAction> {
     return listOf(
-        BottomInputAction.Voice,
-        BottomInputAction.Text,
         BottomInputAction.Emoji,
+        BottomInputAction.Text,
+        BottomInputAction.Voice,
         BottomInputAction.More,
         BottomInputAction.Assistant
     )
@@ -137,9 +138,7 @@ internal fun bottomInputAssistantUsesAiDraftPrediction(): Boolean = true
 
 internal fun assistantPredictionRequiresAiConfiguration(): Boolean = true
 
-internal fun bottomEmojiPanelUsesAndroidXEmojiPicker(): Boolean = true
-
-internal fun bottomEmojiPickerDependencyCoordinate(): String = "androidx.emoji2:emoji2-emojipicker:1.6.0"
+internal fun bottomEmojiPanelUsesLightweightGrid(): Boolean = true
 
 internal fun bottomEmojiPanelKeepsPickerOpenAfterSelection(): Boolean = true
 
@@ -178,8 +177,8 @@ internal fun BottomInputBar(
                 .padding(
                     start = BottomInputBarHorizontalClearanceDp.dp,
                     end = BottomInputBarHorizontalClearanceDp.dp,
-                    top = 5.dp,
-                    bottom = 5.dp
+                    top = 7.dp,
+                    bottom = BottomInputBarBottomPaddingDp.dp
                 )
         ) {
             quotedMessage?.let { message ->
@@ -193,9 +192,19 @@ internal fun BottomInputBar(
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                BottomIcon(
+                    action = BottomInputAction.Emoji,
+                    active = panelMode == BottomPanelMode.Emoji,
+                    onClick = {
+                        onPanelModeChange(
+                            if (panelMode == BottomPanelMode.Emoji) BottomPanelMode.None
+                            else BottomPanelMode.Emoji
+                        )
+                    }
+                )
                 BottomIcon(
                     action = BottomInputAction.Voice,
                     active = panelMode == BottomPanelMode.Voice,
@@ -241,19 +250,6 @@ internal fun BottomInputBar(
                         }
                     }
                 }
-                BottomIcon(
-                    action = BottomInputAction.Emoji,
-                    active = panelMode == BottomPanelMode.Emoji,
-                    onClick = {
-                        onPanelModeChange(
-                            if (panelMode == BottomPanelMode.Emoji) {
-                                BottomPanelMode.None
-                            } else {
-                                BottomPanelMode.Emoji
-                            }
-                        )
-                    }
-                )
                 MoreInputButton(
                     active = panelMode == BottomPanelMode.More,
                     onClick = {
@@ -348,7 +344,7 @@ private fun AlignedMessageInputField(
                 .background(WechatInputBackground)
                 .border(1.dp, borderColor, shape)
                 .onFocusChanged { onFocusedChange(it.isFocused) }
-                .padding(horizontal = 11.dp, vertical = 8.dp),
+                .padding(horizontal = 13.dp, vertical = 9.dp),
             decorationBox = { innerTextField ->
                 Box(
                     modifier = Modifier.fillMaxWidth(),
@@ -409,7 +405,7 @@ private fun BottomIcon(
     }
 }
 
-private val WechatInputBarBackground = androidx.compose.ui.graphics.Color(0xFFF7F7F7)
+private val WechatInputBarBackground = OverlayTokens.bottomComposerSurface
 private val WechatInputBarDivider = androidx.compose.ui.graphics.Color(0xFFD8D8D8)
 private val WechatInputBackground = androidx.compose.ui.graphics.Color(0xFFFFFFFF)
 private val WechatInputFocus = androidx.compose.ui.graphics.Color(0xFF07C160)

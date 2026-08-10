@@ -1,8 +1,6 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.message
 
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
-import com.paifa.ubikitouch.accessibility.floatingchat.input.BottomInputBarBottomPaddingDp
-import com.paifa.ubikitouch.accessibility.floatingchat.input.BottomInputBarMaxHeightDp
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.toLocalThreadId
 import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 
@@ -47,7 +45,8 @@ internal fun messageListReusableContentType(messageType: FloatingChatMessageType
 private const val ReusableMessageRowContentType = "floating-chat-message-row"
 
 internal fun messageListBottomClearanceDp(): Int {
-    return BottomInputBarMaxHeightDp + BottomInputBarBottomPaddingDp + MessageListBottomExtraClearanceDp
+    // The chat body is already resized to the measured input container height.
+    return MessageListBottomExtraClearanceDp
 }
 
 internal fun messageListUsesKeyboardInsets(): Boolean = true

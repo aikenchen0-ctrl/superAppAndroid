@@ -1,25 +1,65 @@
-# 悬浮聊天接口完善进度
+# 工作进度
 
 ## 2026-08-10
 
-- 已启动头像优先专项：范围限定为 Android 悬浮聊天。
-- 已读取 `完成进度.md` 与 `任务计划.md`；发现完成度文档存在底部栏状态滞后。
-- 已记录路径错误：`IOS与安卓进度对照.md` 不存在，待定位实际文件名。
-- 已定位实际功能对照文档：`功能对照.md`。
-- 已确认 iOS 使用宽容头像字段提取；Android UI 加载已存在，当前调查聚焦 Android 接口模型的头像字段解析能力。
-- 根因确认：Android 远程实体只解析 `avatar`，会忽略后端常用 `avatarUrl/headImgUrl/headimgurl/imageUrl`；协议相对头像 URL 也未被规范化。
-- 已完成接口实体别名解析、悬浮聊天映射和联系人面板读取统一头像字段；` :ubiki-accessibility:test` 通过。
-- 真机反馈：头像仍未显示。已新增 `UbikiAvatar` 诊断日志，覆盖接口实体、界面映射和远程图片下载边界；待收集一次真实复现日志后确定根因。
-- Debug APK 已构建：`app/build/outputs/apk/debug/app-debug.apk`。
-- 已更新本地 Debug 配置中的 SCRM 自动引导密码；新的诊断 APK 已构建，等待真机重新验证认证及头像链路。
-- 当前暂停点：用户安装新 APK 并复现后，依据 `UbikiAvatar` 日志确认头像数据是否进入接口实体、界面映射和图片下载阶段。
+### 阶段 1：需求与资料调研
 
-## 下一步接口规划
+- **状态：** 已完成
+- 已完成：建立文件化计划；盘点项目模块、现有蓝图目录及 9 份参考资料。
+- 已完成：读取综合需求文档、接口说明与 DOCX 文本；识别 HTML 保存文件的正文提取限制。
+- 待完成：阅读项目既有计划和实现说明，核对当前已完成能力。
 
-- 已确认下一项不是发送消息，而是补齐 iOS 已有的只读会话同步：`GET /chat/bootstrap` -> `GET /chat/history` -> `GET /messages/changes`。
-- Android 当前 `ScrmReadApi` 尚无上述契约；在头像真机验收通过前不实现，避免同时改变数据源和 UI 显示链路。
-- 发送文本、图片、语音等接口只保留人工测试步骤，不由本轮自动化验证触发。
-- 已完成头像 fallback：主悬浮聊天头像优先显示远程图片，否则显示昵称首字，空昵称显示 `?`；单元测试已通过。
-- 消息显示排查：`scrmFloatingChatConversation` 当前明确将 `messages` 设为空列表，Android 尚未接入 iOS 对应的 `GET /chat/bootstrap`、`GET /chat/history`、`GET /messages/changes`；因此真实用户消息暂时不会进入悬浮聊天，未使用 mock 或假消息修饰该状态。
-- 本轮 UI/缓存：底栏背景改为全屏宽度、控件贴容器顶部，内容左右 60dp 留白；头像缓存改为异步持久化到应用专属 `Android/data/<包名>/files/floating-chat-avatars`，模块契约测试通过。
-- 已完成 `GET /chat/bootstrap`：新增 Android 只读请求契约与会话摘要模型，fixture 单测验证请求参数和响应解析通过；待真机确认真实会话摘要。该阶段不加载消息正文，真实消息显示仍需后续 `GET /chat/history`。
+### 阶段 2：信息架构与范围规划
+
+- **状态：** 已完成
+- 规划交付文档：索引、定位与范围、场景功能地图、悬浮聊天、手势控制、AI 助手、消息中枢、工作流、数据模型、技术架构、开发里程碑、验收发布与安全合规。
+
+### 阶段 3：编写蓝图文档
+
+- **状态：** 已完成
+- 已在 `框架蓝图` 创建 13 份中文 Markdown：索引、定位、场景、悬浮聊天、手势、AI、SCRM、AIfx、数据模型、技术架构、里程碑、验收、风险。
+
+### 阶段 4：审校与验证
+
+- **状态：** 已完成
+- 已确认 13 份文档全部存在一级标题；索引链接有效；未发现空文件与参考接口凭据拷贝；关键主题在多文档中保持一致。
+
+## 验证记录
+
+| 检查项 | 结果 |
+|---|---|
+| 文件化计划已建立 | 通过 |
+
+## 错误记录
+
+| 错误 | 处理方式 |
+|---|---|
+| 文档转换工具并行探测失败 | 将改用独立的可执行文件探测命令。 |
+| 凭据扫描无匹配导致验证聚合命令退出 | 改为显式输出“未发现”，继续完成链接和文件检查。 |
+
+- 2026-08-10：已完成 `GET /openapi/v1/contacts/{friendId}/common-chatrooms` 分页读取。Android 解析共同群列表、群名称、成员数及好友群内角色，支持 `weChatId`、分页、搜索和删除数据过滤参数；契约单测通过，待真机验收，不调用群同步或群管理写接口。
+
+- 2026-08-10：已完成 `GET /openapi/v1/contact-labels` 标签字典读取。Android 返回标签 ID、名称、颜色、说明及联系人/画像统计，支持所属微信号与已删除数据筛选；契约单测通过，待真机验收，不调用标签同步或任何写接口。
+
+- 2026-08-10：已完成 `GET /openapi/v1/contacts/wxids` 好友 wxid 快捷读取。Android 支持微信号、搜索、好友状态、标签、客户等级、来源渠道、画像 Key 和画像存在性筛选，解析 `wxids/count`；契约单测通过，待真机验收，不执行后续批量写操作。
+
+- 2026-08-10：已完成 `POST /openapi/v1/contacts/labels` 写入契约。Android 提供设备、微信号、联系人 ID/wxid 和完整标签集合请求模型；接口注释明确这是替换语义、空集合会清空标签，并记录人工测试与回读验收步骤。仅完成编译验证，严禁 AI 自动调用，待人工测试。
+
+- 2026-08-10：已完成 `POST /openapi/v1/contacts/labels/batch` 写入契约。Android 提供指定好友列表、标签 ID/名称、合并模式和 1..200 数量限制，并解析汇总数量、有效标签及逐好友任务结果。仅完成编译验证；首次人工测试须使用单个测试好友、`mergeExisting=true`、`maxCount=1`，严禁 AI 自动调用。
+
+- 2026-08-10：开始集中补齐悬浮聊天 SCRM 扩展接口契约。已完成现有 Android 方法与 OpenAPI 路由差异盘点，后续按联系人与权限、消息操作、群管理三个域实施；明确不触碰 UI，所有服务端写操作只编译、不自动调用。
+- 2026-08-10：文件化规划恢复脚本因系统 `python.exe` 无法启动而失败一次，已改用 Git 差异与现有三份规划文件恢复上下文。
+- 2026-08-10：联系人与权限扩展契约代码已落地；首次 Kotlin 编译被其他 AI 正在修改的 `FloatingChatRuntimeSections.kt:7` UI 编译错误阻断。本任务不修改 UI，保留错误并继续接口定义。
+
+- 2026-08-10：已完成联系人与权限扩展契约：标签创建/同步/删除、按筛选批量打标、联系人管理分页、客户画像草稿/保存、删除好友、朋友圈权限单个/批量/按筛选、好友资料编辑与刷新。全部标记待 UI 对接；写操作不自动调用。
+- 2026-08-10：已完成消息操作扩展契约：卡片模板、收藏表情、小程序卡片、明确目标/按筛选批量发送、会话状态/历史/MsgSvrId 同步、清空本地聊天记录，以及稳定消息 ID 的转发、撤回、详情补拉、媒体下载和语音转文字。仅卡片模板为只读接口。
+- 2026-08-10：已完成群管理扩展契约：按筛选建群、入群邀请处理、群接龙、二维码入群、管理员、筛选拉人/踢人、通知/备注/通讯录/群内昵称/置顶/验证和群主转让。全部待群详情或群设置 UI 对接，写操作不自动调用。
+- 2026-08-10：扩展接口 Kotlin 编译已通过；当前准备运行完整 Debug APK 构建。编译输出仅有既有 Android API 弃用警告。
+
+- 2026-08-10：`:app:assembleDebug --no-daemon` 构建成功。整个模块单测未运行：安全审查确认其范围可能包含写接口契约测试，与用户禁止测试写入接口的约束冲突；本轮仅以编译和 APK 构建验证。
+- 2026-08-10: Stage 1 UI integration completed: contact detail now performs read-only GET contact detail loading, renders customer profile and label chips, and provides confirmation-only request assembly for profile and batch-label writes. No SCRM write request is sent; awaiting lead confirmation and manual acceptance.
+- 2026-08-10: Message SCRM UI preview added. Long-press -> More now exposes forward, revoke, voice transcription, detail pull, media download, original pull, and emoji detail request previews. Each request is assembled only after confirmation and is not sent automatically.
+- 2026-08-10: Group SCRM UI preview added. Group info now exposes confirmation-only previews for filter member operations, manager changes, ownership transfer, room switches, nickname, and QR join. No group mutation is sent automatically.
+# 2026-08-10
+
+- Bottom More panel SCRM message entries added: favorite emoji, WeApp card, read-only card templates, and filter batch-send preview. Send entries assemble requests only. Focused unit-test verification is blocked by an unrelated shared-worktree compile error: `ScrmFloatingChatBridge.kt` cannot resolve `scrmStableColor`.

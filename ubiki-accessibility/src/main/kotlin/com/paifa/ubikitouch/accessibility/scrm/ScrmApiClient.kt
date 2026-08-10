@@ -9,7 +9,13 @@ import java.util.UUID
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -62,6 +68,22 @@ internal interface ScrmReadApi {
         weChatId: String,
         conversationLimit: Int = 300
     ): ScrmChatBootstrap
+
+    fun getChatHistory(
+        deviceUuid: String,
+        weChatId: String,
+        conversationWxid: String,
+        conversationId: Long = 0L,
+        cursor: String? = null,
+        pageSize: Int = 50
+    ): ScrmChatHistory
+
+    fun getChatChanges(
+        deviceUuid: String,
+        weChatId: String,
+        afterSequence: Long,
+        limit: Int = 200
+    ): ScrmChatChanges
 }
 
 internal interface ScrmTaskApi {
@@ -111,6 +133,41 @@ internal interface ScrmMomentApi {
 
 internal interface ScrmContactApi {
     fun getContacts(query: ScrmContactQuery = ScrmContactQuery()): ScrmContactPage
+    fun getCustomerProfile(contactId: Int, weChatId: String): ScrmCustomerProfile
+    fun getContactDetail(
+        contactId: Int,
+        commonChatRoomLimit: Int = 20,
+        relationLogLimit: Int = 20
+    ): ScrmContactDetail
+    fun getCommonChatRooms(
+        friendId: String,
+        query: ScrmCommonChatRoomQuery = ScrmCommonChatRoomQuery()
+    ): ScrmCommonChatRoomPage
+    fun getContactLabels(
+        weChatId: String? = null,
+        includeDeleted: Boolean = false
+    ): List<ScrmContactLabel>
+    fun getContactWxids(
+        query: ScrmContactWxidQuery = ScrmContactWxidQuery()
+    ): ScrmContactWxidList
+
+    /**
+     * 人工测试专用写接口：替换单个好友的完整标签集合，不做增量合并。
+     * 测试前先用 GET /contact-labels 与 GET /contacts 记录目标原标签；空标签集合会清空标签。
+     * 人工验收：在 Web 调试面板发起一次请求，再用 GET /contacts/{contactId}/detail 确认标签结果和任务状态。
+     */
+    fun setContactLabels(request: ScrmSetContactLabelsRequest): ScrmTaskSubmissionResult
+
+    /**
+     * 人工测试专用写接口：批量追加或替换好友标签，每个好友会生成独立 Android 任务。
+     * 首次测试只选一个测试好友，使用 mergeExisting=true、maxCount=1；严禁自动调用。
+     * 验收时先记录原标签，再按单项 taskId 查询最终回包，最后用联系人详情接口回读标签。
+     * 不得用 mergeExisting=false 或空标签集合测试生产联系人，以免覆盖或清空现有标签。
+     */
+    fun setContactLabelsBatch(
+        request: ScrmBatchSetContactLabelsRequest
+    ): ScrmBatchSetContactLabelsResponse
+
     fun syncContacts(request: ScrmSyncContactsRequest): ScrmTaskSubmissionResult
     fun addFriend(request: ScrmAddFriendRequest): ScrmTaskSubmissionResult
     fun findFriend(request: ScrmFindContactRequest): ScrmTaskSubmissionResult
@@ -157,7 +214,15 @@ internal class ScrmApiClient(
         isLenient = false
         coerceInputValues = false
     }
-) : ScrmReadApi, ScrmTaskApi, ScrmMessageApi, ScrmMomentApi, ScrmContactApi, ScrmChatRoomApi {
+) : ScrmReadApi,
+    ScrmTaskApi,
+    ScrmMessageApi,
+    ScrmMessageOperationApi,
+    ScrmMomentApi,
+    ScrmContactApi,
+    ScrmContactManagementApi,
+    ScrmChatRoomApi,
+    ScrmChatRoomManagementApi {
     override fun getMe(): ScrmMe = get("me")
 
     override fun getDevices(): List<ScrmDevice> = get("devices")
@@ -207,6 +272,60 @@ internal class ScrmApiClient(
                 "deviceUuid" to deviceUuid,
                 "weChatId" to weChatId,
                 "conversationLimit" to conversationLimit.toString()
+            )
+        )
+    }
+
+    override fun getChatHistory(
+        deviceUuid: String,
+        weChatId: String,
+        conversationWxid: String,
+        conversationId: Long,
+        cursor: String?,
+        pageSize: Int
+    ): ScrmChatHistory {
+        require(deviceUuid.isNotBlank()) { "deviceUuid cannot be blank" }
+        require(weChatId.isNotBlank()) { "weChatId cannot be blank" }
+        require(conversationWxid.isNotBlank()) { "conversationWxid cannot be blank" }
+        require(conversationId >= 0L) { "conversationId cannot be negative" }
+        require(pageSize in 1..200) { "pageSize must be between 1 and 200" }
+
+        fun request(identifier: String): ScrmChatHistory {
+            val query = linkedMapOf(
+                "deviceUuid" to deviceUuid,
+                "weChatId" to weChatId,
+                "conversationId" to identifier,
+                "pageSize" to pageSize.toString()
+            )
+            cursor?.takeIf { it.isNotBlank() }?.let { query["cursor"] = it }
+            return get(path = "chat/history", query = query)
+        }
+
+        return try {
+            request(conversationWxid)
+        } catch (error: ScrmHttpException) {
+            if (error.statusCode !in setOf(400, 404) || conversationId <= 0L) throw error
+            request(conversationId.toString())
+        }
+    }
+
+    override fun getChatChanges(
+        deviceUuid: String,
+        weChatId: String,
+        afterSequence: Long,
+        limit: Int
+    ): ScrmChatChanges {
+        require(deviceUuid.isNotBlank()) { "deviceUuid cannot be blank" }
+        require(weChatId.isNotBlank()) { "weChatId cannot be blank" }
+        require(afterSequence >= 0L) { "afterSequence cannot be negative" }
+        require(limit in 1..500) { "limit must be between 1 and 500" }
+        return get(
+            path = "messages/changes",
+            query = linkedMapOf(
+                "deviceUuid" to deviceUuid,
+                "weChatId" to weChatId,
+                "afterSequence" to afterSequence.toString(),
+                "limit" to limit.toString()
             )
         )
     }
@@ -302,6 +421,159 @@ internal class ScrmApiClient(
             path = "messages/quote",
             body = json.encodeToString(request),
             safeRoute = "/openapi/v1/messages/quote"
+        )
+    }
+
+    override fun getCardTemplates(query: ScrmCardTemplateQuery): ScrmCardTemplateResponse {
+        return get(
+            path = "messages/card-templates",
+            query = linkedMapOf(
+                "deviceUuid" to query.deviceUuid,
+                "weChatId" to query.weChatId,
+                "conversationId" to query.conversationId,
+                "thumbUrl" to query.thumbUrl
+            )
+        )
+    }
+
+    override fun sendEmoji(request: ScrmSendEmojiRequest): ScrmTaskSubmissionResult {
+        return post(path = "messages/emoji", body = json.encodeToString(request))
+    }
+
+    override fun sendWeAppCard(request: ScrmSendWeAppCardRequest): ScrmTaskSubmissionResult {
+        return post(path = "messages/weapp-card", body = json.encodeToString(request))
+    }
+
+    override fun sendBatch(request: ScrmBatchSendMessageRequest): ScrmBatchSendMessageResponse {
+        return post(path = "messages/batch", body = json.encodeToString(request))
+    }
+
+    override fun sendBatchByFilter(
+        request: ScrmBatchSendMessageByFilterRequest
+    ): ScrmBatchSendMessageResponse {
+        return post(path = "messages/batch-by-filter", body = json.encodeToString(request))
+    }
+
+    override fun syncConversationUnread(
+        request: ScrmConversationMessageStateRequest
+    ): ScrmTaskSubmissionResult {
+        return post(
+            path = "messages/sync/conversation-unread",
+            body = json.encodeToString(request)
+        )
+    }
+
+    override fun syncHistory(request: ScrmSyncHistoryMessagesRequest): ScrmTaskSubmissionResult {
+        return post(path = "messages/sync/history", body = json.encodeToString(request))
+    }
+
+    override fun syncMessageIds(request: ScrmSyncMessageIdsRequest): ScrmTaskSubmissionResult {
+        return post(path = "messages/sync/ids", body = json.encodeToString(request))
+    }
+
+    override fun syncReadState(
+        request: ScrmConversationMessageStateRequest
+    ): ScrmTaskSubmissionResult {
+        return post(path = "messages/sync/read-state", body = json.encodeToString(request))
+    }
+
+    override fun syncUnreadList(request: ScrmMessageOperationRequest): ScrmTaskSubmissionResult {
+        return post(path = "messages/sync/unread-list", body = json.encodeToString(request))
+    }
+
+    override fun clearAllChatMessages(
+        request: ScrmClearAllChatMessagesRequest
+    ): ScrmTaskSubmissionResult {
+        return post(path = "messages/clear-all", body = json.encodeToString(request))
+    }
+
+    override fun forwardMessages(
+        request: ScrmForwardMessagesRequest,
+        idempotencyKey: String
+    ): ScrmTaskSubmissionResult {
+        return postIdempotent(
+            path = "messages/forward",
+            body = json.encodeToString(request),
+            idempotencyKey = idempotencyKey
+        )
+    }
+
+    override fun pullEmojiDetail(
+        messageId: Long,
+        request: ScrmMessageOperationRequest
+    ): ScrmTaskSubmissionResult {
+        return postMessageOperation(messageId, "emoji-detail", request)
+    }
+
+    override fun forwardMessage(
+        messageId: Long,
+        request: ScrmForwardMessageRequest,
+        idempotencyKey: String
+    ): ScrmTaskSubmissionResult {
+        require(messageId > 0L) { "messageId must be greater than 0" }
+        return postIdempotent(
+            path = "messages/$messageId/forward",
+            body = json.encodeToString(request),
+            idempotencyKey = idempotencyKey,
+            safeRoute = "/openapi/v1/messages/{messageId}/forward"
+        )
+    }
+
+    override fun downloadMessageMedia(
+        messageId: Long,
+        request: ScrmMessageMediaDownloadRequest
+    ): ScrmTaskSubmissionResult {
+        require(messageId > 0L) { "messageId must be greater than 0" }
+        return post(
+            path = "messages/$messageId/media/download",
+            body = json.encodeToString(request),
+            safeRoute = "/openapi/v1/messages/{messageId}/media/download"
+        )
+    }
+
+    override fun pullMessageDetail(
+        messageId: Long,
+        request: ScrmMessageDetailPullRequest
+    ): ScrmTaskSubmissionResult {
+        require(messageId > 0L) { "messageId must be greater than 0" }
+        return post(
+            path = "messages/$messageId/pull-detail",
+            body = json.encodeToString(request),
+            safeRoute = "/openapi/v1/messages/{messageId}/pull-detail"
+        )
+    }
+
+    override fun pullMessageOriginal(
+        messageId: Long,
+        request: ScrmMessageOperationRequest
+    ): ScrmTaskSubmissionResult {
+        return postMessageOperation(messageId, "pull-original", request)
+    }
+
+    override fun revokeMessage(
+        messageId: Long,
+        request: ScrmMessageOperationRequest
+    ): ScrmTaskSubmissionResult {
+        return postMessageOperation(messageId, "revoke", request)
+    }
+
+    override fun transcribeVoiceMessage(
+        messageId: Long,
+        request: ScrmMessageOperationRequest
+    ): ScrmTaskSubmissionResult {
+        return postMessageOperation(messageId, "voice-trans-text", request)
+    }
+
+    private fun postMessageOperation(
+        messageId: Long,
+        action: String,
+        request: ScrmMessageOperationRequest
+    ): ScrmTaskSubmissionResult {
+        require(messageId > 0L) { "messageId must be greater than 0" }
+        return post(
+            path = "messages/$messageId/$action",
+            body = json.encodeToString(request),
+            safeRoute = "/openapi/v1/messages/{messageId}/$action"
         )
     }
 
@@ -476,6 +748,245 @@ internal class ScrmApiClient(
         )
     }
 
+    override fun getCustomerProfile(contactId: Int, weChatId: String): ScrmCustomerProfile {
+        require(contactId > 0) { "contactId must be greater than 0" }
+        require(weChatId.isNotBlank()) { "weChatId cannot be blank" }
+        val response: JsonElement = get(
+            path = "contacts/$contactId/customer-profile",
+            query = linkedMapOf("weChatId" to weChatId),
+            safeRoute = "/openapi/v1/contacts/{contactId}/customer-profile"
+        )
+        return decodeCustomerProfile(response)
+    }
+
+    override fun getContactDetail(
+        contactId: Int,
+        commonChatRoomLimit: Int,
+        relationLogLimit: Int
+    ): ScrmContactDetail {
+        require(contactId > 0) { "contactId must be greater than 0" }
+        require(commonChatRoomLimit >= 0) { "commonChatRoomLimit cannot be negative" }
+        require(relationLogLimit >= 0) { "relationLogLimit cannot be negative" }
+        val response: JsonElement = get(
+            path = "contacts/$contactId/detail",
+            query = linkedMapOf(
+                "commonChatRoomLimit" to commonChatRoomLimit.toString(),
+                "relationLogLimit" to relationLogLimit.toString()
+            ),
+            safeRoute = "/openapi/v1/contacts/{contactId}/detail"
+        )
+        return decodeContactDetail(response)
+    }
+
+    override fun getCommonChatRooms(
+        friendId: String,
+        query: ScrmCommonChatRoomQuery
+    ): ScrmCommonChatRoomPage {
+        require(friendId.isNotBlank()) { "friendId cannot be blank" }
+        return get(
+            path = "contacts/${scrmPathSegment(friendId)}/common-chatrooms",
+            query = linkedMapOf(
+                "weChatId" to query.weChatId?.takeIf { it.isNotBlank() },
+                "page" to query.page.toString(),
+                "pageSize" to query.pageSize.toString(),
+                "search" to query.search?.takeIf { it.isNotBlank() },
+                "includeDeleted" to query.includeDeleted.toString()
+            ),
+            safeRoute = "/openapi/v1/contacts/{friendId}/common-chatrooms"
+        )
+    }
+
+    override fun getContactLabels(
+        weChatId: String?,
+        includeDeleted: Boolean
+    ): List<ScrmContactLabel> {
+        require(weChatId == null || weChatId.isNotBlank()) { "weChatId cannot be blank" }
+        return get(
+            path = "contact-labels",
+            query = linkedMapOf(
+                "weChatId" to weChatId?.takeIf { it.isNotBlank() },
+                "includeDeleted" to includeDeleted.toString()
+            )
+        )
+    }
+
+    override fun getContactWxids(query: ScrmContactWxidQuery): ScrmContactWxidList {
+        return get(
+            path = "contacts/wxids",
+            query = linkedMapOf(
+                "weChatId" to query.weChatId?.takeIf { it.isNotBlank() },
+                "search" to query.search?.takeIf { it.isNotBlank() },
+                "includeDeleted" to query.includeDeleted.toString(),
+                "onlyFriends" to query.onlyFriends.toString(),
+                "labelIds" to query.labelIds?.takeIf { it.isNotBlank() },
+                "labelNames" to query.labelNames?.takeIf { it.isNotBlank() },
+                "customerLevel" to query.customerLevel?.takeIf { it.isNotBlank() },
+                "sourceChannel" to query.sourceChannel?.takeIf { it.isNotBlank() },
+                "profileKey" to query.profileKey?.takeIf { it.isNotBlank() },
+                "profileOnly" to query.profileOnly?.toString()
+            ),
+            safeRoute = "/openapi/v1/contacts/wxids"
+        )
+    }
+
+    override fun setContactLabels(
+        request: ScrmSetContactLabelsRequest
+    ): ScrmTaskSubmissionResult {
+        return post(
+            path = "contacts/labels",
+            body = json.encodeToString(request),
+            safeRoute = "/openapi/v1/contacts/labels"
+        )
+    }
+
+    override fun setContactLabelsBatch(
+        request: ScrmBatchSetContactLabelsRequest
+    ): ScrmBatchSetContactLabelsResponse {
+        return post(
+            path = "contacts/labels/batch",
+            body = json.encodeToString(request),
+            safeRoute = "/openapi/v1/contacts/labels/batch"
+        )
+    }
+
+    override fun saveContactLabel(
+        request: ScrmSaveContactLabelRequest
+    ): ScrmTaskSubmissionResult {
+        return post(
+            path = "contact-labels",
+            body = json.encodeToString(request)
+        )
+    }
+
+    override fun syncContactLabels(
+        request: ScrmAccountMutationRequest
+    ): ScrmTaskSubmissionResult {
+        return post(
+            path = "contact-labels/sync",
+            body = json.encodeToString(request)
+        )
+    }
+
+    override fun deleteContactLabel(
+        request: ScrmDeleteContactLabelRequest
+    ): ScrmTaskSubmissionResult {
+        return delete(
+            path = "contact-labels/${request.labelId}",
+            query = linkedMapOf(
+                "deviceUuid" to request.deviceUuid,
+                "weChatId" to request.weChatId
+            ),
+            body = json.encodeToString(request),
+            safeRoute = "/openapi/v1/contact-labels/{labelId}"
+        )
+    }
+
+    override fun setContactLabelsByFilter(
+        request: ScrmBatchSetContactLabelsByFilterRequest
+    ): ScrmBatchSetContactLabelsResponse {
+        return post(
+            path = "contacts/labels/batch-by-filter",
+            body = json.encodeToString(request)
+        )
+    }
+
+    override fun getContactManagementPage(
+        query: ScrmContactManagementQuery
+    ): ScrmContactManagementPage {
+        return get(
+            path = "contacts/page",
+            query = linkedMapOf(
+                "offset" to query.offset.toString(),
+                "limit" to query.limit.toString(),
+                "search" to query.search,
+                "weChatId" to query.weChatId,
+                "blockedOnly" to query.blockedOnly.toString()
+            )
+        )
+    }
+
+    override fun saveCustomerProfileDraft(
+        request: ScrmSaveCustomerProfileDraftRequest
+    ): ScrmCustomerProfileDraft {
+        return post(
+            path = "contacts/customer-profile-drafts",
+            body = json.encodeToString(request)
+        )
+    }
+
+    override fun saveCustomerProfile(
+        contactId: Int,
+        request: ScrmSaveCustomerProfileRequest
+    ): ScrmCustomerProfile {
+        require(contactId > 0) { "contactId must be greater than 0" }
+        val response: JsonElement = put(
+            path = "contacts/$contactId/customer-profile",
+            body = json.encodeToString(request),
+            safeRoute = "/openapi/v1/contacts/{contactId}/customer-profile"
+        )
+        return decodeCustomerProfile(response)
+    }
+
+    override fun deleteContactFriend(
+        request: ScrmDeleteContactFriendRequest
+    ): ScrmTaskSubmissionResult {
+        return delete(
+            path = "contacts/${request.contactId}/friend",
+            query = linkedMapOf(
+                "deviceUuid" to request.deviceUuid,
+                "weChatId" to request.weChatId,
+                "friendId" to request.friendId
+            ),
+            body = "{}",
+            safeRoute = "/openapi/v1/contacts/{contactId}/friend"
+        )
+    }
+
+    override fun setFriendPermission(
+        request: ScrmSetFriendPermissionRequest
+    ): ScrmTaskSubmissionResult {
+        return post(
+            path = "friends/permissions",
+            body = json.encodeToString(request)
+        )
+    }
+
+    override fun setFriendPermissionsBatch(
+        request: ScrmBatchSetFriendPermissionRequest
+    ): ScrmBatchSetFriendPermissionResponse {
+        return post(
+            path = "friends/permissions/batch",
+            body = json.encodeToString(request)
+        )
+    }
+
+    override fun setFriendPermissionsByFilter(
+        request: ScrmBatchSetFriendPermissionByFilterRequest
+    ): ScrmBatchSetFriendPermissionResponse {
+        return post(
+            path = "friends/permissions/batch-by-filter",
+            body = json.encodeToString(request)
+        )
+    }
+
+    override fun modifyFriendProfile(
+        request: ScrmModifyFriendProfileRequest
+    ): ScrmTaskSubmissionResult {
+        return post(
+            path = "friends/profile",
+            body = json.encodeToString(request)
+        )
+    }
+
+    override fun refreshFriendInfo(
+        request: ScrmRefreshFriendInfoRequest
+    ): ScrmTaskSubmissionResult {
+        return post(
+            path = "friends/refresh-info",
+            body = json.encodeToString(request)
+        )
+    }
+
     override fun getChatRooms(query: ScrmChatRoomQuery): ScrmChatRoomPage {
         return get(
             path = "chatrooms",
@@ -587,6 +1098,112 @@ internal class ScrmApiClient(
         )
     }
 
+    override fun createChatRoomByFilter(
+        request: ScrmCreateChatRoomByFilterRequest
+    ): ScrmTaskSubmissionResult {
+        return post(path = "chatrooms/by-filter", body = json.encodeToString(request))
+    }
+
+    override fun agreeChatRoomInvite(
+        request: ScrmAgreeChatRoomInviteRequest
+    ): ScrmTaskSubmissionResult {
+        return post(path = "chatrooms/invites/agree", body = json.encodeToString(request))
+    }
+
+    override fun approveChatRoomInvite(
+        request: ScrmApproveChatRoomInviteRequest
+    ): ScrmTaskSubmissionResult {
+        return post(path = "chatrooms/invites/approve", body = json.encodeToString(request))
+    }
+
+    override fun pullChatRoomInvites(
+        request: ScrmAccountMutationRequest
+    ): ScrmTaskSubmissionResult {
+        return post(path = "chatrooms/invites/pull", body = json.encodeToString(request))
+    }
+
+    override fun sendJielong(request: ScrmSendJielongRequest): ScrmTaskSubmissionResult {
+        return post(path = "chatrooms/jielong", body = json.encodeToString(request))
+    }
+
+    override fun joinChatRoomByQr(
+        request: ScrmJoinChatRoomByQrRequest
+    ): ScrmTaskSubmissionResult {
+        return post(path = "chatrooms/join-by-qr", body = json.encodeToString(request))
+    }
+
+    override fun addChatRoomManagers(
+        request: ScrmChatRoomManagersRequest
+    ): ScrmTaskSubmissionResult {
+        return post(path = "chatrooms/managers/add", body = json.encodeToString(request))
+    }
+
+    override fun removeChatRoomManagers(
+        request: ScrmChatRoomManagersRequest
+    ): ScrmTaskSubmissionResult {
+        return post(path = "chatrooms/managers/remove", body = json.encodeToString(request))
+    }
+
+    override fun inviteChatRoomMembersByFilter(
+        request: ScrmChatRoomMembersByFilterRequest
+    ): ScrmTaskSubmissionResult {
+        return post(
+            path = "chatrooms/members/invite-by-filter",
+            body = json.encodeToString(request)
+        )
+    }
+
+    override fun kickChatRoomMembersByFilter(
+        request: ScrmChatRoomMembersByFilterRequest
+    ): ScrmTaskSubmissionResult {
+        return post(
+            path = "chatrooms/members/kick-by-filter",
+            body = json.encodeToString(request)
+        )
+    }
+
+    override fun setChatRoomNewMessageNotify(
+        request: ScrmChatRoomSwitchRequest
+    ): ScrmTaskSubmissionResult {
+        return post(path = "chatrooms/new-message-notify", body = json.encodeToString(request))
+    }
+
+    override fun setChatRoomRemark(
+        request: ScrmChatRoomTextRequest
+    ): ScrmTaskSubmissionResult {
+        return post(path = "chatrooms/remark", body = json.encodeToString(request))
+    }
+
+    override fun setChatRoomSavedToPhonebook(
+        request: ScrmChatRoomSwitchRequest
+    ): ScrmTaskSubmissionResult {
+        return post(path = "chatrooms/save-to-phonebook", body = json.encodeToString(request))
+    }
+
+    override fun setChatRoomSelfDisplayName(
+        request: ScrmChatRoomTextRequest
+    ): ScrmTaskSubmissionResult {
+        return post(path = "chatrooms/self-display-name", body = json.encodeToString(request))
+    }
+
+    override fun setChatRoomTop(
+        request: ScrmChatRoomSwitchRequest
+    ): ScrmTaskSubmissionResult {
+        return post(path = "chatrooms/top", body = json.encodeToString(request))
+    }
+
+    override fun transferChatRoomOwner(
+        request: ScrmTransferChatRoomOwnerRequest
+    ): ScrmTaskSubmissionResult {
+        return post(path = "chatrooms/transfer-owner", body = json.encodeToString(request))
+    }
+
+    override fun setChatRoomVerify(
+        request: ScrmChatRoomSwitchRequest
+    ): ScrmTaskSubmissionResult {
+        return post(path = "chatrooms/verify", body = json.encodeToString(request))
+    }
+
     override fun syncContacts(request: ScrmSyncContactsRequest): ScrmTaskSubmissionResult {
         return post(
             path = "contacts/sync",
@@ -693,6 +1310,78 @@ internal class ScrmApiClient(
         )
     }
 
+    /** Keeps Android compatible with the field aliases accepted by the iOS profile reader. */
+    private fun decodeCustomerProfile(element: JsonElement): ScrmCustomerProfile {
+        val envelope = unwrapPayload(element)
+        val root = (envelope["customerProfile"] as? JsonObject) ?: envelope
+        return ScrmCustomerProfile(
+            id = root.intValue("id"),
+            contactId = root.intValue("contactId"),
+            ownerWxid = root.stringValue("ownerWxid"),
+            friendWxid = root.stringValue("friendWxid"),
+            displayName = root.stringValue("displayName"),
+            customerLevel = root.firstStringValue("customerLevel", "level"),
+            sourceChannel = root.firstStringValue("sourceChannel", "source"),
+            sourceDetail = root.firstStringValue("sourceDetail", "sourceExt"),
+            profileKey = root.firstStringValue("profileKey", "profileId"),
+            purchaseHistory = root.firstStringValue("purchaseHistory", "purchases"),
+            socialAccounts = root.firstStringValue("socialAccounts", "socialAccount"),
+            faceImageUrl = root.stringValue("faceImageUrl"),
+            notes = root.firstStringValue("notes", "remark"),
+            phone = root.firstStringValue("phone", "mobile", "mobilePhone"),
+            mappedLabelIds = root["mappedLabelIds"]?.jsonArray
+                ?.mapNotNull { it.jsonPrimitive.contentOrNull?.toIntOrNull() }
+                .orEmpty(),
+            mappedLabelNames = root.firstLabelNames("mappedLabelNames", "labelNames", "labels"),
+            createdAt = root.stringValue("createdAt"),
+            updatedAt = root.stringValue("updatedAt")
+        )
+    }
+
+    private fun decodeContactDetail(element: JsonElement): ScrmContactDetail {
+        val root = unwrapPayload(element)
+        return ScrmContactDetail(
+            contact = root["contact"]?.let { json.decodeFromJsonElement<ScrmContact>(it) },
+            customerProfile = root["customerProfile"]?.let(::decodeCustomerProfile),
+            labels = root["labels"]?.jsonArray?.map {
+                json.decodeFromJsonElement<ScrmContactLabel>(it)
+            }.orEmpty(),
+            commonChatRooms = root["commonChatRooms"]?.jsonArray?.map {
+                json.decodeFromJsonElement<ScrmCommonChatRoom>(it)
+            }.orEmpty(),
+            relationLogs = root["relationLogs"]?.jsonArray?.map {
+                json.decodeFromJsonElement<ScrmContactRelationLog>(it)
+            }.orEmpty()
+        )
+    }
+
+    private fun unwrapPayload(element: JsonElement): JsonObject {
+        val root = element.jsonObject
+        val nested = listOf("data", "result", "payload", "item", "record")
+            .firstNotNullOfOrNull { key -> root[key] as? JsonObject }
+        return nested?.let(::unwrapPayload) ?: root
+    }
+
+    private fun JsonObject.stringValue(key: String): String? {
+        return this[key]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }
+    }
+
+    private fun JsonObject.firstStringValue(vararg keys: String): String? {
+        return keys.firstNotNullOfOrNull { key -> this.stringValue(key) }
+    }
+
+    private fun JsonObject.intValue(key: String): Int {
+        return this[key]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: 0
+    }
+
+    private fun JsonObject.firstLabelNames(vararg keys: String): List<String> {
+        val values = keys.firstNotNullOfOrNull { key -> this[key] as? JsonArray } ?: return emptyList()
+        return values.mapNotNull { value ->
+            (value as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }
+                ?: (value as? JsonObject)?.firstStringValue("name", "labelName", "value")
+        }
+    }
+
     private inline fun <reified T> post(
         path: String,
         body: String,
@@ -703,6 +1392,23 @@ internal class ScrmApiClient(
             path = path,
             body = body,
             safeRoute = safeRoute
+        )
+    }
+
+    private inline fun <reified T> postIdempotent(
+        path: String,
+        body: String,
+        idempotencyKey: String,
+        safeRoute: String = "/openapi/v1/$path"
+    ): T {
+        require(idempotencyKey.isNotBlank()) { "idempotencyKey cannot be blank" }
+        require(idempotencyKey.length <= 128) { "idempotencyKey cannot exceed 128 characters" }
+        return executeJson(
+            method = "POST",
+            path = path,
+            body = body,
+            safeRoute = safeRoute,
+            extraHeaders = mapOf("Idempotency-Key" to idempotencyKey)
         )
     }
 
@@ -739,13 +1445,14 @@ internal class ScrmApiClient(
         path: String,
         query: Map<String, String?> = emptyMap(),
         body: String?,
-        safeRoute: String
+        safeRoute: String,
+        extraHeaders: Map<String, String> = emptyMap()
     ): T {
         return executeRequest(
             method = method,
             path = path,
             query = query,
-            headers = authenticatedJsonHeaders(hasBody = body != null),
+            headers = authenticatedJsonHeaders(hasBody = body != null) + extraHeaders,
             body = body,
             bodyBytes = null,
             safeRoute = safeRoute

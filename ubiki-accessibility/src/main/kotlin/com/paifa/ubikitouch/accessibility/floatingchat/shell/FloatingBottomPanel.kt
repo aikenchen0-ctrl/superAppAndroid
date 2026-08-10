@@ -2,6 +2,7 @@ package com.paifa.ubikitouch.accessibility.floatingchat.shell
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -24,9 +25,13 @@ import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AiVoiceEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AiVoicePanel
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AiVoiceState
 import com.paifa.ubikitouch.accessibility.floatingchat.contacts.ScrmContactsPanel
+import com.paifa.ubikitouch.accessibility.floatingchat.input.BottomGestureTouchClearanceDp
 import com.paifa.ubikitouch.accessibility.floatingchat.input.BottomEmojiPanelHeightDp
+import com.paifa.ubikitouch.accessibility.floatingchat.input.BottomInputBarMaxHeightDp
 import com.paifa.ubikitouch.accessibility.floatingchat.moments.MomentMaterialsPanel
 import com.paifa.ubikitouch.accessibility.floatingchat.moments.MomentsTimelinePanel
+import com.paifa.ubikitouch.accessibility.floatingchat.message.ScrmComposerKind
+import com.paifa.ubikitouch.accessibility.floatingchat.message.ScrmMessageComposerPanel
 import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.AiConfigPanel
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.CompactNoticePanel
@@ -44,6 +49,10 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmContact
 import com.paifa.ubikitouch.accessibility.scrm.ScrmFloatingAccountRoute
 internal fun bottomFloatingPanelUsesDarkText(): Boolean = true
 
+internal fun bottomComposerDrawersUseOpaqueInputBarSurface(): Boolean {
+    return OverlayTokens.bottomComposerSurface.alpha == 1f
+}
+
 internal fun toolFeaturePanelsUseCenteredFloatingSheet(): Boolean = true
 
 internal fun toolFeaturePanelMinWidthDp(): Int = ToolFeaturePanelMinWidthDp
@@ -57,6 +66,8 @@ internal fun FloatingBottomPanel(
     mode: BottomPanelMode,
     scrmContactsRoute: ScrmFloatingAccountRoute?,
     scrmMomentsRoute: ScrmFloatingAccountRoute?,
+    scrmMessageRoute: ScrmFloatingAccountRoute?,
+    scrmMessageConversationId: String?,
     voicePermissionRequestToken: Int,
     locationPermissionRequestToken: Int,
     onClose: () -> Unit,
@@ -65,6 +76,7 @@ internal fun FloatingBottomPanel(
     onAiVoiceEvent: (AiVoiceEvent) -> Unit,
     onAiVoiceCapabilityConfigEvent: (AiVoiceCapabilityConfigEvent) -> Unit,
     onOpenAiVoice: () -> Unit,
+    onOpenToolPanel: (BottomPanelMode) -> Unit,
     onOpenPrivateChat: (ScrmFloatingAccountRoute, ScrmContact) -> Unit,
     onOpenFriendProfile: (ScrmFloatingAccountRoute, ScrmContact) -> Unit,
     onInsertText: (String) -> Unit,
@@ -102,11 +114,18 @@ internal fun FloatingBottomPanel(
     onSendTransfer: (String, String, FloatingChatContact?) -> Unit,
     onSendLocation: (AppLocationOption) -> Unit,
     onSendAccountCard: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    composerHeader: (@Composable () -> Unit)? = null
 ) {
-    val shape = RoundedCornerShape(10.dp)
+    val isBottomDrawer = mode == BottomPanelMode.Emoji || mode == BottomPanelMode.More
+    val shape = if (isBottomDrawer) {
+        RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+    } else {
+        RoundedCornerShape(10.dp)
+    }
     val widthFraction = when (mode) {
-        BottomPanelMode.Emoji -> 0.82f
+        BottomPanelMode.Emoji,
+        BottomPanelMode.More -> 1f
         BottomPanelMode.QuickPhrase -> 0.78f
         BottomPanelMode.Card -> 0.82f
         BottomPanelMode.Moments -> 0.92f
@@ -118,10 +137,15 @@ internal fun FloatingBottomPanel(
         BottomPanelMode.RedPacket,
         BottomPanelMode.Transfer,
         BottomPanelMode.Location -> 0.76f
+        BottomPanelMode.ScrmEmoji,
+        BottomPanelMode.ScrmWeAppCard,
+        BottomPanelMode.ScrmCardTemplates,
+        BottomPanelMode.ScrmBatchSend -> 0.86f
         else -> 0.64f
     }
     val maxHeight = when (mode) {
-        BottomPanelMode.Emoji -> (BottomEmojiPanelHeightDp + 20).dp
+        BottomPanelMode.Emoji -> (BottomEmojiPanelHeightDp + 20 + BottomInputBarMaxHeightDp + BottomGestureTouchClearanceDp).dp
+        BottomPanelMode.More -> (286 + BottomInputBarMaxHeightDp).dp
         BottomPanelMode.QuickPhrase -> 310.dp
         BottomPanelMode.Card -> 360.dp
         BottomPanelMode.Moments -> 520.dp
@@ -133,6 +157,10 @@ internal fun FloatingBottomPanel(
         BottomPanelMode.RedPacket,
         BottomPanelMode.Transfer,
         BottomPanelMode.Location -> 300.dp
+        BottomPanelMode.ScrmEmoji,
+        BottomPanelMode.ScrmWeAppCard,
+        BottomPanelMode.ScrmCardTemplates,
+        BottomPanelMode.ScrmBatchSend -> 440.dp
         else -> 230.dp
     }
     MaterialSurface(
@@ -153,13 +181,21 @@ internal fun FloatingBottomPanel(
                 }
             ),
         shape = shape,
-        color = OverlayTokens.panel,
+        color = if (isBottomDrawer) OverlayTokens.bottomComposerSurface else OverlayTokens.panel,
         border = BorderStroke(1.dp, OverlayTokens.panelBorder)
     ) {
-        Box(modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)) {
+        val panelContent: @Composable () -> Unit = {
+            Box(
+                modifier = Modifier.padding(
+                    start = 10.dp,
+                    end = 10.dp,
+                    top = 10.dp,
+                    bottom = if (isBottomDrawer) BottomGestureTouchClearanceDp.dp else 10.dp
+                )
+            ) {
             when (mode) {
                 BottomPanelMode.More -> MoreToolPanel(
-                    onClose = onClose,
+                    onOpenPanel = onOpenToolPanel,
                     onAiVoiceClick = onOpenAiVoice
                 )
                 BottomPanelMode.Emoji -> EmojiPanel(onInsertText = onInsertText)
@@ -235,6 +271,30 @@ internal fun FloatingBottomPanel(
                     permissionRequestToken = locationPermissionRequestToken,
                     onSendLocation = onSendLocation
                 )
+                BottomPanelMode.ScrmEmoji -> ScrmMessageComposerPanel(
+                    kind = ScrmComposerKind.Emoji,
+                    route = scrmMessageRoute,
+                    conversationId = scrmMessageConversationId,
+                    onBack = { onOpenToolPanel(BottomPanelMode.More) }
+                )
+                BottomPanelMode.ScrmWeAppCard -> ScrmMessageComposerPanel(
+                    kind = ScrmComposerKind.WeAppCard,
+                    route = scrmMessageRoute,
+                    conversationId = scrmMessageConversationId,
+                    onBack = { onOpenToolPanel(BottomPanelMode.More) }
+                )
+                BottomPanelMode.ScrmCardTemplates -> ScrmMessageComposerPanel(
+                    kind = ScrmComposerKind.CardTemplates,
+                    route = scrmMessageRoute,
+                    conversationId = scrmMessageConversationId,
+                    onBack = { onOpenToolPanel(BottomPanelMode.More) }
+                )
+                BottomPanelMode.ScrmBatchSend -> ScrmMessageComposerPanel(
+                    kind = ScrmComposerKind.BatchText,
+                    route = scrmMessageRoute,
+                    conversationId = scrmMessageConversationId,
+                    onBack = { onOpenToolPanel(BottomPanelMode.More) }
+                )
                 BottomPanelMode.Home -> CompactNoticePanel(
                     title = "杩斿洖涓婚〉",
                     message = "已记录当前会话入口，可从悬浮按钮继续打开。",
@@ -258,6 +318,15 @@ internal fun FloatingBottomPanel(
                 )
                 BottomPanelMode.None -> Unit
             }
+            }
+        }
+        if (isBottomDrawer && composerHeader != null) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                composerHeader()
+                panelContent()
+            }
+        } else {
+            panelContent()
         }
     }
 }

@@ -77,6 +77,7 @@ internal fun GroupInfoHost(
     var actionStatus by remember(group.id) { mutableStateOf<String?>(null) }
     var actionError by remember(group.id) { mutableStateOf<String?>(null) }
     var memberPickerMode by remember(group.id) { mutableStateOf<GroupMemberPickerMode?>(null) }
+    var showScrmGroupManagement by remember(group.id) { mutableStateOf(false) }
     val route = remember(accountId) {
         scrmContactsPanelRouteForSelectedAccount(
             selectedAccountId = accountId,
@@ -215,6 +216,7 @@ internal fun GroupInfoHost(
     fun handleGroupInfoEvent(event: GroupInfoUiEvent) {
         when (val action = groupInfoAction(event)) {
             GroupInfoAction.Back -> onDismiss()
+            GroupInfoAction.OpenScrmManagement -> showScrmGroupManagement = true
             GroupInfoAction.InviteMembers -> memberPickerMode = GroupMemberPickerMode.Invite
             GroupInfoAction.RemoveMembers -> {
                 if (canManageMembers) memberPickerMode = GroupMemberPickerMode.Kick
@@ -347,6 +349,16 @@ internal fun GroupInfoHost(
                     GroupMemberPickerMode.Kick -> kickMembers(selected)
                 }
             }
+        )
+        return
+    }
+
+    if (showScrmGroupManagement) {
+        ScrmGroupOperationPreviewPanel(
+            accountId = accountId,
+            group = group,
+            members = members,
+            onDismiss = { showScrmGroupManagement = false }
         )
         return
     }

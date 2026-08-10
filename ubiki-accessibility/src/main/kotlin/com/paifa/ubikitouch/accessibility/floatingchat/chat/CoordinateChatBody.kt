@@ -1,28 +1,44 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.chat
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
 import com.paifa.ubikitouch.accessibility.floatingchat.account.FloatingChatAccountProfile
-import com.paifa.ubikitouch.accessibility.floatingchat.input.BottomInputBarBottomPaddingDp
 import com.paifa.ubikitouch.accessibility.floatingchat.message.MessageListViewportKey
 import com.paifa.ubikitouch.accessibility.floatingchat.message.isPaymentCardMessage
 import com.paifa.ubikitouch.accessibility.floatingchat.message.messageListInitialFirstVisibleItemIndex
@@ -30,6 +46,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.message.messageListViewpo
 import com.paifa.ubikitouch.accessibility.floatingchat.message.shouldRetargetMessageList
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.RightCoordinateRail
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.rightRailWidthDp
+import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatConversation
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
@@ -38,9 +55,67 @@ import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 import com.paifa.ubikitouch.core.model.FloatingChatToolAction
 private val FloatingContentSideInset = 58.dp
 private val EdgeGestureSafeInset = 8.dp
+private const val ChatStatusBarHeightDp = 30
+private const val ChatToolbarHeightDp = 42
 
-internal fun chatBodyBottomReservedHeightDp(bottomInputContainerHeightDp: Int): Int {
-    return bottomInputContainerHeightDp + BottomInputBarBottomPaddingDp
+internal fun chatStatusBarHeightDp(): Int = ChatStatusBarHeightDp
+
+internal fun chatToolbarHeightDp(): Int = ChatToolbarHeightDp
+
+internal fun chatContentTopInsetDp(): Int = 0
+
+internal fun chatToolbarPaintsStatusBarBackground(): Boolean = true
+
+internal fun chatToolbarUsesOpaqueSurface(): Boolean = OverlayTokens.toolbarSurface.alpha == 1f
+
+internal fun chatToolbarUnreadBadgeLabel(unreadCount: Int): String? = when {
+    unreadCount <= 0 -> null
+    unreadCount > 99 -> "99+"
+    else -> unreadCount.toString()
+}
+
+internal fun chatToolbarHasCloseButtonBeforeUnreadBadge(): Boolean = true
+
+internal fun chatToolbarUnreadPrefixLabel(): String = "未读："
+
+internal fun chatToolbarHasSearchButton(): Boolean = true
+
+internal fun chatToolbarWeightDistribution(): List<Int> = listOf(1, 2, 1)
+
+private data class ChatSearchResult(
+    val title: String,
+    val preview: String,
+    val time: String
+)
+
+// TODO(SCRM): replace this local preview list with the remote conversation/message search API.
+private val PreviewChatSearchResults = listOf(
+    ChatSearchResult("林晓晓", "晚点把客户资料发给你", "14:32"),
+    ChatSearchResult("产品讨论群", "新的版本已经提交测试", "昨天"),
+    ChatSearchResult("周明", "下周一上午方便开会吗？", "周一"),
+    ChatSearchResult("售后支持群", "这个问题已经定位到设备连接", "周日")
+)
+
+internal fun chatSearchPreviewResultCount(): Int = PreviewChatSearchResults.size
+
+internal fun chatToolbarTitle(
+    conversation: FloatingChatConversation,
+    selectedThread: ChatThreadSelection,
+    homeOverviewVisible: Boolean
+): String {
+    if (homeOverviewVisible) return conversation.peerName.ifBlank { "消息" }
+    return when (selectedThread) {
+        ChatThreadSelection.Group -> conversation.groupContacts.firstOrNull()?.name
+            ?: conversation.peerName.ifBlank { "群聊" }
+        is ChatThreadSelection.GroupChat -> conversation.groupContacts
+            .firstOrNull { group -> group.id == selectedThread.groupId }
+            ?.name
+            ?: "群聊"
+        is ChatThreadSelection.Private -> conversation.contacts
+            .firstOrNull { contact -> contact.id == selectedThread.contactId }
+            ?.name
+            ?: conversation.peerName.ifBlank { "消息" }
+    }
 }
 
 @Composable
@@ -52,7 +127,6 @@ internal fun CoordinateChatBody(
     selectedThread: ChatThreadSelection,
     homeOverviewVisible: Boolean,
     unreadThreadIds: Set<String>,
-    inputText: String,
     inputFocused: Boolean,
     groupMemberAvatarsVisible: Boolean,
     onThreadSelected: (ChatThreadSelection) -> Unit,
@@ -76,12 +150,11 @@ internal fun CoordinateChatBody(
     claimedPaymentMessageIds: Map<String, Boolean>,
     onToggleMessageSelection: (FloatingChatMessage) -> Unit,
     onBlankAreaTap: () -> Unit,
-    bottomReservedHeight: Dp,
+    onCloseChat: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val connectorState = remember { ConnectorCoordinateState() }
     val density = LocalDensity.current
-    val imeBottomPx = WindowInsets.ime.getBottom(density)
     val selectedAccount = remember(conversation, selectedThread, activeAccountId) {
         selectedAccountForCoordinateBody(
             conversation = conversation,
@@ -202,6 +275,8 @@ internal fun CoordinateChatBody(
     val contactsById = remember(conversation.groupContacts, conversation.contacts) {
         (conversation.groupContacts + conversation.contacts).associateBy { contact -> contact.id }
     }
+    var chatSearchVisible by remember { mutableStateOf(false) }
+    var chatSearchQuery by remember { mutableStateOf("") }
     LaunchedEffect(visibleMessageIds) {
         connectorState.retainMessageBounds(visibleMessageIds)
     }
@@ -211,60 +286,74 @@ internal fun CoordinateChatBody(
         }
         viewportTracker.messageCount = visibleMessages.size
     }
-    LaunchedEffect(viewportKey, inputFocused, inputText, imeBottomPx, visibleMessages.size) {
+    LaunchedEffect(viewportKey, inputFocused, visibleMessages.size) {
         if (inputFocused && visibleMessages.isNotEmpty()) {
-            messageListState.animateScrollToItem(visibleMessages.lastIndex)
+            messageListState.scrollToItem(visibleMessages.lastIndex)
         }
     }
-    Box(
-        modifier = modifier
-            .padding(bottom = bottomReservedHeight)
-            .fillMaxSize()
-    ) {
-        MessageCoordinatePane(
-            messages = visibleMessages,
-            selectedThread = selectedThread,
-            homeOverviewVisible = homeOverviewVisible,
-            contactsById = contactsById,
-            homeOverviewAccountColors = homeUnreadAccountColors,
-            homeOverviewAccountIdsByMessageId = homeUnreadAccountIdsByMessageId,
-            homeOverviewMessageGroups = homeOverviewMessageGroups,
-            groupMemberAvatarsVisible = groupMemberAvatarsVisible,
-            listState = messageListState,
-            connectorState = connectorState,
-            onPreviewMedia = onPreviewMedia,
-            onOpenMediaActions = onOpenMediaActions,
-            onLongPressMessage = onLongPressMessage,
-            onGroupMemberAvatarLongClick = onContactAvatarLongClick,
-            multiSelectMode = multiSelectMode,
-            selectedMessageIds = selectedMessageIds,
-            remindedMessageIds = remindedMessageIds,
-            favoriteMessageIds = favoriteMessageIds,
-            claimedPaymentMessageIds = claimedPaymentMessageIds,
-            onToggleMessageSelection = onToggleMessageSelection,
-            onMessageClick = { message ->
-                if (homeOverviewVisible) {
-                    homeUnreadSummaryByMessageId[message.id]?.let(onHomeUnreadSelected)
-                } else if (message.kind == FloatingChatMessageKind.AiDraft) {
-                    onAiDraftClick(message)
-                } else if (message.isPaymentCardMessage()) {
-                    onPaymentCardClick(message)
-                } else if (message.type == FloatingChatMessageType.FilePreview) {
-                    onPreviewDocument(message)
-                } else if (message.type == FloatingChatMessageType.ChatHistory) {
-                    onChatHistoryClick(message)
-                }
-            },
-            onBlankAreaTap = onBlankAreaTap,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .fillMaxSize()
-                .imePadding()
-                .padding(
-                    start = FloatingContentSideInset + EdgeGestureSafeInset,
-                    end = FloatingContentSideInset + EdgeGestureSafeInset
-                )
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+        val toolbarTitle = remember(conversation, selectedThread, homeOverviewVisible) {
+            chatToolbarTitle(
+                conversation = conversation,
+                selectedThread = selectedThread,
+                homeOverviewVisible = homeOverviewVisible
+            )
+        }
+        ChatTopToolbar(
+            title = toolbarTitle,
+            unreadCount = unreadThreadIds.size,
+            onCloseClick = onCloseChat,
+            onSearchClick = {
+                chatSearchQuery = ""
+                chatSearchVisible = true
+            }
         )
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            MessageCoordinatePane(
+                messages = visibleMessages,
+                selectedThread = selectedThread,
+                homeOverviewVisible = homeOverviewVisible,
+                contactsById = contactsById,
+                homeOverviewAccountColors = homeUnreadAccountColors,
+                homeOverviewAccountIdsByMessageId = homeUnreadAccountIdsByMessageId,
+                homeOverviewMessageGroups = homeOverviewMessageGroups,
+                groupMemberAvatarsVisible = groupMemberAvatarsVisible,
+                listState = messageListState,
+                connectorState = connectorState,
+                onPreviewMedia = onPreviewMedia,
+                onOpenMediaActions = onOpenMediaActions,
+                onLongPressMessage = onLongPressMessage,
+                onGroupMemberAvatarLongClick = onContactAvatarLongClick,
+                multiSelectMode = multiSelectMode,
+                selectedMessageIds = selectedMessageIds,
+                remindedMessageIds = remindedMessageIds,
+                favoriteMessageIds = favoriteMessageIds,
+                claimedPaymentMessageIds = claimedPaymentMessageIds,
+                onToggleMessageSelection = onToggleMessageSelection,
+                onMessageClick = { message ->
+                    onBlankAreaTap()
+                    if (homeOverviewVisible) {
+                        homeUnreadSummaryByMessageId[message.id]?.let(onHomeUnreadSelected)
+                    } else if (message.kind == FloatingChatMessageKind.AiDraft) {
+                        onAiDraftClick(message)
+                    } else if (message.isPaymentCardMessage()) {
+                        onPaymentCardClick(message)
+                    } else if (message.type == FloatingChatMessageType.FilePreview) {
+                        onPreviewDocument(message)
+                    } else if (message.type == FloatingChatMessageType.ChatHistory) {
+                        onChatHistoryClick(message)
+                    }
+                },
+                onBlankAreaTap = onBlankAreaTap,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxSize()
+                    .padding(
+                        start = FloatingContentSideInset + EdgeGestureSafeInset,
+                        end = FloatingContentSideInset + EdgeGestureSafeInset
+                    )
+            )
         if (!homeOverviewVisible) ChatSessionRail(
             groups = conversation.groupContacts,
             contacts = conversation.contacts,
@@ -328,6 +417,213 @@ internal fun CoordinateChatBody(
                 .fillMaxSize()
                 .zIndex(connectorLayerZIndex())
         )
+        }
+        if (chatSearchVisible) {
+            ChatSearchPanel(
+                query = chatSearchQuery,
+                onQueryChange = { chatSearchQuery = it },
+                onClose = { chatSearchVisible = false },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = ChatStatusBarHeightDp.dp)
+                    .zIndex(40f)
+            )
+        }
+    }
+}
+}
+
+@Composable
+private fun ChatTopToolbar(
+    title: String,
+    unreadCount: Int,
+    onCloseClick: () -> Unit,
+    onSearchClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height((ChatStatusBarHeightDp + ChatToolbarHeightDp).dp)
+            .background(OverlayTokens.toolbarSurface)
+            .padding(
+                start = 8.dp,
+                top = ChatStatusBarHeightDp.dp,
+                end = 8.dp
+            )
+    ) {
+        androidx.compose.foundation.layout.Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onCloseClick,
+                        modifier = Modifier.width(40.dp).height(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "关闭聊天",
+                            tint = OverlayTokens.panelPrimaryText,
+                            modifier = Modifier.width(22.dp).height(22.dp)
+                        )
+                    }
+                    chatToolbarUnreadBadgeLabel(unreadCount)?.let { label ->
+                        Text(
+                            text = chatToolbarUnreadPrefixLabel(),
+                            color = OverlayTokens.panelSecondaryText,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(end = 4.dp)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .height(22.dp)
+                                .background(OverlayTokens.accent, CircleShape)
+                                .padding(horizontal = 7.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                color = OverlayTokens.panel,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+            }
+            Box(
+                modifier = Modifier.weight(2f),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = title,
+                    color = OverlayTokens.panelPrimaryText,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                IconButton(
+                    onClick = onSearchClick,
+                    modifier = Modifier.width(40.dp).height(40.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Search,
+                        contentDescription = "搜索聊天记录",
+                        tint = OverlayTokens.panelPrimaryText,
+                        modifier = Modifier.width(22.dp).height(22.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatSearchPanel(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val results = remember(query) {
+        if (query.isBlank()) PreviewChatSearchResults
+        else PreviewChatSearchResults.filter { result ->
+            result.title.contains(query, ignoreCase = true) ||
+                result.preview.contains(query, ignoreCase = true)
+        }
+    }
+    androidx.compose.foundation.layout.Column(
+        modifier = modifier.background(OverlayTokens.panel)
+    ) {
+        androidx.compose.foundation.layout.Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp)
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onClose) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "返回聊天",
+                    tint = OverlayTokens.panelPrimaryText
+                )
+            }
+            Text(
+                text = "搜索聊天记录",
+                color = OverlayTokens.panelPrimaryText,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp),
+            singleLine = true,
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Filled.Search,
+                    contentDescription = null,
+                    tint = OverlayTokens.panelSecondaryText
+                )
+            },
+            placeholder = { Text("搜索联系人、群聊或消息") }
+        )
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 10.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp)
+        ) {
+            items(results) { result ->
+                androidx.compose.foundation.layout.Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 10.dp)
+                ) {
+                    androidx.compose.foundation.layout.Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = result.title,
+                            modifier = Modifier.weight(1f),
+                            color = OverlayTokens.panelPrimaryText,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = result.time,
+                            color = OverlayTokens.panelSecondaryText,
+                            fontSize = 11.sp
+                        )
+                    }
+                    Text(
+                        text = result.preview,
+                        color = OverlayTokens.panelSecondaryText,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
+        }
     }
 }
 

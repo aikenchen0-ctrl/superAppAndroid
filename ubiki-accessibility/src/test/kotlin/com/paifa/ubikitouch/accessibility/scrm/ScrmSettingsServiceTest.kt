@@ -258,6 +258,22 @@ class ScrmSettingsServiceTest {
                     weChatId: String,
                     conversationLimit: Int
                 ): ScrmChatBootstrap = error("not reached")
+
+                override fun getChatHistory(
+                    deviceUuid: String,
+                    weChatId: String,
+                    conversationWxid: String,
+                    conversationId: Long,
+                    cursor: String?,
+                    pageSize: Int
+                ): ScrmChatHistory = error("not reached")
+
+                override fun getChatChanges(
+                    deviceUuid: String,
+                    weChatId: String,
+                    afterSequence: Long,
+                    limit: Int
+                ): ScrmChatChanges = error("not reached")
             }
         }
 
@@ -387,6 +403,22 @@ class ScrmSettingsServiceTest {
             conversationLimit: Int
         ): ScrmChatBootstrap = ScrmChatBootstrap()
 
+        override fun getChatHistory(
+            deviceUuid: String,
+            weChatId: String,
+            conversationWxid: String,
+            conversationId: Long,
+            cursor: String?,
+            pageSize: Int
+        ): ScrmChatHistory = ScrmChatHistory()
+
+        override fun getChatChanges(
+            deviceUuid: String,
+            weChatId: String,
+            afterSequence: Long,
+            limit: Int
+        ): ScrmChatChanges = ScrmChatChanges()
+
         private fun device(uuid: String, online: Boolean): ScrmDevice {
             return ScrmDevice(
                 uuid = uuid,
@@ -432,6 +464,22 @@ class ScrmSettingsServiceTest {
             weChatId: String,
             conversationLimit: Int
         ): ScrmChatBootstrap = error("not reached")
+
+        override fun getChatHistory(
+            deviceUuid: String,
+            weChatId: String,
+            conversationWxid: String,
+            conversationId: Long,
+            cursor: String?,
+            pageSize: Int
+        ): ScrmChatHistory = error("not reached")
+
+        override fun getChatChanges(
+            deviceUuid: String,
+            weChatId: String,
+            afterSequence: Long,
+            limit: Int
+        ): ScrmChatChanges = error("not reached")
     }
 
     private class FakeAdminApi(

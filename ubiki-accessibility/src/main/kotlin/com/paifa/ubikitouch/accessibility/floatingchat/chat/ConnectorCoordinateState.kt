@@ -11,6 +11,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.chat.isGroupThread
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.rightRailAvatarSizeDp
 import com.paifa.ubikitouch.core.model.FloatingChatConnectionTarget
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
+import kotlin.math.abs
 
 internal data class RightRailVisibleAccountItem(
     val index: Int,
@@ -297,7 +298,8 @@ internal fun rightRailPinnedSelectedAccountEdge(
     selectedAccountId: String?,
     visibleItems: List<RightRailVisibleAccountItem>,
     viewportHeightPx: Float,
-    fallbackStepPx: Float
+    fallbackStepPx: Float,
+    reverseLayout: Boolean = false
 ): RailPinnedAvatarEdge? {
     val selectedId = selectedAccountId?.takeIf { id -> id.isNotBlank() } ?: return null
     val viewport = Rect(0f, 0f, rightRailAvatarSizeDp().toFloat(), viewportHeightPx)
@@ -305,7 +307,7 @@ internal fun rightRailPinnedSelectedAccountEdge(
         accountIds = accountIds,
         visibleItems = visibleItems,
         viewport = viewport,
-        fallbackStepPx = fallbackStepPx
+        fallbackStepPx = abs(fallbackStepPx) * if (reverseLayout) -1f else 1f
     )[selectedId] ?: return null
     return selectedBounds.pinnedAvatarEdgeForViewport(viewport)
 }

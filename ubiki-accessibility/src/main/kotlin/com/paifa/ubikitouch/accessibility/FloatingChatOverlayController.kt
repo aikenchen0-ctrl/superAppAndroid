@@ -59,6 +59,7 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmFloatingAccountRoute
 import com.paifa.ubikitouch.accessibility.scrm.ScrmContact
 import com.paifa.ubikitouch.accessibility.scrm.ScrmChatRoom
 import com.paifa.ubikitouch.accessibility.scrm.ScrmChatRoomMember
+import com.paifa.ubikitouch.accessibility.scrm.ScrmChatMessage
 import com.paifa.ubikitouch.accessibility.scrm.ScrmDevice
 import com.paifa.ubikitouch.accessibility.scrm.ScrmMessagePreflightFailure
 import com.paifa.ubikitouch.accessibility.scrm.ScrmWechatAccount
@@ -968,7 +969,32 @@ internal class FloatingChatOverlayController(
         session: ScrmSelectedSession,
         route: ScrmFloatingAccountRoute
     ): ScrmFloatingAccountConversation {
+        val cacheKey = scrmAccountRouteCacheKey(route)
+        cachedScrmAccountConversations[cacheKey]?.let { cached ->
+            return loadScrmAccountChanges(session, route, cached)
+        }
         val chatRooms = loadAllScrmChatRooms(session, route.weChatId)
+        val bootstrap = session.readApi.getChatBootstrap(
+            deviceUuid = route.deviceUuid,
+            weChatId = route.weChatId
+        )
+        // Load the read-only history for each conversation returned by bootstrap.
+        // Sending and other mutating endpoints remain outside this refresh path.
+        val messagesByConversation = bootstrap.conversations.mapNotNull { summary ->
+            val conversationWxid = summary.conversationWxid?.takeIf { it.isNotBlank() }
+                ?: return@mapNotNull null
+            conversationWxid to session.readApi.getChatHistory(
+                deviceUuid = route.deviceUuid,
+                weChatId = route.weChatId,
+                conversationWxid = conversationWxid,
+                conversationId = summary.id,
+                pageSize = ScrmConversationHistoryPageSize
+            ).messages
+        }.toMap()
+        val conversationWxidByBackendId = bootstrap.conversations.mapNotNull { summary ->
+            summary.conversationWxid?.takeIf { it.isNotBlank() }
+                ?.let { conversationWxid -> summary.id.takeIf { it > 0L }?.let { it to conversationWxid } }
+        }.toMap()
         return ScrmFloatingAccountConversation(
             deviceUuid = route.deviceUuid,
             weChatId = route.weChatId,
@@ -978,7 +1004,45 @@ internal class FloatingChatOverlayController(
                 session = session,
                 weChatId = route.weChatId,
                 chatRooms = chatRooms
+            ),
+            messagesByConversation = messagesByConversation,
+            conversationWxidByBackendId = conversationWxidByBackendId,
+            nextSequence = bootstrap.baselineSequence
+        )
+    }
+
+    private fun loadScrmAccountChanges(
+        session: ScrmSelectedSession,
+        route: ScrmFloatingAccountRoute,
+        cached: ScrmFloatingAccountConversation
+    ): ScrmFloatingAccountConversation {
+        val messagesByConversation = cached.messagesByConversation.toMutableMap()
+        var afterSequence = cached.nextSequence
+        do {
+            val changes = session.readApi.getChatChanges(
+                deviceUuid = route.deviceUuid,
+                weChatId = route.weChatId,
+                afterSequence = afterSequence,
+                limit = ScrmConversationChangesLimit
             )
+            changes.items.mapNotNull { it.message }.forEach { message ->
+                val conversationWxid = message.conversationId
+                    ?.let(cached.conversationWxidByBackendId::get)
+                if (conversationWxid == null) {
+                    Log.w(TAG, "ignored SCRM change without a known conversation id=${message.conversationId}")
+                    return@forEach
+                }
+                messagesByConversation[conversationWxid] = scrmMergeReadOnlyMessages(
+                    existing = messagesByConversation[conversationWxid].orEmpty(),
+                    incoming = message
+                )
+            }
+            if (changes.nextSequence <= afterSequence) break
+            afterSequence = changes.nextSequence
+        } while (changes.hasMore)
+        return cached.copy(
+            messagesByConversation = messagesByConversation,
+            nextSequence = afterSequence
         )
     }
 
@@ -1451,6 +1515,8 @@ internal class FloatingChatOverlayController(
         const val EXTRA_EXTERNAL_DOCUMENT_URI = "floating_chat_external_document_uri"
         const val EXTRA_EXTERNAL_DOCUMENT_MIME_TYPE = "floating_chat_external_document_mime_type"
         const val ScrmConversationPageSize = 200
+        const val ScrmConversationHistoryPageSize = 50
+        const val ScrmConversationChangesLimit = 200
         const val ScrmGroupMemberPageSize = 200
     }
 }
@@ -1617,6 +1683,25 @@ internal fun mergeScrmAccountConversationCache(
         conversationsByRoute[scrmAccountConversationCacheKey(conversation)] = conversation
     }
     return conversationsByRoute.values.toList()
+}
+
+private fun scrmMergeReadOnlyMessages(
+    existing: List<ScrmChatMessage>,
+    incoming: ScrmChatMessage
+): List<ScrmChatMessage> {
+    val incomingKey = scrmReadOnlyMessageKey(incoming)
+    if (existing.any { scrmReadOnlyMessageKey(it) == incomingKey }) return existing
+    return existing + incoming
+}
+
+private fun scrmReadOnlyMessageKey(message: ScrmChatMessage): String {
+    return when {
+        message.messageId > 0L -> "id:${message.messageId}"
+        message.messageServerId != null -> "server:${message.messageServerId}"
+        !message.clientMessageId.isNullOrBlank() -> "client:${message.clientMessageId}"
+        !message.localMessageId.isNullOrBlank() -> "local:${message.localMessageId}"
+        else -> "fallback:${message.conversationId}:${message.createdAt}:${message.content}"
+    }
 }
 
 private fun scrmAccountConversationCacheKey(

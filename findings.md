@@ -1,17 +1,45 @@
-# 悬浮聊天接口完善发现
+# 调研发现与决策
 
-## 当前事实
+## 用户需求
 
-- `完成进度.md` 记录了悬浮聊天完成度，但其中底部栏 `+` 入口仍为“部分实现”，与当前代码已有 `MoreInputButton` 不一致。
-- Android 已存在头像 URL、远程状态映射、头像加载及相关单测；需要沿数据流确认真实接口字段是否抵达 UI。
-- 用户要求先完成头像显示，其余接口功能需在该功能真机验收后逐项推进。
-- 功能对照文档实际为 `功能对照.md`，已确认它只针对悬浮聊天补齐顺序。
-- Android UI 端 `CompactAvatar` 已通过 `rememberAsyncAvatarBitmap(resolvedAvatarImageUri(...))` 加载远程 `contact.avatarUrl`，不是首要缺口。
-- 修复后 `ScrmFloatingChatBridge` 会将四类 SCRM 实体的 `displayAvatarUrl` 映射为 `FloatingChatContact.avatarUrl`。
-- iOS `OpenApiDisplay` 支持 `avatarUrl`、`headImgUrl`、`headimgurl`、`imageUrl` 等多字段及 `contact/member/sender` 嵌套路径；Android 远程模型的单一 `avatar` 字段很可能丢失真实接口头像。
-- 修复前 Android SCRM 模型只声明 `avatar`；Kotlin JSON 解码会忽略 `avatarUrl/headImgUrl/headimgurl/imageUrl`，导致映射层收到空头像。现已增加别名字段和统一取值属性。
-- Android `normalizedRemoteImageUri` 现已将协议相对地址规范化为 HTTPS，并继续升级特定微信域名的 HTTP 地址。
+- 参考 `C:\Users\Administrator\Desktop\我的提示词\任务文档` 中的所有文档。
+- 在项目“框架蓝图”中编写 Android 端计划书，并梳理对应用的理解。
+- 当前已知设计集中于“悬浮聊天、侧边手势”，需要补全可用的产品与开发设计。
+- 尽量产出多份、名称可直接反映功能或开发流程的中文 Markdown 文档。
 
-## 待确认
+## 调研发现
 
-- API 分页/详情响应是否存在 `data/result/payload` 嵌套头像对象；当前模型修复先覆盖已经收到的实体字段。
+- 项目为多模块 Android 工程：`app`、`ubiki-accessibility`、`ubiki-overlay`、`ubiki-core`、`adbcore`、`blinkvoice-visual-sdk` 与 `benchmark`。
+- 项目现有源码与测试命名显示，应用已覆盖侧边手势、悬浮聊天、联系人/群组/朋友圈、图片视频文档、AI 语音、SCRM、无障碍保活、ADB 保活和快捷设置等能力。
+- `框架蓝图` 目录已存在，适合作为面向产品和开发的正式设计文档位置。
+- 参考目录共 9 份资料：Markdown 4 份、HTML 2 份、TXT 1 份、DOCX 1 份、另含 1 份数据模型 Markdown；需逐一阅读。
+- `任务重点.md` 与 `任务重点.docx` 的内容一致，已明确产品定位、现状差距、分期和主要合规风险，可作为本次蓝图的核心输入。
+- `接口.txt` 提供 SCRM OpenAPI 文档与调试入口；其中包含登录凭据，后续蓝图仅记录接口边界，不复制凭据。
+- 两份 HTML 是保存下来的网页文档，源文件主要由页面运行资源和嵌入图像组成，直接文本提取无有效正文；其同类主题已在“任务重点”汇总中覆盖（单账号数据模型、Agent 状态机）。
+- `任务重点` 建议先聚焦 B 端企业版：以消息中枢为 P0，AIfx 与可复用交互框架为 P1，流量联盟与 iOS 扩展为 P2；Android 应用应采用“AI 建议 + 用户确认”的默认执行方式。
+
+## 设计决策
+
+| 决策 | 理由 |
+|---|---|
+| 以用户任务闭环组织设计 | 防止功能清单停留在零散交互，明确从唤起、理解、执行、反馈到配置的完整路径。 |
+| 不把参考资料中的自动营销与账号控制直接列为默认能力 | 涉及平台规则、隐私和账号风险；计划中将以显式授权、人工确认、可审计为先决条件。 |
+
+## 资源
+
+- 项目根目录：`C:\WorkSpace\UbikiTouch`
+- 参考目录：`C:\Users\Administrator\Desktop\我的提示词\任务文档`
+
+## 问题记录
+
+| 问题 | 处理方式 |
+|---|---|
+| HTML 保存文件无法直接提取有效正文 | 记录其载体限制，并以内容相同的已整理参考文档作为主题依据。 |
+
+## 2026-08-10 悬浮聊天 SCRM 接口差异
+
+- Android 已具备基础账号、设备、能力、任务、会话 bootstrap/history/changes、常用消息发送、联系人/群列表与少量联系人和群写接口。
+- 联系人域主要缺口：标签创建/同步/删除、筛选批量标签、联系人管理分页、客户画像草稿/保存、朋友圈权限单个/批量/筛选批量、好友资料刷新与编辑。
+- 消息域主要缺口：卡片模板、收藏表情/小程序卡片、批量发送、同步历史/未读/已读/MsgSvrId，以及按稳定消息 ID 的转发、撤回、详情补拉、媒体下载和语音转文字。
+- 群域主要缺口：按筛选建群/邀请/踢人，群备注、置顶、通知、通讯录、验证、群内昵称、管理员和群主转让等管理契约。
+- 用户明确要求 UI 由另外两个 AI 负责，因此本任务只新增接口、模型、维护注释和文档，不接入任何界面或交互状态。

@@ -9,6 +9,7 @@ internal object OverlayTokens {
     val shell = Color(0xF2D9E4E8)
     val shellBorder = Color(0xB8F8FCFF)
     val bar = Color(0xB8D7E1E7)
+    val bottomComposerSurface = Color(0xFFF7F7F7)
     val bottomBarStroke = Color(0x90F8FCFF)
     val rail = Color(0x00000000)
     val control = Color(0xFFEEF5F7)
@@ -20,6 +21,7 @@ internal object OverlayTokens {
     val inputFocus = Color(0xCC7DCC16)
     val hairline = FloatingChatLightColors.outline
     val panel = Color(0xE8EDF4F5)
+    val toolbarSurface = Color(0xFFF7F7F7)
     val panelBorder = Color(0xB8F8FCFF)
     val panelIcon = Color(0x88778D94)
     val panelPrimaryText = Color(0xFF173C48)
@@ -66,8 +68,8 @@ internal object OverlayTokens {
     val legacySelfBubble = Color(0xFFF7F9FB)
     val legacyOtherBubble = Color(0xFFF7F9FB)
     val legacyBubbleBorder = Color(0xFFCAD5DD)
-    val selfBubble = Color(0x40FFFFFF)
-    val otherBubble = Color.Transparent
+    val selfBubble = Color(0xFF95EC69)
+    val otherBubble = Color(0xFFF7F7F7)
     val systemBubble = Color(0xFFF8FCFF)
     val specialCard = Color(0xFFF7F9FB)
     val specialCardBorder = Color(0xFFCAD5DD)
@@ -76,13 +78,13 @@ internal object OverlayTokens {
     val aiDashedBorder = Color(0xFF7DCC16)
     val aiBadge = Color(0x4A7DCC16)
     val aiText = Color(0xFF507F0D)
-    val selfBubbleBorder = Color(0x4DFFFFFF)
-    val otherBubbleBorder = Color(0x80FFFFFF)
+    val selfBubbleBorder = Color(0x18000000)
+    val otherBubbleBorder = Color(0x14000000)
     val bubbleBorder = Color(0x80000000)
     val glassShadow = Color(0x1A000000)
-    val bubbleText = Color(0xF8F8FCFF)
-    val bubbleTextMuted = Color(0xD9F1F7FA)
-    val bubbleNameText = Color(0xF8F8FCFF)
+    val bubbleText = Color(0xFF171717)
+    val bubbleTextMuted = Color(0xFF666666)
+    val bubbleNameText = Color(0xFF707070)
     val systemPromptText = Color(0xF4F8FCFF)
     val cardPrimaryText = Color(0xF8F8FCFF)
     val cardSecondaryText = Color(0xD9F1F7FA)
@@ -104,6 +106,12 @@ internal object OverlayTokens {
     val fileCardBorder = Color(0xFFBCC8D2)
     val voiceCard = Color(0xFFE7EEF6)
     val voiceCardBorder = Color(0xFFBBC8D8)
+    val unavailableMessageCard = Color(0xFFF0F3F5)
+    val unavailableMessageCardBorder = Color(0xFFD6DEE2)
+    val unavailableMessageIconBackground = Color(0xFFDDE6EA)
+    val unavailableMessageIcon = Color(0xFF6D7D85)
+    val unavailableMessageTitle = Color(0xFF43545D)
+    val unavailableMessageDescription = Color(0xFF78878E)
     val mediaCard = Color(0xFFEDF2F5)
     val resourcePanel = Color(0xFFE9F0F1)
     val resourcePanelBorder = Color(0xFFBECBD1)
@@ -152,14 +160,14 @@ internal object OverlayTokens {
     val videoFrame = Color(0xFF5E737B)
     val inlineAvatar = Color(0xFF5B6D75)
     val imModuleTextShadow = Shadow(
-        color = Color(0xE6000000),
-        offset = Offset(0f, 2f),
-        blurRadius = 12f
+        color = Color.Transparent,
+        offset = Offset.Zero,
+        blurRadius = 0f
     )
     val leftRailFollowTextShadow = Shadow(
-        color = Color(0xE6000000),
-        offset = Offset(0f, 2f),
-        blurRadius = 12f
+        color = Color.Transparent,
+        offset = Offset.Zero,
+        blurRadius = 0f
     )
     val textShadow = imModuleTextShadow
 

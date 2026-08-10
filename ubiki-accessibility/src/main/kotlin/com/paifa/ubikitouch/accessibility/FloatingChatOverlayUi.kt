@@ -50,6 +50,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.shell.FloatingChatPreview
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.floatingChatFrostedBackdrop
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.floatingChatOverlayGestureBinding
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.isCenteredToolFeaturePanel
+import com.paifa.ubikitouch.accessibility.floatingchat.shell.isBottomComposerDrawer
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.rememberFloatingChatMediaOverlayState
 import android.content.Context
 import android.content.SharedPreferences
@@ -69,7 +70,12 @@ import android.os.Looper
 import android.content.pm.PackageManager
 import android.util.Log
 import android.widget.Toast
-import androidx.emoji2.emojipicker.EmojiPickerView
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.MutableTransitionState
 import java.io.StringReader
 import java.io.StringWriter
 import java.util.Properties
@@ -231,7 +237,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.zIndex
@@ -314,6 +319,8 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskSubmissionResult
 import com.paifa.ubikitouch.accessibility.scrm.scrmContactsPanelRouteForSelectedAccount
 import com.paifa.ubikitouch.accessibility.scrm.resolveScrmTaskResult
 import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingAccountId
+import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingAccountRouteForContactId
+import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingContactConversationId
 import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingContactId
 import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingScopedThreadId
 import com.paifa.ubikitouch.accessibility.scrm.scrmMessageOperationType
@@ -374,8 +381,24 @@ internal fun FloatingChatOverlay(
     var liveConversation by remember { mutableStateOf(conversation) }
     var inputText by remember { mutableStateOf("") }
     var inputFocused by remember { mutableStateOf(false) }
-    var bottomInputContainerHeightDp by remember { mutableIntStateOf(BottomInputBarMinHeightDp) }
     var bottomPanelMode by remember { mutableStateOf(BottomPanelMode.None) }
+    var displayedBottomPanelMode by remember { mutableStateOf(BottomPanelMode.None) }
+    val bottomPanelVisibility = remember { MutableTransitionState(false) }
+    val imeInsets = WindowInsets.ime
+    val imeVisible by remember(imeInsets, density) {
+        derivedStateOf { imeInsets.getBottom(density) > 0 }
+    }
+    LaunchedEffect(bottomPanelMode) {
+        if (bottomPanelMode != BottomPanelMode.None) {
+            displayedBottomPanelMode = bottomPanelMode
+        }
+        bottomPanelVisibility.targetState = bottomPanelMode != BottomPanelMode.None
+    }
+    LaunchedEffect(imeVisible) {
+        if (imeVisible && bottomPanelMode.isBottomComposerDrawer()) {
+            bottomPanelMode = BottomPanelMode.None
+        }
+    }
     val aiVoiceApiConfig = remember {
         AiVoiceApiConfig(
             gatewayBaseUrl = BuildConfig.AI_VOICE_GATEWAY_BASE_URL,
@@ -890,6 +913,7 @@ internal fun FloatingChatOverlay(
     val selectedMessagesForCurrentAction = {
         selectedMessagesForAction(displayConversation.messages, selectedMessageIds)
     }
+    var scrmMessageOperationTarget by remember { mutableStateOf<FloatingChatMessage?>(null) }
     val messageLongPressActions = MessageLongPressActions(
         favoriteMessageIds = favoriteMessageIds,
         reminderMessageIds = reminderMessageIds,
@@ -906,6 +930,7 @@ internal fun FloatingChatOverlay(
             quotedMessage = message
             inputFocused = true
         },
+        onScrmOperationRequested = { message -> scrmMessageOperationTarget = message },
         onCloseLongPressMenu = { longPressMessage = null }
     )
     PickedMediaEffects(
@@ -960,11 +985,10 @@ internal fun FloatingChatOverlay(
         onShowToast = { message -> Toast.makeText(context, message, Toast.LENGTH_SHORT).show() }
     )
     val hideKeyboardFromBlankArea = {
-        if (inputFocused) {
-            focusManager.clearFocus(force = true)
-            keyboardController?.hide()
-            inputFocused = false
-        }
+        focusManager.clearFocus(force = true)
+        keyboardController?.hide()
+        inputFocused = false
+        bottomPanelMode = BottomPanelMode.None
     }
     ChatThreadEffects(
         effectiveConversation = effectiveConversation,
@@ -1011,7 +1035,6 @@ internal fun FloatingChatOverlay(
             selectedThread = selectedThread,
             homeOverviewVisible = homeOverviewVisible,
             unreadThreadIds = unreadThreadIds.filterValues { unread -> unread }.keys.toSet(),
-            inputText = inputText,
             inputFocused = inputFocused,
             groupMemberAvatarsVisible = currentGroupMemberAvatarsVisible,
             onThreadSelected = { thread -> chatNavigationActions.openChatThread(thread) },
@@ -1082,32 +1105,94 @@ internal fun FloatingChatOverlay(
                     selectedMessageIds[message.id] = true
                 }
             },
-            bottomReservedHeight = chatBodyBottomReservedHeightDp(bottomInputContainerHeightDp).dp,
-            onBlankAreaTap = {
-                if (inputFocused) {
-                    hideKeyboardFromBlankArea()
-                }
-            },
+            onBlankAreaTap = hideKeyboardFromBlankArea,
+            onCloseChat = onCollapse,
             modifier = Modifier.fillMaxSize()
         )
         },
-        panelContent = {
-        if (bottomPanelMode != BottomPanelMode.None) {
-            if (bottomPanelMode.isCenteredToolFeaturePanel()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(OverlayTokens.centerPanelScrim)
-                        .pointerInput(bottomPanelMode) {
-                            detectTapGestures(onTap = {
-                                if (bottomPanelMode == BottomPanelMode.AiVoice) aiVoiceRuntime?.stop()
-                                bottomPanelMode = BottomPanelMode.None
-                            })
+        bottomContent = {
+        if (bottomInputBarVisibleForCenteredToolPanel(bottomPanelMode.isCenteredToolFeaturePanel()) &&
+            !bottomPanelMode.isBottomComposerDrawer()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .imePadding()
+                    .navigationBarsPadding()
+                    .padding(bottom = 10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                blinkInputStatusText?.let { statusText ->
+                    BlinkVoiceInputStatusBar(
+                        text = statusText,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp)
+                    )
+                }
+                BottomInputBar(
+                    inputText = inputText,
+                    onInputTextChange = {
+                        inputText = it
+                        blinkGeneratedInputClearable = false
+                    },
+                    quotedMessage = quotedMessage,
+                    onClearQuote = { quotedMessage = null },
+                    aiGeneratedClearable = blinkGeneratedInputClearable,
+                    onClearAiGeneratedInput = {
+                        inputText = ""
+                        blinkGeneratedInputClearable = false
+                        blinkInputStatusText = null
+                        blinkInputStatusAutoDismiss = false
+                    },
+                    inputFocused = inputFocused,
+                    onInputFocusedChange = { inputFocused = it },
+                    panelMode = bottomPanelMode,
+                    onPanelModeChange = { nextMode ->
+                        if (nextMode == BottomPanelMode.Emoji || nextMode == BottomPanelMode.More) {
+                            keyboardController?.hide()
+                            focusManager.clearFocus()
                         }
+                        bottomPanelMode = nextMode
+                    },
+                    onSend = { inputMessageActions.sendInputMessage() },
+                    onAssistantPredict = { aiDraftGenerationActions.generate() },
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
-            FloatingBottomPanel(
-                mode = bottomPanelMode,
+        }
+        },
+        panelContent = {
+        if (bottomPanelVisibility.currentState || bottomPanelVisibility.targetState) {
+            val displayedPanelIsBottomDrawer = displayedBottomPanelMode.isBottomComposerDrawer()
+            AnimatedVisibility(
+                modifier = if (displayedPanelIsBottomDrawer) {
+                    Modifier.align(Alignment.BottomCenter)
+                } else {
+                    Modifier.fillMaxSize()
+                },
+                visibleState = bottomPanelVisibility,
+                enter = slideInVertically(initialOffsetY = { height -> height }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { height -> height }) + fadeOut()
+            ) {
+            Box(
+                modifier = if (displayedPanelIsBottomDrawer) Modifier else Modifier.fillMaxSize()
+            ) {
+                if (displayedBottomPanelMode.isCenteredToolFeaturePanel()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(OverlayTokens.centerPanelScrim)
+                            .pointerInput(displayedBottomPanelMode) {
+                                detectTapGestures(onTap = {
+                                    if (displayedBottomPanelMode == BottomPanelMode.AiVoice) aiVoiceRuntime?.stop()
+                                    bottomPanelMode = BottomPanelMode.None
+                                })
+                            }
+                    )
+                }
+                FloatingBottomPanel(
+                mode = displayedBottomPanelMode,
                 scrmContactsRoute = scrmContactsPanelRouteForSelectedAccount(
                     selectedAccountId = selectedAccount.id,
                     fallbackDeviceUuid = null,
@@ -1118,6 +1203,12 @@ internal fun FloatingChatOverlay(
                     fallbackDeviceUuid = null,
                     fallbackWeChatId = null
                 ),
+                scrmMessageRoute = scrmFloatingAccountRouteForContactId(selectedAccount.id),
+                scrmMessageConversationId = when (val thread = selectedThread) {
+                    is ChatThreadSelection.Private -> scrmFloatingContactConversationId(thread.contactId)
+                    is ChatThreadSelection.GroupChat -> scrmFloatingContactConversationId(thread.groupId)
+                    ChatThreadSelection.Group -> null
+                },
                 voicePermissionRequestToken = voicePermissionRequestToken,
                 locationPermissionRequestToken = locationPermissionRequestToken,
                 onClose = {
@@ -1270,6 +1361,7 @@ internal fun FloatingChatOverlay(
                     aiVoiceState = AiVoiceState.Menu
                     bottomPanelMode = BottomPanelMode.AiVoice
                 },
+                onOpenToolPanel = { nextMode -> bottomPanelMode = nextMode },
                 onOpenPrivateChat = { route, contact ->
                     val threadId = scrmPrivateChatThreadIdForContact(route, contact)
                     if (threadId == null) {
@@ -1390,65 +1482,52 @@ internal fun FloatingChatOverlay(
                     }
                 },
                 onSendAccountCard = { accountId -> toolMessageActions.sendAccountCard(accountId) },
-                modifier = if (bottomPanelMode.isCenteredToolFeaturePanel()) {
+                modifier = if (displayedBottomPanelMode.isCenteredToolFeaturePanel()) {
                     Modifier
                         .align(Alignment.Center)
                         .padding(horizontal = 18.dp)
                 } else {
                     Modifier
-                        .align(Alignment.BottomEnd)
-                        .imePadding()
-                        .navigationBarsPadding()
-                        .padding(end = 58.dp, bottom = 76.dp)
+                        .align(Alignment.BottomCenter)
+                },
+                composerHeader = if (displayedBottomPanelMode.isBottomComposerDrawer()) {
+                    {
+                        BottomInputBar(
+                            inputText = inputText,
+                            onInputTextChange = {
+                                inputText = it
+                                blinkGeneratedInputClearable = false
+                            },
+                            quotedMessage = quotedMessage,
+                            onClearQuote = { quotedMessage = null },
+                            aiGeneratedClearable = blinkGeneratedInputClearable,
+                            onClearAiGeneratedInput = {
+                                inputText = ""
+                                blinkGeneratedInputClearable = false
+                                blinkInputStatusText = null
+                                blinkInputStatusAutoDismiss = false
+                            },
+                            inputFocused = inputFocused,
+                            onInputFocusedChange = { inputFocused = it },
+                            panelMode = bottomPanelMode,
+                            onPanelModeChange = { nextMode ->
+                                if (nextMode == BottomPanelMode.Emoji || nextMode == BottomPanelMode.More) {
+                                    keyboardController?.hide()
+                                    focusManager.clearFocus()
+                                }
+                                bottomPanelMode = nextMode
+                            },
+                            onSend = { inputMessageActions.sendInputMessage() },
+                            onAssistantPredict = { aiDraftGenerationActions.generate() },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                } else {
+                    null
                 }
             )
-        }
-        if (bottomInputBarVisibleForCenteredToolPanel(bottomPanelMode.isCenteredToolFeaturePanel())) {
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .imePadding()
-                .navigationBarsPadding()
-                .padding(bottom = 10.dp)
-                .onSizeChanged { size ->
-                    bottomInputContainerHeightDp = with(density) {
-                        size.height.toDp().value.roundToInt()
-                    }
-                },
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                blinkInputStatusText?.let { statusText ->
-                    BlinkVoiceInputStatusBar(
-                        text = statusText,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp)
-                    )
-                }
-                BottomInputBar(
-                    inputText = inputText,
-                    onInputTextChange = {
-                        inputText = it
-                        blinkGeneratedInputClearable = false
-                    },
-                    quotedMessage = quotedMessage,
-                    onClearQuote = { quotedMessage = null },
-                    aiGeneratedClearable = blinkGeneratedInputClearable,
-                    onClearAiGeneratedInput = {
-                        inputText = ""
-                        blinkGeneratedInputClearable = false
-                        blinkInputStatusText = null
-                        blinkInputStatusAutoDismiss = false
-                    },
-                    inputFocused = inputFocused,
-                    onInputFocusedChange = { inputFocused = it },
-                    panelMode = bottomPanelMode,
-                    onPanelModeChange = { bottomPanelMode = it },
-                    onSend = { inputMessageActions.sendInputMessage() },
-                    onAssistantPredict = { aiDraftGenerationActions.generate() },
-                    modifier = Modifier.fillMaxWidth()
-                )
             }
+        }
         }
         },
         overlayContent = {
@@ -1525,6 +1604,13 @@ internal fun FloatingChatOverlay(
                 .navigationBarsPadding()
                 .padding(start = 48.dp, end = 48.dp, bottom = 64.dp)
         )
+        scrmMessageOperationTarget?.let { message ->
+            ScrmMessageOperationPreviewPanel(
+                message = message,
+                selectedAccountId = selectedAccount.id,
+                onDismiss = { scrmMessageOperationTarget = null }
+            )
+        }
         ProfileEditorOverlayHost(
             contactEditorTarget = contactEditorTarget,
             accountEditorTarget = accountEditorTarget,

@@ -63,6 +63,8 @@ internal fun GroupInfoScreen(
             GroupInfoMemberGridRow(row, state.canManageMembers, onEvent)
         }
         item { GroupInfoSectionGap() }
+        item { Section { InfoRow("群管理操作") { onEvent(GroupInfoUiEvent.ScrmManagementRequested) } } }
+        item { GroupInfoSectionGap() }
         item {
             Section {
                 GroupInfoEditableRow("缇よ亰鍚嶇О", state.groupName, "濉啓缇よ亰鍚嶇О", {

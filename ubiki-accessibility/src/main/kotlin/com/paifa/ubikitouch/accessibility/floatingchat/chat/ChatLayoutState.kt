@@ -1,6 +1,7 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.chat
 
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
 import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
@@ -196,7 +197,7 @@ internal fun leftRailFollowTextUsesCompactTypography(): Boolean {
 internal fun leftRailFollowTextUsesBackgroundHalo(): Boolean = false
 
 internal fun leftRailFollowTextUsesDarkTextShadow(): Boolean {
-    return OverlayTokens.leftRailFollowTextShadow.color.toArgb() == 0xE6000000.toInt()
+    return OverlayTokens.leftRailFollowTextShadow.color.toArgb() != 0x00000000
 }
 
 internal data class LeftRailFollowInfo(
@@ -204,9 +205,34 @@ internal data class LeftRailFollowInfo(
     val name: String,
     val lastMessage: String,
     val lastTime: String,
+    val avatarColor: Long,
     val topPx: Float = 0f,
     val heightPx: Float = 0f
 )
+
+internal data class LeftRailFollowTextColors(
+    val name: Color,
+    val message: Color,
+    val time: Color
+)
+
+internal fun leftRailFollowTextColors(avatarColor: Long): LeftRailFollowTextColors {
+    val base = Color(avatarColor)
+    return LeftRailFollowTextColors(
+        name = base.leftRailFollowTextTone(0.58f),
+        message = base.leftRailFollowTextTone(0.46f),
+        time = base.leftRailFollowTextTone(0.36f)
+    )
+}
+
+private fun Color.leftRailFollowTextTone(intensity: Float): Color {
+    return Color(
+        red = red * intensity,
+        green = green * intensity,
+        blue = blue * intensity,
+        alpha = 1f
+    )
+}
 
 internal fun leftRailVisibleFollowInfos(
     conversation: FloatingChatConversation,
@@ -248,6 +274,7 @@ internal fun leftRailFollowInfoForContact(
         name = contact.name,
         lastMessage = latestMessage?.text?.ifBlank { contact.description } ?: contact.description,
         lastTime = latestMessage?.time ?: "",
+        avatarColor = contact.avatarColor,
         topPx = 0f,
         heightPx = 0f
     )
@@ -354,7 +381,7 @@ internal fun privateChatLeftConnectorAnchorsToUserAvatarRightEdge(): Boolean = t
 internal fun privateChatRightConnectorAnchorsToAccountAvatarLeftEdge(): Boolean = true
 
 private const val SessionRailWidthDp = 56
-private const val RailScreenEdgeInsetPx = 8
+private const val RailScreenEdgeInsetPx = 12
 private const val RailAvatarSizeDp = 46
 private const val MessagePaneHorizontalPaddingDp = 4
 private const val LeftRailFollowTextHideDelayMs = 0
@@ -363,7 +390,7 @@ private const val LeftRailFollowTextWidthDp = 280
 private const val LeftRailFollowTextLayerWidthDp = LeftRailFollowTextStartOffsetDp + LeftRailFollowTextWidthDp
 private const val LeftRailFollowTextInnerPaddingDp = 0
 private const val LeftRailFollowTextNameSizeSp = 10f
-private const val LeftRailFollowTextMessageSizeSp = 8.8f
+private const val LeftRailFollowTextMessageSizeSp = 13f
 private const val LeftRailFollowTextTimeSizeSp = 8f
 private const val LeftRailLeadingSpacerItemCount = 1
 private const val LeftRailShortContentScrollPaddingDp = 96

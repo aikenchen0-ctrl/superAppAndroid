@@ -556,6 +556,7 @@ private fun LeftRailFollowTextOverlay(
     ) {
         infos.forEach { info ->
             val yOffset = with(density) { info.topPx.toDp() }
+            val textColors = leftRailFollowTextColors(info.avatarColor)
             Column(
                 modifier = Modifier
                     .offset(x = leftRailFollowTextInnerPaddingDp().dp, y = yOffset)
@@ -568,7 +569,7 @@ private fun LeftRailFollowTextOverlay(
                     text = info.name,
                     size = leftRailFollowTextNameSizeSp().sp,
                     weight = FontWeight.SemiBold,
-                    color = OverlayTokens.primaryText,
+                    color = textColors.name,
                     maxLines = 1,
                     shadow = OverlayTokens.leftRailFollowTextShadow
                 )
@@ -576,7 +577,7 @@ private fun LeftRailFollowTextOverlay(
                     text = info.lastMessage,
                     size = leftRailFollowTextMessageSizeSp().sp,
                     weight = FontWeight.Medium,
-                    color = OverlayTokens.secondaryText,
+                    color = textColors.message,
                     maxLines = 1,
                     shadow = OverlayTokens.leftRailFollowTextShadow
                 )
@@ -584,7 +585,7 @@ private fun LeftRailFollowTextOverlay(
                     text = info.lastTime,
                     size = leftRailFollowTextTimeSizeSp().sp,
                     weight = FontWeight.Medium,
-                    color = OverlayTokens.tertiaryText,
+                    color = textColors.time,
                     maxLines = 1,
                     shadow = OverlayTokens.leftRailFollowTextShadow
                 )

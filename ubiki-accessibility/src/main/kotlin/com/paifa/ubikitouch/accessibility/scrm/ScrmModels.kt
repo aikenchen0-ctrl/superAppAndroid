@@ -572,6 +572,29 @@ internal data class ScrmContactQuery(
     }
 }
 
+internal data class ScrmContactWxidQuery(
+    val weChatId: String? = null,
+    val search: String? = null,
+    val includeDeleted: Boolean = false,
+    val onlyFriends: Boolean = true,
+    val labelIds: String? = null,
+    val labelNames: String? = null,
+    val customerLevel: String? = null,
+    val sourceChannel: String? = null,
+    val profileKey: String? = null,
+    val profileOnly: Boolean? = null
+) {
+    init {
+        require(weChatId == null || weChatId.isNotBlank()) { "weChatId cannot be blank" }
+        require(search == null || search.isNotBlank()) { "search cannot be blank" }
+        require(labelIds == null || labelIds.isNotBlank()) { "labelIds cannot be blank" }
+        require(labelNames == null || labelNames.isNotBlank()) { "labelNames cannot be blank" }
+        require(customerLevel == null || customerLevel.isNotBlank()) { "customerLevel cannot be blank" }
+        require(sourceChannel == null || sourceChannel.isNotBlank()) { "sourceChannel cannot be blank" }
+        require(profileKey == null || profileKey.isNotBlank()) { "profileKey cannot be blank" }
+    }
+}
+
 internal data class ScrmChatRoomQuery(
     val weChatId: String? = null,
     val page: Int = 1,
@@ -584,6 +607,21 @@ internal data class ScrmChatRoomQuery(
         require(pageSize in 1..200) { "pageSize 必须在 1 到 200 之间" }
         require(weChatId == null || weChatId.isNotBlank()) { "weChatId 涓嶈兘涓虹┖" }
         require(search == null || search.isNotBlank()) { "search 涓嶈兘涓虹┖" }
+    }
+}
+
+internal data class ScrmCommonChatRoomQuery(
+    val weChatId: String? = null,
+    val page: Int = 1,
+    val pageSize: Int = 100,
+    val search: String? = null,
+    val includeDeleted: Boolean = false
+) {
+    init {
+        require(page > 0) { "page must be greater than 0" }
+        require(pageSize in 1..200) { "pageSize must be between 1 and 200" }
+        require(weChatId == null || weChatId.isNotBlank()) { "weChatId cannot be blank" }
+        require(search == null || search.isNotBlank()) { "search cannot be blank" }
     }
 }
 
@@ -611,8 +649,103 @@ internal data class ScrmContactPage(
 )
 
 @Serializable
+internal data class ScrmContactWxidList(
+    val weChatId: String? = null,
+    val wxids: List<String> = emptyList(),
+    val count: Int = 0
+)
+
+/**
+ * 人工测试专用：labelIds/labelNames 表示目标好友的新完整标签集合，传空集合即清空标签。
+ * 测试前记录原标签；仅在 Web 调试面板和测试手机上发起一次请求，随后用详情读取接口回读确认。
+ */
+@Serializable
+internal data class ScrmSetContactLabelsRequest(
+    val deviceUuid: String,
+    val weChatId: String,
+    val contactId: Int? = null,
+    val friendId: String? = null,
+    val labelIds: List<Int> = emptyList(),
+    val labelNames: List<String> = emptyList()
+) {
+    init {
+        require(deviceUuid.isNotBlank()) { "deviceUuid cannot be blank" }
+        require(weChatId.isNotBlank()) { "weChatId cannot be blank" }
+        require((contactId ?: 0) > 0 || !friendId.isNullOrBlank()) {
+            "contactId or friendId must be provided"
+        }
+        require(contactId == null || contactId > 0) { "contactId must be greater than 0" }
+        require(labelIds.all { it > 0 }) { "labelIds must contain positive values" }
+        require(labelNames.all { it.isNotBlank() }) { "labelNames cannot contain blank values" }
+    }
+}
+
+/**
+ * 批量标签写入请求，仅供人工联调入口使用。
+ *
+ * 人工测试前先用 GET /contacts/{contactId}/detail 记录原标签，并且首次只选择一个测试好友、
+ * mergeExisting=true、maxCount=1。mergeExisting=false 会用传入集合完整替换现有标签，
+ * 空标签集合可能清空生产联系人标签，禁止把这两种组合用于生产联系人测试。
+ */
+@Serializable
+internal data class ScrmBatchSetContactLabelsRequest(
+    val deviceUuid: String? = null,
+    val weChatId: String? = null,
+    val friendIds: List<String> = emptyList(),
+    val labelIds: List<Int> = emptyList(),
+    val labelNames: List<String> = emptyList(),
+    val mergeExisting: Boolean = true,
+    val maxCount: Int = 200
+) {
+    init {
+        require(deviceUuid == null || deviceUuid.isNotBlank()) { "deviceUuid cannot be blank" }
+        require(weChatId == null || weChatId.isNotBlank()) { "weChatId cannot be blank" }
+        require(friendIds.all { it.isNotBlank() }) { "friendIds cannot contain blank values" }
+        require(labelIds.all { it > 0 }) { "labelIds must contain positive values" }
+        require(labelNames.all { it.isNotBlank() }) { "labelNames cannot contain blank values" }
+        require(maxCount in 1..200) { "maxCount must be between 1 and 200" }
+    }
+}
+
+@Serializable
+internal data class ScrmBatchSetContactLabelsResponse(
+    val deviceUuid: String? = null,
+    val weChatId: String? = null,
+    val requestedCount: Int = 0,
+    val acceptedCount: Int = 0,
+    val successCount: Int = 0,
+    val unknownCount: Int = 0,
+    val failCount: Int = 0,
+    val effectiveLabelIds: List<Int> = emptyList(),
+    val mergeExisting: Boolean = true,
+    val items: List<ScrmBatchTaskItemResult> = emptyList()
+)
+
+@Serializable
+internal data class ScrmBatchTaskItemResult(
+    val targetId: String? = null,
+    val success: Boolean = false,
+    val status: String? = null,
+    val resultUnknown: Boolean = false,
+    val resultCode: String? = null,
+    val taskId: Long? = null,
+    val message: String? = null,
+    val taskResultUrl: String? = null,
+    val recentTaskResultsUrl: String? = null,
+    val data: JsonElement? = null
+)
+
+@Serializable
 internal data class ScrmChatRoomPage(
     val items: List<ScrmChatRoom> = emptyList(),
+    val totalCount: Int = 0,
+    val page: Int = 1,
+    val pageSize: Int = 100
+)
+
+@Serializable
+internal data class ScrmCommonChatRoomPage(
+    val items: List<ScrmCommonChatRoom> = emptyList(),
     val totalCount: Int = 0,
     val page: Int = 1,
     val pageSize: Int = 100
@@ -649,6 +782,53 @@ internal data class ScrmChatConversationSummary(
     val lastMessageContent: String? = null,
     val lastMessageTime: String? = null,
     val updatedAt: String? = null
+)
+
+@Serializable
+internal data class ScrmChatHistory(
+    val hasMore: Boolean = false,
+    val nextCursor: String? = null,
+    val items: List<ScrmChatMessage> = emptyList()
+) {
+    val messages: List<ScrmChatMessage>
+        get() = items
+}
+
+@Serializable
+internal data class ScrmChatChanges(
+    val afterSequence: Long = 0L,
+    val nextSequence: Long = 0L,
+    val headSequence: Long = 0L,
+    val minAvailableSequence: Long = 0L,
+    val hasMore: Boolean = false,
+    val items: List<ScrmChatChangeItem> = emptyList()
+)
+
+@Serializable
+internal data class ScrmChatChangeItem(
+    val sequence: Long = 0L,
+    val message: ScrmChatMessage? = null
+)
+
+@Serializable
+internal data class ScrmChatMessage(
+    val messageId: Long = 0L,
+    val messageServerId: Long? = null,
+    val conversationId: Long? = null,
+    val senderWxid: String? = null,
+    val receiverWxid: String? = null,
+    val chatType: Int = 0,
+    val messageType: Int = 0,
+    val content: String = "",
+    val direction: Int = 0,
+    val localMessageId: String? = null,
+    val clientMessageId: String? = null,
+    val sentAt: String? = null,
+    val receivedAt: String? = null,
+    val createdAt: String? = null,
+    val updatedAt: String? = null,
+    val isRevoked: Boolean = false,
+    val isDeleted: Boolean = false
 )
 
 @Serializable
@@ -689,6 +869,89 @@ internal data class ScrmContact(
             ?: wxid?.takeIf { it.isNotBlank() }
             ?: "未知联系人"
 }
+
+/** Read-only SCRM customer profile; it does not represent WeChat contact metadata. */
+internal data class ScrmCustomerProfile(
+    val id: Int = 0,
+    val contactId: Int = 0,
+    val ownerWxid: String? = null,
+    val friendWxid: String? = null,
+    val displayName: String? = null,
+    val customerLevel: String? = null,
+    val sourceChannel: String? = null,
+    val sourceDetail: String? = null,
+    val profileKey: String? = null,
+    val purchaseHistory: String? = null,
+    val socialAccounts: String? = null,
+    val faceImageUrl: String? = null,
+    val notes: String? = null,
+    val phone: String? = null,
+    val mappedLabelIds: List<Int> = emptyList(),
+    val mappedLabelNames: List<String> = emptyList(),
+    val createdAt: String? = null,
+    val updatedAt: String? = null
+)
+
+/** A read-only contact page snapshot assembled from SCRM's persisted data. */
+internal data class ScrmContactDetail(
+    val contact: ScrmContact? = null,
+    val customerProfile: ScrmCustomerProfile? = null,
+    val labels: List<ScrmContactLabel> = emptyList(),
+    val commonChatRooms: List<ScrmCommonChatRoom> = emptyList(),
+    val relationLogs: List<ScrmContactRelationLog> = emptyList()
+)
+
+@Serializable
+internal data class ScrmContactLabel(
+    val id: Int = 0,
+    val ownerWxid: String? = null,
+    val wechatAccountId: Long = 0L,
+    val labelId: Int = 0,
+    val tagName: String? = null,
+    val tagColor: String? = null,
+    val tagDescription: String? = null,
+    val createdAt: String? = null,
+    val updatedAt: String? = null,
+    val isDeleted: Boolean = false,
+    val customerProfileCount: Int = 0,
+    val contactCount: Int = 0
+)
+
+@Serializable
+internal data class ScrmCommonChatRoom(
+    val id: Int = 0,
+    val ownerWxid: String? = null,
+    val friendWxid: String? = null,
+    val chatRoomId: String? = null,
+    val name: String? = null,
+    val avatar: String? = null,
+    val ownerMemberWxid: String? = null,
+    val memberCount: Int = 0,
+    val friendDisplayName: String? = null,
+    val friendMemberRole: Int = 0,
+    val friendIsOwner: Boolean = false,
+    val friendIsAdmin: Boolean = false,
+    val updatedAt: String? = null
+)
+
+@Serializable
+internal data class ScrmContactRelationLog(
+    val id: Int = 0,
+    val contactId: Int = 0,
+    val changeType: String? = null,
+    val actionText: String? = null,
+    val ownerWxid: String? = null,
+    val friendWxid: String? = null,
+    val oldIsDeleted: Boolean = false,
+    val oldIsFriend: Int = 0,
+    val oldIsBlocked: Int = 0,
+    val newIsDeleted: Boolean = false,
+    val newIsFriend: Int = 0,
+    val newIsBlocked: Int = 0,
+    val reason: Int = 0,
+    val sourceNotice: String? = null,
+    val createdAt: String? = null
+)
 
 @Serializable
 internal data class ScrmChatRoom(

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -52,7 +53,8 @@ internal enum class MessageLongPressAction(val label: String) {
     Delete("删除"),
     MultiSelect("多选"),
     Quote("引用"),
-    Reminder("提醒")
+    Reminder("提醒"),
+    ScrmOperations("更多")
 }
 
 internal fun messageLongPressPrimaryActions(): List<MessageLongPressAction> {
@@ -63,7 +65,8 @@ internal fun messageLongPressPrimaryActions(): List<MessageLongPressAction> {
         MessageLongPressAction.Delete,
         MessageLongPressAction.MultiSelect,
         MessageLongPressAction.Quote,
-        MessageLongPressAction.Reminder
+        MessageLongPressAction.Reminder,
+        MessageLongPressAction.ScrmOperations
     )
 }
 
@@ -310,8 +313,9 @@ private fun MessageLongPressAction.icon(): ImageVector {
         MessageLongPressAction.MultiSelect -> Icons.Filled.Checklist
         MessageLongPressAction.Quote -> Icons.Filled.FormatQuote
         MessageLongPressAction.Reminder -> Icons.Filled.Notifications
+        MessageLongPressAction.ScrmOperations -> Icons.Filled.MoreHoriz
     }
 }
 
 internal val MessageLongPressMenuWidth = 300.dp
-internal val MessageLongPressMenuEstimatedHeight = 122.dp
+internal val MessageLongPressMenuEstimatedHeight = 182.dp

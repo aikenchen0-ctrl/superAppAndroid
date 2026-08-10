@@ -1,0 +1,161 @@
+package com.paifa.ubikitouch.accessibility.floatingchat.message
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Alignment
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingDialogCloseButton
+import com.paifa.ubikitouch.accessibility.scrm.ScrmForwardMessageRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMessageDetailPullRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMessageMediaDownloadRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMessageOperationRequest
+import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingAccountRouteForContactId
+import com.paifa.ubikitouch.core.model.FloatingChatMessage
+
+private enum class ScrmMessagePreviewOperation(val title: String) {
+    Forward("转发"),
+    Revoke("撤回"),
+    Transcribe("语音转文字"),
+    PullDetail("拉取消息详情"),
+    DownloadMedia("下载媒体"),
+    PullOriginal("补拉原文"),
+    PullEmojiDetail("收藏表情详情")
+}
+
+/**
+ * UI 对接：消息长按 -> 更多。
+ * 人工测试：选择任意操作，核对目标消息 ID 和账号，点击“组装请求”后应只显示待人工发送状态。
+ * 禁止在此组件中调用 messageOperationApi 的写任务方法。
+ */
+@Composable
+internal fun ScrmMessageOperationPreviewPanel(
+    message: FloatingChatMessage,
+    selectedAccountId: String,
+    onDismiss: () -> Unit
+) {
+    val route = remember(selectedAccountId) { scrmFloatingAccountRouteForContactId(selectedAccountId) }
+    val messageId = remember(message.remoteMessageServerId) { message.remoteMessageServerId?.toLongOrNull() }
+    var operation by remember(message.id) { mutableStateOf<ScrmMessagePreviewOperation?>(null) }
+    var targetConversationId by remember(message.id) { mutableStateOf("") }
+    var status by remember(message.id) { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(operation?.title ?: "消息操作", modifier = Modifier.weight(1f))
+                FloatingDialogCloseButton(onClose = onDismiss)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("目标消息：${messageId?.toString() ?: "缺少远端消息 ID"}")
+                Text("当前账号：${route?.weChatId ?: "缺少 SCRM 路由"}")
+                if (operation == null) {
+                    ScrmMessagePreviewOperation.values().forEach { item ->
+                        TextButton(
+                            onClick = { operation = item },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text(item.title) }
+                    }
+                } else {
+                    if (operation == ScrmMessagePreviewOperation.Forward) {
+                        OutlinedTextField(
+                            value = targetConversationId,
+                            onValueChange = { targetConversationId = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("目标会话 ID") },
+                            singleLine = true
+                        )
+                    }
+                    Text("该操作会产生服务端任务。本页面仅组装参数，不会发送。")
+                    status?.let { Text(it) }
+                }
+            }
+        },
+        confirmButton = {
+            if (operation == null) {
+                TextButton(onClick = onDismiss) { Text("关闭") }
+            } else {
+                Button(onClick = {
+                    status = prepareMessageOperationRequest(
+                        operation = operation ?: return@Button,
+                        messageId = messageId,
+                        routeDeviceUuid = route?.deviceUuid,
+                        routeWechatId = route?.weChatId,
+                        targetConversationId = targetConversationId
+                    )
+                }) { Text("组装请求") }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = {
+                if (operation == null) onDismiss() else operation = null
+            }) { Text(if (operation == null) "取消" else "返回") }
+        }
+    )
+}
+
+private fun prepareMessageOperationRequest(
+    operation: ScrmMessagePreviewOperation,
+    messageId: Long?,
+    routeDeviceUuid: String?,
+    routeWechatId: String?,
+    targetConversationId: String
+): String {
+    if (messageId == null || messageId <= 0L) return "无法组装：缺少有效远端消息 ID"
+    if (routeDeviceUuid.isNullOrBlank() || routeWechatId.isNullOrBlank()) return "无法组装：缺少当前账号 SCRM 路由"
+    val baseRequest = ScrmMessageOperationRequest(routeDeviceUuid, routeWechatId)
+    return when (operation) {
+        ScrmMessagePreviewOperation.Forward -> {
+            if (targetConversationId.isBlank()) return "无法组装：请输入目标会话 ID"
+            // Manual test: confirm target conversation in UI, then a human may call forwardMessage.
+            ScrmForwardMessageRequest(routeDeviceUuid, routeWechatId, targetConversationId)
+            "转发请求已组装，未发送"
+        }
+        ScrmMessagePreviewOperation.Revoke -> {
+            // Manual test: verify message ID and account, then a human may call revokeMessage.
+            baseRequest
+            "撤回请求已组装，未发送"
+        }
+        ScrmMessagePreviewOperation.Transcribe -> {
+            // Manual test: use a real voice message only; a human may call transcribeVoiceMessage.
+            baseRequest
+            "语音转文字请求已组装，未发送"
+        }
+        ScrmMessagePreviewOperation.PullDetail -> {
+            // Manual test: a human may call pullMessageDetail and inspect taskId/result.
+            ScrmMessageDetailPullRequest(routeDeviceUuid, routeWechatId, getOriginal = false)
+            "消息详情请求已组装，未发送"
+        }
+        ScrmMessagePreviewOperation.DownloadMedia -> {
+            // Manual test: provide a media or extension ID before calling downloadMessageMedia.
+            ScrmMessageMediaDownloadRequest(routeDeviceUuid, routeWechatId)
+            "媒体下载请求已组装，未发送"
+        }
+        ScrmMessagePreviewOperation.PullOriginal -> {
+            // Manual test: a human may call pullMessageOriginal after validating target message ID.
+            baseRequest
+            "补拉原文请求已组装，未发送"
+        }
+        ScrmMessagePreviewOperation.PullEmojiDetail -> {
+            // Manual test: a human may call pullEmojiDetail for a known emoji message ID.
+            baseRequest
+            "表情详情请求已组装，未发送"
+        }
+    }
+}

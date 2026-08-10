@@ -13,6 +13,7 @@ internal class MessageLongPressActions(
     private val onFavoriteChanged: (FloatingChatMessage, Boolean) -> Unit,
     private val onMultiSelectModeChanged: (Boolean) -> Unit,
     private val onQuoteMessage: (FloatingChatMessage) -> Unit,
+    private val onScrmOperationRequested: (FloatingChatMessage) -> Unit,
     private val onCloseLongPressMenu: () -> Unit
 ) {
     fun performLongPressAction(message: FloatingChatMessage, action: MessageLongPressAction) {
@@ -47,6 +48,11 @@ internal class MessageLongPressActions(
                 val nextReminder = reminderMessageIds[message.id] != true
                 reminderMessageIds[message.id] = nextReminder
                 onShowToast(if (nextReminder) "已提醒" else "已取消提醒")
+            }
+            MessageLongPressAction.ScrmOperations -> {
+                // UI test: long-press a message -> More. This only opens a request preview.
+                // Do not invoke a write task until a human explicitly performs the final test.
+                onScrmOperationRequested(message)
             }
         }
         onCloseLongPressMenu()

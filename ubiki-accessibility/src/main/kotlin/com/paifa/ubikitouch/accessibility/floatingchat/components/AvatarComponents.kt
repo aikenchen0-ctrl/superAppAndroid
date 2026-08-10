@@ -192,7 +192,7 @@ internal fun CompactAvatar(
                 text = avatarFallbackText(contact),
                 size = if (sizeDp > 30) 17.sp else 13.sp,
                 weight = FontWeight.Bold,
-                color = OverlayTokens.primaryText,
+                color = avatarFallbackTextColor(),
                 maxLines = 1,
                 textAlign = TextAlign.Center
             )
@@ -221,6 +221,9 @@ internal fun CompactAvatar(
 }
 
 internal fun avatarTextTagsVisible(): Boolean = false
+
+/** 浅亮 M3 初始头像底色使用深色文字，避免昵称首字在浅色块上失去对比度。 */
+internal fun avatarFallbackTextColor(): Color = Color(0xFF1A1C1E)
 
 internal enum class AvatarPressResult {
     None,

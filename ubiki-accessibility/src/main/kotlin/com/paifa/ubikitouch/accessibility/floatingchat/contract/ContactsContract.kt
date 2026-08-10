@@ -195,6 +195,7 @@ fun groupMemberAction(event: GroupMemberUiEvent): GroupMemberAction = when (even
 
 sealed interface GroupInfoUiEvent {
     data object BackRequested : GroupInfoUiEvent
+    data object ScrmManagementRequested : GroupInfoUiEvent
     data object AddMemberRequested : GroupInfoUiEvent
     data object RemoveMemberRequested : GroupInfoUiEvent
     data class MemberSelected(val memberId: String) : GroupInfoUiEvent
@@ -219,6 +220,7 @@ sealed interface GroupInfoUiEvent {
 
 sealed interface GroupInfoAction {
     data object Back : GroupInfoAction
+    data object OpenScrmManagement : GroupInfoAction
     data object InviteMembers : GroupInfoAction
     data object RemoveMembers : GroupInfoAction
     data class OpenMember(val memberId: String) : GroupInfoAction
@@ -243,6 +245,7 @@ sealed interface GroupInfoAction {
 
 fun groupInfoAction(event: GroupInfoUiEvent): GroupInfoAction = when (event) {
     GroupInfoUiEvent.BackRequested -> GroupInfoAction.Back
+    GroupInfoUiEvent.ScrmManagementRequested -> GroupInfoAction.OpenScrmManagement
     GroupInfoUiEvent.AddMemberRequested -> GroupInfoAction.InviteMembers
     GroupInfoUiEvent.RemoveMemberRequested -> GroupInfoAction.RemoveMembers
     is GroupInfoUiEvent.MemberSelected -> GroupInfoAction.OpenMember(event.memberId)

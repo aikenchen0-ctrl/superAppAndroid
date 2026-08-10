@@ -11,11 +11,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
@@ -44,20 +41,6 @@ internal fun ChatConnectorLayer(
     var layerBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
     val connectorNativePaint = remember { Paint(Paint.ANTI_ALIAS_FLAG) }
     val connectorTreeNativePaint = remember { Paint(Paint.ANTI_ALIAS_FLAG) }
-    val connectorStroke = remember {
-        Stroke(
-            width = imModuleConnectionLineStrokeWidthPx(),
-            cap = StrokeCap.Round,
-            join = StrokeJoin.Round
-        )
-    }
-    val connectorTreeStroke = remember {
-        Stroke(
-            width = imModuleConnectionLineStrokeWidthPx(),
-            cap = StrokeCap.Butt,
-            join = StrokeJoin.Round
-        )
-    }
     Canvas(
         modifier = modifier.onGloballyPositioned { coordinates ->
             layerBoundsInRoot = coordinates.boundsInRoot()
@@ -115,8 +98,7 @@ internal fun ChatConnectorLayer(
                 memberBounds = visibleGroupMemberBounds,
                 layerBounds = layerBounds,
                 visibleRootBounds = messageViewportBounds,
-                nativePaint = connectorTreeNativePaint,
-                stroke = connectorTreeStroke
+                nativePaint = connectorTreeNativePaint
             )
         }
 
@@ -175,7 +157,7 @@ internal fun ChatConnectorLayer(
                 avatarOffscreenEdge = avatarOffscreenEdge
             ) ?: return@forEach
 
-            drawChatConnectorTree(tree, connectorTreeNativePaint, connectorTreeStroke)
+            drawChatConnectorTree(tree, connectorTreeNativePaint)
         }
         directGroupMemberBranches.forEach { branch ->
             drawChatConnectorBranch(branch, connectorNativePaint)
@@ -210,25 +192,16 @@ private fun DrawScope.drawChatConnectorBranch(
             nativePaint
         )
     }
-    drawLine(
-        color = OverlayTokens.connectorLine,
-        start = branch.start,
-        end = branch.end,
-        strokeWidth = imModuleConnectionLineStrokeWidthPx(),
-        cap = StrokeCap.Round
-    )
 }
 
 private fun DrawScope.drawChatConnectorTree(
     tree: ChatConnectorTree,
-    nativePaint: Paint,
-    stroke: Stroke
+    nativePaint: Paint
 ) {
     val connectorPath = tree.toPath()
     drawIntoCanvas { canvas ->
         canvas.nativeCanvas.drawPath(connectorPath.asAndroidPath(), nativePaint)
     }
-    drawPath(path = connectorPath, color = OverlayTokens.connectorLine, style = stroke)
 }
 
 private fun DrawScope.drawGroupMemberConnectorTree(
@@ -236,8 +209,7 @@ private fun DrawScope.drawGroupMemberConnectorTree(
     memberBounds: List<Rect>,
     layerBounds: Rect,
     visibleRootBounds: Rect,
-    nativePaint: Paint,
-    stroke: Stroke
+    nativePaint: Paint
 ) {
     val groupAvatarBounds = connectorState.groupThreadAvatar ?: return
     if (memberBounds.isEmpty()) return
@@ -251,7 +223,7 @@ private fun DrawScope.drawGroupMemberConnectorTree(
         hasMessagesAbove = false,
         hasMessagesBelow = false
     ) ?: return
-    drawChatConnectorTree(tree, nativePaint, stroke)
+    drawChatConnectorTree(tree, nativePaint)
 }
 
 private fun ChatConnectorTree.toPath(): Path {

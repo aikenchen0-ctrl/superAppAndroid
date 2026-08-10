@@ -8,6 +8,7 @@ import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatConversation
 import com.paifa.ubikitouch.core.model.FloatingChatFileFormat
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
+import com.paifa.ubikitouch.core.model.FloatingChatAccessState
 import com.paifa.ubikitouch.core.model.FloatingChatMessagePresentation
 import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 import com.paifa.ubikitouch.core.model.FloatingChatSendState
@@ -22,6 +23,9 @@ import com.paifa.ubikitouch.accessibility.floatingchat.chat.*
 import com.paifa.ubikitouch.accessibility.floatingchat.components.avatarTextTagsVisible
 import com.paifa.ubikitouch.accessibility.floatingchat.components.avatarFallbackText
 import com.paifa.ubikitouch.accessibility.floatingchat.components.resolvedAvatarImageUri
+import com.paifa.ubikitouch.accessibility.floatingchat.components.floatingChatWorkspaceUsesVerticalSlots
+import com.paifa.ubikitouch.accessibility.floatingchat.components.floatingChatWorkspaceBodyUsesWeight
+import com.paifa.ubikitouch.accessibility.floatingchat.components.floatingChatWorkspaceHandlesInsetsAtBottomBoundary
 import com.paifa.ubikitouch.accessibility.floatingchat.contacts.*
 import com.paifa.ubikitouch.accessibility.floatingchat.group.*
 import com.paifa.ubikitouch.accessibility.floatingchat.input.*
@@ -58,6 +62,46 @@ import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class FloatingChatMessageUiContractTest {
+    @Test
+    fun chatWorkspaceKeepsToolbarBodyAndComposerInOneVerticalContainer() {
+        assertEquals(true, floatingChatWorkspaceUsesVerticalSlots())
+        assertEquals(true, floatingChatWorkspaceBodyUsesWeight())
+        assertEquals(true, floatingChatWorkspaceHandlesInsetsAtBottomBoundary())
+        assertEquals(0, chatContentTopInsetDp())
+    }
+
+    @Test
+    fun chatToolbarUsesSelectedConversationTitleBelowStatusBar() {
+        val alice = FloatingChatContact("alice", "Alice", "A", "", 0xFF1B9AAA)
+        val team = FloatingChatContact("team", "Team", "T", "", 0xFF5B7CFA)
+        val conversation = FloatingChatConversation(
+            peerName = "Messages",
+            accountName = "Account",
+            contacts = listOf(alice),
+            accountContacts = emptyList(),
+            messages = emptyList(),
+            toolActions = emptyList(),
+            groupContacts = listOf(team)
+        )
+
+        assertEquals(30, chatStatusBarHeightDp())
+        assertEquals(42, chatToolbarHeightDp())
+        assertEquals(0, chatContentTopInsetDp())
+        assertEquals(true, chatToolbarPaintsStatusBarBackground())
+        assertEquals(true, chatToolbarUsesOpaqueSurface())
+        assertEquals("Alice", chatToolbarTitle(conversation, ChatThreadSelection.Private("alice"), false))
+        assertEquals("Team", chatToolbarTitle(conversation, ChatThreadSelection.GroupChat("team"), false))
+        assertEquals("Messages", chatToolbarTitle(conversation, ChatThreadSelection.Group, true))
+        assertEquals(null, chatToolbarUnreadBadgeLabel(0))
+        assertEquals("8", chatToolbarUnreadBadgeLabel(8))
+        assertEquals("99+", chatToolbarUnreadBadgeLabel(100))
+        assertEquals(true, chatToolbarHasCloseButtonBeforeUnreadBadge())
+        assertEquals("未读：", chatToolbarUnreadPrefixLabel())
+        assertEquals(true, chatToolbarHasSearchButton())
+        assertEquals(listOf(1, 2, 1), chatToolbarWeightDistribution())
+        assertEquals(4, chatSearchPreviewResultCount())
+    }
+
     @Test
     fun avatarFallbackUsesNicknameFirstCharacterWhenRemoteImageIsMissing() {
         val contact = FloatingChatContact(
@@ -170,8 +214,8 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
-    fun messageListLeavesEnoughBottomClearanceForFloatingInputBar() {
-        assertEquals(184, messageListBottomClearanceDp())
+    fun messageListKeepsOnlyVisualSpacingAboveMeasuredInputContainer() {
+        assertEquals(22, messageListBottomClearanceDp())
         assertEquals(true, messageListUsesKeyboardInsets())
         assertEquals(true, messageListAutoScrollsDuringInput())
         assertEquals(true, messageListAutoScrollsOnInputFocus())
@@ -1279,7 +1323,8 @@ class FloatingChatMessageUiContractTest {
         assertEquals(false, floatingChatBlankAreaClickCollapsesOverlay())
         assertEquals(true, floatingChatBackKeyCollapsesOverlay())
         assertEquals(true, floatingChatBlankAreaClickHidesKeyboard())
-        assertEquals(false, floatingChatBlankAreaClickHidesKeyboardWhenInputNotFocused())
+        assertEquals(true, floatingChatBlankAreaClickHidesKeyboardWhenInputNotFocused())
+        assertEquals(true, floatingChatBlankAreaClickResetsBottomPanel())
     }
 
     @Test
@@ -1323,23 +1368,27 @@ class FloatingChatMessageUiContractTest {
 
     @Test
     fun textChatBubblesReuseImModuleDesignTokens() {
-        assertEquals(0x40FFFFFF, imModuleSelfBubbleColorArgb())
-        assertEquals(0x00000000, imModuleOtherBubbleColorArgb())
-        assertEquals(0x4DFFFFFF, imModuleSelfBubbleBorderColorArgb())
-        assertEquals(0x80FFFFFF.toInt(), imModuleOtherBubbleBorderColorArgb())
-        assertEquals(0xF8F8FCFF.toInt(), imModuleBubbleTextColorArgb())
-        assertEquals(0xE6000000.toInt(), imModuleBubbleShadowColorArgb())
-        assertEquals(true, imModuleBubbleUsesDemoGlassEffect())
-        assertEquals(20, imModuleSelfBubbleBackdropBlurDp())
-        assertEquals(8, imModuleSelfBubbleShadowOffsetYDp())
-        assertEquals(32, imModuleSelfBubbleShadowBlurDp())
-        assertEquals(true, imModuleOtherBubbleIsTransparentWithHalfBorder())
-        assertEquals(true, cardMessageTextUsesImModuleShadow())
-        assertEquals(true, resourceUrlTextUsesImModuleShadow())
-        assertEquals(true, chipTextUsesImModuleShadow())
-        assertEquals(true, inlineCardTextUsesImModuleShadow())
+        assertEquals(0xFF95EC69.toInt(), imModuleSelfBubbleColorArgb())
+        assertEquals(0xFFF7F7F7.toInt(), imModuleOtherBubbleColorArgb())
+        assertEquals(0x18000000, imModuleSelfBubbleBorderColorArgb())
+        assertEquals(0x14000000, imModuleOtherBubbleBorderColorArgb())
+        assertEquals(0xFF171717.toInt(), imModuleBubbleTextColorArgb())
+        assertEquals(0x00000000, imModuleBubbleShadowColorArgb())
+        assertEquals(false, imModuleBubbleUsesDemoGlassEffect())
+        assertEquals(0, imModuleSelfBubbleBackdropBlurDp())
+        assertEquals(0, imModuleSelfBubbleShadowOffsetYDp())
+        assertEquals(0, imModuleSelfBubbleShadowBlurDp())
+        assertEquals(false, imModuleOtherBubbleIsTransparentWithHalfBorder())
+        assertEquals(false, cardMessageTextUsesImModuleShadow())
+        assertEquals(false, resourceUrlTextUsesImModuleShadow())
+        assertEquals(false, chipTextUsesImModuleShadow())
+        assertEquals(false, inlineCardTextUsesImModuleShadow())
+        assertEquals("你好，晚点联系", chatBubbleDisplayText("{\"content\":\"你好，晚点联系\",\"senderWxid\":\"wxid_demo\"}"))
+        assertEquals("消息", chatBubbleDisplayText("{\"senderWxid\":\"wxid_demo\"}"))
+        assertEquals("林晓晓", chatBubbleDisplaySenderName(false, "wxid_demo", "林晓晓"))
+        assertEquals("我", chatBubbleDisplaySenderName(true, "wxid_account", null))
         assertEquals(true, systemPromptMessageUsesTextOnly())
-        assertEquals(true, systemPromptTextUsesShadow())
+        assertEquals(false, systemPromptTextUsesShadow())
         assertEquals(true, messageTypeUsesImModuleBubble(FloatingChatMessageType.Text))
         assertEquals(true, messageTypeUsesImModuleBubble(FloatingChatMessageType.MixedText))
         assertEquals(true, messageTypeUsesImModuleBubble(FloatingChatMessageType.Quote))
@@ -1352,6 +1401,82 @@ class FloatingChatMessageUiContractTest {
         assertEquals(true, messageTypeUsesImModuleBubble(FloatingChatMessageType.InlineLocation))
         assertEquals(false, messageTypeUsesImModuleBubble(FloatingChatMessageType.ImageThumbnail))
         assertEquals(false, messageTypeUsesImModuleBubble(FloatingChatMessageType.VideoPreview))
+    }
+
+    @Test
+    fun senderNicknameOnlyAppearsForOtherPeopleInGroupChats() {
+        assertEquals(false, shouldShowMessageSenderNickname(isGroupChat = false, fromMe = false, isSystem = false))
+        assertEquals(false, shouldShowMessageSenderNickname(isGroupChat = false, fromMe = true, isSystem = false))
+        assertEquals(true, shouldShowMessageSenderNickname(isGroupChat = true, fromMe = false, isSystem = false))
+        assertEquals(false, shouldShowMessageSenderNickname(isGroupChat = true, fromMe = true, isSystem = false))
+        assertEquals(false, shouldShowMessageSenderNickname(isGroupChat = true, fromMe = false, isSystem = true))
+    }
+
+    @Test
+    fun messageDisplayGroupsMatchMessageSemantics() {
+        val text = FloatingChatMessage("text", FloatingChatMessageType.Text, "你好", false, "张三", "10:00")
+        val image = FloatingChatMessage(
+            "image", FloatingChatMessageType.ImageThumbnail, "图片", false, "张三", "10:01",
+            thumbnailUrl = "content://media/image/1"
+        )
+        val file = FloatingChatMessage("file", FloatingChatMessageType.FilePreview, "方案.pdf", false, "张三", "10:02")
+        val system = FloatingChatMessage(
+            "system", FloatingChatMessageType.Text, "群公告", false, "系统", "10:03",
+            presentation = FloatingChatMessagePresentation.System
+        )
+
+        assertEquals(MessageDisplayGroup.Bubble, messageDisplayGroupFor(text))
+        assertEquals(MessageDisplayGroup.Media, messageDisplayGroupFor(image))
+        assertEquals(MessageDisplayGroup.Card, messageDisplayGroupFor(file))
+        assertEquals(MessageDisplayGroup.System, messageDisplayGroupFor(system))
+    }
+
+    @Test
+    fun unavailableMessagesExposeClearLocalStates() {
+        val accessPending = FloatingChatMessage(
+            "pending", FloatingChatMessageType.ImageThumbnail, "图片", false, "张三", "10:00",
+            thumbnailUrl = "content://media/image/2",
+            accessState = FloatingChatAccessState.NeedsApply
+        )
+        val expiredMedia = FloatingChatMessage(
+            "expired", FloatingChatMessageType.VideoPreview, "", false, "张三", "10:01"
+        )
+        val missingContent = FloatingChatMessage(
+            "missing", FloatingChatMessageType.Text, "", false, "张三", "10:02"
+        )
+
+        assertEquals(MessageUnavailableState.AccessPending, messageUnavailableStateFor(accessPending))
+        assertEquals(MessageUnavailableState.MediaExpired, messageUnavailableStateFor(expiredMedia))
+        assertEquals(MessageUnavailableState.ContentUnavailable, messageUnavailableStateFor(missingContent))
+    }
+
+    @Test
+    fun unavailableMessagesUseCompactNonPreviewableCards() {
+        assertEquals("媒体已失效", unavailableMessageTitle(MessageUnavailableState.MediaExpired))
+        assertEquals(false, unavailableMessageCanPreview(MessageUnavailableState.MediaExpired))
+        assertEquals(true, unavailableMessageUsesCompactCard())
+    }
+
+    @Test
+    fun messageDisplayGroupsUseExpectedChrome() {
+        assertEquals(true, messageDisplayGroupUsesBubbleChrome(MessageDisplayGroup.Bubble))
+        assertEquals(false, messageDisplayGroupUsesBubbleChrome(MessageDisplayGroup.Card))
+        assertEquals(false, messageDisplayGroupUsesBubbleChrome(MessageDisplayGroup.Media))
+        assertEquals(false, messageDisplayGroupUsesBubbleChrome(MessageDisplayGroup.System))
+        assertEquals(false, messageDisplayGroupUsesBubbleChrome(MessageDisplayGroup.Unavailable))
+    }
+
+    @Test
+    fun leftRailFollowTextUsesOpaqueTonesDerivedFromAvatarColor() {
+        val blueGray = leftRailFollowTextColors(0xFF7B97A4)
+        val green = leftRailFollowTextColors(0xFF5FA77B)
+
+        assertEquals(1f, blueGray.name.alpha)
+        assertEquals(1f, blueGray.message.alpha)
+        assertEquals(1f, blueGray.time.alpha)
+        assertFalse(blueGray.name == blueGray.message)
+        assertFalse(blueGray.message == blueGray.time)
+        assertFalse(blueGray.name == green.name)
     }
 
     @Test
@@ -1637,8 +1762,8 @@ class FloatingChatMessageUiContractTest {
         assertEquals(280, leftRailFollowTextWidthDp())
         assertEquals(322, leftRailFollowTextLayerWidthDp())
         assertEquals(56, leftRailTouchableWidthDp())
-        assertEquals(8, railScreenEdgeInsetPx())
-        assertEquals(8, leftRailAvatarScreenEdgeInsetPx())
+        assertEquals(12, railScreenEdgeInsetPx())
+        assertEquals(12, leftRailAvatarScreenEdgeInsetPx())
         assertEquals(0, leftRailFollowTextInnerPaddingDp())
         assertEquals(true, leftRailFollowTextStartsAtAvatarRightEdge())
         assertEquals(true, leftRailFollowTextIncludesScreenEdgeInset())
@@ -1647,6 +1772,7 @@ class FloatingChatMessageUiContractTest {
         assertEquals(true, leftRailFollowTextYMatchesAvatarBounds())
         assertEquals(true, leftRailFollowTextBoundsUseSingleInvalidationVersion())
         assertEquals(true, leftRailFollowTextUsesCompactTypography())
+        assertEquals(13f, leftRailFollowTextMessageSizeSp())
         assertEquals(false, leftRailFollowTextUsesBackgroundHalo())
         assertEquals(294, leftRailScrollableBottomPaddingDp(itemCount = 14, viewportHeightDp = 800))
         assertEquals(726, leftRailScrollableBottomPaddingDp(itemCount = 5, viewportHeightDp = 800))
@@ -1713,6 +1839,17 @@ class FloatingChatMessageUiContractTest {
             )
         )
         assertEquals(
+            RailPinnedAvatarEdge.Top,
+            rightRailPinnedSelectedAccountEdge(
+                accountIds = listOf("a", "b", "c"),
+                selectedAccountId = "c",
+                visibleItems = listOf(RightRailVisibleAccountItem(index = 1, offset = 48, size = 42)),
+                viewportHeightPx = 120f,
+                fallbackStepPx = 48f,
+                reverseLayout = true
+            )
+        )
+        assertEquals(
             null,
             leftRailPinnedSelectedAvatarEdge(
                 sessionIds = listOf("a", "b", "c"),
@@ -1723,7 +1860,7 @@ class FloatingChatMessageUiContractTest {
             )
         )
         assertEquals(true, leftRailFollowTextIncludesNameLastMessageAndTime())
-        assertEquals(true, leftRailFollowTextUsesDarkTextShadow())
+        assertEquals(false, leftRailFollowTextUsesDarkTextShadow())
         assertEquals(conversation.contacts.first { contact -> contact.id == "li-si" }.name, info.name)
         assertEquals(
             visibleMessagesForThread(
@@ -1967,28 +2104,28 @@ class FloatingChatMessageUiContractTest {
 
     @Test
     fun bottomInputBarMatchesFloatingCapsuleControls() {
-        assertEquals(52, bottomInputBarMinHeightDp())
-        assertEquals(136, bottomInputBarMaxHeightDp())
-        assertEquals(34, bottomInputBarBottomPaddingDp())
-        assertEquals(60, bottomInputBarHorizontalClearanceDp())
+        assertEquals(84, bottomInputBarMinHeightDp())
+        assertEquals(174, bottomInputBarMaxHeightDp())
+        assertEquals(30, bottomInputBarBottomPaddingDp())
+        assertEquals(12, bottomInputBarHorizontalClearanceDp())
         assertEquals(true, bottomInputBarUsesKeyboardInsets())
         assertEquals(true, bottomInputControlsUseCenterAlignment())
         assertEquals(true, bottomInputBarUsesWechatStyle())
         assertEquals(true, bottomInputBarReservesBottomGestureBarSpace())
         assertEquals(true, bottomInputUsesCustomBasicTextField())
-        assertEquals(11, bottomInputTextSizeSp())
-        assertEquals(11, bottomInputPlaceholderTextSizeSp())
-        assertEquals(36, bottomInputIconButtonSizeDp())
-        assertEquals(20, bottomInputIconSizeDp())
+        assertEquals(13, bottomInputTextSizeSp())
+        assertEquals(13, bottomInputPlaceholderTextSizeSp())
+        assertEquals(40, bottomInputIconButtonSizeDp())
+        assertEquals(24, bottomInputIconSizeDp())
         assertEquals(46, leftRailAvatarSizeDp())
         assertEquals(46, rightRailAvatarSizeDp())
         assertEquals(1, bottomInputMinLines())
         assertEquals(4, bottomInputMaxLines())
         assertEquals(
             listOf(
-                BottomInputAction.Voice,
-                BottomInputAction.Text,
                 BottomInputAction.Emoji,
+                BottomInputAction.Text,
+                BottomInputAction.Voice,
                 BottomInputAction.More,
                 BottomInputAction.Assistant
             ),
@@ -2000,18 +2137,12 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
-    fun chatBodyReservesMeasuredBottomInputHeightForBothRails() {
-        assertEquals(86, chatBodyBottomReservedHeightDp(bottomInputContainerHeightDp = 52))
-        assertEquals(170, chatBodyBottomReservedHeightDp(bottomInputContainerHeightDp = 136))
-    }
-
-    @Test
-    fun moreInputButtonIsPlacedBetweenEmojiAndAssistantAndTogglesMorePanel() {
+    fun bottomInputPutsEmojiBeforeTheTextFieldAndTogglesMorePanel() {
         assertEquals(
             listOf(
-                BottomInputAction.Voice,
-                BottomInputAction.Text,
                 BottomInputAction.Emoji,
+                BottomInputAction.Text,
+                BottomInputAction.Voice,
                 BottomInputAction.More,
                 BottomInputAction.Assistant
             ),
@@ -2505,7 +2636,7 @@ class FloatingChatMessageUiContractTest {
             hasMessagesBelow = false
         )
 
-        assertEquals(42f, fallbackBounds.right)
+        assertEquals(46f, fallbackBounds.right)
         assertEquals(88f, tree?.trunkStart?.x)
         assertEquals(120f, tree?.messageBranches?.single()?.end?.x)
         assertEquals(true, homeUnreadOverviewUsesFallbackConnectorSourceWhenRailAvatarIsOffscreen())
@@ -2528,12 +2659,12 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
-    fun bottomEmojiAndVoicePanelsUseRealPlatformComponents() {
-        assertEquals(true, bottomEmojiPanelUsesAndroidXEmojiPicker())
-        assertEquals("androidx.emoji2:emoji2-emojipicker:1.6.0", bottomEmojiPickerDependencyCoordinate())
+    fun bottomEmojiAndVoicePanelsUseLightweightComponents() {
+        assertEquals(true, bottomEmojiPanelUsesLightweightGrid())
         assertEquals(true, bottomEmojiPanelKeepsPickerOpenAfterSelection())
         assertEquals(300, bottomEmojiPanelHeightDp())
         assertEquals(true, bottomFloatingPanelUsesDarkText())
+        assertEquals(true, bottomComposerDrawersUseOpaqueInputBarSurface())
         assertEquals(true, voiceInputRecordsAudioMessage())
         assertEquals(true, voiceInputSendsRecordedAudio())
         assertEquals(true, voiceMessageSupportsPlayback())
@@ -2840,8 +2971,8 @@ class FloatingChatMessageUiContractTest {
         assertEquals(0.67f, rightRailAccountWeightForAccountAreaDrag())
         assertEquals(0.24f, rightRailAccountWeightForToolAreaDrag())
         assertEquals(58, rightRailWidthDp())
-        assertEquals(8, rightRailAvatarScreenEdgeInsetPx())
-        assertEquals(8, rightRailToolIconScreenEdgeInsetPx())
+        assertEquals(12, rightRailAvatarScreenEdgeInsetPx())
+        assertEquals(12, rightRailToolIconScreenEdgeInsetPx())
         assertEquals(42, rightRailToolButtonWidthDp())
         assertEquals(42, rightRailToolButtonHeightDp())
         assertEquals(

@@ -243,7 +243,8 @@ internal fun RightCoordinateRail(
                         )
                     },
                     viewportHeightPx = viewportHeight,
-                    fallbackStepPx = accountVirtualFallbackStepPx
+                    fallbackStepPx = accountVirtualFallbackStepPx,
+                    reverseLayout = true
                 )
             }
         }
@@ -271,7 +272,7 @@ internal fun RightCoordinateRail(
                 accountIds = accountIds,
                 visibleItems = visibleItems,
                 viewport = viewport,
-                fallbackStepPx = accountVirtualFallbackStepPx
+                fallbackStepPx = -accountVirtualFallbackStepPx
             )
         }
     }
