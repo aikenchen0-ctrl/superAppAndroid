@@ -57,6 +57,11 @@ internal interface ScrmReadApi {
     ): ScrmQuickStart
 
     fun getCapabilities(deviceUuid: String, weChatId: String): ScrmCapabilities
+    fun getChatBootstrap(
+        deviceUuid: String,
+        weChatId: String,
+        conversationLimit: Int = 300
+    ): ScrmChatBootstrap
 }
 
 internal interface ScrmTaskApi {
@@ -184,6 +189,24 @@ internal class ScrmApiClient(
             query = linkedMapOf(
                 "deviceUuid" to deviceUuid,
                 "weChatId" to weChatId
+            )
+        )
+    }
+
+    override fun getChatBootstrap(
+        deviceUuid: String,
+        weChatId: String,
+        conversationLimit: Int
+    ): ScrmChatBootstrap {
+        require(deviceUuid.isNotBlank()) { "deviceUuid cannot be blank" }
+        require(weChatId.isNotBlank()) { "weChatId cannot be blank" }
+        require(conversationLimit in 1..1_000) { "conversationLimit must be between 1 and 1000" }
+        return get(
+            path = "chat/bootstrap",
+            query = linkedMapOf(
+                "deviceUuid" to deviceUuid,
+                "weChatId" to weChatId,
+                "conversationLimit" to conversationLimit.toString()
             )
         )
     }

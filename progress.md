@@ -22,3 +22,4 @@
 - 已完成头像 fallback：主悬浮聊天头像优先显示远程图片，否则显示昵称首字，空昵称显示 `?`；单元测试已通过。
 - 消息显示排查：`scrmFloatingChatConversation` 当前明确将 `messages` 设为空列表，Android 尚未接入 iOS 对应的 `GET /chat/bootstrap`、`GET /chat/history`、`GET /messages/changes`；因此真实用户消息暂时不会进入悬浮聊天，未使用 mock 或假消息修饰该状态。
 - 本轮 UI/缓存：底栏背景改为全屏宽度、控件贴容器顶部，内容左右 60dp 留白；头像缓存改为异步持久化到应用专属 `Android/data/<包名>/files/floating-chat-avatars`，模块契约测试通过。
+- 已完成 `GET /chat/bootstrap`：新增 Android 只读请求契约与会话摘要模型，fixture 单测验证请求参数和响应解析通过；待真机确认真实会话摘要。该阶段不加载消息正文，真实消息显示仍需后续 `GET /chat/history`。

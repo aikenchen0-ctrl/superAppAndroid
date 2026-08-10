@@ -19,6 +19,51 @@ class ScrmApiClientTest {
     )
 
     @Test
+    fun getChatBootstrapParsesConversationSummaries() {
+        val transport = RecordingTransport(
+            ok(
+                """
+                {
+                  "accountId": "account-1",
+                  "deviceUuid": "device-1",
+                  "baselineSequence": 42,
+                  "conversations": [
+                    {
+                      "id": 7,
+                      "conversationWxid": "wxid_friend",
+                      "conversationType": 1,
+                      "displayName": "朋友",
+                      "displayAvatar": "https://cdn.example/avatar.png",
+                      "unreadCount": 3,
+                      "messageCount": 18,
+                      "lastMessageContent": "你好",
+                      "lastMessageTime": "2026-08-10T10:00:00Z",
+                      "updatedAt": "2026-08-10T10:01:00Z"
+                    }
+                  ]
+                }
+                """.trimIndent()
+            )
+        )
+
+        val result = ScrmApiClient(config, transport).getChatBootstrap(
+            deviceUuid = "device-1",
+            weChatId = "wxid_account",
+            conversationLimit = 100
+        )
+
+        assertEquals("account-1", result.accountId)
+        assertEquals(42L, result.baselineSequence)
+        assertEquals("wxid_friend", result.conversations.single().conversationWxid)
+        assertEquals("https://cdn.example/avatar.png", result.conversations.single().displayAvatar)
+        assertEquals(3, result.conversations.single().unreadCount)
+        assertEquals(
+            "https://api.example.com/openapi/v1/chat/bootstrap?deviceUuid=device-1&weChatId=wxid_account&conversationLimit=100",
+            transport.lastRequest?.url
+        )
+    }
+
+    @Test
     fun getMeInjectsApiKeyAndParsesIdentity() {
         val transport = RecordingTransport(
             ScrmHttpResponse(

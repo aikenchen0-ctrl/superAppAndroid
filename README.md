@@ -1,72 +1,48 @@
 # ubikiTouch
 
-ubikiTouch is an Android accessibility-based edge gesture SDK prototype. It provides transparent left and right edge bars, recognizes common edge gestures, and maps them to configured system actions.
+ubikiTouch 是一个基于 Android 无障碍服务的边缘手势与悬浮交互项目。它通过屏幕边缘的透明触控区域识别手势，并将手势映射为返回、主页、通知、截图、音量控制或启动应用等系统操作。
 
-## Current Status
+## 主要功能
 
-- Multi-module Android project is in place.
-- Minimal `AccessibilityService` is implemented.
-- Left and right `TYPE_ACCESSIBILITY_OVERLAY` edge bars are implemented.
-- Gesture recognition and action mapping are implemented.
-- Edge size, indicator, haptic feedback, and gesture-action settings are configurable in the sample app.
-- Gesture actions support system actions and manual `LaunchApp` package bindings.
-- App blocklist is implemented through foreground package tracking.
-- Optional landscape auto-disable is implemented.
-- Optional keyboard-visible auto-disable is implemented through accessibility window tracking.
-- Quick Settings tile can pause or resume edge bars without opening the app.
-- Debug APK and debug androidTest APK build successfully.
-- JVM tests and `lintDebug` pass.
+- 左右边缘及底部手势识别，可配置触控区域、灵敏度和手势动作。
+- 基于 `AccessibilityService` 的系统操作执行。
+- 悬浮聊天窗口，支持相机、媒体、文档、定位和语音等交互能力。
+- 手势暂停、应用黑名单、横屏禁用、键盘显示时禁用等控制选项。
+- 通过快捷设置磁贴快速暂停或恢复边缘手势。
+- 集成 ADB 核心模块和 BlinkVoice 视觉 SDK。
 
-## Modules
+## 项目结构
 
-- `ubiki-core`: pure Kotlin models and gesture classification.
-- `ubiki-overlay`: transparent edge bar view and touch event detection.
-- `ubiki-accessibility`: accessibility service, action executor, preferences, and SDK facade.
-- `app`: sample and debug app.
+- `app`：示例应用及主要界面。
+- `ubiki-core`：手势模型与分类逻辑。
+- `ubiki-overlay`：透明边缘触控层与触摸事件处理。
+- `ubiki-accessibility`：无障碍服务、动作执行和配置管理。
+- `adbcore`：ADB 通信、配对及保活能力。
+- `blinkvoice-visual-sdk`：视觉与语音相关 SDK 模块。
+- `benchmark`：性能基准测试。
 
-## Build
+## 环境与构建
+
+需要 Android Studio、Android SDK 36、JDK 17。执行以下命令构建并运行检查：
 
 ```powershell
 $env:JAVA_HOME='C:\Program Files\Android\Android Studio\jbr'
 .\gradlew.bat test lintDebug assembleDebug :app:assembleDebugAndroidTest --no-daemon
 ```
 
-Debug APK output:
+Debug APK 输出路径：
 
 ```text
 app/build/outputs/apk/debug/app-debug.apk
 ```
 
-## SDK Example
+## 使用注意
 
-```kotlin
-val ubikiTouch = UbikiTouch.create(context)
-ubikiTouch.globalEnabled = true
-ubikiTouch.setAction(
-    side = EdgeSide.LEFT,
-    gestureType = GestureType.PULL_INWARD,
-    action = GestureAction.Back
-)
-ubikiTouch.setAction(
-    side = EdgeSide.LEFT,
-    gestureType = GestureType.PULL_INWARD_HOLD,
-    action = GestureAction.Home
-)
-ubikiTouch.addBlockedPackage("com.example.game")
-ubikiTouch.pauseFor(5L * 60L * 1000L)
-ubikiTouch.resumeNow()
-```
+首次使用需要在系统设置中手动启用本项目的无障碍服务，并根据系统策略允许应用在后台运行或加入电池优化白名单。项目不能也不会自动获取无障碍权限。
 
-The host app must still declare the accessibility service in its manifest and the user must manually enable it. The SDK cannot and should not automatically obtain accessibility permission. Keyboard-visible auto-disable requires interactive accessibility window tracking.
+## 相关文档
 
-## ADB Testing
-
-See [ADB_TESTING.md](docs/ADB_TESTING.md).
-
-## SDK Integration
-
-See [SDK_INTEGRATION.md](docs/SDK_INTEGRATION.md).
-
-## EdgeControl Reference Boundary
-
-See [EDGE_CONTROL_REFERENCE.md](docs/EDGE_CONTROL_REFERENCE.md).
+- [ADB 测试说明](docs/ADB_TESTING.md)
+- [SDK 集成说明](docs/SDK_INTEGRATION.md)
+- [悬浮聊天组件 API](docs/FLOATING_CHAT_COMPONENT_API.md)
+- [边缘控制参考](docs/EDGE_CONTROL_REFERENCE.md)

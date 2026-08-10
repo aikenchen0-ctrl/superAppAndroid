@@ -252,6 +252,12 @@ class ScrmSettingsServiceTest {
 
                 override fun getCapabilities(deviceUuid: String, weChatId: String): ScrmCapabilities =
                     error("not reached")
+
+                override fun getChatBootstrap(
+                    deviceUuid: String,
+                    weChatId: String,
+                    conversationLimit: Int
+                ): ScrmChatBootstrap = error("not reached")
             }
         }
 
@@ -375,6 +381,12 @@ class ScrmSettingsServiceTest {
             )
         }
 
+        override fun getChatBootstrap(
+            deviceUuid: String,
+            weChatId: String,
+            conversationLimit: Int
+        ): ScrmChatBootstrap = ScrmChatBootstrap()
+
         private fun device(uuid: String, online: Boolean): ScrmDevice {
             return ScrmDevice(
                 uuid = uuid,
@@ -414,6 +426,12 @@ class ScrmSettingsServiceTest {
 
         override fun getCapabilities(deviceUuid: String, weChatId: String): ScrmCapabilities =
             error("not reached")
+
+        override fun getChatBootstrap(
+            deviceUuid: String,
+            weChatId: String,
+            conversationLimit: Int
+        ): ScrmChatBootstrap = error("not reached")
     }
 
     private class FakeAdminApi(

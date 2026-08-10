@@ -626,6 +626,31 @@ internal data class ScrmChatRoomMemberPage(
     val pageSize: Int = 200
 )
 
+/** Read-only SCRM chat bootstrap; it mirrors the iOS conversation summary boundary. */
+@Serializable
+internal data class ScrmChatBootstrap(
+    val accountId: String? = null,
+    val deviceUuid: String? = null,
+    val baselineSequence: Long = 0L,
+    val conversations: List<ScrmChatConversationSummary> = emptyList()
+)
+
+@Serializable
+internal data class ScrmChatConversationSummary(
+    val id: Long = 0L,
+    val conversationWxid: String? = null,
+    val conversationType: Int = 0,
+    val displayName: String? = null,
+    val displayAvatar: String? = null,
+    val unreadCount: Int = 0,
+    val messageCount: Int = 0,
+    val isPinned: Int = 0,
+    val isMuted: Int = 0,
+    val lastMessageContent: String? = null,
+    val lastMessageTime: String? = null,
+    val updatedAt: String? = null
+)
+
 @Serializable
 internal data class ScrmContact(
     val id: Int,

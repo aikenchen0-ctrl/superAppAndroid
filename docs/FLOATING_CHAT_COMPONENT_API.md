@@ -44,7 +44,7 @@ The Android host currently reads devices, WeChat accounts, contacts, chatrooms a
 | Stage | Endpoint | Consumer | Status | Test boundary |
 |---|---|---|---|---|
 | 0 | `GET /devices`, `/wechat-accounts`, `/contacts`, `/chatrooms`, `/chatrooms/{id}/members` | account rail and avatars | Android code exists; real-device verification pending | Read only |
-| 1 | `GET /chat/bootstrap` | conversation list, unread summaries and avatar source | Planned next | Fixture/contract test, then real device |
+| 1 | `GET /chat/bootstrap` | conversation list, unread summaries and avatar source | Android contract and fixture test complete; real-device verification pending | Read only; verify request query and response summaries |
 | 2 | `GET /chat/history` | selected conversation messages | Planned | Cursor and backend-ID fallback tests |
 | 3 | `GET /messages/changes` | incremental messages and unread updates | Planned | Sequence cursor and `hasMore` tests |
 

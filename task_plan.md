@@ -10,12 +10,13 @@
 - [completed] 2. 为根因写失败测试，实施最小修复并构建 Debug APK。
 - [completed] 3. 更新 `完成进度.md`、`任务计划.md`、功能对照文档中的头像状态与证据。
 - [in_progress] 4. 已更新 Debug 凭据并交付含 `UbikiAvatar` 日志的 APK，等待真机重新认证并收集接口和图片链路证据。
+- [completed] 5. 完成 `GET /chat/bootstrap` 的 Android 只读契约、会话摘要模型与 fixture 单测；待真机确认真实接口数据。
 
 ## 下一阶段规划（仅悬浮聊天 SCRM）
 
 1. **头像链路真机验收（当前）**：只读验证认证、账号/联系人/群/群成员头像计数与图片下载；不调用发送消息、建群、加好友等写接口。
-2. **会话引导读取（下一项）**：对齐 iOS `OpenAPIChatSynchronizer.loadBootstrap`，新增 Android `GET /chat/bootstrap` 读取契约、分页/数量边界和会话摘要映射；先用 fixture/契约测试，再由用户真机验收。
-3. **会话历史读取**：对齐 iOS `loadHistory`，实现 `GET /chat/history` 的游标分页、会话 wxid/后端 ID 路由和消息类型解析；只读测试。
+2. **会话引导读取（待真机验收）**：已对齐 iOS `OpenAPIChatSynchronizer.loadBootstrap`，新增 Android `GET /chat/bootstrap` 读取契约、数量边界和会话摘要解析；fixture/契约测试已通过，等待用户真机验收。
+3. **会话历史读取（下一项）**：对齐 iOS `loadHistory`，实现 `GET /chat/history` 的游标分页、会话 wxid/后端 ID 路由和消息类型解析；只读测试。
 4. **增量未读同步**：对齐 iOS `loadChanges`，实现 `GET /messages/changes` 的序列游标、hasMore 和未读数更新；只读测试。
 5. **人工发送接口验收**：发送文本、图片、语音等接口只整理请求/响应和测试步骤，由人工在 Web 调试面板与测试手机执行，Android 不自动触发。
 
