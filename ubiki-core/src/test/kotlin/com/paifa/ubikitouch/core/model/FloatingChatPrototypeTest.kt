@@ -97,7 +97,26 @@ class FloatingChatPrototypeTest {
                 FloatingChatMessageType.VideoPreview,
                 FloatingChatMessageType.Voice,
                 FloatingChatMessageType.InlineContact,
-                FloatingChatMessageType.InlineLocation
+                FloatingChatMessageType.InlineLocation,
+                FloatingChatMessageType.Emoji,
+                FloatingChatMessageType.StickerGif,
+                FloatingChatMessageType.CapturedPhoto,
+                FloatingChatMessageType.LiveLocation,
+                FloatingChatMessageType.GroupInvite,
+                FloatingChatMessageType.WebLink,
+                FloatingChatMessageType.Article,
+                FloatingChatMessageType.ChannelsVideo,
+                FloatingChatMessageType.ChannelsLive,
+                FloatingChatMessageType.Music,
+                FloatingChatMessageType.Favorite,
+                FloatingChatMessageType.RedPacket,
+                FloatingChatMessageType.Transfer,
+                FloatingChatMessageType.SplitBill,
+                FloatingChatMessageType.Coupon,
+                FloatingChatMessageType.VoiceCall,
+                FloatingChatMessageType.VideoCall,
+                FloatingChatMessageType.Relay,
+                FloatingChatMessageType.GroupNotice
             ),
             FloatingChatMessageType.entries.toSet()
         )
@@ -105,7 +124,7 @@ class FloatingChatPrototypeTest {
             FloatingChatMessageType.entries.toSet(),
             conversation.messages.map { it.type }.toSet()
         )
-        assertEquals(13, FloatingChatMessageType.entries.size)
+        assertEquals(32, FloatingChatMessageType.entries.size)
         assertTrue(conversation.messages.size >= FloatingChatMessageType.entries.size)
     }
 

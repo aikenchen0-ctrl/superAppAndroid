@@ -587,6 +587,7 @@ private fun FloatingChatMessage.aiPromptContent(): String {
             ?.joinToString(separator = "") { token -> token.text }
             ?.ifBlank { text }
             ?: text
+        else -> "[${type.label}] ${detail ?: text}"
     }.replace(Regex("\\s+"), " ").trim()
 }
 

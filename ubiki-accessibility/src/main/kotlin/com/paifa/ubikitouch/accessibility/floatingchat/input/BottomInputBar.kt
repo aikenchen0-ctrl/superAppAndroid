@@ -65,7 +65,7 @@ internal const val BottomInputBarHorizontalClearanceDp = 12
 internal const val BottomGestureTouchClearanceDp = 30
 internal const val BottomEmojiPanelHeightDp = 300
 
-internal const val BottomInputIconButtonSizeDp = 40
+internal const val BottomInputIconButtonSizeDp = 44
 internal const val BottomInputIconSizeDp = 24
 private const val BottomInputFieldMinHeightDp = 46
 private const val BottomInputFieldMaxHeightDp = 128

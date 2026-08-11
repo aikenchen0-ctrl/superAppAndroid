@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.ManageAccounts
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Star
@@ -76,6 +77,7 @@ internal fun MoreToolPanel(
             PanelTool(Icons.Filled.CardGiftcard, "\u5c0f\u7a0b\u5e8f\u5361\u7247", BottomPanelMode.ScrmWeAppCard),
             PanelTool(Icons.Filled.Contacts, "\u5361\u7247\u6a21\u677f", BottomPanelMode.ScrmCardTemplates),
             PanelTool(Icons.Filled.Textsms, "\u6279\u91cf\u53d1\u9001", BottomPanelMode.ScrmBatchSend),
+            PanelTool(Icons.Filled.ManageAccounts, "SCRM\u8fd0\u8425", BottomPanelMode.ScrmOperations),
             PanelTool(Icons.Filled.Contacts, "\u540d\u7247", BottomPanelMode.Card),
             PanelTool(Icons.Filled.Collections, "\u670b\u53cb\u5708", BottomPanelMode.Moments),
             PanelTool(Icons.Filled.Collections, "\u7d20\u6750", BottomPanelMode.MomentMaterials),

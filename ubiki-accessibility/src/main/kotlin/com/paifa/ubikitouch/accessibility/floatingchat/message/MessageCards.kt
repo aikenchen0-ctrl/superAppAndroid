@@ -11,9 +11,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -33,10 +35,12 @@ import androidx.compose.ui.unit.sp
 import com.paifa.ubikitouch.accessibility.floatingchat.account.AccountCardPreviewContent
 import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingChatLocationGlyph
 import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
+import com.paifa.ubikitouch.accessibility.floatingchat.media.MediaThumbnailSurface
 import com.paifa.ubikitouch.accessibility.floatingchat.components.SquareAvatarChip
 import com.paifa.ubikitouch.accessibility.floatingchat.components.TextLabel
 import com.paifa.ubikitouch.core.model.FloatingChatContactCardKind
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
+import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 
 @Composable
 internal fun LocationMessageContent(message: FloatingChatMessage) {
@@ -58,7 +62,7 @@ internal fun LocationMessageContent(message: FloatingChatMessage) {
         )
         TextLabel(
             text = message.locationAddress.orEmpty(),
-            size = 8.sp,
+            size = 10.sp,
             weight = FontWeight.Normal,
             color = OverlayTokens.locationMapSubtext,
             maxLines = 1
@@ -148,6 +152,218 @@ internal fun InlineLocationContent(message: FloatingChatMessage) {
     }
 }
 
+/** Read-only cards for iOS message kinds that do not have send support on Android yet. */
+@Composable
+internal fun IosAlignedMessageContent(message: FloatingChatMessage) {
+    when (message.type) {
+        FloatingChatMessageType.Emoji -> EmojiMessageCard(message)
+        FloatingChatMessageType.StickerGif -> StickerMessageCard(message)
+        FloatingChatMessageType.LiveLocation -> LocationMessageContent(message.copy(type = FloatingChatMessageType.Location))
+        FloatingChatMessageType.GroupInvite -> ContactLinkCardContent(message.copy(type = FloatingChatMessageType.ContactLink))
+        FloatingChatMessageType.WebLink,
+        FloatingChatMessageType.Article,
+        FloatingChatMessageType.ChannelsLive,
+        FloatingChatMessageType.Music,
+        FloatingChatMessageType.Favorite -> LinkMessageCard(message)
+        FloatingChatMessageType.RedPacket,
+        FloatingChatMessageType.Transfer,
+        FloatingChatMessageType.SplitBill,
+        FloatingChatMessageType.Coupon -> MoneyMessageCard(message)
+        FloatingChatMessageType.VoiceCall,
+        FloatingChatMessageType.VideoCall -> CallMessageCard(message)
+        FloatingChatMessageType.Relay -> StackedMessageCard(message)
+        FloatingChatMessageType.GroupNotice -> NoticeMessageCard(message)
+        else -> LinkMessageCard(message)
+    }
+}
+
+@Composable
+internal fun EmojiMessageCard(message: FloatingChatMessage) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        TextLabel(
+            text = message.text.ifBlank { "🙂" },
+            size = 30.sp,
+            weight = FontWeight.Normal,
+            color = OverlayTokens.bubbleText,
+            maxLines = 2,
+            lineHeight = 34.sp
+        )
+        MessageMetaLine("Emoji 表情", message.detail)
+    }
+}
+
+@Composable
+internal fun StickerMessageCard(message: FloatingChatMessage) {
+    Column(
+        modifier = Modifier
+            .widthIn(max = 236.dp)
+            .clip(RoundedCornerShape(9.dp))
+            .background(OverlayTokens.mediaCard)
+            .border(1.dp, OverlayTokens.resourcePanelBorder, RoundedCornerShape(9.dp))
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(108.dp)
+                .background(OverlayTokens.imageBlock),
+            contentAlignment = Alignment.Center
+        ) {
+            TextLabel(text = "GIF", size = 24.sp, weight = FontWeight.Bold, color = OverlayTokens.imageWatermark, maxLines = 1)
+        }
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            TextLabel(text = "动态表情", size = 11.sp, weight = FontWeight.Bold, color = OverlayTokens.cardKindText, maxLines = 1)
+            TextLabel(text = message.text, size = 10.sp, color = OverlayTokens.bubbleTextMuted, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+internal fun LinkMessageCard(message: FloatingChatMessage) {
+    val kind = linkMessageCardKindFor(message.type)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(9.dp))
+            .background(OverlayTokens.resourcePanel)
+            .border(1.dp, OverlayTokens.resourcePanelBorder, RoundedCornerShape(9.dp))
+            .padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (message.thumbnailUrl != null || message.resourceUrl != null) {
+            Box(
+                modifier = Modifier
+                    .size(54.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(OverlayTokens.imageBlock)
+            ) {
+                MediaThumbnailSurface(message, Modifier.fillMaxWidth().height(54.dp), showChrome = false)
+            }
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(OverlayTokens.miniProgramIcon),
+                contentAlignment = Alignment.Center
+            ) {
+                TextLabel(text = kind.glyph, size = 16.sp, weight = FontWeight.Bold, color = Color.White, maxLines = 1)
+            }
+        }
+        Spacer(modifier = Modifier.width(9.dp))
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            TextLabel(text = message.appName?.ifBlank { null } ?: kind.sourceLabel, size = 9.sp, color = OverlayTokens.cardSecondaryText, maxLines = 1)
+            TextLabel(text = message.text.ifBlank { message.detail.orEmpty() }, size = 12.sp, weight = FontWeight.Bold, color = OverlayTokens.cardKindText, maxLines = 2, lineHeight = 15.sp)
+            MessageMetaLine(kind.sourceLabel, message.detail?.takeIf { it != message.text })
+            ResourceUrlLine(message.resourceUrl)
+        }
+    }
+}
+
+@Composable
+internal fun MoneyMessageCard(message: FloatingChatMessage) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(9.dp))
+            .background(OverlayTokens.paymentCard)
+            .padding(top = 11.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 11.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(modifier = Modifier.size(38.dp).clip(RoundedCornerShape(10.dp)).background(OverlayTokens.paymentCardBorder), contentAlignment = Alignment.Center) {
+                TextLabel(text = if (message.type == FloatingChatMessageType.Coupon) "券" else "¥", size = 18.sp, weight = FontWeight.Bold, color = OverlayTokens.paymentCardText, maxLines = 1)
+            }
+            Spacer(modifier = Modifier.width(9.dp))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                TextLabel(text = message.text.ifBlank { iosAlignedTitle(message.type) }, size = 13.sp, weight = FontWeight.Bold, color = OverlayTokens.paymentCardText, maxLines = 2)
+                TextLabel(text = message.detail.orEmpty().ifBlank { iosAlignedTitle(message.type) }, size = 10.sp, color = OverlayTokens.paymentCardFooterText, maxLines = 1)
+            }
+        }
+        Spacer(modifier = Modifier.fillMaxWidth().height(1.dp).background(OverlayTokens.paymentCardBorder))
+        TextLabel(
+            text = paymentFooterLabel(message.type),
+            size = 9.sp,
+            color = OverlayTokens.paymentCardFooterText,
+            maxLines = 1,
+            modifier = Modifier.padding(start = 11.dp, end = 11.dp, bottom = 10.dp)
+        )
+    }
+}
+
+@Composable
+internal fun CallMessageCard(message: FloatingChatMessage) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(9.dp))
+            .background(OverlayTokens.voiceCard)
+            .border(1.dp, OverlayTokens.voiceCardBorder, RoundedCornerShape(9.dp))
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)).background(OverlayTokens.linkText), contentAlignment = Alignment.Center) {
+                TextLabel(text = if (message.type == FloatingChatMessageType.VideoCall) "▣" else "☎", size = 16.sp, color = Color.White, maxLines = 1)
+            }
+            Spacer(modifier = Modifier.width(9.dp))
+            TextLabel(text = iosAlignedTitle(message.type), size = 11.sp, weight = FontWeight.Bold, color = OverlayTokens.cardKindText, maxLines = 1)
+        }
+        TextLabel(text = message.text.ifBlank { "通话记录" }, size = 11.sp, color = OverlayTokens.bubbleText, maxLines = 2)
+        TextLabel(text = message.detail.orEmpty().ifBlank { "已结束" }, size = 9.sp, color = OverlayTokens.bubbleTextMuted, maxLines = 1)
+    }
+}
+
+@Composable
+internal fun StackedMessageCard(message: FloatingChatMessage) {
+    Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp)).background(OverlayTokens.specialCard).border(1.dp, OverlayTokens.specialCardBorder, RoundedCornerShape(9.dp)).padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        TextLabel(text = "接龙", size = 9.sp, color = OverlayTokens.cardSecondaryText, maxLines = 1)
+        TextLabel(text = message.text, size = 12.sp, weight = FontWeight.Bold, color = OverlayTokens.cardKindText, maxLines = 2)
+        message.filePreviewLines.take(3).forEachIndexed { index, line -> TextLabel(text = "${index + 1}. $line", size = 10.sp, color = OverlayTokens.bubbleTextMuted, maxLines = 1) }
+        TextLabel(text = "${message.filePreviewLines.size.coerceAtLeast(1)} 条接龙内容", size = 9.sp, color = OverlayTokens.cardSecondaryText, maxLines = 1)
+    }
+}
+
+@Composable
+internal fun NoticeMessageCard(message: FloatingChatMessage) {
+    Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp)).background(OverlayTokens.locationCard).border(1.dp, OverlayTokens.locationCardBorder, RoundedCornerShape(9.dp)).padding(horizontal = 11.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        TextLabel(text = message.detail?.takeIf { it.isNotBlank() } ?: "群公告", size = 9.sp, color = OverlayTokens.locationMapSubtext, maxLines = 1)
+        TextLabel(text = message.text.ifBlank { "暂无公告内容" }, size = 12.sp, weight = FontWeight.Bold, color = OverlayTokens.locationMapText, maxLines = 3, lineHeight = 16.sp)
+        TextLabel(text = message.senderName.ifBlank { "群管理员" }, size = 9.sp, color = OverlayTokens.locationMapSubtext, maxLines = 1)
+    }
+}
+
+@Composable
+private fun MessageMetaLine(label: String?, detail: String?) {
+    val value = listOfNotNull(label, detail?.takeIf { it.isNotBlank() }).joinToString(" · ")
+    if (value.isNotBlank()) TextLabel(text = value, size = 9.sp, color = OverlayTokens.bubbleTextMuted, maxLines = 1)
+}
+
+private fun iosAlignedTitle(type: FloatingChatMessageType): String = when (type) {
+    FloatingChatMessageType.WebLink -> "网页链接"
+    FloatingChatMessageType.Article -> "公众号文章"
+    FloatingChatMessageType.ChannelsLive -> "视频号直播"
+    FloatingChatMessageType.Music -> "音乐分享"
+    FloatingChatMessageType.Favorite -> "收藏分享"
+    FloatingChatMessageType.RedPacket -> "红包"
+    FloatingChatMessageType.Transfer -> "转账"
+    FloatingChatMessageType.SplitBill -> "AA 收款"
+    FloatingChatMessageType.Coupon -> "优惠券"
+    FloatingChatMessageType.VoiceCall -> "语音通话"
+    FloatingChatMessageType.VideoCall -> "视频通话"
+    else -> type.label
+}
+
+private fun paymentFooterLabel(type: FloatingChatMessageType): String = when (type) {
+    FloatingChatMessageType.RedPacket -> "微信红包"
+    FloatingChatMessageType.Transfer -> "转账"
+    FloatingChatMessageType.SplitBill -> "AA 收款"
+    FloatingChatMessageType.Coupon -> "微信卡券"
+    else -> type.label
+}
+
 @Composable
 internal fun MiniProgramLinkContent(
     message: FloatingChatMessage,
@@ -196,7 +412,7 @@ internal fun MiniProgramLinkContent(
             )
             TextLabel(
                 text = message.appName.orEmpty(),
-                size = 9.sp,
+                size = 10.sp,
                 color = OverlayTokens.cardSecondaryText,
                 maxLines = 1,
                 shadow = OverlayTokens.imModuleTextShadow

@@ -233,8 +233,8 @@ internal fun RightCoordinateRail(
                 null
             } else {
                 rightRailPinnedSelectedAccountEdge(
-                    accountIds = accountIds,
-                    selectedAccountId = selectedAccountId,
+                accountIds = accountIds,
+                selectedAccountId = selectedAccountId,
                     visibleItems = layoutInfo.visibleItemsInfo.map { item ->
                         RightRailVisibleAccountItem(
                             index = item.index,
@@ -249,13 +249,15 @@ internal fun RightCoordinateRail(
             }
         }
     }
-    LaunchedEffect(accounts, selectedAccountId) {
-        accountListState.scrollToItem(
-            rightRailSelectedAccountFirstVisibleIndex(
-                accounts = accounts,
-                selectedAccountId = selectedAccountId
-            )
-        )
+    LaunchedEffect(selectedAccountId) {
+        val targetIndex = accountIds.indexOf(selectedAccountId)
+        if (targetIndex < 0) return@LaunchedEffect
+        val targetVisible = accountListState.layoutInfo.visibleItemsInfo.any { item ->
+            item.index == targetIndex
+        }
+        if (!targetVisible) {
+            accountListState.scrollToItem(targetIndex)
+        }
     }
     LaunchedEffect(accountIds, accountListState, accountViewportBounds, accountVirtualFallbackStepPx) {
         snapshotFlow {
@@ -272,8 +274,10 @@ internal fun RightCoordinateRail(
                 accountIds = accountIds,
                 visibleItems = visibleItems,
                 viewport = viewport,
-                fallbackStepPx = -accountVirtualFallbackStepPx
-            )
+                    // LazyColumn 的 offset 始终以屏幕顶部为正方向；reverseLayout
+                    // 只影响项目排列，不能把虚拟头像的几何步长取反。
+                    fallbackStepPx = accountVirtualFallbackStepPx
+                )
         }
     }
     Column(
@@ -610,7 +614,7 @@ private fun ToolButton(
                 )
                 TextLabel(
                     text = toolActionLabel(action),
-                    size = 7.sp,
+                    size = 9.sp,
                     weight = FontWeight.Bold,
                     color = if (selected || activeForReorder) OverlayTokens.toolIconActive else OverlayTokens.toolIcon,
                     maxLines = 1,

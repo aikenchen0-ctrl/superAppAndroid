@@ -42,10 +42,10 @@ internal fun SimpleTextMessageContent(message: FloatingChatMessage, index: Int) 
     val displayText = remember(message.text) { chatBubbleDisplayText(message.text) }
     TextLabel(
         text = displayText,
-        size = if (isSystem) 9.sp else 14.sp,
+        size = if (isSystem) 11.sp else 14.sp,
         weight = if (isSystem) FontWeight.Normal else FontWeight.Normal,
         color = if (isSystem) OverlayTokens.systemPromptText else OverlayTokens.bubbleText,
-        lineHeight = if (isSystem) 13.sp else 20.sp,
+        lineHeight = if (isSystem) 15.sp else 20.sp,
         maxLines = if (isSystem) 2 else if (index < 2) 3 else 4,
         shadow = OverlayTokens.imModuleTextShadow
     )
@@ -53,10 +53,10 @@ internal fun SimpleTextMessageContent(message: FloatingChatMessage, index: Int) 
         Spacer(modifier = Modifier.height(2.dp))
         TextLabel(
             text = detail,
-            size = 9.sp,
+            size = 10.sp,
             weight = FontWeight.SemiBold,
             color = OverlayTokens.bubbleTextMuted,
-            lineHeight = 12.sp,
+            lineHeight = 14.sp,
             maxLines = 1,
             shadow = OverlayTokens.imModuleTextShadow
         )
@@ -153,7 +153,7 @@ internal fun ChatHistoryMessageContent(message: FloatingChatMessage) {
             Spacer(modifier = Modifier.width(5.dp))
             TextLabel(
                 text = "聊天记录",
-                size = 9.sp,
+                size = 10.sp,
                 color = OverlayTokens.panelSecondaryText,
                 maxLines = 1
             )
@@ -179,7 +179,7 @@ private fun QuoteBlock(message: FloatingChatMessage) {
         Column {
             TextLabel(
                 text = message.quoteAuthor.orEmpty(),
-                size = 9.sp,
+                size = 10.sp,
                 weight = FontWeight.SemiBold,
                 color = OverlayTokens.bubbleText,
                 maxLines = 1,
@@ -187,7 +187,7 @@ private fun QuoteBlock(message: FloatingChatMessage) {
             )
             TextLabel(
                 text = message.quoteText.orEmpty(),
-                size = 9.sp,
+                size = 10.sp,
                 color = OverlayTokens.bubbleTextMuted,
                 maxLines = 1,
                 shadow = OverlayTokens.imModuleTextShadow

@@ -1,6 +1,7 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.chat
 
 import android.graphics.Paint
+import android.graphics.Path
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
@@ -10,9 +11,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.asAndroidPath
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
@@ -39,8 +37,33 @@ internal fun ChatConnectorLayer(
     modifier: Modifier = Modifier
 ) {
     var layerBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
-    val connectorNativePaint = remember { Paint(Paint.ANTI_ALIAS_FLAG) }
-    val connectorTreeNativePaint = remember { Paint(Paint.ANTI_ALIAS_FLAG) }
+    val connectorNativePaint = remember {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply { configureConnectorPaint(cap = Paint.Cap.ROUND) }
+    }
+    val connectorTreeNativePaint = remember {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply { configureConnectorPaint(cap = Paint.Cap.BUTT) }
+    }
+    val connectorPath = remember { Path() }
+    val connectorTreePath = remember { Path() }
+    val visibleBubbleGroups = remember(messages, selection, homeOverviewVisible) {
+        linkedMapOf<ConnectorTargetKey, MutableList<Rect>>()
+    }
+    val activeBubbleGroupKeys = remember(messages, selection, homeOverviewVisible) {
+        linkedSetOf<ConnectorTargetKey>()
+    }
+    val avatarSourceKeys = remember(messages, selection, homeOverviewVisible) {
+        linkedMapOf<ConnectorTargetKey, ConnectorTargetKey>()
+    }
+    val directGroupMemberBranches = remember(messages, selection) {
+        mutableListOf<ChatConnectorBranch>()
+    }
+    val visibleGroupMemberBounds = remember(messages, selection) { mutableListOf<Rect>() }
+    val connectorKeys = remember(messages, selection, homeOverviewVisible) {
+        linkedSetOf<ConnectorTargetKey>()
+    }
+    val offscreenEdges = remember(messages, selection, homeOverviewVisible) {
+        linkedMapOf<ConnectorTargetKey, ConnectorViewportEdgeState>()
+    }
     Canvas(
         modifier = modifier.onGloballyPositioned { coordinates ->
             layerBoundsInRoot = coordinates.boundsInRoot()
@@ -52,13 +75,14 @@ internal fun ChatConnectorLayer(
         if (visibleItems.isEmpty()) return@Canvas
         val layerBounds = layerBoundsInRoot ?: return@Canvas
         val messageViewportBounds = connectorState.messageViewport ?: return@Canvas
-        connectorNativePaint.configureConnectorPaint(cap = Paint.Cap.ROUND)
-        connectorTreeNativePaint.configureConnectorPaint(cap = Paint.Cap.BUTT)
-
-        val visibleBubbleGroups = linkedMapOf<ConnectorTargetKey, MutableList<Rect>>()
-        val avatarSourceKeys = linkedMapOf<ConnectorTargetKey, ConnectorTargetKey>()
-        val directGroupMemberBranches = mutableListOf<ChatConnectorBranch>()
-        val visibleGroupMemberBounds = mutableListOf<Rect>()
+        connectorPath.rewind()
+        connectorTreePath.rewind()
+        visibleBubbleGroups.values.forEach(MutableList<Rect>::clear)
+        activeBubbleGroupKeys.clear()
+        avatarSourceKeys.clear()
+        directGroupMemberBranches.clear()
+        visibleGroupMemberBounds.clear()
+        connectorKeys.clear()
         visibleItems.forEach { itemInfo ->
             val itemMessages = if (homeOverviewVisible) {
                 homeOverviewMessagesForVisibleGroup(homeOverviewMessageGroups, itemInfo.index)
@@ -89,31 +113,34 @@ internal fun ChatConnectorLayer(
                     }
                 }
                 visibleBubbleGroups.getOrPut(key) { mutableListOf() }.add(bubbleBounds)
+                activeBubbleGroupKeys += key
             }
         }
 
         if (selection.isGroupThread() && groupMemberAvatarsVisible) {
-            drawGroupMemberConnectorTree(
+            appendGroupMemberConnectorTree(
                 connectorState = connectorState,
                 memberBounds = visibleGroupMemberBounds,
                 layerBounds = layerBounds,
                 visibleRootBounds = messageViewportBounds,
-                nativePaint = connectorTreeNativePaint
+                path = connectorTreePath
             )
         }
 
         val firstVisibleIndex = visibleItems.minOf { it.index }
         val lastVisibleIndex = visibleItems.maxOf { it.index }
-        val offscreenEdges = if (homeOverviewVisible) {
-            emptyMap()
+        if (homeOverviewVisible) {
+            offscreenEdges.clear()
         } else {
-            offscreenConnectorEdges(
+            updateOffscreenConnectorEdges(
                 index = offscreenIndex,
                 firstVisibleIndex = firstVisibleIndex,
-                lastVisibleIndex = lastVisibleIndex
+                lastVisibleIndex = lastVisibleIndex,
+                destination = offscreenEdges
             )
         }
-        val connectorKeys = visibleBubbleGroups.keys + offscreenEdges.keys
+        connectorKeys += activeBubbleGroupKeys
+        connectorKeys += offscreenEdges.keys
         connectorKeys.forEach { key ->
             if (key.lane == ConnectorAvatarLane.GroupMember) return@forEach
             val avatarSourceKey = avatarSourceKeys[key] ?: key
@@ -157,10 +184,18 @@ internal fun ChatConnectorLayer(
                 avatarOffscreenEdge = avatarOffscreenEdge
             ) ?: return@forEach
 
-            drawChatConnectorTree(tree, connectorTreeNativePaint)
+            connectorTreePath.appendChatConnectorTree(tree)
         }
         directGroupMemberBranches.forEach { branch ->
-            drawChatConnectorBranch(branch, connectorNativePaint)
+            connectorPath.appendChatConnectorBranch(branch)
+        }
+        drawIntoCanvas { canvas ->
+            if (!connectorTreePath.isEmpty) {
+                canvas.nativeCanvas.drawPath(connectorTreePath, connectorTreeNativePaint)
+            }
+            if (!connectorPath.isEmpty) {
+                canvas.nativeCanvas.drawPath(connectorPath, connectorNativePaint)
+            }
         }
     }
 }
@@ -179,37 +214,17 @@ private fun Paint.configureConnectorPaint(cap: Paint.Cap) {
     )
 }
 
-private fun DrawScope.drawChatConnectorBranch(
-    branch: ChatConnectorBranch,
-    nativePaint: Paint
-) {
-    drawIntoCanvas { canvas ->
-        canvas.nativeCanvas.drawLine(
-            branch.start.x,
-            branch.start.y,
-            branch.end.x,
-            branch.end.y,
-            nativePaint
-        )
-    }
+private fun Path.appendChatConnectorBranch(branch: ChatConnectorBranch) {
+    moveTo(branch.start.x, branch.start.y)
+    lineTo(branch.end.x, branch.end.y)
 }
 
-private fun DrawScope.drawChatConnectorTree(
-    tree: ChatConnectorTree,
-    nativePaint: Paint
-) {
-    val connectorPath = tree.toPath()
-    drawIntoCanvas { canvas ->
-        canvas.nativeCanvas.drawPath(connectorPath.asAndroidPath(), nativePaint)
-    }
-}
-
-private fun DrawScope.drawGroupMemberConnectorTree(
+private fun appendGroupMemberConnectorTree(
     connectorState: ConnectorCoordinateState,
     memberBounds: List<Rect>,
     layerBounds: Rect,
     visibleRootBounds: Rect,
-    nativePaint: Paint
+    path: Path
 ) {
     val groupAvatarBounds = connectorState.groupThreadAvatar ?: return
     if (memberBounds.isEmpty()) return
@@ -223,27 +238,24 @@ private fun DrawScope.drawGroupMemberConnectorTree(
         hasMessagesAbove = false,
         hasMessagesBelow = false
     ) ?: return
-    drawChatConnectorTree(tree, nativePaint)
+    path.appendChatConnectorTree(tree)
 }
 
-private fun ChatConnectorTree.toPath(): Path {
-    val geometry = createChatConnectorBraceGeometry(this)
-    return Path().apply {
-        geometry.trunkSegments.forEach { segment ->
-            moveTo(segment.start.x, segment.start.y)
-            lineTo(segment.end.x, segment.end.y)
-        }
-        geometry.hooks.forEach { hook -> braceHookSegment(hook) }
+private fun Path.appendChatConnectorTree(tree: ChatConnectorTree) {
+    val geometry = createChatConnectorBraceGeometry(tree)
+    geometry.trunkSegments.forEach { segment ->
+        appendChatConnectorBranch(segment)
     }
+    geometry.hooks.forEach { hook -> appendBraceHookSegment(hook) }
 }
 
-private fun Path.braceHookSegment(hook: ChatConnectorBraceHook) {
+private fun Path.appendBraceHookSegment(hook: ChatConnectorBraceHook) {
     val deltaX = hook.branchEnd.x - hook.center.x
     if (abs(deltaX) <= 0.5f) return
 
     val geometry = hook.roundedElbowGeometry()
     moveTo(geometry.curveStart.x, geometry.curveStart.y)
-    quadraticTo(
+    quadTo(
         geometry.curveControl.x,
         geometry.curveControl.y,
         geometry.horizontalStart.x,

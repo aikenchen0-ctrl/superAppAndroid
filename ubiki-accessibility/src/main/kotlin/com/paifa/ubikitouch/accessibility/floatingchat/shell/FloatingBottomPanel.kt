@@ -32,6 +32,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.moments.MomentMaterialsPa
 import com.paifa.ubikitouch.accessibility.floatingchat.moments.MomentsTimelinePanel
 import com.paifa.ubikitouch.accessibility.floatingchat.message.ScrmComposerKind
 import com.paifa.ubikitouch.accessibility.floatingchat.message.ScrmMessageComposerPanel
+import com.paifa.ubikitouch.accessibility.floatingchat.scrm.ScrmOperationsHubPanel
 import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.AiConfigPanel
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.CompactNoticePanel
@@ -140,7 +141,8 @@ internal fun FloatingBottomPanel(
         BottomPanelMode.ScrmEmoji,
         BottomPanelMode.ScrmWeAppCard,
         BottomPanelMode.ScrmCardTemplates,
-        BottomPanelMode.ScrmBatchSend -> 0.86f
+        BottomPanelMode.ScrmBatchSend,
+        BottomPanelMode.ScrmOperations -> 0.92f
         else -> 0.64f
     }
     val maxHeight = when (mode) {
@@ -160,7 +162,8 @@ internal fun FloatingBottomPanel(
         BottomPanelMode.ScrmEmoji,
         BottomPanelMode.ScrmWeAppCard,
         BottomPanelMode.ScrmCardTemplates,
-        BottomPanelMode.ScrmBatchSend -> 440.dp
+        BottomPanelMode.ScrmBatchSend,
+        BottomPanelMode.ScrmOperations -> 520.dp
         else -> 230.dp
     }
     MaterialSurface(
@@ -294,6 +297,12 @@ internal fun FloatingBottomPanel(
                     route = scrmMessageRoute,
                     conversationId = scrmMessageConversationId,
                     onBack = { onOpenToolPanel(BottomPanelMode.More) }
+                )
+                BottomPanelMode.ScrmOperations -> ScrmOperationsHubPanel(
+                    route = scrmMessageRoute,
+                    conversationId = scrmMessageConversationId,
+                    onOpenPanel = onOpenToolPanel,
+                    onClose = onClose
                 )
                 BottomPanelMode.Home -> CompactNoticePanel(
                     title = "杩斿洖涓婚〉",

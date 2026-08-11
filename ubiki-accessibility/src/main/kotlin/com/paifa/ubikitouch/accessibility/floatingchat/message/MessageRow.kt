@@ -19,7 +19,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -46,6 +45,18 @@ import com.paifa.ubikitouch.accessibility.floatingchat.chat.rootBoundsFromPositi
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import com.paifa.ubikitouch.core.model.FloatingChatMessagePresentation
+
+internal class MessageBoundsHolder {
+    var value: Rect? = null
+        private set
+
+    fun update(bounds: Rect, onChanged: (Rect) -> Unit): Boolean {
+        if (value == bounds) return false
+        value = bounds
+        onChanged(bounds)
+        return true
+    }
+}
 
 @Composable
 internal fun MessageRow(
@@ -199,10 +210,9 @@ internal fun MessageBlock(
     modifier: Modifier = Modifier
 ) {
     val bubbleClickSource = remember { MutableInteractionSource() }
-    var currentBounds by remember(message.id) { mutableStateOf<Rect?>(null) }
+    val currentBounds = remember(message.id) { MessageBoundsHolder() }
     fun updateCurrentBounds(bounds: Rect) {
-        currentBounds = bounds
-        onBubbleBoundsChanged(bounds)
+        currentBounds.update(bounds, onBubbleBoundsChanged)
     }
     val isSystem = message.presentation == FloatingChatMessagePresentation.System
     val isSpecialCard = message.presentation == FloatingChatMessagePresentation.SpecialCard
@@ -279,7 +289,7 @@ internal fun MessageBlock(
                                         onClick()
                                     }
                                 },
-                                onLongClick = { onLongPressMessage(message, currentBounds) }
+                                onLongClick = { onLongPressMessage(message, currentBounds.value) }
                             )
                             .padding(
                                 horizontal = when {
@@ -338,7 +348,7 @@ internal fun MessageBlock(
                                         onClick()
                                     }
                                 },
-                                onLongClick = { onLongPressMessage(message, currentBounds) }
+                                onLongClick = { onLongPressMessage(message, currentBounds.value) }
                             )
                     ) {
                         MessageContent(

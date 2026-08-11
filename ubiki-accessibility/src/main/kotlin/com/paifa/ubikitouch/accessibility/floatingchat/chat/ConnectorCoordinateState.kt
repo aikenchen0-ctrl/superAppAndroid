@@ -102,14 +102,16 @@ internal class ConnectorCoordinateState {
         viewport: Rect,
         fallbackStepPx: Float
     ) {
-        leftRailVirtualSessionAvatarBounds(
+        var changed = false
+        forEachLeftRailVirtualSessionAvatarBounds(
             sessionIds = sessionIds,
             visibleItems = visibleItems,
             viewport = viewport,
             fallbackStepPx = fallbackStepPx
-        ).forEach { (id, bounds) ->
-            if (retainedUserAvatars.updateIfChanged(id, bounds)) invalidate()
+        ) { id, bounds ->
+            changed = retainedUserAvatars.updateVirtualIfVisuallyChanged(id, bounds, viewport) || changed
         }
+        if (changed) invalidate()
     }
 
     fun userAvatarFor(id: String): Rect? {
@@ -148,14 +150,16 @@ internal class ConnectorCoordinateState {
         viewport: Rect,
         fallbackStepPx: Float
     ) {
-        rightRailVirtualAccountAvatarBounds(
+        var changed = false
+        forEachRightRailVirtualAccountAvatarBounds(
             accountIds = accountIds,
             visibleItems = visibleItems,
             viewport = viewport,
             fallbackStepPx = fallbackStepPx
-        ).forEach { (id, bounds) ->
-            if (retainedAccountAvatars.updateIfChanged(id, bounds)) invalidate()
+        ) { id, bounds ->
+            changed = retainedAccountAvatars.updateVirtualIfVisuallyChanged(id, bounds, viewport) || changed
         }
+        if (changed) invalidate()
     }
 
     fun accountAvatarFor(id: String): Rect? {
@@ -256,41 +260,70 @@ internal fun rightRailVirtualAccountAvatarBounds(
     fallbackStepPx: Float
 ): Map<String, Rect> {
     if (accountIds.isEmpty() || visibleItems.isEmpty()) return emptyMap()
-    val sortedItems = visibleItems
-        .filter { item -> item.index in accountIds.indices && item.size > 0 }
-        .sortedBy { item -> item.index }
-    if (sortedItems.isEmpty()) return emptyMap()
+    return buildMap {
+        forEachRightRailVirtualAccountAvatarBounds(
+            accountIds = accountIds,
+            visibleItems = visibleItems,
+            viewport = viewport,
+            fallbackStepPx = fallbackStepPx
+        ) { id, bounds -> put(id, bounds) }
+    }
+}
 
-    val anchor = sortedItems.first()
-    val anchorSize = anchor.size.toFloat()
-    val anchorCenterY = viewport.top + anchor.offset + anchorSize / 2f
-    val stepPx = sortedItems
-        .zipWithNext()
-        .firstNotNullOfOrNull { (first, second) ->
-            val indexDelta = second.index - first.index
-            if (indexDelta == 0) {
-                null
-            } else {
-                val firstCenterY = first.offset + first.size / 2f
-                val secondCenterY = second.offset + second.size / 2f
+private inline fun forEachRightRailVirtualAccountAvatarBounds(
+    accountIds: List<String>,
+    visibleItems: List<RightRailVisibleAccountItem>,
+    viewport: Rect,
+    fallbackStepPx: Float,
+    action: (String, Rect) -> Unit
+) {
+    if (accountIds.isEmpty() || visibleItems.isEmpty()) return
+    var anchor: RightRailVisibleAccountItem? = null
+    var nextAnchor: RightRailVisibleAccountItem? = null
+    visibleItems.forEach { item ->
+        if (item.index !in accountIds.indices || item.size <= 0) return@forEach
+        val currentAnchor = anchor
+        when {
+            currentAnchor == null || item.index < currentAnchor.index -> {
+                nextAnchor = currentAnchor
+                anchor = item
+            }
+            item.index > currentAnchor.index &&
+                (nextAnchor == null || item.index < nextAnchor!!.index) -> {
+                nextAnchor = item
+            }
+        }
+    }
+    val resolvedAnchor = anchor ?: return
+    val anchorSize = resolvedAnchor.size.toFloat()
+    val anchorCenterY = viewport.top + resolvedAnchor.offset + anchorSize / 2f
+    val stepPx = nextAnchor
+        ?.let { next ->
+            val indexDelta = next.index - resolvedAnchor.index
+            if (indexDelta == 0) null else {
+                val firstCenterY = resolvedAnchor.offset + resolvedAnchor.size / 2f
+                val secondCenterY = next.offset + next.size / 2f
                 (secondCenterY - firstCenterY) / indexDelta
             }
         }
         ?.takeIf { step -> step != 0f }
         ?: fallbackStepPx.takeIf { step -> step != 0f }
-        ?: return emptyMap()
+        ?: return
     val left = viewport.right - anchorSize
     val right = viewport.right
 
-    return accountIds.mapIndexed { index, id ->
-        val centerY = anchorCenterY + stepPx * (index - anchor.index)
-        id to Rect(
-            left = left,
-            top = centerY - anchorSize / 2f,
-            right = right,
-            bottom = centerY + anchorSize / 2f
+    accountIds.forEachIndexed { index, id ->
+        val centerY = anchorCenterY + stepPx * (index - resolvedAnchor.index)
+        action(
+            id,
+            Rect(
+                left = left,
+                top = centerY - anchorSize / 2f,
+                right = right,
+                bottom = centerY + anchorSize / 2f
+            )
         )
-    }.toMap()
+    }
 }
 
 internal fun rightRailPinnedSelectedAccountEdge(
@@ -302,14 +335,32 @@ internal fun rightRailPinnedSelectedAccountEdge(
     reverseLayout: Boolean = false
 ): RailPinnedAvatarEdge? {
     val selectedId = selectedAccountId?.takeIf { id -> id.isNotBlank() } ?: return null
+    val selectedIndex = accountIds.indexOf(selectedId)
+    if (selectedIndex < 0 || visibleItems.isEmpty()) return null
+    val visibleIndices = visibleItems
+        .asSequence()
+        .map { item -> item.index }
+        .filter { index -> index in accountIds.indices }
+        .toList()
+    if (visibleIndices.isNotEmpty()) {
+        val firstVisibleIndex = visibleIndices.minOrNull() ?: return null
+        val lastVisibleIndex = visibleIndices.maxOrNull() ?: return null
+        // reverseLayout 下索引越小越靠近底部，越大越靠近顶部。
+        if (selectedIndex < firstVisibleIndex) return RailPinnedAvatarEdge.Bottom
+        if (selectedIndex > lastVisibleIndex) return RailPinnedAvatarEdge.Top
+    }
     val viewport = Rect(0f, 0f, rightRailAvatarSizeDp().toFloat(), viewportHeightPx)
-    val selectedBounds = rightRailVirtualAccountAvatarBounds(
+    var selectedBounds: Rect? = null
+    forEachRightRailVirtualAccountAvatarBounds(
         accountIds = accountIds,
         visibleItems = visibleItems,
         viewport = viewport,
-        fallbackStepPx = abs(fallbackStepPx) * if (reverseLayout) -1f else 1f
-    )[selectedId] ?: return null
-    return selectedBounds.pinnedAvatarEdgeForViewport(viewport)
+        fallbackStepPx = abs(fallbackStepPx)
+    ) { id, bounds ->
+        if (id == selectedId) selectedBounds = bounds
+    }
+    val resolvedSelectedBounds = selectedBounds ?: return null
+    return resolvedSelectedBounds.pinnedAvatarEdgeForViewport(viewport)
 }
 
 internal fun leftRailVirtualSessionAvatarBounds(
@@ -319,41 +370,70 @@ internal fun leftRailVirtualSessionAvatarBounds(
     fallbackStepPx: Float
 ): Map<String, Rect> {
     if (sessionIds.isEmpty() || visibleItems.isEmpty()) return emptyMap()
-    val sortedItems = visibleItems
-        .filter { item -> item.index in sessionIds.indices && item.size > 0 }
-        .sortedBy { item -> item.index }
-    if (sortedItems.isEmpty()) return emptyMap()
+    return buildMap {
+        forEachLeftRailVirtualSessionAvatarBounds(
+            sessionIds = sessionIds,
+            visibleItems = visibleItems,
+            viewport = viewport,
+            fallbackStepPx = fallbackStepPx
+        ) { id, bounds -> put(id, bounds) }
+    }
+}
 
-    val anchor = sortedItems.first()
-    val anchorSize = anchor.size.toFloat()
-    val anchorCenterY = viewport.top + anchor.offset + anchorSize / 2f
-    val stepPx = sortedItems
-        .zipWithNext()
-        .firstNotNullOfOrNull { (first, second) ->
-            val indexDelta = second.index - first.index
-            if (indexDelta == 0) {
-                null
-            } else {
-                val firstCenterY = first.offset + first.size / 2f
-                val secondCenterY = second.offset + second.size / 2f
+private inline fun forEachLeftRailVirtualSessionAvatarBounds(
+    sessionIds: List<String>,
+    visibleItems: List<LeftRailVisibleSessionItem>,
+    viewport: Rect,
+    fallbackStepPx: Float,
+    action: (String, Rect) -> Unit
+) {
+    if (sessionIds.isEmpty() || visibleItems.isEmpty()) return
+    var anchor: LeftRailVisibleSessionItem? = null
+    var nextAnchor: LeftRailVisibleSessionItem? = null
+    visibleItems.forEach { item ->
+        if (item.index !in sessionIds.indices || item.size <= 0) return@forEach
+        val currentAnchor = anchor
+        when {
+            currentAnchor == null || item.index < currentAnchor.index -> {
+                nextAnchor = currentAnchor
+                anchor = item
+            }
+            item.index > currentAnchor.index &&
+                (nextAnchor == null || item.index < nextAnchor!!.index) -> {
+                nextAnchor = item
+            }
+        }
+    }
+    val resolvedAnchor = anchor ?: return
+    val anchorSize = resolvedAnchor.size.toFloat()
+    val anchorCenterY = viewport.top + resolvedAnchor.offset + anchorSize / 2f
+    val stepPx = nextAnchor
+        ?.let { next ->
+            val indexDelta = next.index - resolvedAnchor.index
+            if (indexDelta == 0) null else {
+                val firstCenterY = resolvedAnchor.offset + resolvedAnchor.size / 2f
+                val secondCenterY = next.offset + next.size / 2f
                 (secondCenterY - firstCenterY) / indexDelta
             }
         }
         ?.takeIf { step -> step != 0f }
         ?: fallbackStepPx.takeIf { step -> step != 0f }
-        ?: return emptyMap()
+        ?: return
     val left = viewport.left
     val right = viewport.left + anchorSize
 
-    return sessionIds.mapIndexed { index, id ->
-        val centerY = anchorCenterY + stepPx * (index - anchor.index)
-        id to Rect(
-            left = left,
-            top = centerY - anchorSize / 2f,
-            right = right,
-            bottom = centerY + anchorSize / 2f
+    sessionIds.forEachIndexed { index, id ->
+        val centerY = anchorCenterY + stepPx * (index - resolvedAnchor.index)
+        action(
+            id,
+            Rect(
+                left = left,
+                top = centerY - anchorSize / 2f,
+                right = right,
+                bottom = centerY + anchorSize / 2f
+            )
         )
-    }.toMap()
+    }
 }
 
 internal fun leftRailPinnedSelectedAvatarEdge(
@@ -365,13 +445,17 @@ internal fun leftRailPinnedSelectedAvatarEdge(
 ): RailPinnedAvatarEdge? {
     val selectedId = selectedSessionId?.takeIf { id -> id.isNotBlank() } ?: return null
     val viewport = Rect(0f, 0f, leftRailAvatarSizeDp().toFloat(), viewportHeightPx)
-    val selectedBounds = leftRailVirtualSessionAvatarBounds(
+    var selectedBounds: Rect? = null
+    forEachLeftRailVirtualSessionAvatarBounds(
         sessionIds = sessionIds,
         visibleItems = visibleItems,
         viewport = viewport,
         fallbackStepPx = fallbackStepPx
-    )[selectedId] ?: return null
-    return selectedBounds.pinnedAvatarEdgeForViewport(viewport)
+    ) { id, bounds ->
+        if (id == selectedId) selectedBounds = bounds
+    }
+    val resolvedSelectedBounds = selectedBounds ?: return null
+    return resolvedSelectedBounds.pinnedAvatarEdgeForViewport(viewport)
 }
 
 private fun Rect.pinnedAvatarEdgeForViewport(viewport: Rect): RailPinnedAvatarEdge? {
@@ -399,6 +483,16 @@ private fun MutableMap<String, Rect>.updateIfChanged(id: String, bounds: Rect): 
     if (this[id] == bounds) return false
     this[id] = bounds
     return true
+}
+
+private fun MutableMap<String, Rect>.updateVirtualIfVisuallyChanged(
+    id: String,
+    bounds: Rect,
+    viewport: Rect
+): Boolean {
+    val previousVisibleBounds = this[id]?.pinnedVerticallyTo(viewport)
+    this[id] = bounds
+    return previousVisibleBounds != bounds.pinnedVerticallyTo(viewport)
 }
 
 internal data class ConnectorTargetKey(
@@ -439,7 +533,8 @@ internal data class ConnectorOffscreenIndex(
             }
 
             val keysByIndex = messages.map { message ->
-                message.toOffscreenConnectorTargetKey(
+                offscreenConnectorTargetKey(
+                    message = message,
                     selection = selection,
                     selectedAccountId = selectedAccountId,
                     homeOverviewVisible = homeOverviewVisible,
@@ -525,13 +620,28 @@ internal fun offscreenConnectorEdges(
     lastVisibleIndex: Int
 ): Map<ConnectorTargetKey, ConnectorViewportEdgeState> {
     val states = linkedMapOf<ConnectorTargetKey, ConnectorViewportEdgeState>()
+    updateOffscreenConnectorEdges(
+        index = index,
+        firstVisibleIndex = firstVisibleIndex,
+        lastVisibleIndex = lastVisibleIndex,
+        destination = states
+    )
+    return states
+}
+
+internal fun updateOffscreenConnectorEdges(
+    index: ConnectorOffscreenIndex,
+    firstVisibleIndex: Int,
+    lastVisibleIndex: Int,
+    destination: MutableMap<ConnectorTargetKey, ConnectorViewportEdgeState>
+) {
+    destination.clear()
     index.targetsAbove(firstVisibleIndex).forEach { key ->
-        states[key] = (states[key] ?: ConnectorViewportEdgeState()).copy(hasAbove = true)
+        destination[key] = (destination[key] ?: ConnectorViewportEdgeState()).copy(hasAbove = true)
     }
     index.targetsBelow(lastVisibleIndex).forEach { key ->
-        states[key] = (states[key] ?: ConnectorViewportEdgeState()).copy(hasBelow = true)
+        destination[key] = (destination[key] ?: ConnectorViewportEdgeState()).copy(hasBelow = true)
     }
-    return states
 }
 
 internal fun FloatingChatMessage.toConnectorTargetKey(

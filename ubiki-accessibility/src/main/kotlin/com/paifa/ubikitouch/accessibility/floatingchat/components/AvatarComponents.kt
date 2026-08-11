@@ -173,7 +173,8 @@ internal fun CompactAvatar(
         },
         shape = shape,
         color = avatarColor,
-        shadowElevation = if (contact.selected || highlightColor != null) 7.dp else 3.dp,
+        // Ordinary rail avatars do not need individual shadow layers during scroll.
+        shadowElevation = if (contact.selected || highlightColor != null) 7.dp else 0.dp,
         border = BorderStroke(borderWidth, border)
     ) {
         Box(

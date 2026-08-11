@@ -33,11 +33,14 @@ import androidx.compose.material.icons.filled.Textsms
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.Surface as MaterialSurface
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -115,6 +118,8 @@ internal fun MomentsTimelinePanel(
     var commentingPostId by remember { mutableStateOf<String?>(null) }
     var activeMomentMenuPostId by remember { mutableStateOf<String?>(null) }
     var commentDraft by remember { mutableStateOf("") }
+    var showAdvancedTools by remember { mutableStateOf(false) }
+    var advancedToolStatus by remember { mutableStateOf<String?>(null) }
     var state by remember(route) { mutableStateOf(ScrmMomentsPanelState()) }
 
     fun loadMoments() {
@@ -297,6 +302,8 @@ internal fun MomentsTimelinePanel(
                 maxLines = 1,
                 modifier = Modifier.weight(1f)
             )
+            SmallChoiceButton(label = "工具", onClick = { showAdvancedTools = !showAdvancedTools })
+            Spacer(modifier = Modifier.width(6.dp))
             SmallChoiceButton(label = "刷新", onClick = ::loadMoments)
             Spacer(modifier = Modifier.width(6.dp))
             SmallChoiceButton(label = "图片/视频", onClick = onPickMedia)
@@ -311,6 +318,15 @@ internal fun MomentsTimelinePanel(
                     }
                 }
             )
+        }
+        if (showAdvancedTools) {
+            MomentAdvancedToolsMenu(
+                status = advancedToolStatus,
+                onSelect = { label ->
+                    advancedToolStatus = "$label：已打开 UI 预览，接口接入后再执行"
+                }
+            )
+            Spacer(modifier = Modifier.height(6.dp))
         }
         state.status?.let { status ->
             TextLabel(
@@ -405,6 +421,417 @@ internal fun MomentsTimelinePanel(
                     }
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun MomentAdvancedToolsMenu(status: String?, onSelect: (String) -> Unit) {
+    var selectedTool by remember { mutableStateOf<String?>(null) }
+    var confirmed by remember { mutableStateOf(false) }
+    val tools = remember {
+        listOf(
+            "互动消息：未读与已读",
+            "可见范围与置顶",
+            "删除动态与好友刷新",
+            "批量发布计划",
+            "从素材复制发布"
+        )
+    }
+    MaterialSurface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color(0xFFF7FAFB),
+        shape = RoundedCornerShape(8.dp),
+        border = BorderStroke(1.dp, OverlayTokens.panelBorder)
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            TextLabel(text = "朋友圈工具", size = 11.sp, weight = FontWeight.SemiBold, color = OverlayTokens.panelPrimaryText, maxLines = 1)
+            tools.forEach { label ->
+                TextButton(
+                    onClick = { selectedTool = label; confirmed = false },
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 5.dp)
+                ) {
+                    Text(label, modifier = Modifier.weight(1f), color = OverlayTokens.panelPrimaryText, fontSize = 12.sp)
+                    Text("预览", color = Color(0xFFB26A00), fontSize = 10.sp)
+                }
+            }
+            selectedTool?.let { tool ->
+                if (tool == "互动消息：未读与已读") {
+                    MomentInteractionPreviewEditor(
+                        confirmed = confirmed,
+                        onConfirmedChange = { confirmed = it },
+                        onGeneratePreview = { onSelect(tool) }
+                    )
+                } else if (tool == "可见范围与置顶") {
+                    MomentVisibilityPreviewEditor(
+                        confirmed = confirmed,
+                        onConfirmedChange = { confirmed = it },
+                        onGeneratePreview = { onSelect(tool) }
+                    )
+                } else if (tool == "删除动态与好友刷新") {
+                    MomentCleanupPreviewEditor(
+                        confirmed = confirmed,
+                        onConfirmedChange = { confirmed = it },
+                        onGeneratePreview = { onSelect(tool) }
+                    )
+                } else if (tool == "从素材复制发布") {
+                    MomentMaterialPublishPreviewEditor(
+                        confirmed = confirmed,
+                        onConfirmedChange = { confirmed = it },
+                        onGeneratePreview = { onSelect(tool) }
+                    )
+                } else if (tool == "批量发布计划") {
+                    MomentBatchPublishPlanEditor(
+                        confirmed = confirmed,
+                        onConfirmedChange = { confirmed = it },
+                        onGeneratePreview = { onSelect(tool) }
+                    )
+                } else {
+                    Column(
+                        Modifier.fillMaxWidth().background(Color(0xFFF0F6EC), RoundedCornerShape(6.dp)).padding(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Text("$tool", color = OverlayTokens.panelPrimaryText, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        Text("当前仅生成 UI 预览，后续接口接入后会显示实际影响范围与任务结果。", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = confirmed, onCheckedChange = { confirmed = it })
+                            Text("我已确认当前操作范围", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            Button(
+                                enabled = confirmed,
+                                onClick = { onSelect(tool) },
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp)
+                            ) { Text("生成预览", fontSize = 10.sp) }
+                        }
+                    }
+                }
+            }
+            status?.let { TextLabel(it, 10.sp, color = OverlayTokens.panelSecondaryText, maxLines = 2) }
+        }
+    }
+}
+
+@Composable
+private fun MomentMaterialPublishPreviewEditor(
+    confirmed: Boolean,
+    onConfirmedChange: (Boolean) -> Unit,
+    onGeneratePreview: () -> Unit
+) {
+    var materialId by remember { mutableStateOf("") }
+    var contentSummary by remember { mutableStateOf("") }
+    var targetSummary by remember { mutableStateOf("") }
+    var scheduledAt by remember { mutableStateOf("") }
+    val preview = MomentMaterialPublishPreviewDraft(
+        materialId = materialId,
+        contentSummary = contentSummary,
+        targetSummary = targetSummary,
+        scheduledAt = scheduledAt
+    ).toPreview()
+    Column(
+        Modifier.fillMaxWidth().background(Color(0xFFF0F6EC), RoundedCornerShape(6.dp)).padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Text("从素材复制发布预览", color = OverlayTokens.panelPrimaryText, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        Text("素材详情和实际发布结果需由接口回读，当前不创建副本。", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp)
+        PanelTextInput(materialId, {
+            materialId = it
+            onConfirmedChange(false)
+        }, "素材 ID")
+        PanelTextInput(contentSummary, {
+            contentSummary = it
+            onConfirmedChange(false)
+        }, "发布文案摘要，可留空使用原文")
+        PanelTextInput(targetSummary, {
+            targetSummary = it
+            onConfirmedChange(false)
+        }, "目标账号或范围")
+        PanelTextInput(scheduledAt, {
+            scheduledAt = it
+            onConfirmedChange(false)
+        }, "计划时间，可留空")
+        Text(preview.materialSummary, color = OverlayTokens.panelPrimaryText, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+        Text("文案：${preview.contentSummary}", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp, maxLines = 2)
+        Text("范围：${preview.targetSummary} · 时间：${preview.scheduledAt}", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp, maxLines = 2)
+        Text(preview.validationMessage, color = Color(0xFF9A5B00), fontSize = 10.sp)
+        Text(preview.executionStatement, color = Color(0xFF9A5B00), fontSize = 10.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = confirmed, onCheckedChange = onConfirmedChange)
+            Text("我已确认素材、目标范围和计划时间", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp)
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            Button(
+                enabled = preview.canGeneratePreview && confirmed,
+                onClick = onGeneratePreview,
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp)
+            ) { Text("生成预览", fontSize = 10.sp) }
+        }
+    }
+}
+
+@Composable
+private fun MomentCleanupPreviewEditor(
+    confirmed: Boolean,
+    onConfirmedChange: (Boolean) -> Unit,
+    onGeneratePreview: () -> Unit
+) {
+    var action by remember { mutableStateOf(MomentCleanupAction.DeleteMoment) }
+    var momentId by remember { mutableStateOf("") }
+    var targetSummary by remember { mutableStateOf("") }
+    var affectedCount by remember { mutableStateOf("") }
+    var confirmationText by remember { mutableStateOf("") }
+    val preview = MomentCleanupPreviewDraft(
+        action = action,
+        momentId = momentId,
+        targetSummary = targetSummary,
+        affectedCount = affectedCount.toIntOrNull(),
+        confirmationText = confirmationText
+    ).toPreview()
+    Column(
+        Modifier.fillMaxWidth().background(Color(0xFFFFF4F1), RoundedCornerShape(6.dp)).padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Text("删除动态与好友刷新预览", color = OverlayTokens.panelPrimaryText, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        Text("删除不可撤销，当前仅生成预览，不会修改朋友圈数据。", color = Color(0xFF9A3E20), fontSize = 10.sp)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            MomentCleanupAction.values().forEach { option ->
+                TextButton(
+                    onClick = {
+                        action = option
+                        onConfirmedChange(false)
+                    },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 3.dp, vertical = 3.dp),
+                    colors = ButtonDefaults.textButtonColors(
+                        containerColor = if (action == option) Color(0xFFF8D8CE) else Color.Transparent
+                    )
+                ) { Text(option.label, fontSize = 10.sp, color = OverlayTokens.panelPrimaryText, maxLines = 1) }
+            }
+        }
+        PanelTextInput(targetSummary, {
+            targetSummary = it
+            onConfirmedChange(false)
+        }, "目标账号或范围")
+        PanelTextInput(affectedCount, {
+            affectedCount = it.filter(Char::isDigit)
+            onConfirmedChange(false)
+        }, if (action == MomentCleanupAction.DeleteMoment) "影响动态数，通常为 1" else "预计刷新好友数，可留空")
+        if (action == MomentCleanupAction.DeleteMoment) {
+            PanelTextInput(momentId, {
+                momentId = it
+                onConfirmedChange(false)
+            }, "要删除的朋友圈动态 ID")
+            PanelTextInput(confirmationText, {
+                confirmationText = it
+                onConfirmedChange(false)
+            }, "请输入“删除动态”")
+        }
+        Text("${preview.actionLabel} · ${preview.targetItemSummary}", color = OverlayTokens.panelPrimaryText, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+        Text("范围：${preview.targetSummary} · ${preview.impactSummary}", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp, maxLines = 2)
+        Text(preview.confirmationHint, color = Color(0xFF9A3E20), fontSize = 10.sp)
+        Text(preview.executionStatement, color = Color(0xFF9A3E20), fontSize = 10.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = confirmed, onCheckedChange = onConfirmedChange)
+            Text("我已确认当前账号、目标范围与影响数量", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp)
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            Button(
+                enabled = preview.canGeneratePreview && confirmed,
+                onClick = onGeneratePreview,
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB44727))
+            ) { Text("生成预览", fontSize = 10.sp) }
+        }
+    }
+}
+
+@Composable
+private fun MomentVisibilityPreviewEditor(
+    confirmed: Boolean,
+    onConfirmedChange: (Boolean) -> Unit,
+    onGeneratePreview: () -> Unit
+) {
+    var visibility by remember { mutableStateOf(MomentVisibilityScope.AllFriends) }
+    var targetSummary by remember { mutableStateOf("") }
+    var affectedCount by remember { mutableStateOf("") }
+    var sticky by remember { mutableStateOf(false) }
+    val preview = MomentVisibilityPreviewDraft(
+        visibility = visibility,
+        targetSummary = targetSummary,
+        affectedAccountCount = affectedCount.toIntOrNull(),
+        sticky = sticky
+    ).toPreview()
+    Column(
+        Modifier.fillMaxWidth().background(Color(0xFFF0F6EC), RoundedCornerShape(6.dp)).padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Text("可见范围与置顶预览", color = OverlayTokens.panelPrimaryText, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        Text("仅核对范围与置顶意图，接口接入后才会变更朋友圈状态。", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp)
+        MomentVisibilityScope.values().forEach { option ->
+            TextButton(
+                onClick = {
+                    visibility = option
+                    onConfirmedChange(false)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
+                colors = ButtonDefaults.textButtonColors(
+                    containerColor = if (visibility == option) OverlayTokens.accent.copy(alpha = 0.15f) else Color.Transparent
+                )
+            ) { Text(option.label, modifier = Modifier.fillMaxWidth(), fontSize = 10.sp, color = OverlayTokens.panelPrimaryText) }
+        }
+        PanelTextInput(targetSummary, {
+            targetSummary = it
+            onConfirmedChange(false)
+        }, "目标账号、标签或朋友范围")
+        PanelTextInput(affectedCount, {
+            affectedCount = it.filter(Char::isDigit)
+            onConfirmedChange(false)
+        }, "预计影响账号数，可留空")
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(
+                checked = sticky,
+                onCheckedChange = {
+                    sticky = it
+                    onConfirmedChange(false)
+                }
+            )
+            Text("置顶到当前账号的朋友圈列表", color = OverlayTokens.panelPrimaryText, fontSize = 10.sp)
+        }
+        Text("${preview.visibilityLabel} · ${preview.stickyLabel}", color = OverlayTokens.panelPrimaryText, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+        Text("范围：${preview.targetSummary}", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp, maxLines = 1)
+        Text(preview.affectedSummary, color = Color(0xFF9A5B00), fontSize = 10.sp, maxLines = 1)
+        Text(preview.executionStatement, color = Color(0xFF9A5B00), fontSize = 10.sp, maxLines = 1)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = confirmed, onCheckedChange = onConfirmedChange)
+            Text("我已确认当前账号、可见范围和置顶影响", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp)
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            Button(
+                enabled = confirmed,
+                onClick = onGeneratePreview,
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp)
+            ) { Text("生成预览", fontSize = 10.sp) }
+        }
+    }
+}
+
+@Composable
+private fun MomentInteractionPreviewEditor(
+    confirmed: Boolean,
+    onConfirmedChange: (Boolean) -> Unit,
+    onGeneratePreview: () -> Unit
+) {
+    var action by remember { mutableStateOf(MomentInteractionAction.FetchUnread) }
+    var targetSummary by remember { mutableStateOf("") }
+    var unreadCount by remember { mutableStateOf("") }
+    val preview = MomentInteractionPreviewDraft(
+        action = action,
+        targetSummary = targetSummary,
+        unreadCount = unreadCount.toIntOrNull()
+    ).toPreview()
+    Column(
+        Modifier.fillMaxWidth().background(Color(0xFFF0F6EC), RoundedCornerShape(6.dp)).padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Text("互动消息预览", color = OverlayTokens.panelPrimaryText, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        Text("未读数由接口读取，当前输入仅用于核对影响范围。", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            MomentInteractionAction.values().forEach { option ->
+                TextButton(
+                    onClick = {
+                        action = option
+                        onConfirmedChange(false)
+                    },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 3.dp, vertical = 3.dp),
+                    colors = ButtonDefaults.textButtonColors(
+                        containerColor = if (action == option) OverlayTokens.accent.copy(alpha = 0.15f) else Color.Transparent
+                    )
+                ) { Text(option.label, fontSize = 10.sp, color = OverlayTokens.panelPrimaryText, maxLines = 1) }
+            }
+        }
+        PanelTextInput(targetSummary, { targetSummary = it }, "目标账号或范围")
+        PanelTextInput(unreadCount, { unreadCount = it.filter(Char::isDigit) }, "未读互动数量，仅用于预览")
+        Text("${preview.actionLabel} · ${preview.unreadSummary}", color = OverlayTokens.panelPrimaryText, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+        Text("范围：${preview.targetSummary}", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp, maxLines = 1)
+        Text(preview.impactSummary, color = Color(0xFF9A5B00), fontSize = 10.sp, maxLines = 2)
+        Text(preview.executionStatement, color = Color(0xFF9A5B00), fontSize = 10.sp, maxLines = 1)
+        if (preview.requiresConfirmation) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = confirmed, onCheckedChange = onConfirmedChange)
+                Text("我已确认当前账号、范围和未读影响数量", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp)
+            }
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            Button(
+                enabled = !preview.requiresConfirmation || confirmed,
+                onClick = onGeneratePreview,
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp)
+            ) { Text("生成预览", fontSize = 10.sp) }
+        }
+    }
+}
+
+@Composable
+private fun MomentBatchPublishPlanEditor(
+    confirmed: Boolean,
+    onConfirmedChange: (Boolean) -> Unit,
+    onGeneratePreview: () -> Unit
+) {
+    var planName by remember { mutableStateOf("") }
+    var contentSummary by remember { mutableStateOf("") }
+    var targetSummary by remember { mutableStateOf("") }
+    var scheduledAt by remember { mutableStateOf("") }
+    var status by remember { mutableStateOf(MomentBatchPlanStatus.Draft) }
+    var estimatedImpact by remember { mutableStateOf("") }
+    val preview = MomentBatchPublishPlanDraft(
+        planName = planName,
+        contentSummary = contentSummary,
+        targetSummary = targetSummary,
+        scheduledAt = scheduledAt,
+        status = status,
+        estimatedImpactCount = estimatedImpact.trim().toIntOrNull()
+    ).toPreview()
+    Column(
+        Modifier.fillMaxWidth().background(Color(0xFFF0F6EC), RoundedCornerShape(6.dp)).padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Text("批量发布计划预览", color = OverlayTokens.panelPrimaryText, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        Text("先整理草稿，接口完善后再接入创建与执行。", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp)
+        PanelTextInput(planName, { planName = it }, "计划名称")
+        PanelTextInput(contentSummary, { contentSummary = it }, "素材 / 文案摘要")
+        PanelTextInput(targetSummary, { targetSummary = it }, "目标账号或范围")
+        PanelTextInput(scheduledAt, { scheduledAt = it }, "计划时间，例如 2026-08-12 10:00")
+        PanelTextInput(estimatedImpact, { estimatedImpact = it.filter(Char::isDigit) }, "预计影响账号数，可留空")
+        Text("计划状态", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            MomentBatchPlanStatus.values().forEach { option ->
+                TextButton(
+                    onClick = { status = option },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 3.dp, vertical = 3.dp),
+                    colors = ButtonDefaults.textButtonColors(
+                        containerColor = if (status == option) OverlayTokens.accent.copy(alpha = 0.15f) else Color.Transparent
+                    )
+                ) { Text(option.shortLabel, fontSize = 10.sp, color = OverlayTokens.panelPrimaryText, maxLines = 1) }
+            }
+        }
+        Text("${preview.planName} · ${preview.statusLabel}", color = OverlayTokens.panelPrimaryText, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+        Text("内容：${preview.contentSummary}", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp, maxLines = 2)
+        Text("范围：${preview.targetSummary} · 时间：${preview.scheduledAt}", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp, maxLines = 2)
+        Text("${preview.estimatedImpact}。${preview.executionStatement}", color = Color(0xFF9A5B00), fontSize = 10.sp, maxLines = 2)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = confirmed, onCheckedChange = onConfirmedChange)
+            Text("我已确认当前账号、目标范围和影响数量", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp)
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            Button(
+                enabled = confirmed,
+                onClick = onGeneratePreview,
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp)
+            ) { Text("生成预览", fontSize = 10.sp) }
         }
     }
 }
@@ -857,6 +1284,10 @@ internal fun MomentMaterialsPanel(
     var nameDraft by remember { mutableStateOf("") }
     var categoryDraft by remember { mutableStateOf("") }
     var contentDraft by remember { mutableStateOf("") }
+    var createMaterialConfirmed by remember { mutableStateOf(false) }
+    var materialOperationDraft by remember { mutableStateOf<MomentMaterialOperationPreviewDraft?>(null) }
+    var materialOperationConfirmation by remember { mutableStateOf("") }
+    var materialOperationConfirmed by remember { mutableStateOf(false) }
     var state by remember(route) { mutableStateOf(ScrmMomentMaterialsPanelState()) }
 
     fun requireRoute(): ScrmFloatingAccountRoute? {
@@ -1099,30 +1530,62 @@ internal fun MomentMaterialsPanel(
             Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 PanelTextInput(
                     value = nameDraft,
-                    onValueChange = { nameDraft = it },
+                    onValueChange = { nameDraft = it; createMaterialConfirmed = false },
                     placeholder = "素材名称",
                     modifier = Modifier.weight(0.9f)
                 )
                 PanelTextInput(
                     value = categoryDraft,
-                    onValueChange = { categoryDraft = it },
+                    onValueChange = { categoryDraft = it; createMaterialConfirmed = false },
                     placeholder = "分类",
                     modifier = Modifier.weight(0.65f)
                 )
             }
             PanelTextInput(
                 value = contentDraft,
-                onValueChange = { contentDraft = it },
+                onValueChange = { contentDraft = it; createMaterialConfirmed = false },
                 placeholder = "朋友圈素材文案",
                 modifier = Modifier.fillMaxWidth()
             )
+            val createPreview = MomentMaterialCreatePreviewDraft(nameDraft, categoryDraft, contentDraft).toPreview()
+            TextLabel("预览：${createPreview.name} / ${createPreview.category}", 10.sp, color = OverlayTokens.panelSecondaryText, maxLines = 1)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(createMaterialConfirmed, onCheckedChange = { createMaterialConfirmed = it })
+                Text("我已确认素材名称、分类和文案", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp)
+            }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 ScrmPanelButton(
-                    label = "保存",
-                    enabled = !state.loading,
+                    label = "生成预览",
+                    enabled = !state.loading && createPreview.canGeneratePreview && createMaterialConfirmed,
                     accent = true,
-                    onClick = ::createMaterial
+                    onClick = {
+                        state = state.copy(status = "创建素材：仅生成 UI 预览，未创建", error = null)
+                    }
                 )
+            }
+        }
+
+        materialOperationDraft?.let { draft ->
+            val preview = draft.copy(confirmationText = materialOperationConfirmation).toPreview()
+            Column(
+                modifier = Modifier.fillMaxWidth().background(Color(0xFFFFF4F1), RoundedCornerShape(7.dp)).padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                TextLabel(text = "${preview.actionLabel}预览", size = 10.sp, weight = FontWeight.SemiBold, color = Color(0xFF9A3E20), maxLines = 1)
+                TextLabel(preview.materialSummary, 10.sp, color = OverlayTokens.panelPrimaryText, maxLines = 1)
+                if (draft.action == MomentMaterialOperation.Archive) {
+                    PanelTextInput(materialOperationConfirmation, { materialOperationConfirmation = it; materialOperationConfirmed = false }, "请输入“归档素材”")
+                }
+                TextLabel(preview.confirmationHint, 10.sp, color = Color(0xFF9A3E20), maxLines = 1)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(materialOperationConfirmed, onCheckedChange = { materialOperationConfirmed = it })
+                    Text("我已确认素材和影响范围", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    Button(enabled = preview.canGeneratePreview && materialOperationConfirmed, onClick = {
+                        state = state.copy(status = "${preview.actionLabel}：仅生成 UI 预览，未执行", error = null)
+                    }, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp)) { Text("生成预览", fontSize = 10.sp) }
+                }
             }
         }
 
@@ -1153,8 +1616,16 @@ internal fun MomentMaterialsPanel(
                         selected = state.selectedMaterial?.id == material.id,
                         enabled = !state.loading,
                         onSelect = { loadDetail(material) },
-                        onCopy = { copyMaterial(material) },
-                        onArchive = { archiveMaterial(material) }
+                        onCopy = {
+                            materialOperationDraft = MomentMaterialOperationPreviewDraft(MomentMaterialOperation.Copy, material.id.toString(), material.displayName)
+                            materialOperationConfirmation = ""
+                            materialOperationConfirmed = false
+                        },
+                        onArchive = {
+                            materialOperationDraft = MomentMaterialOperationPreviewDraft(MomentMaterialOperation.Archive, material.id.toString(), material.displayName)
+                            materialOperationConfirmation = ""
+                            materialOperationConfirmed = false
+                        }
                     )
                 }
             }
@@ -1266,8 +1737,8 @@ private fun MomentMaterialRow(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             ScrmPanelButton(label = "详情", enabled = enabled, onClick = onSelect)
-            ScrmPanelButton(label = "复制", enabled = enabled, accent = true, onClick = onCopy)
-            ScrmPanelButton(label = "归档", enabled = enabled, danger = true, onClick = onArchive)
+            ScrmPanelButton(label = "复制预览", enabled = enabled, accent = true, onClick = onCopy)
+            ScrmPanelButton(label = "归档预览", enabled = enabled, danger = true, onClick = onArchive)
         }
     }
 }

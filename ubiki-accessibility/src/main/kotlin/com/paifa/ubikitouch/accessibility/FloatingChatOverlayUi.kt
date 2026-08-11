@@ -534,14 +534,22 @@ internal fun FloatingChatOverlay(
     val accountIds = remember(liveConversation.accountContacts) {
         liveConversation.accountContacts.map { account -> account.id }
     }
-    var activeAccountId by remember(accountIds) {
+    var activeAccountId by remember {
         mutableStateOf(
             initialSelectedAccountId
                 ?.takeIf { accountId -> accountIds.contains(accountId) }
                 ?: profiledConversation.accountContacts.firstOrNull { account -> account.selected }?.id
                 ?: profiledConversation.accountContacts.firstOrNull()?.id
-                ?: ""
+            ?: ""
         )
+    }
+    LaunchedEffect(accountIds) {
+        if (activeAccountId.isNotBlank() && activeAccountId in accountIds) return@LaunchedEffect
+        activeAccountId = initialSelectedAccountId
+            ?.takeIf { accountId -> accountId in accountIds }
+            ?: profiledConversation.accountContacts.firstOrNull { account -> account.selected }?.id
+            ?: accountIds.firstOrNull()
+            ?: ""
     }
     val effectiveConversation = remember(profiledConversation, activeAccountId) {
         accountScopedConversation(
@@ -1118,8 +1126,7 @@ internal fun FloatingChatOverlay(
                 modifier = Modifier
                     .fillMaxWidth()
                     .imePadding()
-                    .navigationBarsPadding()
-                    .padding(bottom = 10.dp),
+                    .navigationBarsPadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 blinkInputStatusText?.let { statusText ->

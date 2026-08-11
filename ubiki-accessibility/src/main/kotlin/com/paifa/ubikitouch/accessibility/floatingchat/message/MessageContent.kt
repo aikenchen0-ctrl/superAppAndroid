@@ -33,35 +33,37 @@ internal fun MessageContent(
         if (unavailableState != null) {
             UnavailableMessageContent(unavailableState)
         } else {
-            when (message.type) {
-                FloatingChatMessageType.Location -> LocationMessageContent(message)
-                FloatingChatMessageType.ContactLink -> ContactLinkCardContent(message)
-                FloatingChatMessageType.MiniProgramLink -> MiniProgramLinkContent(message, claimed)
-                FloatingChatMessageType.Text -> SimpleTextMessageContent(message = message, index = index)
-                FloatingChatMessageType.MixedText -> MixedTextMessageContent(message)
-                FloatingChatMessageType.Quote -> QuoteMessageContent(message)
-                FloatingChatMessageType.ChatHistory -> ChatHistoryMessageContent(message)
-                FloatingChatMessageType.FilePreview -> FilePreviewContent(message = message)
-                FloatingChatMessageType.ImageThumbnail -> ImageThumbnailContent(
-                    message = message,
-                    onPreviewMedia = onPreviewMedia,
-                    onOpenMediaActions = onOpenMediaActions,
-                    onLongPressMessage = onLongPressMessage,
-                    multiSelectMode = multiSelectMode,
-                    onToggleSelection = onToggleSelection,
-                    onContentBoundsChanged = onContentBoundsChanged
-                )
-                FloatingChatMessageType.VideoPreview -> VideoPreviewContent(
-                    message = message,
-                    onPreviewMedia = onPreviewMedia,
-                    onLongPressMessage = onLongPressMessage,
-                    multiSelectMode = multiSelectMode,
-                    onToggleSelection = onToggleSelection,
-                    onContentBoundsChanged = onContentBoundsChanged
-                )
-                FloatingChatMessageType.Voice -> VoiceMessageContent(message)
-                FloatingChatMessageType.InlineContact -> InlineContactContent(message)
-                FloatingChatMessageType.InlineLocation -> InlineLocationContent(message)
+            when (messageRendererGroupFor(message.type)) {
+                MessageRendererGroup.Text -> if (message.type == FloatingChatMessageType.Text) {
+                    SimpleTextMessageContent(message = message, index = index)
+                } else {
+                    MixedTextMessageContent(message)
+                }
+                MessageRendererGroup.OversizedText -> EmojiMessageCard(message)
+                MessageRendererGroup.Media -> when (message.type) {
+                    FloatingChatMessageType.VideoPreview -> VideoPreviewContent(message, onPreviewMedia, onLongPressMessage, multiSelectMode, onToggleSelection, onContentBoundsChanged)
+                    FloatingChatMessageType.StickerGif -> if (message.thumbnailUrl != null || message.resourceUrl != null) {
+                        // GIF payloads use the same thumbnail pipeline as images when a remote media URL exists.
+                        ImageThumbnailContent(message.copy(type = FloatingChatMessageType.ImageThumbnail), onPreviewMedia, onOpenMediaActions, onLongPressMessage, multiSelectMode, onToggleSelection, onContentBoundsChanged)
+                    } else {
+                        StickerMessageCard(message)
+                    }
+                    else -> ImageThumbnailContent(message.copy(type = FloatingChatMessageType.ImageThumbnail), onPreviewMedia, onOpenMediaActions, onLongPressMessage, multiSelectMode, onToggleSelection, onContentBoundsChanged)
+                }
+                MessageRendererGroup.ChannelVideo -> VideoPreviewContent(message.copy(type = FloatingChatMessageType.VideoPreview), onPreviewMedia, onLongPressMessage, multiSelectMode, onToggleSelection, onContentBoundsChanged)
+                MessageRendererGroup.Voice -> VoiceMessageContent(message)
+                MessageRendererGroup.Document -> FilePreviewContent(message)
+                MessageRendererGroup.Location -> if (message.type == FloatingChatMessageType.InlineLocation) InlineLocationContent(message) else LocationMessageContent(message)
+                MessageRendererGroup.Profile -> when (message.type) {
+                    FloatingChatMessageType.InlineContact -> InlineContactContent(message)
+                    else -> ContactLinkCardContent(message.copy(type = FloatingChatMessageType.ContactLink))
+                }
+                MessageRendererGroup.Link -> if (message.type == FloatingChatMessageType.MiniProgramLink) MiniProgramLinkContent(message, claimed) else LinkMessageCard(message)
+                MessageRendererGroup.Stacked -> if (message.type == FloatingChatMessageType.ChatHistory) ChatHistoryMessageContent(message) else StackedMessageCard(message)
+                MessageRendererGroup.Money -> MoneyMessageCard(message)
+                MessageRendererGroup.Call -> CallMessageCard(message)
+                MessageRendererGroup.Notice -> NoticeMessageCard(message)
+                MessageRendererGroup.Quote -> QuoteMessageContent(message)
             }
         }
         if (message.kind == FloatingChatMessageKind.AiDraft && !isSystem) {

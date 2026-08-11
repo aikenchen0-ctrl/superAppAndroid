@@ -76,7 +76,13 @@ internal fun chatToolbarUnreadBadgeLabel(unreadCount: Int): String? = when {
 
 internal fun chatToolbarHasCloseButtonBeforeUnreadBadge(): Boolean = true
 
-internal fun chatToolbarUnreadPrefixLabel(): String = "未读："
+internal fun chatToolbarUnreadPrefixLabel(): String? = null
+
+internal fun chatToolbarUnreadBadgeHeightDp(): Int = 18
+
+internal fun chatToolbarUnreadBadgeHorizontalPaddingDp(): Int = 5
+
+internal fun chatToolbarUnreadBadgeTextSizeSp(): Int = 10
 
 internal fun chatToolbarHasSearchButton(): Boolean = true
 
@@ -264,7 +270,7 @@ internal fun CoordinateChatBody(
         selectedAccount.id,
         groupMemberAvatarsVisible
     ) {
-        ConnectorOffscreenIndex.fromMessages(
+        buildOffscreenConnectorIndex(
             messages = visibleMessages,
             selection = selectedThread,
             selectedAccountId = selectedAccount.id,
@@ -473,24 +479,17 @@ private fun ChatTopToolbar(
                         )
                     }
                     chatToolbarUnreadBadgeLabel(unreadCount)?.let { label ->
-                        Text(
-                            text = chatToolbarUnreadPrefixLabel(),
-                            color = OverlayTokens.panelSecondaryText,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(end = 4.dp)
-                        )
                         Box(
                             modifier = Modifier
-                                .height(22.dp)
+                                .height(chatToolbarUnreadBadgeHeightDp().dp)
                                 .background(OverlayTokens.accent, CircleShape)
-                                .padding(horizontal = 7.dp),
+                                .padding(horizontal = chatToolbarUnreadBadgeHorizontalPaddingDp().dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = label,
                                 color = OverlayTokens.panel,
-                                fontSize = 11.sp,
+                                fontSize = chatToolbarUnreadBadgeTextSizeSp().sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1
                             )

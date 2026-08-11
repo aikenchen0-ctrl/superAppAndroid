@@ -30,4 +30,30 @@ class ScrmAvatarPaletteTest {
         assertEquals(2, conversation.contacts.size)
         assertNotEquals(conversation.contacts[0].avatarColor, conversation.contacts[1].avatarColor)
     }
+
+    @Test
+    fun contactAvatarColorDoesNotChangeWhenContactOrderChanges() {
+        val first = listOf(
+            ScrmContact(id = 11, wxid = "wx-first", nickname = "First"),
+            ScrmContact(id = 12, wxid = "wx-second", nickname = "Second")
+        )
+        val forward = scrmFloatingChatConversation(
+            base = com.paifa.ubikitouch.core.model.FloatingChatPrototype.sampleConversation(),
+            contacts = first,
+            accounts = emptyList(),
+            devices = emptyList(),
+            selectedDeviceUuid = "device-1",
+            selectedWeChatId = "wxid-account"
+        ).contacts.associateBy { it.id }
+        val reversed = scrmFloatingChatConversation(
+            base = com.paifa.ubikitouch.core.model.FloatingChatPrototype.sampleConversation(),
+            contacts = first.reversed(),
+            accounts = emptyList(),
+            devices = emptyList(),
+            selectedDeviceUuid = "device-1",
+            selectedWeChatId = "wxid-account"
+        ).contacts.associateBy { it.id }
+
+        assertEquals(forward.mapValues { it.value.avatarColor }, reversed.mapValues { it.value.avatarColor })
+    }
 }

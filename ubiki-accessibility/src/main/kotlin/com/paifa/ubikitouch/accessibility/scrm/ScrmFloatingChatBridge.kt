@@ -6,6 +6,12 @@ import com.paifa.ubikitouch.core.model.FloatingChatConversation
 import com.paifa.ubikitouch.core.model.FloatingChatConnectionTarget
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import com.paifa.ubikitouch.core.model.FloatingChatMessageType
+import com.paifa.ubikitouch.core.model.FloatingChatMessagePresentation
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import java.net.URLDecoder
 import java.net.URLEncoder
 
@@ -16,6 +22,7 @@ private const val ScrmFloatingScopedThreadSeparator = "__"
 private const val ScrmGroupAvatarMemberLimit = 9
 private const val ScrmChatRoomMemberOwnerRole = 1
 private const val ScrmChatRoomMemberAdminRole = 2
+private val ScrmMessageJson = Json { isLenient = true; ignoreUnknownKeys = true }
 
 private val ScrmAvatarPalette = longArrayOf(
     0xFFFFB4AB,
@@ -190,21 +197,156 @@ private fun scrmFloatingHistoryMessages(
                     ?: message.localMessageId
                     ?: return@mapNotNull null
                 val fromMe = message.direction == 1 || message.senderWxid == account.weChatId
-                FloatingChatMessage(
+                scrmFloatingMappedMessage(
+                    remote = message,
                     id = "scrm-message:$accountId:$remoteId",
-                    type = FloatingChatMessageType.Text,
-                    text = message.content,
                     fromMe = fromMe,
                     senderName = if (fromMe) account.weChatId else message.senderWxid.orEmpty().ifBlank { conversationWxid },
                     time = message.createdAt.orEmpty().substringAfter('T').take(5),
                     connectionTarget = if (fromMe) FloatingChatConnectionTarget.Account else FloatingChatConnectionTarget.User,
                     connectionTargetId = threadId,
-                    threadContactId = threadId,
-                    remoteMessageServerId = message.messageServerId?.toString()
+                    threadContactId = threadId
                 )
             }
         }
     }
+}
+
+private fun scrmFloatingMappedMessage(
+    remote: ScrmChatMessage,
+    id: String,
+    fromMe: Boolean,
+    senderName: String,
+    time: String,
+    connectionTarget: FloatingChatConnectionTarget,
+    connectionTargetId: String,
+    threadContactId: String,
+): FloatingChatMessage {
+    val type = scrmFloatingMessageType(remote.messageType, remote.content)
+    val text = scrmFloatingMessageText(type, remote.content)
+    val system = remote.messageType == 10000 || remote.messageType == 10002
+    return FloatingChatMessage(
+        id = id,
+        type = type,
+        text = text,
+        fromMe = fromMe,
+        senderName = senderName,
+        time = time,
+        presentation = if (system) FloatingChatMessagePresentation.System else FloatingChatMessagePresentation.Bubble,
+        connectionTarget = connectionTarget,
+        connectionTargetId = connectionTargetId,
+        threadContactId = threadContactId,
+        detail = scrmFloatingMessageDetail(type, remote.content, remote.voiceText),
+        resourceUrl = remote.media.firstOrNull()?.resolvedUrl
+            ?: remote.extensions.firstNotNullOfOrNull { extension ->
+                extension.value.takeIf { extension.key.lowercase() in ScrmMediaUrlKeys && it.isNotBlank() }
+            }
+            ?: scrmFloatingMessageUrl(remote.content),
+        fileName = remote.media.firstOrNull()?.fileExtension?.takeIf { it.isNotBlank() },
+        fileSizeLabel = remote.media.firstOrNull()?.fileSize?.takeIf { it > 0L }?.let(::scrmFormatFileSize),
+        remoteMessageServerId = remote.messageServerId?.toString()
+    )
+}
+
+/** Maps WeChat messageType values used by iOS to the Android read-only renderer. */
+private fun scrmFloatingMessageType(messageType: Int, content: String): FloatingChatMessageType {
+    val lower = content.lowercase()
+    return when (messageType) {
+        1 -> FloatingChatMessageType.Text
+        3 -> FloatingChatMessageType.ImageThumbnail
+        34 -> FloatingChatMessageType.Voice
+        37, 42 -> FloatingChatMessageType.ContactLink
+        43, 62 -> FloatingChatMessageType.VideoPreview
+        47 -> FloatingChatMessageType.StickerGif
+        48 -> FloatingChatMessageType.Location
+        49 -> when {
+            "<type>33</type>" in lower || "<type>36</type>" in lower -> FloatingChatMessageType.MiniProgramLink
+            "<type>6</type>" in lower -> FloatingChatMessageType.FilePreview
+            "<type>19</type>" in lower -> FloatingChatMessageType.ChatHistory
+            "<type>2000</type>" in lower -> FloatingChatMessageType.Transfer
+            "<type>2001</type>" in lower -> FloatingChatMessageType.RedPacket
+            else -> FloatingChatMessageType.WebLink
+        }
+        50 -> FloatingChatMessageType.VoiceCall
+        else -> FloatingChatMessageType.Text
+    }
+}
+
+private fun scrmFloatingMessageText(type: FloatingChatMessageType, content: String): String {
+    val extracted = scrmFloatingJsonText(content)
+    if (type == FloatingChatMessageType.Text) return extracted ?: content.trim()
+    if (!extracted.isNullOrBlank() && !extracted.startsWith("wxid_")) return extracted
+    return when (type) {
+        FloatingChatMessageType.ImageThumbnail, FloatingChatMessageType.CapturedPhoto -> "[图片]"
+        FloatingChatMessageType.VideoPreview, FloatingChatMessageType.ChannelsVideo -> "[视频]"
+        FloatingChatMessageType.Voice -> "[语音]"
+        FloatingChatMessageType.StickerGif, FloatingChatMessageType.Emoji -> "[表情]"
+        FloatingChatMessageType.Location, FloatingChatMessageType.LiveLocation -> "[位置]"
+        FloatingChatMessageType.ContactLink, FloatingChatMessageType.GroupInvite -> "[名片]"
+        FloatingChatMessageType.FilePreview -> "[文件]"
+        FloatingChatMessageType.ChatHistory -> "[聊天记录]"
+        FloatingChatMessageType.WebLink, FloatingChatMessageType.Article -> "[链接]"
+        FloatingChatMessageType.VoiceCall -> "[语音通话]"
+        FloatingChatMessageType.VideoCall -> "[视频通话]"
+        FloatingChatMessageType.RedPacket -> "[红包]"
+        FloatingChatMessageType.Transfer -> "[转账]"
+        FloatingChatMessageType.Text -> "消息"
+        else -> type.label
+    }
+}
+
+private fun scrmFloatingMessageDetail(
+    type: FloatingChatMessageType,
+    content: String,
+    voiceText: JsonElement?
+): String? {
+    val extracted = scrmFloatingJsonText(content)?.takeIf { it.isNotBlank() }
+    val voice = voiceText?.scrmTextValue()?.takeIf { it.isNotBlank() }
+    return extracted ?: when (type) {
+        FloatingChatMessageType.Voice -> voice ?: "语音消息"
+        FloatingChatMessageType.StickerGif -> "GIF 贴纸"
+        FloatingChatMessageType.VoiceCall -> "通话记录"
+        else -> null
+    }
+}
+
+private val ScrmMediaUrlKeys = setOf("url", "mediaurl", "downloadurl", "fileurl", "imageurl", "videourl", "voiceurl", "path")
+
+private fun scrmFormatFileSize(size: Long): String {
+    return when {
+        size >= 1024L * 1024L -> "%.1f MB".format(size.toDouble() / (1024L * 1024L))
+        size >= 1024L -> "%.1f KB".format(size.toDouble() / 1024L)
+        else -> "$size B"
+    }
+}
+
+private fun scrmFloatingJsonText(content: String): String? {
+    val start = content.indexOfFirst { it == '{' || it == '[' }
+    if (start < 0) return null
+    val element = runCatching { ScrmMessageJson.parseToJsonElement(content.substring(start)) }.getOrNull() ?: return null
+    return element.scrmTextValue()
+}
+
+private fun JsonElement.scrmTextValue(): String? {
+    if (this is JsonObject) {
+        listOf("content", "text", "title", "description", "des", "displayName").forEach { key ->
+            val value = this[key]?.jsonPrimitive?.contentOrNull?.trim()
+            if (!value.isNullOrBlank()) return value
+        }
+        listOf("data", "payload", "body", "result").forEach { key ->
+            this[key]?.scrmTextValue()?.takeIf { !it.isNullOrBlank() }?.let { return it }
+        }
+    }
+    return null
+}
+
+private fun scrmFloatingMessageUrl(content: String): String? {
+    val start = content.indexOfFirst { it == '{' || it == '[' }
+    if (start < 0) return null
+    val element = runCatching { ScrmMessageJson.parseToJsonElement(content.substring(start)) }.getOrNull() as? JsonObject
+        ?: return null
+    return listOf("url", "mediaUrl", "downloadUrl", "fileUrl", "imageUrl", "videoUrl", "voiceUrl", "Url")
+        .firstNotNullOfOrNull { key -> element[key]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } }
 }
 
 private fun scrmUnreadDemoMessages(
@@ -515,11 +657,11 @@ private fun scrmApplyAvatarPalette(
     contacts: List<FloatingChatContact>,
     startPosition: Int = 0
 ): List<FloatingChatContact> {
-    var memberPosition = startPosition + contacts.size
-    return contacts.mapIndexed { index, contact ->
-        val color = scrmAvatarColorForPosition(startPosition + index)
+    // 颜色必须绑定联系人稳定 ID；列表刷新、排序或分页不能改变同一联系人的颜色。
+    return contacts.map { contact ->
+        val color = scrmStableColor(contact.id)
         val members = contact.groupMemberContacts.map { member ->
-            member.copy(avatarColor = scrmAvatarColorForPosition(memberPosition++))
+            member.copy(avatarColor = scrmStableColor(member.id))
         }
         contact.copy(avatarColor = color, groupMemberContacts = members)
     }

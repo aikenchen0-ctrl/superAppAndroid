@@ -89,6 +89,7 @@ private fun cardMessageColorFor(type: FloatingChatMessageType): Color {
         FloatingChatMessageType.MixedText,
         FloatingChatMessageType.Quote,
         FloatingChatMessageType.ChatHistory -> OverlayTokens.specialCard
+        else -> OverlayTokens.resourcePanel
     }
 }
 
@@ -199,6 +200,7 @@ internal fun messageTypeUsesImModuleBubble(type: FloatingChatMessageType): Boole
         FloatingChatMessageType.ChatHistory -> true
         FloatingChatMessageType.ImageThumbnail,
         FloatingChatMessageType.VideoPreview -> false
+        else -> false
     }
 }
 

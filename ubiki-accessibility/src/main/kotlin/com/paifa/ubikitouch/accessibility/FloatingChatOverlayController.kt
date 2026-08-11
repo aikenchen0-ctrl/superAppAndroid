@@ -847,7 +847,8 @@ internal class FloatingChatOverlayController(
             mainHandler.post {
                 result.onSuccess { nextConversation ->
                     if (nextConversation != null) {
-                        applyScrmConversation(nextConversation)
+                        // 后台预取只填充账号会话缓存，不能提交到当前 UI；否则用户
+                        // 正在查看的账号会被“下一个账号”的预取结果异步切走。
                         scheduleScrmConversationBackgroundPrefetch()
                     }
                 }.onFailure { error ->

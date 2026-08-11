@@ -828,7 +828,36 @@ internal data class ScrmChatMessage(
     val createdAt: String? = null,
     val updatedAt: String? = null,
     val isRevoked: Boolean = false,
-    val isDeleted: Boolean = false
+    val isDeleted: Boolean = false,
+    val media: List<ScrmChatMedia> = emptyList(),
+    val extensions: List<ScrmChatExtension> = emptyList(),
+    val voiceText: kotlinx.serialization.json.JsonElement? = null
+)
+
+@Serializable
+internal data class ScrmChatMedia(
+    val mediaType: Int = 0,
+    val fileSize: Long = 0L,
+    val fileExtension: String = "",
+    val uploadStatus: Int = 0,
+    val downloadUrl: String = "",
+    val mediaUrl: String = "",
+    val fileUrl: String = "",
+    val imageUrl: String = "",
+    val videoUrl: String = "",
+    val voiceUrl: String = "",
+    val url: String = "",
+    val path: String = ""
+) {
+    val resolvedUrl: String?
+        get() = listOf(downloadUrl, mediaUrl, fileUrl, imageUrl, videoUrl, voiceUrl, url, path)
+            .firstOrNull { it.isNotBlank() }
+}
+
+@Serializable
+internal data class ScrmChatExtension(
+    val key: String = "",
+    val value: String = ""
 )
 
 @Serializable

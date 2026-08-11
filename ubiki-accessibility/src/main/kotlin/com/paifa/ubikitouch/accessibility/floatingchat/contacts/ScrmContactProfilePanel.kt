@@ -29,7 +29,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,7 +48,6 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmContactLabel
 import com.paifa.ubikitouch.accessibility.scrm.ScrmContactDetail
 import com.paifa.ubikitouch.accessibility.scrm.ScrmCustomerProfile
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSaveCustomerProfileRequest
-import com.paifa.ubikitouch.accessibility.scrm.ScrmSetFriendPermissionRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmModifyFriendProfileRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSaveContactLabelRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmDeleteContactLabelRequest
@@ -82,9 +80,6 @@ internal fun ScrmContactProfilePanel(
     var showBatchLabels by remember(contact.id) { mutableStateOf(false) }
     var showFriendEditor by remember(contact.id) { mutableStateOf(false) }
     var showLabelEditor by remember(contact.id) { mutableStateOf(false) }
-    var onlyChat by remember(contact.id) { mutableStateOf(false) }
-    var notSeeMoments by remember(contact.id) { mutableStateOf(false) }
-    var notLetSeeMoments by remember(contact.id) { mutableStateOf(false) }
     val profile = detail?.customerProfile ?: customerProfile
     var draft by remember(profile) {
         mutableStateOf(
@@ -175,8 +170,11 @@ internal fun ScrmContactProfilePanel(
                 Column(Modifier.fillMaxWidth().background(Color.White).padding(16.dp)) {
                     Text("微信侧资料变更需要单独确认", color = Color(0xFF777E86), fontSize = 12.sp)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { editorPage = ContactEditorPage.FriendPermissions }) {
+                        TextButton(onClick = { showFriendEditor = true }) {
                             Icon(Icons.Filled.Edit, null, Modifier.size(16.dp)); Spacer(Modifier.size(4.dp)); Text("编辑资料")
+                        }
+                        TextButton(onClick = { editorPage = ContactEditorPage.FriendPermissions }) {
+                            Text("朋友圈权限")
                         }
                         TextButton(onClick = {
                             val request = ScrmRefreshFriendInfoRequest(contactId = contact.id, friendId = contact.wxid)
@@ -212,20 +210,11 @@ internal fun ScrmContactProfilePanel(
             item {
                 ProfileSectionTitle("朋友圈权限")
                 Column(Modifier.fillMaxWidth().background(Color.White).padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    PermissionSwitchRow("仅聊天", "限制双方朋友圈可见", onlyChat) { onlyChat = it }
-                    PermissionSwitchRow("不看他的朋友圈", "隐藏该联系人的朋友圈", notSeeMoments) { notSeeMoments = it }
-                    PermissionSwitchRow("不让他看我的朋友圈", "限制该联系人查看我的朋友圈", notLetSeeMoments) { notLetSeeMoments = it }
+                    Text("请先进入编辑页读取已同步状态，再确认修改。", color = Color(0xFF777E86), fontSize = 12.sp)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         TextButton(onClick = {
-                            val request = ScrmSetFriendPermissionRequest(
-                                contactId = contact.id,
-                                friendId = contact.wxid,
-                                onlyChat = onlyChat,
-                                notSeeFriendMoments = notSeeMoments,
-                                notLetFriendSeeMyMoments = notLetSeeMoments
-                            )
-                            onWritePreview("朋友圈权限请求已组装，未发送（${request::class.simpleName}）")
-                        }) { Text("预览权限变更") }
+                            editorPage = ContactEditorPage.FriendPermissions
+                        }) { Text("编辑朋友圈权限") }
                     }
                 }
             }
@@ -437,14 +426,3 @@ private fun PreviewBanner(title: String, message: String) {
 
 @Composable private fun ProfileSectionTitle(text: String) { Text(text, Modifier.padding(start = 18.dp, top = 14.dp, bottom = 6.dp), color = Color(0xFF858C94), fontSize = 12.sp) }
 @Composable private fun ProfileValueRow(label: String, value: String) { Row(Modifier.fillMaxWidth().padding(vertical = 5.dp)) { Text(label, Modifier.width(80.dp), color = Color(0xFF4B5158), fontSize = 13.sp); Text(value.ifBlank { "未设置" }, color = Color(0xFF777E86), fontSize = 13.sp) } }
-
-@Composable
-private fun PermissionSwitchRow(label: String, detail: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(label, color = Color(0xFF4B5158), fontSize = 13.sp)
-            Text(detail, color = Color(0xFF8B929A), fontSize = 10.sp)
-        }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
-    }
-}

@@ -5,7 +5,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -16,8 +19,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.accessibility.scrm.ScrmCardTemplateItem
 import com.paifa.ubikitouch.accessibility.scrm.ScrmCardTemplateQuery
 import com.paifa.ubikitouch.accessibility.scrm.ScrmFloatingAccountRoute
@@ -58,6 +65,7 @@ internal fun ScrmMessageComposerPanel(
     var status by remember(kind) { mutableStateOf<String?>(null) }
     var loading by remember(kind) { mutableStateOf(false) }
     var templates by remember(kind) { mutableStateOf<List<ScrmCardTemplateItem>>(emptyList()) }
+    var confirmed by remember(kind) { mutableStateOf(false) }
 
     fun assemble(): String {
         val safeRoute = route ?: return "无法组装：缺少当前账号 SCRM 路由"
@@ -83,10 +91,17 @@ internal fun ScrmMessageComposerPanel(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(kind.title)
+            Text(kind.title, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             TextButton(onClick = onBack) { Text("返回") }
         }
-        Text("当前会话：${conversationId ?: "未选择 SCRM 会话"}")
+        Column(
+            Modifier.fillMaxWidth().background(Color(0xFFF0F6EC), RoundedCornerShape(8.dp)).padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text("当前账号：${route?.weChatId ?: "未选择账号"}", color = OverlayTokens.panelPrimaryText, fontSize = 11.sp)
+            Text("当前会话：${conversationId ?: "未选择 SCRM 会话"}", color = OverlayTokens.panelSecondaryText, fontSize = 11.sp)
+            Text(if (kind == ScrmComposerKind.CardTemplates) "只读加载，不会发送消息" else "仅 UI 预览，发送接口尚未接入", color = Color(0xFF4E7A55), fontSize = 10.sp)
+        }
         when (kind) {
             ScrmComposerKind.Emoji -> ComposerField(emojiMd5, { emojiMd5 = it }, "表情 MD5")
             ScrmComposerKind.WeAppCard -> {
@@ -133,12 +148,22 @@ internal fun ScrmMessageComposerPanel(
                         }
                     }
                 ) { Text(if (loading) "加载中" else "加载模板") }
-                templates.forEach { item -> Text("${item.title ?: item.kind ?: "未命名模板"} ${item.description.orEmpty()}") }
+                templates.forEach { item ->
+                    Column(
+                        Modifier.fillMaxWidth().background(Color(0xFFF7F8F9), RoundedCornerShape(6.dp)).padding(9.dp)
+                    ) {
+                        Text(item.title ?: item.kind ?: "未命名模板", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        item.description?.takeIf { it.isNotBlank() }?.let { Text(it, fontSize = 10.sp, color = OverlayTokens.panelSecondaryText) }
+                    }
+                }
             }
         }
         if (kind != ScrmComposerKind.CardTemplates) {
-            Text("此操作会产生发送任务，确认仅组装参数，不会调用接口。")
-            Button(onClick = { status = assemble() }) { Text("确认并组装") }
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Checkbox(checked = confirmed, onCheckedChange = { confirmed = it })
+                Text("我已确认发送目标和内容", fontSize = 11.sp, color = OverlayTokens.panelSecondaryText)
+            }
+            Button(enabled = confirmed, onClick = { status = assemble() }) { Text("生成请求预览") }
         }
         status?.let { value -> Text(value) }
     }

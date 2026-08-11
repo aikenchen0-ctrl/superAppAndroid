@@ -26,6 +26,8 @@ import java.net.HttpURLConnection
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Semaphore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -44,20 +46,34 @@ internal fun rememberAsyncImageThumbnailBitmap(
     maxSizePx: Int = REAL_MEDIA_DECODE_MAX_SIZE_PX,
     cacheNamespace: String = IMAGE_THUMBNAIL_CACHE_NAMESPACE
 ): Bitmap? {
+    val cacheKey = imageThumbnailCacheKey(uriText, cacheNamespace)
     return produceState(
-        initialValue = cachedImageThumbnailBitmap(uriText, cacheNamespace),
+        initialValue = cacheKey?.let(SharedBitmapMemoryCache::get),
         context,
         uriText,
         maxSizePx,
         cacheNamespace
     ) {
-        value = withContext(Dispatchers.IO) {
-            loadImageThumbnailBitmap(
-                context = context.applicationContext,
-                uriText = uriText,
-                maxSizePx = maxSizePx,
-                cacheNamespace = cacheNamespace
-            )
+        if (value != null || cacheKey == null) return@produceState
+        val inFlightKey = "$cacheKey@$maxSizePx"
+        val deferred = inFlightImageLoads[inFlightKey]
+            ?.takeIf { it.isActive }
+            ?: async(Dispatchers.IO) {
+                loadImageThumbnailBitmap(
+                    context = context.applicationContext,
+                    uriText = uriText,
+                    maxSizePx = maxSizePx,
+                    cacheNamespace = cacheNamespace
+                )
+            }.let { candidate ->
+                inFlightImageLoads.putIfAbsent(inFlightKey, candidate)?.also {
+                    candidate.cancel()
+                } ?: candidate
+            }
+        try {
+            value = deferred.await()
+        } finally {
+            inFlightImageLoads.remove(inFlightKey, deferred)
         }
     }.value
 }
@@ -184,14 +200,18 @@ private fun loadPersistentRemoteImageBitmap(
 ): Bitmap? {
     val file = persistentRemoteImageFile(context, cacheKey)
     if (!file.isFile || file.length() <= 0L) return null
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(file.absolutePath, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
     return BitmapFactory.decodeFile(
         file.absolutePath,
         BitmapFactory.Options().apply {
             inSampleSize = imageDecodeSampleSize(
-                width = maxSizePx,
-                height = maxSizePx,
+                width = bounds.outWidth,
+                height = bounds.outHeight,
                 maxSize = maxSizePx
             )
+            inPreferredConfig = Bitmap.Config.RGB_565
         }
     )
 }
@@ -294,6 +314,9 @@ private val SharedBitmapMemoryCache = WeightedLruCache<String, Bitmap>(
 )
 
 private val FailedRemoteImageLoads = ConcurrentHashMap<String, Long>()
+
+/** 同一帧内多个头像引用同一资源时共享一次 IO/解码任务。 */
+private val inFlightImageLoads = ConcurrentHashMap<String, Deferred<Bitmap?>>()
 
 private val RemoteImageLoadSemaphore = Semaphore(remoteAvatarMaxConcurrentLoads(), true)
 

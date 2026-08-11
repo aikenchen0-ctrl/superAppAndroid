@@ -101,7 +101,27 @@ enum class FloatingChatMessageType(val label: String) {
     VideoPreview("视频消息"),
     Voice("语音消息"),
     InlineContact("夹杂名片"),
-    InlineLocation("夹杂定位")
+    InlineLocation("夹杂定位"),
+    // iOS 对齐的只读消息类型，悬浮聊天先提供本地渲染，不进入发送队列。
+    Emoji("Emoji 表情"),
+    StickerGif("贴纸 / GIF"),
+    CapturedPhoto("拍摄照片"),
+    LiveLocation("实时位置"),
+    GroupInvite("群邀请卡"),
+    WebLink("网页链接"),
+    Article("公众号文章"),
+    ChannelsVideo("视频号视频"),
+    ChannelsLive("视频号直播"),
+    Music("音乐分享"),
+    Favorite("收藏分享"),
+    RedPacket("红包"),
+    Transfer("转账"),
+    SplitBill("AA 收款"),
+    Coupon("优惠券"),
+    VoiceCall("语音通话"),
+    VideoCall("视频通话"),
+    Relay("接龙消息"),
+    GroupNotice("群公告")
 }
 
 enum class FloatingChatContactCardKind(val label: String) {
@@ -709,7 +729,26 @@ object FloatingChatPrototype {
                     "唐一澈：连续三条未回要在主页合并展示"
                 )
             ),
-            message(22, FloatingChatMessageType.Text, "系统提示：钱越加入群聊，沈嘉木更新了一条文件权限。", false, "系统", presentation = FloatingChatMessagePresentation.System, connectionTarget = FloatingChatConnectionTarget.None)
+            message(22, FloatingChatMessageType.Text, "系统提示：钱越加入群聊，沈嘉木更新了一条文件权限。", false, "系统", presentation = FloatingChatMessagePresentation.System, connectionTarget = FloatingChatConnectionTarget.None),
+            message(201, FloatingChatMessageType.Emoji, "😂 😂 😂", false, "沈嘉木", connectionTargetId = "li-si"),
+            message(202, FloatingChatMessageType.StickerGif, "收到一个动态表情", false, "许知南", connectionTargetId = "wang-wu", detail = "GIF 贴纸"),
+            message(203, FloatingChatMessageType.CapturedPhoto, "刚刚拍摄的现场照片", false, "陈若川", connectionTargetId = "xiao-chen", thumbnailUrl = "https://aiff.app/images/captured-203.jpg"),
+            message(204, FloatingChatMessageType.LiveLocation, "正在共享实时位置", false, "罗北", connectionTargetId = "luo-bei", locationTitle = "深圳湾公园", locationAddress = "位置共享中"),
+            message(205, FloatingChatMessageType.GroupInvite, "邀请你加入产品评审群", false, "唐一澈", connectionTargetId = "zhao-liu", cardName = "产品评审群", cardSubtitle = "12 位成员"),
+            message(206, FloatingChatMessageType.WebLink, "设计规范 v2.4", true, "林舟", connectionTargetId = "account-main", detail = "aiff.app/design/spec", resourceUrl = "https://aiff.app/design/spec"),
+            message(207, FloatingChatMessageType.Article, "本周客户运营观察", false, "星河产品实验室", connectionTargetId = "assistant", detail = "公众号文章 · 6 分钟阅读", resourceUrl = "https://aiff.app/articles/207"),
+            message(208, FloatingChatMessageType.ChannelsVideo, "门店会员日现场回放", false, "星河视频号", connectionTargetId = "wang-wu", detail = "视频号视频 · 01:28", thumbnailUrl = "https://aiff.app/videos/208/cover.jpg"),
+            message(209, FloatingChatMessageType.ChannelsLive, "今晚 20:00 直播答疑", true, "星河视频号", connectionTargetId = "account-main", detail = "直播预约", resourceUrl = "https://aiff.app/live/209"),
+            message(210, FloatingChatMessageType.Music, "A Walk Through the City", false, "顾言", connectionTargetId = "gu-yan", detail = "音乐分享 · 3:42", resourceUrl = "https://aiff.app/music/210"),
+            message(211, FloatingChatMessageType.Favorite, "收藏：客户沟通话术", true, "林舟", connectionTargetId = "account-main", detail = "来自我的收藏", resourceUrl = "https://aiff.app/favorite/211"),
+            message(212, FloatingChatMessageType.RedPacket, "恭喜发财，大吉大利", false, "孙临", connectionTargetId = "sun-lin", detail = "红包 ¥8.88", resourceUrl = "https://aiff.app/app/red-packet/212"),
+            message(213, FloatingChatMessageType.Transfer, "转账 ¥88.00", false, "何苗", connectionTargetId = "he-miao", detail = "转账给你，请查收", resourceUrl = "https://aiff.app/app/transfer/213"),
+            message(214, FloatingChatMessageType.SplitBill, "晚餐 AA 收款", true, "林舟", connectionTargetId = "account-main", detail = "4 人 · 每人 ¥52.00", resourceUrl = "https://aiff.app/app/split-bill/214"),
+            message(215, FloatingChatMessageType.Coupon, "门店会员日优惠券", false, "门店助手", connectionTargetId = "account-store", detail = "满 100 减 20", resourceUrl = "https://aiff.app/coupon/215"),
+            message(216, FloatingChatMessageType.VoiceCall, "语音通话 02:16", false, "沈嘉木", connectionTargetId = "li-si", detail = "已接通"),
+            message(217, FloatingChatMessageType.VideoCall, "视频通话 08:42", true, "林舟", connectionTargetId = "account-main", detail = "已接通"),
+            message(218, FloatingChatMessageType.Relay, "接龙：周三评审参会确认", false, "群助手", connectionTargetId = "assistant", detail = "已有 7 人接龙", filePreviewLines = listOf("1. 林舟", "2. 沈嘉木", "3. 许知南")),
+            message(219, FloatingChatMessageType.GroupNotice, "群公告：本周五 18:00 前提交周报", false, "群主", connectionTargetId = "group-product", detail = "产品评审群")
         )
     }
 

@@ -21,6 +21,7 @@ internal enum class BottomPanelMode {
     ScrmWeAppCard,
     ScrmCardTemplates,
     ScrmBatchSend,
+    ScrmOperations,
     More
 }
 
@@ -39,7 +40,8 @@ internal fun BottomPanelMode.isCenteredToolFeaturePanel(): Boolean {
         this == BottomPanelMode.ScrmEmoji ||
         this == BottomPanelMode.ScrmWeAppCard ||
         this == BottomPanelMode.ScrmCardTemplates ||
-        this == BottomPanelMode.ScrmBatchSend
+        this == BottomPanelMode.ScrmBatchSend ||
+        this == BottomPanelMode.ScrmOperations
 }
 
 internal fun BottomPanelMode.isBottomComposerDrawer(): Boolean {

@@ -13,6 +13,40 @@ import org.junit.Test
 
 class ScrmFloatingChatBridgeTest {
     @Test
+    fun floatingChatPreservesRemoteMessageTypesInsteadOfDowngradingThemToText() {
+        val conversation = scrmFloatingChatConversation(
+            base = FloatingChatPrototype.sampleConversation(),
+            contacts = emptyList(),
+            accountConversations = listOf(
+                ScrmFloatingAccountConversation(
+                    deviceUuid = "device-1",
+                    weChatId = "wxid_account",
+                    contacts = emptyList(),
+                    messagesByConversation = mapOf(
+                        "wxid_friend" to listOf(
+                            ScrmChatMessage(messageId = 1, messageType = 3, content = ""),
+                            ScrmChatMessage(messageId = 2, messageType = 34, content = ""),
+                            ScrmChatMessage(messageId = 3, messageType = 47, content = ""),
+                            ScrmChatMessage(messageId = 4, messageType = 48, content = ""),
+                            ScrmChatMessage(messageId = 5, messageType = 50, content = "")
+                        )
+                    )
+                )
+            ),
+            accounts = listOf(ScrmWechatAccount("wxid_account", "Account", "device-1")),
+            devices = listOf(device("device-1", "wxid_account", online = true)),
+            selectedDeviceUuid = "device-1",
+            selectedWeChatId = "wxid_account"
+        )
+
+        assertEquals(
+            listOf("ImageThumbnail", "Voice", "StickerGif", "Location", "VoiceCall"),
+            conversation.messages.map { it.type.name }
+        )
+        assertEquals(listOf("[图片]", "[语音]", "[表情]", "[位置]", "[语音通话]"), conversation.messages.map { it.text })
+    }
+
+    @Test
     fun floatingChatMapsReadOnlyHistoryMessagesToConversationThreads() {
         val conversation = scrmFloatingChatConversation(
             base = FloatingChatPrototype.sampleConversation(),
