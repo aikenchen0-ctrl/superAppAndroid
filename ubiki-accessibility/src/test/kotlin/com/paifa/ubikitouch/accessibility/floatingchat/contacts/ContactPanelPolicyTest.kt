@@ -8,4 +8,9 @@ class ContactPanelPolicyTest {
     fun userProfileOverlayUsesActivityLikeFullScreenSurface() {
         assertTrue(contactEditPanelUsesFullScreenProfileSurface())
     }
+
+    @Test
+    fun userProfileOverlayReservesStatusBarHeight() {
+        assertTrue(contactEditPanelReservesStatusBarHeightDp() == 30)
+    }
 }

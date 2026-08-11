@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface as MaterialSurface
@@ -64,7 +65,10 @@ internal fun ContactEditOverlay(
         val fullScreenProfile = target is ContactEditorTarget.User || friendProfileTarget != null
         MaterialSurface(
             modifier = if (fullScreenProfile) {
-                Modifier.fillMaxSize()
+                Modifier
+                    .fillMaxSize()
+                    // 悬浮窗不自动消费系统状态栏 inset，显式保留顶部安全区。
+                    .padding(top = ContactProfileStatusBarReserve)
             } else {
                 Modifier
                     .widthIn(min = 320.dp, max = 390.dp)
@@ -147,3 +151,5 @@ internal fun ContactEditOverlay(
         }
     }
 }
+
+private val ContactProfileStatusBarReserve = 30.dp

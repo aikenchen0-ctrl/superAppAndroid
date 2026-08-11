@@ -12,6 +12,8 @@ internal fun contactEditPanelUsesWechatFriendProfileLayout(): Boolean = true
 
 internal fun contactEditPanelUsesFullScreenProfileSurface(): Boolean = true
 
+internal fun contactEditPanelReservesStatusBarHeightDp(): Int = 30
+
 internal fun contactEditPanelHasDeleteFriendAction(): Boolean = true
 
 internal fun wechatContactIntroFriendProfileReusesLongPressPanel(): Boolean = true
