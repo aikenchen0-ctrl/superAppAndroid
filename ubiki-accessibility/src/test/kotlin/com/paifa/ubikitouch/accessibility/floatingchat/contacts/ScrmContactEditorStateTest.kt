@@ -71,4 +71,22 @@ class ScrmContactEditorStateTest {
         assertFalse(profileHasChanges(before, unchanged))
         assertTrue(profileHasChanges(before, unchanged.copy(notes = "follow up")))
     }
+
+    @Test
+    fun unchangedProfileCannotEnterReviewing() {
+        val snapshot = ScrmCustomerProfile(contactId = 42, customerLevel = "VIP")
+
+        assertFalse(profileHasChanges(snapshot, CustomerProfileDraft(customerLevel = " VIP ")))
+    }
+
+    @Test
+    fun unknownPermissionCannotBeSaved() {
+        val draft = FriendPermissionsDraft(
+            onlyChat = PermissionChoice.Unknown,
+            notSeeFriendMoments = PermissionChoice.Disabled,
+            notLetFriendSeeMyMoments = PermissionChoice.Disabled
+        )
+
+        assertEquals(null, permissionRequestValuesOrNull(draft))
+    }
 }

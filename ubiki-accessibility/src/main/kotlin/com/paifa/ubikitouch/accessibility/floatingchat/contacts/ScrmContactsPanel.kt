@@ -95,6 +95,8 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmAdminBootstrapResult
 import com.paifa.ubikitouch.accessibility.scrm.ScrmAuthenticationException
 import com.paifa.ubikitouch.accessibility.scrm.ScrmContact
 import com.paifa.ubikitouch.accessibility.scrm.ScrmContactDetail
+import com.paifa.ubikitouch.accessibility.scrm.ScrmContactLabel
+import com.paifa.ubikitouch.accessibility.scrm.ScrmContactManagementApi
 import com.paifa.ubikitouch.accessibility.scrm.ScrmCustomerProfile
 import com.paifa.ubikitouch.accessibility.scrm.ScrmContactQuery
 import com.paifa.ubikitouch.accessibility.scrm.ScrmContactTaskRunner
@@ -107,6 +109,9 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmHandleFriendRequestRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmInvalidResponseException
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSendFriendVerifyRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSettingsManager
+import com.paifa.ubikitouch.accessibility.scrm.ScrmSaveCustomerProfileRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmSetContactLabelsRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmSetFriendPermissionRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSyncContactsRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskSubmissionResult
 import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingAccountId
@@ -308,7 +313,8 @@ internal fun ScrmContactsPanel(
                         customerProfile = session.contactApi.getCustomerProfile(
                             contactId = contact.id,
                             weChatId = route.weChatId
-                        )
+                        ),
+                        availableLabels = session.contactApi.getContactLabels(weChatId = route.weChatId)
                     )
                 }
             }.onSuccess { result ->
@@ -316,11 +322,127 @@ internal fun ScrmContactsPanel(
                     detailLoading = false,
                     selectedContactDetail = result.detail,
                     selectedCustomerProfile = result.customerProfile,
+                    availableContactLabels = result.availableLabels,
                     status = "客户画像已刷新",
                     error = null
                 )
             }.onFailure { error ->
-                state = state.copy(detailLoading = false, selectedContactDetail = null, selectedCustomerProfile = null, status = null, error = error.toScrmContactsPanelMessage())
+                state = state.copy(detailLoading = false, selectedContactDetail = null, selectedCustomerProfile = null, availableContactLabels = emptyList(), status = null, error = error.toScrmContactsPanelMessage())
+            }
+        }
+    }
+
+    fun saveSelectedCustomerProfile(draft: CustomerProfileDraft) {
+        val contact = state.selectedContact ?: return
+        scope.launch {
+            state = state.copy(loading = true, error = null, status = "正在保存客户画像")
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    scrmRouteCurrentDeviceMismatchMessage(route, session.readApi.getDevices())?.let { throw IllegalStateException(it) }
+                    val managementApi = session.contactApi as? ScrmContactManagementApi
+                        ?: error("当前 SCRM 客户端不支持客户画像保存")
+                    managementApi.saveCustomerProfile(
+                        contact.id,
+                        ScrmSaveCustomerProfileRequest(
+                            weChatId = route.weChatId,
+                            customerLevel = draft.customerLevel,
+                            sourceChannel = draft.sourceChannel,
+                            sourceDetail = draft.sourceDetail,
+                            profileKey = draft.profileKey,
+                            purchaseHistory = draft.purchaseHistory,
+                            socialAccounts = draft.socialAccounts,
+                            faceImageUrl = draft.faceImageUrl,
+                            notes = draft.notes,
+                            mappedLabelIds = draft.mappedLabelIds,
+                            mappedLabelNames = draft.mappedLabelNames
+                        )
+                    )
+                    session.contactApi.getCustomerProfile(contact.id, route.weChatId)
+                }
+            }.onSuccess { profile ->
+                state = state.copy(loading = false, selectedCustomerProfile = profile, status = "客户画像已保存并完成回读", error = null)
+                loadSelectedContactDetail(contact)
+            }.onFailure { error ->
+                state = state.copy(loading = false, status = null, error = error.toScrmContactsPanelMessage())
+            }
+        }
+    }
+
+    fun saveSelectedContactLabels(draft: ContactLabelsDraft) {
+        val contact = state.selectedContact ?: return
+        scope.launch {
+            state = state.copy(loading = true, error = null, status = "正在提交联系人完整标签集合")
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    scrmRouteCurrentDeviceMismatchMessage(route, session.readApi.getDevices())?.let { throw IllegalStateException(it) }
+                    val outcome = ScrmContactTaskRunner(session.taskApi).submitAndAwait(reloadContactsOnSuccess = false) {
+                        session.contactApi.setContactLabels(
+                            ScrmSetContactLabelsRequest(
+                                deviceUuid = route.deviceUuid,
+                                weChatId = route.weChatId,
+                                contactId = contact.id,
+                                friendId = contact.wxid,
+                                labelIds = draft.selectedLabelIds.toList().sorted(),
+                                labelNames = draft.selectedLabelNames.toList().sorted()
+                            )
+                        )
+                    }
+                    if (!outcome.completed) throw IllegalStateException("标签任务未完成 #${outcome.taskId}")
+                    session.contactApi.getContactDetail(contact.id)
+                }
+            }.onSuccess { detail ->
+                state = state.copy(loading = false, selectedContactDetail = detail, status = "联系人标签已保存并完成回读", error = null)
+            }.onFailure { error ->
+                state = state.copy(loading = false, status = null, error = error.toScrmContactsPanelMessage())
+            }
+        }
+    }
+
+    fun saveSelectedFriendPermissions(draft: FriendPermissionsDraft) {
+        val contact = state.selectedContact ?: return
+        val values = permissionRequestValuesOrNull(draft)
+        if (values == null) {
+            state = state.copy(error = "朋友圈权限尚未同步，不能保存未知状态")
+            return
+        }
+        scope.launch {
+            state = state.copy(loading = true, error = null, status = "正在提交朋友圈权限")
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    scrmRouteCurrentDeviceMismatchMessage(route, session.readApi.getDevices())?.let { throw IllegalStateException(it) }
+                    val managementApi = session.contactApi as? ScrmContactManagementApi
+                        ?: error("当前 SCRM 客户端不支持朋友圈权限设置")
+                    val mask = values.first
+                    val flags = values.second
+                    val outcome = ScrmContactTaskRunner(session.taskApi).submitAndAwait(reloadContactsOnSuccess = false) {
+                        managementApi.setFriendPermission(
+                            ScrmSetFriendPermissionRequest(
+                                deviceUuid = route.deviceUuid,
+                                weChatId = route.weChatId,
+                                contactId = contact.id,
+                                friendId = contact.wxid,
+                                permissionMask = mask,
+                                onlyChat = flags.first,
+                                notSeeFriendMoments = flags.second,
+                                notLetFriendSeeMyMoments = flags.third
+                            )
+                        )
+                    }
+                    if (!outcome.completed) throw IllegalStateException("朋友圈权限任务未完成 #${outcome.taskId}")
+                    session.contactApi.getContactDetail(contact.id)
+                }
+            }.onSuccess { detail ->
+                val refreshedContact = detail.contact
+                if (refreshedContact?.friendPermissionSynced != true || refreshedContact.friendPermissionMask != values.first) {
+                    state = state.copy(loading = false, selectedContactDetail = detail, status = "权限写入结果待确认，请刷新后复核", error = null)
+                } else {
+                    state = state.copy(loading = false, selectedContactDetail = detail, status = "朋友圈权限已保存并完成回读", error = null)
+                }
+            }.onFailure { error ->
+                state = state.copy(loading = false, status = null, error = error.toScrmContactsPanelMessage())
             }
         }
     }
@@ -593,7 +715,7 @@ internal fun ScrmContactsPanel(
                         }
                         is ContactsScreenAction.OpenContact -> {
                             contactsById[action.contactId]?.let { contact ->
-                                state = state.copy(selectedContact = contact, selectedContactDetail = null, selectedCustomerProfile = null, error = null)
+                                state = state.copy(selectedContact = contact, selectedContactDetail = null, selectedCustomerProfile = null, availableContactLabels = emptyList(), error = null)
                                 addWxidText = contact.wxid.orEmpty()
                                 panelScreen = WechatContactsPanelScreen.ContactIntro
                                 showPlusMenu = false
@@ -635,7 +757,12 @@ internal fun ScrmContactsPanel(
                         onBack = { panelScreen = WechatContactsPanelScreen.Contacts },
                         onRefresh = { loadSelectedContactDetail(selectedContact) },
                         onOpenChat = { onOpenPrivateChat(route, selectedContact) },
-                        onWritePreview = { message -> state = state.copy(status = message, error = null) }
+                        onWritePreview = { message -> state = state.copy(status = message, error = null) },
+                        saving = state.loading,
+                        availableLabels = state.availableContactLabels,
+                        onSaveCustomerProfile = ::saveSelectedCustomerProfile,
+                        onSaveContactLabels = ::saveSelectedContactLabels,
+                        onSaveFriendPermissions = ::saveSelectedFriendPermissions
                     )
                 } else {
                 ContactProfileScreen(
@@ -1740,6 +1867,7 @@ private data class ScrmContactsPanelState(
     val selectedContact: ScrmContact? = null,
     val selectedContactDetail: ScrmContactDetail? = null,
     val selectedCustomerProfile: ScrmCustomerProfile? = null,
+    val availableContactLabels: List<ScrmContactLabel> = emptyList(),
     val detailLoading: Boolean = false,
     val friendSearchProfile: ScrmFriendSearchProfile? = null,
     val status: String? = null,
@@ -1748,7 +1876,8 @@ private data class ScrmContactsPanelState(
 
 private data class ContactDetailLoadResult(
     val detail: ScrmContactDetail,
-    val customerProfile: ScrmCustomerProfile
+    val customerProfile: ScrmCustomerProfile,
+    val availableLabels: List<ScrmContactLabel>
 )
 
 private data class ScrmContactsPanelLoadResult(

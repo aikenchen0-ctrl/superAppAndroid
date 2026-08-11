@@ -150,6 +150,10 @@ internal interface ScrmContactApi {
     fun getContactWxids(
         query: ScrmContactWxidQuery = ScrmContactWxidQuery()
     ): ScrmContactWxidList
+    fun saveCustomerProfile(
+        contactId: Int,
+        request: ScrmSaveCustomerProfileRequest
+    ): ScrmCustomerProfile
 
     /**
      * 人工测试专用写接口：替换单个好友的完整标签集合，不做增量合并。
@@ -157,6 +161,7 @@ internal interface ScrmContactApi {
      * 人工验收：在 Web 调试面板发起一次请求，再用 GET /contacts/{contactId}/detail 确认标签结果和任务状态。
      */
     fun setContactLabels(request: ScrmSetContactLabelsRequest): ScrmTaskSubmissionResult
+    fun setFriendPermission(request: ScrmSetFriendPermissionRequest): ScrmTaskSubmissionResult
 
     /**
      * 人工测试专用写接口：批量追加或替换好友标签，每个好友会生成独立 Android 任务。
