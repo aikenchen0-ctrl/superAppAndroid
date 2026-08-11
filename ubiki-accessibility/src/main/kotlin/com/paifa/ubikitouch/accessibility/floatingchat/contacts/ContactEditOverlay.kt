@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -60,17 +61,22 @@ internal fun ContactEditOverlay(
             },
         contentAlignment = Alignment.Center
     ) {
+        val fullScreenProfile = target is ContactEditorTarget.User || friendProfileTarget != null
         MaterialSurface(
-            modifier = Modifier
-                .widthIn(min = 320.dp, max = 390.dp)
-                .heightIn(max = 620.dp)
+            modifier = if (fullScreenProfile) {
+                Modifier.fillMaxSize()
+            } else {
+                Modifier
+                    .widthIn(min = 320.dp, max = 390.dp)
+                    .heightIn(max = 620.dp)
+            }
                 .pointerInput(target) {
                     detectTapGestures(onTap = {})
                 },
-            shape = RoundedCornerShape(14.dp),
+            shape = if (fullScreenProfile) RoundedCornerShape(0.dp) else RoundedCornerShape(14.dp),
             color = OverlayTokens.panel,
-            border = BorderStroke(1.dp, OverlayTokens.panelBorder),
-            shadowElevation = 10.dp
+            border = if (fullScreenProfile) null else BorderStroke(1.dp, OverlayTokens.panelBorder),
+            shadowElevation = if (fullScreenProfile) 0.dp else 10.dp
         ) {
             val activeFriendProfile = friendProfileTarget
             val activeGroupMember = selectedGroupMember

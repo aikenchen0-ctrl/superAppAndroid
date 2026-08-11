@@ -10,6 +10,8 @@ internal fun contactEditPanelSupportsRemarkAndTags(): Boolean = true
 
 internal fun contactEditPanelUsesWechatFriendProfileLayout(): Boolean = true
 
+internal fun contactEditPanelUsesFullScreenProfileSurface(): Boolean = true
+
 internal fun contactEditPanelHasDeleteFriendAction(): Boolean = true
 
 internal fun wechatContactIntroFriendProfileReusesLongPressPanel(): Boolean = true
