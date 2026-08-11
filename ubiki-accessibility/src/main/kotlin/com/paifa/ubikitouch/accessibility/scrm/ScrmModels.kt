@@ -10,6 +10,55 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonElement
 
 @Serializable
+internal data class ScrmSendLuckyMoneyRequest(
+    val deviceUuid: String? = null,
+    val weChatId: String? = null,
+    val friendId: String? = null,
+    val moneyFen: Int? = null,
+    val number: Int? = null,
+    val paymentPassword: String? = null,
+    val wish: String? = null
+)
+
+@Serializable
+internal data class ScrmTakeLuckyMoneyByMessageRequest(
+    val deviceUuid: String? = null,
+    val messageId: Long? = null,
+    val refuse: Boolean? = null
+)
+
+@Serializable
+internal data class ScrmRedPacketQueryByMessageRequest(
+    val deviceUuid: String? = null,
+    val messageId: Long? = null
+)
+
+@Serializable
+internal data class ScrmSendRemittanceRequest(
+    val deviceUuid: String? = null,
+    val weChatId: String? = null,
+    val friendId: String? = null,
+    val roomId: String? = null,
+    val moneyFen: Int? = null,
+    val paymentPassword: String? = null,
+    val memo: String? = null
+)
+
+@Serializable
+internal data class ScrmTakeTransferByMessageRequest(
+    val deviceUuid: String? = null,
+    val messageId: Long? = null,
+    val refuse: Boolean? = null
+)
+
+@Serializable
+internal data class ScrmWalletBalanceRequest(
+    val deviceUuid: String? = null,
+    val weChatId: String? = null,
+    val flag: Int? = null
+)
+
+@Serializable
 internal data class ScrmSendTextMessageRequest(
     val deviceUuid: String,
     val weChatId: String,

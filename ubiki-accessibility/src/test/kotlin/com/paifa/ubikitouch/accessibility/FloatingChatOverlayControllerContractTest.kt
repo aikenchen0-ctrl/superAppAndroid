@@ -79,6 +79,41 @@ class FloatingChatOverlayControllerContractTest {
     }
 
     @Test
+    fun recentlyLoadedAccountConversationSkipsImmediateRefresh() {
+        assertTrue(scrmAccountConversationCacheIsFresh(10_000L, 20_000L, 15_000L))
+        assertFalse(scrmAccountConversationCacheIsFresh(10_000L, 30_001L, 15_000L))
+        assertFalse(scrmAccountConversationCacheIsFresh(null, 20_000L, 15_000L))
+    }
+
+    @Test
+    fun staleConversationRefreshResultCannotReplaceCurrentAccount() {
+        assertFalse(
+            shouldApplyScrmConversationRefreshResult(
+                requestGeneration = 1L,
+                latestGeneration = 2L,
+                requestedAccountId = "account-a",
+                currentAccountId = "account-b"
+            )
+        )
+        assertFalse(
+            shouldApplyScrmConversationRefreshResult(
+                requestGeneration = 2L,
+                latestGeneration = 2L,
+                requestedAccountId = "account-a",
+                currentAccountId = "account-b"
+            )
+        )
+        assertTrue(
+            shouldApplyScrmConversationRefreshResult(
+                requestGeneration = 2L,
+                latestGeneration = 2L,
+                requestedAccountId = "account-b",
+                currentAccountId = "account-b"
+            )
+        )
+    }
+
+    @Test
     fun scrmAccountConversationCacheKeepsLoadedAccountsAndReplacesLatestRoute() {
         val accountOneOld = ScrmFloatingAccountConversation(
             deviceUuid = "device-1",

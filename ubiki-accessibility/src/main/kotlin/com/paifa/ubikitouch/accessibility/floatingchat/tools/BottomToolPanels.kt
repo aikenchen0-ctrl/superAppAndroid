@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Contacts
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.ManageAccounts
 import androidx.compose.material.icons.filled.Mic
@@ -63,27 +64,7 @@ internal fun MoreToolPanel(
     onOpenPanel: (BottomPanelMode) -> Unit,
     onAiVoiceClick: () -> Unit
 ) {
-    val tools = remember {
-        listOf(
-            PanelTool(Icons.Filled.Mic, "\u8bed\u97f3\u8f93\u5165", BottomPanelMode.Voice),
-            PanelTool(Icons.Filled.SmartToy, "AI\u8bed\u97f3", opensAiVoice = true),
-            PanelTool(Icons.Filled.Textsms, "\u5feb\u6377\u8bdd\u672f", BottomPanelMode.QuickPhrase),
-            PanelTool(Icons.Filled.LocationOn, "\u4f4d\u7f6e", BottomPanelMode.Location),
-            PanelTool(Icons.Filled.CardGiftcard, "\u7ea2\u5305", BottomPanelMode.RedPacket),
-            PanelTool(Icons.Filled.AttachMoney, "\u8f6c\u8d26", BottomPanelMode.Transfer),
-            PanelTool(Icons.Filled.CardGiftcard, "\u793c\u7269", BottomPanelMode.Gift),
-            PanelTool(Icons.Filled.Star, "\u6536\u85cf", BottomPanelMode.Favorite),
-            PanelTool(Icons.Filled.Star, "\u6536\u85cf\u8868\u60c5", BottomPanelMode.ScrmEmoji),
-            PanelTool(Icons.Filled.CardGiftcard, "\u5c0f\u7a0b\u5e8f\u5361\u7247", BottomPanelMode.ScrmWeAppCard),
-            PanelTool(Icons.Filled.Contacts, "\u5361\u7247\u6a21\u677f", BottomPanelMode.ScrmCardTemplates),
-            PanelTool(Icons.Filled.Textsms, "\u6279\u91cf\u53d1\u9001", BottomPanelMode.ScrmBatchSend),
-            PanelTool(Icons.Filled.ManageAccounts, "SCRM\u8fd0\u8425", BottomPanelMode.ScrmOperations),
-            PanelTool(Icons.Filled.Contacts, "\u540d\u7247", BottomPanelMode.Card),
-            PanelTool(Icons.Filled.Collections, "\u670b\u53cb\u5708", BottomPanelMode.Moments),
-            PanelTool(Icons.Filled.Collections, "\u7d20\u6750", BottomPanelMode.MomentMaterials),
-            PanelTool(Icons.Filled.Textsms, "\u5e38\u7528\u8bed", BottomPanelMode.QuickPhrase)
-        )
-    }
+    val tools = remember { morePanelTools() }
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -102,6 +83,31 @@ internal fun MoreToolPanel(
             }
         }
     }
+}
+
+private fun morePanelTools(): List<PanelTool> = listOf(
+    PanelTool(Icons.Filled.Mic, "\u8bed\u97f3\u8f93\u5165", BottomPanelMode.Voice),
+    PanelTool(Icons.Filled.SmartToy, "AI\u8bed\u97f3", opensAiVoice = true),
+    PanelTool(Icons.Filled.Textsms, "\u5feb\u6377\u8bdd\u672f", BottomPanelMode.QuickPhrase),
+    PanelTool(Icons.Filled.LocationOn, "\u4f4d\u7f6e", BottomPanelMode.Location),
+    PanelTool(Icons.Filled.CardGiftcard, "\u7ea2\u5305", BottomPanelMode.RedPacket),
+    PanelTool(Icons.Filled.AttachMoney, "\u8f6c\u8d26", BottomPanelMode.Transfer),
+    PanelTool(Icons.Filled.Groups, "AA 收款", BottomPanelMode.SplitBill),
+    PanelTool(Icons.Filled.CardGiftcard, "\u793c\u7269", BottomPanelMode.Gift),
+    PanelTool(Icons.Filled.Star, "\u6536\u85cf", BottomPanelMode.Favorite),
+    PanelTool(Icons.Filled.Star, "\u6536\u85cf\u8868\u60c5", BottomPanelMode.ScrmEmoji),
+    PanelTool(Icons.Filled.CardGiftcard, "\u5c0f\u7a0b\u5e8f\u5361\u7247", BottomPanelMode.ScrmWeAppCard),
+    PanelTool(Icons.Filled.Contacts, "\u5361\u7247\u6a21\u677f", BottomPanelMode.ScrmCardTemplates),
+    PanelTool(Icons.Filled.Textsms, "\u6279\u91cf\u53d1\u9001", BottomPanelMode.ScrmBatchSend),
+    PanelTool(Icons.Filled.ManageAccounts, "SCRM\u8fd0\u8425", BottomPanelMode.ScrmOperations),
+    PanelTool(Icons.Filled.Contacts, "\u540d\u7247", BottomPanelMode.Card),
+    PanelTool(Icons.Filled.Collections, "\u670b\u53cb\u5708", BottomPanelMode.Moments),
+    PanelTool(Icons.Filled.Collections, "\u7d20\u6750", BottomPanelMode.MomentMaterials)
+)
+
+internal fun moreToolPanelUsesUniqueDestinations(): Boolean {
+    val destinations = morePanelTools().mapNotNull { it.panelMode }
+    return destinations.size == destinations.toSet().size
 }
 
 @Composable

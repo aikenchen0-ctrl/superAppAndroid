@@ -1563,6 +1563,31 @@ class ScrmApiClientTest {
     }
 
     @Test
+    fun paymentWriteUsesIdempotencyKeyAndDocumentedRoute() {
+        val transport = RecordingTransport(
+            ok("""{"taskId":501,"success":true,"message":"queued"}""")
+        )
+        val result = ScrmApiClient(config, transport).sendLuckyMoney(
+            ScrmSendLuckyMoneyRequest(
+                deviceUuid = "device-1",
+                weChatId = "wxid-me",
+                friendId = "wxid-friend",
+                moneyFen = 100,
+                number = 1
+            ),
+            idempotencyKey = "payment-test-key"
+        )
+        val request = requireNotNull(transport.lastRequest)
+        assertEquals(501L, result.taskId)
+        assertEquals("POST", request.method)
+        assertEquals(
+            "https://api.example.com/openapi/v1/payments/lucky-money",
+            request.url
+        )
+        assertEquals("payment-test-key", request.headers["Idempotency-Key"])
+    }
+
+    @Test
     fun statusCodesMapToActionableApiErrors() {
         val cases = listOf(
             401 to ScrmAuthenticationException::class.java,

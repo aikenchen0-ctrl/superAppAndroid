@@ -1,16 +1,19 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.message
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -42,6 +45,9 @@ private enum class ScrmMessagePreviewOperation(val title: String) {
     PullEmojiDetail("收藏表情详情")
 }
 
+/** Accessibility overlay cannot open a platform Dialog window with an application token. */
+internal fun messageOperationPreviewUsesInTreeOverlay(): Boolean = true
+
 /**
  * UI 对接：消息长按 -> 更多。
  * 人工测试：选择任意操作，核对目标消息 ID 和账号，点击“组装请求”后应只显示待人工发送状态。
@@ -72,15 +78,27 @@ internal fun ScrmMessageOperationPreviewPanel(
         )
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0x66000000))
+            .clickable(onClick = onDismiss),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
+                .clickable(onClick = {}),
+            shape = RoundedCornerShape(12.dp),
+            color = Color(0xFFFDFDFE),
+            tonalElevation = 6.dp
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(operation?.title ?: "消息操作", modifier = Modifier.weight(1f))
                 FloatingDialogCloseButton(onClose = onDismiss)
             }
-        },
-        text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Column(
                     Modifier.fillMaxWidth().background(Color(0xFFF0F6EC), RoundedCornerShape(8.dp)).padding(10.dp),
@@ -135,30 +153,32 @@ internal fun ScrmMessageOperationPreviewPanel(
                     status?.let { Text(it) }
                 }
             }
-        },
-        confirmButton = {
-            if (operation == null) {
-                TextButton(onClick = onDismiss) { Text("关闭") }
-            } else {
-                Button(enabled = confirmed, onClick = {
-                    status = prepareMessageOperationRequest(
-                        operation = operation ?: return@Button,
-                        messageId = messageId,
-                        routeDeviceUuid = route?.deviceUuid,
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = {
+                    if (operation == null) onDismiss() else {
+                        operation = null
+                        confirmed = false
+                    }
+                }) { Text(if (operation == null) "取消" else "返回") }
+                if (operation == null) {
+                    TextButton(onClick = onDismiss) { Text("关闭") }
+                } else {
+                    Button(enabled = confirmed, onClick = {
+                        status = prepareMessageOperationRequest(
+                            operation = operation ?: return@Button,
+                            messageId = messageId,
+                            routeDeviceUuid = route?.deviceUuid,
                     routeWechatId = route?.weChatId,
                     targetConversationId = targetConversationId,
                     mediaId = mediaIdText.toIntOrNull(),
                     includeOriginal = includeOriginal
-                    )
-                }) { Text("组装请求") }
+                        )
+                    }) { Text("组装请求") }
+                }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = {
-                if (operation == null) onDismiss() else { operation = null; confirmed = false }
-            }) { Text(if (operation == null) "取消" else "返回") }
+            }
         }
-    )
+    }
 }
 
 @Composable

@@ -6,10 +6,41 @@ import com.paifa.ubikitouch.accessibility.floatingchat.chat.ConnectorCoordinateS
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.RightRailVisibleAccountItem
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.createChatConnectorTree
 import com.paifa.ubikitouch.core.model.FloatingChatConnectionTarget
+import com.paifa.ubikitouch.core.model.FloatingChatToolAction
 
 internal fun rightRailToolButtonsUseMaterialIcons(): Boolean = true
 
 internal fun rightRailToolButtonsShowTextLabels(): Boolean = true
+
+internal fun rightRailUsesDedicatedAiEntry(): Boolean = false
+
+internal fun rightRailDedicatedAiAction(): FloatingChatToolAction = FloatingChatToolAction.Assistant
+
+internal fun rightRailScrollableToolActions(
+    actions: List<FloatingChatToolAction>
+): List<FloatingChatToolAction> {
+    // Keep the rail scannable and stable even when the server returns a different tool order.
+    val fixed = listOf(
+        FloatingChatToolAction.Assistant,
+        FloatingChatToolAction.Search,
+        FloatingChatToolAction.Contacts,
+        FloatingChatToolAction.Notes,
+        FloatingChatToolAction.Card,
+        FloatingChatToolAction.Reminder,
+        FloatingChatToolAction.QuickPhrase,
+        FloatingChatToolAction.MomentMaterials,
+        FloatingChatToolAction.Wallet,
+        FloatingChatToolAction.Share,
+        FloatingChatToolAction.Pin,
+        FloatingChatToolAction.Transfer,
+        FloatingChatToolAction.Favorite,
+        FloatingChatToolAction.Device,
+        FloatingChatToolAction.Gallery,
+        FloatingChatToolAction.Voice,
+        FloatingChatToolAction.Files
+    )
+    return fixed
+}
 
 internal fun rightRailToolButtonsSupportLongPressReorder(): Boolean = true
 

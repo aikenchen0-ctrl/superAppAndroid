@@ -26,7 +26,10 @@ data class FloatingChatContact(
     val groupMemberAvatarUrls: List<String> = emptyList(),
     val groupMemberContacts: List<FloatingChatContact> = emptyList(),
     val groupMemberIsOwner: Boolean = false,
-    val groupMemberIsAdmin: Boolean = false
+    val groupMemberIsAdmin: Boolean = false,
+    // Session rail metadata is optional because remote contacts can be partially synchronized.
+    val region: String = "",
+    val tags: List<String> = emptyList()
 )
 
 data class FloatingChatMessage(
@@ -240,17 +243,29 @@ object FloatingChatPrototype {
         conversation: FloatingChatConversation,
         contactId: String
     ): FloatingChatContact {
-        val activeAccounts = conversation.accountContacts.filter { account ->
-            conversation.messages.any { message ->
+        // Build the account/thread index in one message pass. This function is
+        // used by unread-summary recomputation on the UI dispatcher; scanning
+        // every message once per account caused an account-count x message-count
+        // spike during rapid avatar switching and could trigger an ANR.
+        val targetThreadId = if (contactId == conversation.defaultGroupContactId()) null else contactId
+        val activeAccountIds = HashSet<String>()
+        var threadAccountId: String? = null
+        conversation.messages.forEach { message ->
+            if (
                 message.connectionTarget == FloatingChatConnectionTarget.Account &&
-                    message.connectionTargetId == account.id
+                !message.connectionTargetId.isNullOrBlank()
+            ) {
+                activeAccountIds += message.connectionTargetId.orEmpty()
+                if (threadAccountId == null && message.threadContactId == targetThreadId) {
+                    threadAccountId = message.connectionTargetId
+                }
             }
-        }.ifEmpty {
-            conversation.accountContacts
         }
+        val activeAccounts = conversation.accountContacts.filter { account ->
+            account.id in activeAccountIds
+        }.ifEmpty { conversation.accountContacts }
         require(activeAccounts.isNotEmpty()) { "Conversation must have at least one account." }
 
-        val threadAccountId = conversation.threadAccountIdFor(contactId)
         if (threadAccountId != null) {
             activeAccounts.firstOrNull { account -> account.id == threadAccountId }?.let { account ->
                 return account
@@ -1454,19 +1469,6 @@ object FloatingChatPrototype {
     private fun FloatingChatConversation.defaultGroupContactId(): String? {
         return groupContacts.firstOrNull { group -> group.selected }?.id
             ?: groupContacts.firstOrNull()?.id
-    }
-
-    private fun FloatingChatConversation.threadAccountIdFor(contactId: String): String? {
-        val targetThreadId = if (contactId == defaultGroupContactId()) {
-            null
-        } else {
-            contactId
-        }
-        return messages.firstOrNull { message ->
-            message.threadContactId == targetThreadId &&
-                message.connectionTarget == FloatingChatConnectionTarget.Account &&
-                message.connectionTargetId != null
-        }?.connectionTargetId
     }
 
     private fun formatVoiceDuration(durationMs: Int): String {

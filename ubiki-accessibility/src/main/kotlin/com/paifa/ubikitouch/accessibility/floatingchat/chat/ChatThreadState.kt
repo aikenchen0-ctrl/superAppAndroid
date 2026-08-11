@@ -36,6 +36,24 @@ internal fun selectedAccountIdAfterAccountAvatarClick(
     return clickedAccountId.ifBlank { currentAccountId }
 }
 
+internal fun shouldHandleAccountAvatarClick(
+    currentAccountId: String,
+    clickedAccountId: String
+): Boolean = clickedAccountId.isNotBlank() && clickedAccountId != currentAccountId
+
+/** Reuses the expensive account-scoped contact, group and message graph while its source is unchanged. */
+internal class AccountScopedConversationCache(
+    private val source: FloatingChatConversation
+) {
+    private val conversations = mutableMapOf<String, FloatingChatConversation>()
+
+    fun conversationFor(accountId: String): FloatingChatConversation {
+        return conversations.getOrPut(accountId) {
+            accountScopedConversation(source, accountId)
+        }
+    }
+}
+
 internal fun selectedThreadAfterAccountAvatarClick(
     conversation: FloatingChatConversation,
     clickedAccountId: String,

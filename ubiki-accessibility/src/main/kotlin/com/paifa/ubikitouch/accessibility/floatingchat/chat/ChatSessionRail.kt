@@ -23,13 +23,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface as MaterialSurface
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Forward
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -82,8 +88,14 @@ import com.paifa.ubikitouch.core.model.FloatingChatConnectionTarget
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatConversation
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
+import com.paifa.ubikitouch.core.model.FloatingChatToolAction
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+
+private const val SessionDetailBadgeWidthDp = 28
+private const val SessionDetailBadgeHeightDp = 10
+private const val SessionDetailBadgeIconSizeDp = 10
+private const val SessionDetailBadgeOffsetYDp = 5
 
 @Composable
 internal fun ChatSessionRail(
@@ -96,6 +108,7 @@ internal fun ChatSessionRail(
     onThreadSelected: (ChatThreadSelection) -> Unit,
     onGroupAvatarLongClick: (FloatingChatContact) -> Unit,
     onContactAvatarLongClick: (FloatingChatContact) -> Unit,
+    onToolAction: (FloatingChatToolAction) -> Unit,
     connectorState: ConnectorCoordinateState,
     modifier: Modifier = Modifier
 ) {
@@ -109,6 +122,7 @@ internal fun ChatSessionRail(
         onThreadSelected = onThreadSelected,
         onGroupAvatarLongClick = onGroupAvatarLongClick,
         onContactAvatarLongClick = onContactAvatarLongClick,
+        onToolAction = onToolAction,
         connectorState = connectorState,
         modifier = modifier
     )
@@ -125,6 +139,7 @@ private fun ScrollableSessionRail(
     onThreadSelected: (ChatThreadSelection) -> Unit,
     onGroupAvatarLongClick: (FloatingChatContact) -> Unit,
     onContactAvatarLongClick: (FloatingChatContact) -> Unit,
+    onToolAction: (FloatingChatToolAction) -> Unit,
     connectorState: ConnectorCoordinateState,
     modifier: Modifier = Modifier
 ) {
@@ -156,6 +171,8 @@ private fun ScrollableSessionRail(
         initialFirstVisibleItemIndex = leftRailInitialFirstVisibleItemIndex()
     )
     var showFollowText by remember { mutableStateOf(false) }
+    var railIsScrolling by remember { mutableStateOf(false) }
+    var selectedActionsExpanded by remember(selectedThread) { mutableStateOf(false) }
     val avatarBoundsByContactId = remember { mutableMapOf<String, Rect>() }
     var avatarBoundsVersion by remember { mutableIntStateOf(0) }
     fun updateAvatarBounds(id: String, bounds: Rect) {
@@ -243,6 +260,7 @@ private fun ScrollableSessionRail(
     LaunchedEffect(listState) {
         snapshotFlow { listState.isScrollInProgress }
             .collectLatest { scrolling ->
+                railIsScrolling = scrolling
                 if (scrolling) {
                     showFollowText = true
                 } else {
@@ -250,6 +268,13 @@ private fun ScrollableSessionRail(
                     showFollowText = false
                 }
             }
+    }
+    LaunchedEffect(selectedThread, railIsScrolling) {
+        selectedActionsExpanded = false
+        if (!railIsScrolling) {
+            delay(leftRailSelectedActionsDwellMs())
+            selectedActionsExpanded = true
+        }
     }
     LaunchedEffect(selectedPrivateContactId, selectedPrivateAvatarBounds) {
         val contactId = selectedPrivateContactId
@@ -402,6 +427,12 @@ private fun ScrollableSessionRail(
                     onThreadSelected = onThreadSelected,
                     onGroupAvatarLongClick = onGroupAvatarLongClick,
                     onContactAvatarLongClick = onContactAvatarLongClick,
+                    onToolAction = onToolAction,
+                    selectedActionsExpanded = leftRailSelectionActionsVisible(
+                        selectedDurationMs = if (selectedActionsExpanded) leftRailSelectedActionsDwellMs() else 0L,
+                        isSelected = item.toThreadSelection() == selectedThread,
+                        isScrolling = railIsScrolling
+                    ),
                     removeBoundsOnDispose = true,
                     modifier = Modifier.padding(start = railScreenEdgeInsetDp)
                 )
@@ -422,6 +453,12 @@ private fun ScrollableSessionRail(
                 onThreadSelected = onThreadSelected,
                 onGroupAvatarLongClick = onGroupAvatarLongClick,
                 onContactAvatarLongClick = onContactAvatarLongClick,
+                onToolAction = onToolAction,
+                selectedActionsExpanded = leftRailSelectionActionsVisible(
+                    selectedDurationMs = if (selectedActionsExpanded) leftRailSelectedActionsDwellMs() else 0L,
+                    isSelected = true,
+                    isScrolling = railIsScrolling
+                ),
                 removeBoundsOnDispose = false,
                 modifier = Modifier
                     .align(pinnedEdge.toLeftRailAlignment())
@@ -435,7 +472,7 @@ private fun ScrollableSessionRail(
             modifier = Modifier
                 .offset(x = leftRailFollowTextStartOffsetDp().dp + railScreenEdgeInsetDp)
                 .fillMaxHeight()
-                .requiredWidth(leftRailFollowTextWidthDp().dp)
+                .requiredWidth(leftRailFollowTextContainerWidthDp().dp)
                 .zIndex(12f)
         )
     }
@@ -455,78 +492,171 @@ private fun SessionRailAvatarItem(
     onThreadSelected: (ChatThreadSelection) -> Unit,
     onGroupAvatarLongClick: (FloatingChatContact) -> Unit,
     onContactAvatarLongClick: (FloatingChatContact) -> Unit,
+    onToolAction: (FloatingChatToolAction) -> Unit,
+    selectedActionsExpanded: Boolean,
     removeBoundsOnDispose: Boolean,
     modifier: Modifier = Modifier
 ) {
-    when (item) {
-        is SessionRailItem.Group -> {
-            val group = item.contact
-            val selection = group.toGroupThreadSelection()
-            Box(modifier = modifier) {
-                GroupChatAvatar(
-                    selected = selectedThread == selection,
-                    unread = unreadThreadIds.contains(selection.toLocalThreadId()),
-                    memberCount = contactsCount,
-                    label = group.initials,
-                    color = Color(group.avatarColor),
-                    memberAvatarUris = groupChatAvatarDisplayImageUris(group),
-                    onClick = { onThreadSelected(selection) },
-                    onLongClick = { onGroupAvatarLongClick(group) },
-                    onBoundsChanged = { bounds ->
-                        updateAvatarBounds(group.id, bounds)
-                        val connectorId = group.groupConnectorId()
-                        if (selectedThread == selection) {
-                            connectorState.updateGroupThreadAvatar(connectorId, bounds)
-                        }
-                        connectorState.updateUserAvatar(connectorId, bounds)
-                    },
-                    onRemoved = {
-                        if (removeBoundsOnDispose) {
-                            removeAvatarBounds(group.id)
-                            val connectorId = group.groupConnectorId()
-                            connectorState.removeUserAvatar(connectorId)
-                            connectorState.removeGroupThreadAvatar(connectorId)
-                        }
+    val selection = item.toThreadSelection()
+    val isSelected = selection == selectedThread
+    val openProfileOrSettings = {
+        when (item) {
+            is SessionRailItem.Group -> onGroupAvatarLongClick(item.contact)
+            is SessionRailItem.Contact -> onContactAvatarLongClick(item.contact)
+        }
+    }
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        if (isSelected && selectedActionsExpanded) {
+            SessionRailInlineAction(label = "转发", onClick = { onToolAction(FloatingChatToolAction.Share) })
+        }
+        Box(modifier = Modifier.height(58.dp)) {
+            when (item) {
+                is SessionRailItem.Group -> {
+                    val group = item.contact
+                    Box(modifier = Modifier.align(Alignment.Center)) {
+                        GroupChatAvatar(
+                            selected = isSelected,
+                            unread = unreadThreadIds.contains(selection.toLocalThreadId()),
+                            memberCount = contactsCount,
+                            label = group.initials,
+                            color = Color(group.avatarColor),
+                            memberAvatarUris = groupChatAvatarDisplayImageUris(group),
+                            onClick = { onThreadSelected(selection) },
+                            onLongClick = { onGroupAvatarLongClick(group) },
+                            onBoundsChanged = { bounds ->
+                                updateAvatarBounds(group.id, bounds)
+                                val connectorId = group.groupConnectorId()
+                                if (isSelected) connectorState.updateGroupThreadAvatar(connectorId, bounds)
+                                connectorState.updateUserAvatar(connectorId, bounds)
+                            },
+                            onRemoved = {
+                                if (removeBoundsOnDispose) {
+                                    removeAvatarBounds(group.id)
+                                    val connectorId = group.groupConnectorId()
+                                    connectorState.removeUserAvatar(connectorId)
+                                    connectorState.removeGroupThreadAvatar(connectorId)
+                                }
+                            }
+                        )
                     }
+                }
+                is SessionRailItem.Contact -> {
+                    val contact = item.contact
+                    var currentAvatarBounds by remember(contact.id) { mutableStateOf<Rect?>(null) }
+                    Box(modifier = Modifier.align(Alignment.Center)) {
+                        CompactAvatar(
+                            contact = contact.copy(
+                                selected = isSelected,
+                                online = unreadThreadIds.contains(selection.toLocalThreadId())
+                            ),
+                            role = AvatarRole.Session,
+                            onClick = {
+                                (currentAvatarBounds ?: avatarBoundsByContactId[contact.id])?.let { bounds ->
+                                    connectorState.updatePrivateThreadAvatar(contact.id, bounds)
+                                }
+                                onThreadSelected(selection)
+                            },
+                            onLongClick = { onContactAvatarLongClick(contact) },
+                            onBoundsChanged = { bounds ->
+                                currentAvatarBounds = bounds
+                                updateAvatarBounds(contact.id, bounds)
+                                connectorState.updateUserAvatar(contact.id, bounds)
+                                if (selectedPrivateContactId == contact.id) {
+                                    connectorState.updatePrivateThreadAvatar(contact.id, bounds)
+                                }
+                            },
+                            onRemoved = {
+                                if (removeBoundsOnDispose) {
+                                    removeAvatarBounds(contact.id)
+                                    connectorState.removeUserAvatar(contact.id)
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+            if (isSelected) {
+                SessionRailAvatarAnchoredActions(
+                    onOpenProfile = openProfileOrSettings,
+                    onOpenSettings = openProfileOrSettings,
+                    modifier = Modifier.align(Alignment.Center)
                 )
             }
         }
-        is SessionRailItem.Contact -> {
-            val contact = item.contact
-            var currentAvatarBounds by remember(contact.id) { mutableStateOf<Rect?>(null) }
-            Box(modifier = modifier) {
-                CompactAvatar(
-                    contact = contact.copy(
-                        selected = selectedThread is ChatThreadSelection.Private &&
-                            selectedThread.contactId == contact.id,
-                        online = unreadThreadIds.contains(ChatThreadSelection.Private(contact.id).toLocalThreadId())
-                    ),
-                    role = AvatarRole.Session,
-                    onClick = {
-                        (currentAvatarBounds ?: avatarBoundsByContactId[contact.id])?.let { bounds ->
-                            connectorState.updatePrivateThreadAvatar(contact.id, bounds)
-                        }
-                        onThreadSelected(ChatThreadSelection.Private(contact.id))
-                    },
-                    onLongClick = { onContactAvatarLongClick(contact) },
-                    onBoundsChanged = { bounds ->
-                        currentAvatarBounds = bounds
-                        updateAvatarBounds(contact.id, bounds)
-                        connectorState.updateUserAvatar(contact.id, bounds)
-                        if (selectedPrivateContactId == contact.id) {
-                            connectorState.updatePrivateThreadAvatar(contact.id, bounds)
-                        }
-                    },
-                    onRemoved = {
-                        if (removeBoundsOnDispose) {
-                            removeAvatarBounds(contact.id)
-                            connectorState.removeUserAvatar(contact.id)
-                        }
-                    }
+        if (isSelected && selectedActionsExpanded) {
+            SessionRailInlineAction(label = "朋友圈", onClick = { onToolAction(FloatingChatToolAction.Moments) })
+        }
+    }
+}
+
+@Composable
+private fun SessionRailAvatarAnchoredActions(
+    onOpenProfile: () -> Unit,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier.size(leftRailAvatarSizeDp().dp)) {
+        IconButton(
+            onClick = onOpenProfile,
+            modifier = Modifier.align(Alignment.TopCenter).offset(y = (-10).dp).size(22.dp)
+        ) {
+            Icon(Icons.Filled.Visibility, contentDescription = "用户画像", tint = OverlayTokens.panelPrimaryText, modifier = Modifier.size(15.dp))
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                // Keep the action centered on the avatar's lower edge without covering the avatar.
+                .offset(y = SessionDetailBadgeOffsetYDp.dp)
+                .size(
+                    width = leftRailAvatarSizeDp().dp,
+                    height = SessionDetailBadgeHeightDp.dp
+                )
+                .clickable(onClick = onOpenSettings),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(
+                        width = SessionDetailBadgeWidthDp.dp,
+                        height = SessionDetailBadgeHeightDp.dp
+                    )
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(Color(0xFFE94B4B)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Filled.MoreHoriz,
+                    contentDescription = "会话详细设置",
+                    tint = Color.White,
+                    modifier = Modifier.size(SessionDetailBadgeIconSizeDp.dp)
                 )
             }
         }
     }
+}
+
+@Composable
+private fun SessionRailInlineAction(label: String, onClick: () -> Unit) {
+    MaterialSurface(
+        onClick = onClick,
+        color = OverlayTokens.panel,
+        shape = RoundedCornerShape(6.dp),
+        border = BorderStroke(1.dp, OverlayTokens.panelBorder),
+        modifier = Modifier.width(50.dp).height(24.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            if (label == "转发") {
+                Icon(Icons.AutoMirrored.Filled.Forward, contentDescription = label, tint = OverlayTokens.panelPrimaryText, modifier = Modifier.size(14.dp))
+            } else {
+                TextLabel(text = label, size = 8.sp, color = OverlayTokens.panelPrimaryText, maxLines = 1)
+            }
+        }
+    }
+}
+
+private fun SessionRailItem.toThreadSelection(): ChatThreadSelection = when (this) {
+    is SessionRailItem.Group -> contact.toGroupThreadSelection()
+    is SessionRailItem.Contact -> ChatThreadSelection.Private(contact.id)
 }
 
 private fun RailPinnedAvatarEdge.toLeftRailAlignment(): Alignment {
@@ -556,39 +686,63 @@ private fun LeftRailFollowTextOverlay(
     ) {
         infos.forEach { info ->
             val yOffset = with(density) { info.topPx.toDp() }
-            val textColors = leftRailFollowTextColors(info.avatarColor)
-            Column(
+            Box(
                 modifier = Modifier
-                    .offset(x = leftRailFollowTextInnerPaddingDp().dp, y = yOffset)
-                    .widthIn(
-                        max = (leftRailFollowTextWidthDp() - leftRailFollowTextInnerPaddingDp() * 2).dp
-                    )
-                    .padding(horizontal = 2.dp, vertical = 2.dp)
+                    .offset(x = leftRailFollowTextAvatarGapDp().dp, y = yOffset)
+                    .width(leftRailFollowTextWidthDp().dp)
+                    .height(leftRailFollowTextCardHeightDp().dp)
+                    .clip(RoundedCornerShape(leftRailFollowTextCardCornerDp().dp))
+                    .background(Color(0xFFD6D9DC).copy(alpha = leftRailFollowTextCardBackgroundAlpha()))
             ) {
-                TextLabel(
-                    text = info.name,
-                    size = leftRailFollowTextNameSizeSp().sp,
-                    weight = FontWeight.SemiBold,
-                    color = textColors.name,
-                    maxLines = 1,
-                    shadow = OverlayTokens.leftRailFollowTextShadow
-                )
-                TextLabel(
-                    text = info.lastMessage,
-                    size = leftRailFollowTextMessageSizeSp().sp,
-                    weight = FontWeight.Medium,
-                    color = textColors.message,
-                    maxLines = 1,
-                    shadow = OverlayTokens.leftRailFollowTextShadow
-                )
-                TextLabel(
-                    text = info.lastTime,
-                    size = leftRailFollowTextTimeSizeSp().sp,
-                    weight = FontWeight.Medium,
-                    color = textColors.time,
-                    maxLines = 1,
-                    shadow = OverlayTokens.leftRailFollowTextShadow
-                )
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val corner = leftRailFollowTextCardCornerDp().dp.toPx()
+                    drawRoundRect(
+                        color = Color.White.copy(alpha = 0.90f),
+                        topLeft = Offset(0f, 0f),
+                        size = Size(size.width, size.height),
+                        cornerRadius = CornerRadius(corner, corner),
+                        style = Stroke(width = 1.dp.toPx())
+                    )
+                }
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    TextLabel(
+                        text = info.name,
+                        size = leftRailFollowTextNameSizeSp().sp,
+                        weight = FontWeight.SemiBold,
+                        color = Color.Black.copy(alpha = 0.86f),
+                        maxLines = 1,
+                        shadow = OverlayTokens.leftRailFollowTextShadow
+                    )
+                    TextLabel(
+                        text = info.lastMessage.ifBlank { "信息" },
+                        size = leftRailFollowTextMessageSizeSp().sp,
+                        weight = FontWeight.Medium,
+                        color = Color.Black.copy(alpha = 0.78f),
+                        maxLines = 1,
+                        shadow = OverlayTokens.leftRailFollowTextShadow
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(Color.Black.copy(alpha = 0.20f))
+                    )
+                    if (info.lastTime.isNotBlank()) {
+                        TextLabel(
+                            text = info.lastTime,
+                            size = leftRailFollowTextTimeSizeSp().sp,
+                            weight = FontWeight.Medium,
+                            color = Color.Black.copy(alpha = 0.64f),
+                            maxLines = 1,
+                            shadow = OverlayTokens.leftRailFollowTextShadow
+                        )
+                    }
+                }
             }
         }
     }

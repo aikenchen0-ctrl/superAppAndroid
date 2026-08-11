@@ -68,8 +68,9 @@ internal object OverlayTokens {
     val legacySelfBubble = Color(0xFFF7F9FB)
     val legacyOtherBubble = Color(0xFFF7F9FB)
     val legacyBubbleBorder = Color(0xFFCAD5DD)
-    val selfBubble = Color(0xFF95EC69)
-    val otherBubble = Color(0xFFF7F7F7)
+    // Dark translucent glass keeps white message text readable over the blurred chat backdrop.
+    val selfBubble = Color(0xB84A4A4A)
+    val otherBubble = Color(0x96424242)
     val systemBubble = Color(0xFFF8FCFF)
     val specialCard = Color(0xFFF7F9FB)
     val specialCardBorder = Color(0xFFCAD5DD)
@@ -83,6 +84,8 @@ internal object OverlayTokens {
     val bubbleBorder = Color(0x80000000)
     val glassShadow = Color(0x1A000000)
     val bubbleText = Color(0xFF171717)
+    val imModuleBubbleGlass = Color(0xA8666666)
+    val imModuleBubbleText = Color(0xFFF8F8F8)
     val bubbleTextMuted = Color(0xFF666666)
     val bubbleNameText = Color(0xFF707070)
     val systemPromptText = Color(0xF4F8FCFF)
@@ -160,14 +163,14 @@ internal object OverlayTokens {
     val videoFrame = Color(0xFF5E737B)
     val inlineAvatar = Color(0xFF5B6D75)
     val imModuleTextShadow = Shadow(
-        color = Color.Transparent,
-        offset = Offset.Zero,
-        blurRadius = 0f
+        color = Color(0xCC000000),
+        offset = Offset(0f, 1f),
+        blurRadius = 2.4f
     )
     val leftRailFollowTextShadow = Shadow(
-        color = Color.Transparent,
-        offset = Offset.Zero,
-        blurRadius = 0f
+        color = Color(0x55000000),
+        offset = Offset(0f, 1f),
+        blurRadius = 1.6f
     )
     val textShadow = imModuleTextShadow
 

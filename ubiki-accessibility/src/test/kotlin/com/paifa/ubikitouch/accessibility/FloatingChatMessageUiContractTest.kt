@@ -59,6 +59,7 @@ import androidx.compose.ui.geometry.Offset
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FloatingChatMessageUiContractTest {
@@ -103,6 +104,7 @@ class FloatingChatMessageUiContractTest {
         assertEquals(true, chatToolbarHasSearchButton())
         assertEquals(listOf(1, 2, 1), chatToolbarWeightDistribution())
         assertEquals(4, chatSearchPreviewResultCount())
+        assertTrue(messageOperationPreviewUsesInTreeOverlay())
     }
 
     @Test
@@ -1371,14 +1373,15 @@ class FloatingChatMessageUiContractTest {
 
     @Test
     fun textChatBubblesReuseImModuleDesignTokens() {
-        assertEquals(0xFF95EC69.toInt(), imModuleSelfBubbleColorArgb())
-        assertEquals(0xFFF7F7F7.toInt(), imModuleOtherBubbleColorArgb())
+        assertEquals(0xB84A4A4A.toInt(), imModuleSelfBubbleColorArgb())
+        assertEquals(0x96424242.toInt(), imModuleOtherBubbleColorArgb())
         assertEquals(0x18000000, imModuleSelfBubbleBorderColorArgb())
         assertEquals(0x14000000, imModuleOtherBubbleBorderColorArgb())
-        assertEquals(0xFF171717.toInt(), imModuleBubbleTextColorArgb())
-        assertEquals(0x00000000, imModuleBubbleShadowColorArgb())
-        assertEquals(false, imModuleBubbleUsesDemoGlassEffect())
-        assertEquals(0, imModuleSelfBubbleBackdropBlurDp())
+        assertEquals(0xFFF8F8F8.toInt(), imModuleBubbleTextColorArgb())
+        assertEquals(0xCC000000.toInt(), imModuleBubbleShadowColorArgb())
+        assertEquals(true, imModuleBubbleUsesDemoGlassEffect())
+        assertEquals(8, imModuleSelfBubbleBackdropBlurDp())
+        assertEquals(0.62f, imModuleBubbleGlassFillMultiplier())
         assertEquals(0, imModuleSelfBubbleShadowOffsetYDp())
         assertEquals(0, imModuleSelfBubbleShadowBlurDp())
         assertEquals(false, imModuleOtherBubbleIsTransparentWithHalfBorder())
@@ -1761,9 +1764,11 @@ class FloatingChatMessageUiContractTest {
         assertEquals(true, leftRailScrollShowsFollowTextOverlay())
         assertEquals(0, leftRailFollowTextHideDelayMs())
         assertEquals(true, leftRailFollowTextHidesOnRelease())
-        assertEquals(42, leftRailFollowTextStartOffsetDp())
-        assertEquals(280, leftRailFollowTextWidthDp())
-        assertEquals(322, leftRailFollowTextLayerWidthDp())
+        assertEquals(46, leftRailFollowTextStartOffsetDp())
+        assertEquals(172, leftRailFollowTextWidthDp())
+        assertEquals(4, leftRailFollowTextAvatarGapDp())
+        assertEquals(176, leftRailFollowTextContainerWidthDp())
+        assertEquals(222, leftRailFollowTextLayerWidthDp())
         assertEquals(56, leftRailTouchableWidthDp())
         assertEquals(12, railScreenEdgeInsetPx())
         assertEquals(12, leftRailAvatarScreenEdgeInsetPx())
@@ -1863,7 +1868,7 @@ class FloatingChatMessageUiContractTest {
             )
         )
         assertEquals(true, leftRailFollowTextIncludesNameLastMessageAndTime())
-        assertEquals(false, leftRailFollowTextUsesDarkTextShadow())
+        assertEquals(true, leftRailFollowTextUsesDarkTextShadow())
         assertEquals(conversation.contacts.first { contact -> contact.id == "li-si" }.name, info.name)
         assertEquals(
             visibleMessagesForThread(

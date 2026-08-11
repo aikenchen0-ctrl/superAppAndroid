@@ -44,7 +44,7 @@ internal fun SimpleTextMessageContent(message: FloatingChatMessage, index: Int) 
         text = displayText,
         size = if (isSystem) 11.sp else 14.sp,
         weight = if (isSystem) FontWeight.Normal else FontWeight.Normal,
-        color = if (isSystem) OverlayTokens.systemPromptText else OverlayTokens.bubbleText,
+        color = if (isSystem) OverlayTokens.systemPromptText else OverlayTokens.imModuleBubbleText,
         lineHeight = if (isSystem) 15.sp else 20.sp,
         maxLines = if (isSystem) 2 else if (index < 2) 3 else 4,
         shadow = OverlayTokens.imModuleTextShadow
@@ -55,7 +55,7 @@ internal fun SimpleTextMessageContent(message: FloatingChatMessage, index: Int) 
             text = detail,
             size = 10.sp,
             weight = FontWeight.SemiBold,
-            color = OverlayTokens.bubbleTextMuted,
+            color = OverlayTokens.imModuleBubbleText.copy(alpha = 0.78f),
             lineHeight = 14.sp,
             maxLines = 1,
             shadow = OverlayTokens.imModuleTextShadow
@@ -72,7 +72,7 @@ internal fun MixedTextMessageContent(message: FloatingChatMessage) {
             buildAnnotatedString {
                 message.inlineTokens.forEach { token ->
                     val color = when (token.type) {
-                        FloatingChatInlineTokenType.Plain -> OverlayTokens.bubbleText
+                        FloatingChatInlineTokenType.Plain -> OverlayTokens.imModuleBubbleText
                         FloatingChatInlineTokenType.PaidianLink,
                         FloatingChatInlineTokenType.FileLink,
                         FloatingChatInlineTokenType.Url,
@@ -108,7 +108,7 @@ internal fun QuoteMessageContent(message: FloatingChatMessage) {
         text = chatBubbleDisplayText(message.text),
         size = 14.sp,
         weight = FontWeight.Normal,
-        color = OverlayTokens.bubbleText,
+        color = OverlayTokens.imModuleBubbleText,
         lineHeight = 15.sp,
         maxLines = 4,
         shadow = OverlayTokens.imModuleTextShadow
@@ -181,14 +181,14 @@ private fun QuoteBlock(message: FloatingChatMessage) {
                 text = message.quoteAuthor.orEmpty(),
                 size = 10.sp,
                 weight = FontWeight.SemiBold,
-                color = OverlayTokens.bubbleText,
+                color = OverlayTokens.imModuleBubbleText,
                 maxLines = 1,
                 shadow = OverlayTokens.imModuleTextShadow
             )
             TextLabel(
                 text = message.quoteText.orEmpty(),
                 size = 10.sp,
-                color = OverlayTokens.bubbleTextMuted,
+                color = OverlayTokens.imModuleBubbleText.copy(alpha = 0.78f),
                 maxLines = 1,
                 shadow = OverlayTokens.imModuleTextShadow
             )
@@ -211,7 +211,7 @@ private fun AnnotatedTextLabel(
         maxLines = maxLines,
         overflow = TextOverflow.Ellipsis,
         style = TextStyle.Default.copy(
-            color = OverlayTokens.bubbleText,
+            color = OverlayTokens.imModuleBubbleText,
             fontSize = size,
             lineHeight = lineHeight,
             fontWeight = FontWeight.SemiBold,

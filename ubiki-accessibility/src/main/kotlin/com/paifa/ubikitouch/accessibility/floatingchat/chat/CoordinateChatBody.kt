@@ -16,9 +16,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.PersonAddAlt1
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -148,6 +153,7 @@ internal fun CoordinateChatBody(
     onPaymentCardClick: (FloatingChatMessage) -> Unit,
     onChatHistoryClick: (FloatingChatMessage) -> Unit,
     onAiDraftClick: (FloatingChatMessage) -> Unit,
+    onMessageClick: (FloatingChatMessage) -> Unit,
     onLongPressMessage: (FloatingChatMessage, Rect?) -> Unit,
     multiSelectMode: Boolean,
     selectedMessageIds: Map<String, Boolean>,
@@ -157,6 +163,8 @@ internal fun CoordinateChatBody(
     onToggleMessageSelection: (FloatingChatMessage) -> Unit,
     onBlankAreaTap: () -> Unit,
     onCloseChat: () -> Unit,
+    onScanClick: () -> Unit,
+    onAddFriendClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val connectorState = remember { ConnectorCoordinateState() }
@@ -306,10 +314,32 @@ internal fun CoordinateChatBody(
                 homeOverviewVisible = homeOverviewVisible
             )
         }
+        val toolbarEditableContact = remember(conversation.contacts, selectedThread) {
+            when (selectedThread) {
+                is ChatThreadSelection.Private -> conversation.contacts
+                    .firstOrNull { contact -> contact.id == selectedThread.contactId }
+                else -> null
+            }
+        }
+        val toolbarEditableGroup = remember(conversation.groupContacts, selectedThread) {
+            when (selectedThread) {
+                ChatThreadSelection.Group -> conversation.groupContacts.firstOrNull()
+                is ChatThreadSelection.GroupChat -> conversation.groupContacts
+                    .firstOrNull { group -> group.id == selectedThread.groupId }
+                is ChatThreadSelection.Private -> null
+            }
+        }
         ChatTopToolbar(
             title = toolbarTitle,
-            unreadCount = unreadThreadIds.size,
-            onCloseClick = onCloseChat,
+            accountName = selectedAccount.name,
+            hasUnreadIndicator = unreadThreadIds.isNotEmpty(),
+            onNavigationClick = onCloseChat,
+            onEditClick = {
+                toolbarEditableContact?.let(onContactAvatarLongClick)
+                    ?: toolbarEditableGroup?.let(onGroupAvatarLongClick)
+            },
+            onScanClick = onScanClick,
+            onAddFriendClick = onAddFriendClick,
             onSearchClick = {
                 chatSearchQuery = ""
                 chatSearchVisible = true
@@ -349,6 +379,8 @@ internal fun CoordinateChatBody(
                         onPreviewDocument(message)
                     } else if (message.type == FloatingChatMessageType.ChatHistory) {
                         onChatHistoryClick(message)
+                    } else {
+                        onMessageClick(message)
                     }
                 },
                 onBlankAreaTap = onBlankAreaTap,
@@ -370,6 +402,7 @@ internal fun CoordinateChatBody(
             onThreadSelected = onThreadSelected,
             onGroupAvatarLongClick = onGroupAvatarLongClick,
             onContactAvatarLongClick = onContactAvatarLongClick,
+            onToolAction = onToolAction,
             connectorState = connectorState,
             modifier = Modifier
                 .align(Alignment.CenterStart)
@@ -407,6 +440,7 @@ internal fun CoordinateChatBody(
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
                 .width(rightRailWidthDp().dp)
+                .zIndex(leftRailLayerZIndex())
         )
         ChatConnectorLayer(
             messages = visibleMessages,
@@ -442,11 +476,16 @@ internal fun CoordinateChatBody(
 @Composable
 private fun ChatTopToolbar(
     title: String,
-    unreadCount: Int,
-    onCloseClick: () -> Unit,
+    accountName: String,
+    hasUnreadIndicator: Boolean,
+    onNavigationClick: () -> Unit,
+    onEditClick: () -> Unit,
+    onScanClick: () -> Unit,
+    onAddFriendClick: () -> Unit,
     onSearchClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var utilityMenuExpanded by remember { mutableStateOf(false) }
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -462,68 +501,122 @@ private fun ChatTopToolbar(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier.weight(1f),
-                contentAlignment = Alignment.CenterStart
-            ) {
-                androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = onCloseClick,
-                        modifier = Modifier.width(40.dp).height(40.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "关闭聊天",
-                            tint = OverlayTokens.panelPrimaryText,
-                            modifier = Modifier.width(22.dp).height(22.dp)
-                        )
-                    }
-                    chatToolbarUnreadBadgeLabel(unreadCount)?.let { label ->
-                        Box(
-                            modifier = Modifier
-                                .height(chatToolbarUnreadBadgeHeightDp().dp)
-                                .background(OverlayTokens.accent, CircleShape)
-                                .padding(horizontal = chatToolbarUnreadBadgeHorizontalPaddingDp().dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = label,
-                                color = OverlayTokens.panel,
-                                fontSize = chatToolbarUnreadBadgeTextSizeSp().sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1
-                            )
-                        }
-                    }
+            Box(contentAlignment = Alignment.CenterStart) {
+                IconButton(
+                    onClick = onNavigationClick,
+                    modifier = Modifier.width(36.dp).height(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "返回",
+                        tint = OverlayTokens.panelPrimaryText,
+                        modifier = Modifier.width(20.dp).height(20.dp)
+                    )
+                }
+                if (hasUnreadIndicator) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 8.dp, end = 4.dp)
+                            .width(8.dp)
+                            .height(8.dp)
+                            .background(OverlayTokens.accent, CircleShape)
+                    )
                 }
             }
-            Box(
-                modifier = Modifier.weight(2f),
-                contentAlignment = Alignment.Center
+            androidx.compose.foundation.layout.Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 2.dp, end = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = title,
+                    modifier = Modifier.weight(1f),
                     color = OverlayTokens.panelPrimaryText,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
-                    textAlign = TextAlign.Center,
+                    textAlign = TextAlign.Start,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                IconButton(
+                    onClick = onEditClick,
+                    modifier = Modifier.width(30.dp).height(30.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Edit,
+                        contentDescription = "编辑会话",
+                        tint = OverlayTokens.panelSecondaryText,
+                        modifier = Modifier.width(16.dp).height(16.dp)
+                    )
+                }
             }
-            Box(
-                modifier = Modifier.weight(1f),
-                contentAlignment = Alignment.CenterEnd
+            androidx.compose.foundation.layout.Row(
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
+                    onClick = { utilityMenuExpanded = true },
+                    modifier = Modifier.width(30.dp).height(30.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Filled.QrCodeScanner,
+                            contentDescription = "扫一扫与加人",
+                            tint = OverlayTokens.panelPrimaryText,
+                            modifier = Modifier.width(18.dp).height(18.dp)
+                        )
+                        Icon(
+                            imageVector = Icons.Filled.PersonAddAlt1,
+                            contentDescription = null,
+                            tint = OverlayTokens.accent,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .width(10.dp)
+                                .height(10.dp)
+                        )
+                    }
+                }
+                DropdownMenu(
+                    expanded = utilityMenuExpanded,
+                    onDismissRequest = { utilityMenuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("扫一扫") },
+                        onClick = {
+                            utilityMenuExpanded = false
+                            onScanClick()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("添加朋友") },
+                        onClick = {
+                            utilityMenuExpanded = false
+                            onAddFriendClick()
+                        }
+                    )
+                }
+                Text(
+                    text = accountName,
+                    modifier = Modifier
+                        .width(72.dp)
+                        .padding(horizontal = 2.dp),
+                    color = OverlayTokens.panelSecondaryText,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.End,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                IconButton(
                     onClick = onSearchClick,
-                    modifier = Modifier.width(40.dp).height(40.dp)
+                    modifier = Modifier.width(30.dp).height(30.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Search,
                         contentDescription = "搜索聊天记录",
                         tint = OverlayTokens.panelPrimaryText,
-                        modifier = Modifier.width(22.dp).height(22.dp)
+                        modifier = Modifier.width(18.dp).height(18.dp)
                     )
                 }
             }

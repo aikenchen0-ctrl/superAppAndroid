@@ -264,10 +264,14 @@ private fun scrmFloatingMessageType(messageType: Int, content: String): Floating
             "<type>6</type>" in lower -> FloatingChatMessageType.FilePreview
             "<type>19</type>" in lower -> FloatingChatMessageType.ChatHistory
             "<type>2000</type>" in lower -> FloatingChatMessageType.Transfer
-            "<type>2001</type>" in lower -> FloatingChatMessageType.RedPacket
+            "<type>2001</type>" in lower || "<type>2002</type>" in lower -> FloatingChatMessageType.RedPacket
+            "<type>57</type>" in lower -> FloatingChatMessageType.Quote
+            "<type>5</type>" in lower || "h5" in lower -> FloatingChatMessageType.WebLink
             else -> FloatingChatMessageType.WebLink
         }
         50 -> FloatingChatMessageType.VoiceCall
+        // System/group-management notifications keep Text as their model type,
+        // while presentation is switched to System above so they render without a bubble.
         else -> FloatingChatMessageType.Text
     }
 }

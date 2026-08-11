@@ -173,3 +173,50 @@
 - 已将朋友圈素材“保存”改为创建预览，文案为空时禁止生成，名称和分类显示默认值；复制、归档、创建三个素材操作现在均从 UI 预览入口开始，不调用对应写接口。
 - `MomentMaterialCreatePreviewTest` 与 `MomentMaterialOperationPreviewTest` 已通过，主源码编译和 `git diff --check` 通过。
 - 已在 SCRM 运营工作台增加“接口验收状态”摘要，明确区分本地测试已通过、真实服务待验收、写操作仅预览；不伪造真实服务成功结果。`:ubiki-accessibility:compileDebugKotlin` 通过。
+# 2026-08-11 支付模块 iOS 流程对齐（第一阶段）
+
+- 已完成确认页微信零钱回读入口：用户点击“零钱”后才调用 `wallet-balance`；同步回包展示格式化余额，异步回包只展示任务 ID，不伪造余额。
+- 支付状态中心已接入用户主动触发的 `tasks/recent` 只读查询，并筛选支付相关任务显示 taskId、状态和安全说明。
+- 新增钱包余额 fixture 解析测试；`PaymentFlowTest`、完整 Debug APK 构建通过，APK 已安装到 `d0512adb`。
+- 已完成支付详情浮层的只读状态回读：用户点击“刷新支付状态”后，红包按服务端消息 ID 调用 `red-packets/detail-by-message`，UI 显示加载、任务处理中、可领取、已领取、已过期、已领完、拒收、失败和待人工核对状态。
+- 转账详情不会错误调用红包接口；当前接口文档未提供按消息查询转账详情的只读路由，UI 明确提示应使用任务回读。领取和收款点击不再写本地“已成功”状态，改为人工验收提示。
+- 验证：关闭 Kotlin 增量编译后，`PaymentFlowTest` 通过；Debug APK 构建成功并已安装到 `d0512adb`。没有调用真实支付、领取、转账或钱包接口。
+- 已新增支付模块设计与实现计划：`docs/superpowers/specs/2026-08-11-支付模块对齐设计.md`、`docs/superpowers/plans/2026-08-11-支付模块对齐计划.md`。
+- Android SCRM 已补齐红包、红包领取、红包详情/状态、转账、转账收取、钱包余额 7 组支付 API 的请求模型、路由和幂等键调用逻辑；写接口仅保留人工触发入口。
+- 新增支付金额分/元转换、任务 `processing/success/failed/unknown` 状态映射、红包/转账详情状态解析；`unknown` 不允许自动重发。
+- 红包/转账 Composer 已改为 iOS 风格两步确认：填写 -> 确认摘要 -> 生成请求；确认摘要显示账号流程和钱包余额查询占位，不自动调用真实接口。
+- SCRM 运营工作台消息页新增“支付状态中心”流程预览，展示红包、转账、钱包任务范围及人工只读刷新边界。
+- 自动验证：`PaymentFlowTest`、支付写接口幂等键/路由测试通过；真实支付接口未测试。
+# 2026-08-11 悬浮聊天左侧会话轨道
+
+- 已实现当前会话头像上缘的用户画像眼睛图标和下缘红色三点会话详细设置图标；非当前会话不会渲染这些入口。
+- 已实现当前会话停止 5 秒后在轨道内插入转发和朋友圈操作位，切换会话或开始滚动会立即取消停留状态。转发和朋友圈仅进入既有工具面板，不调用写接口。
+- 已复用现有 pinned avatar 覆盖层：当前会话滚出左侧轨道上下边界时，头像及其选中操作固定在边缘；回到可视区域后由列表项继续渲染。
+- 已为会话摘要增加可选地区和标签行，模型未提供数据时不显示空行。
+- 已核对聊天消息区：LazyColumn、详细气泡、系统消息无气泡、勾选式多选和底部转发/收藏/删除/关闭操作均已存在。本轮未修改 renderer，防止影响既有 30 类消息渲染。
+- 验证：`ChatLayoutStateTest.selectedRailActionsAppearOnlyAfterFiveSecondsWithoutScroll` 已先失败再通过；`:ubiki-accessibility:compileDebugKotlin --no-daemon --max-workers=1 '-Pkotlin.incremental=false'` 成功。未构建 APK，未调用任何写接口。
+## 2026-08-11 悬浮聊天标准界面完善
+
+- 已完成 `标准.txt` 与当前 UI 的逐项审查。
+- 已确定按消息交互、气泡、消息类型、右侧工作流的顺序实施。
+- 未调用任何写接口，未构建 APK。
+- 首次扩展“放大”操作后编译发现 `FloatingChatMessageType` 缺少导入，已按根因补充导入。
+- 消息主操作已固定为标准八项：话外音、放大、复制、转发、收藏、删除、多选、引用。
+- 多选栏可见操作已调整为转发、合并转发、收藏、删除、关闭，勾选控件移动到消息下边缘中央。
+- 气泡最大宽度由 99% 收紧到 88%，详细气泡发送者名称增加半透明衬底、阴影和边缘偏移。
+- SCRM 只读映射补充 appmsg type 57 引用、type 5/H5、type 2002 领取红包识别。
+- 右侧 16 个标准业务名称已对齐，第 17 项保留“文件”；AIFF 第二行使用横向 marquee。
+- 定向测试 `MessageStandardActionsTest`、`RightRailWorkflowLabelTest` 已通过。
+- 最终验证通过：`:ubiki-accessibility:testDebugUnitTest` 两个定向测试类、`:app:compileDebugKotlin`。
+- 未构建或安装 APK；未调用任何发送、支付、红包、转账写接口。
+- 真机待验收：详细气泡标题的透明质感、气泡左右最大边界、AIFF marquee 节奏、右侧头像快速连续点击稳定性。
+- 右侧头像连续点击优化：复现 30 次快速点击未抓到 `FATAL EXCEPTION`，但观察到 18-72ms 主线程帧耗时。
+- 根因定位为账号切换重复构造账号作用域会话，以及近期缓存命中后仍重复安排只读刷新；头像加载器原本已有内存 LRU、磁盘缓存和 in-flight 合并。
+- 新增 `AccountScopedConversationCache`，同一源会话下按账号复用联系人、群聊和消息树；源会话变化时通过 Compose `remember` 自动整体失效。
+- 同账号或空账号 ID 的重复点击在状态切换前直接忽略。
+- SCRM 账号只读会话增加 15 秒明确新鲜期，近期缓存命中不重复 GET，过期后仍正常刷新。
+- 回归测试 `AccountAvatarSwitchPolicyTest` 和缓存新鲜度测试通过；未调用任何写接口。
+- 最新验证：重新执行 `:ubiki-accessibility:testDebugUnitTest`（`AccountAvatarSwitchPolicyTest`、`FloatingChatOverlayControllerContractTest`）通过，`:app:compileDebugKotlin --no-daemon --max-workers=1 -Pkotlin.incremental=false` 通过；未构建或安装 APK，未调用发送、支付、红包、转账等写接口。
+- 真机复测前提：需安装本次编译产物后，再用 ADB 连续点击右侧账号头像，对比 `AndroidRuntime` 崩溃栈和跳帧日志；当前证据已确认并优化的是重复重组、重复只读刷新和旧回包覆盖风险。
+- 追加 ANR 根因证据：设备日志出现 `signal 3`、`Wrote stack traces to tombstoned`，随后进程结束；主线程热点位于 `FloatingChatPrototype.pairedAccountFor` 的账号与消息嵌套扫描。已改为单次消息遍历建立账号集合和线程账号映射，避免账号数乘消息数的扫描放大；`:ubiki-core:test` 与 `:app:compileDebugKotlin` 已通过。当前设备尚未安装包含本次修复的新 APK。
+- 已按 `C:\WorkSpace\ios-float` 的 `API_FRONTEND_INTEGRATION_PROGRESS.md`、`AppKitRegistry.swift`、Payments/Wallet/Calls/Search/Moments/OpenAPIWorkbench/OperationLab/MessageRender 模块重新盘点 Android SCRM。`完成进度.md` 顶部新增 2026-08-11 权威结论、模块状态总表、接口优先的 P0-P3 计划和验收口径；旧百分比表已标为历史快照。未修改功能代码、未调用接口、未构建 APK。

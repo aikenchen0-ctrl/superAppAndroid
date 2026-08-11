@@ -43,6 +43,8 @@ import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.visibleMessagesForThread
 import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.accessibility.floatingchat.components.TextLabel
+import com.paifa.ubikitouch.accessibility.scrm.PaymentReadback
+import com.paifa.ubikitouch.accessibility.scrm.PaymentReadbackState
 import com.paifa.ubikitouch.core.model.FloatingChatConnectionTarget
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatConversation
@@ -142,7 +144,9 @@ internal fun PaymentDetailOverlay(
     selectedThread: ChatThreadSelection,
     selectedAccount: FloatingChatContact,
     claimed: Boolean,
+    readback: PaymentReadback = PaymentReadback(),
     onClaim: () -> Unit,
+    onRefresh: () -> Unit = {},
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -168,8 +172,10 @@ internal fun PaymentDetailOverlay(
         selectedThread = selectedThread,
         selectedAccount = selectedAccount
     )
-    LaunchedEffect(claiming, claimed) {
-        if (claimed) {
+    val remoteClaimed = readback.state == PaymentReadbackState.RECEIVED
+    val effectiveClaimed = claimed || remoteClaimed
+    LaunchedEffect(claiming, effectiveClaimed) {
+        if (effectiveClaimed) {
             claiming = false
             return@LaunchedEffect
         }
@@ -262,9 +268,29 @@ internal fun PaymentDetailOverlay(
                     maxLines = 1,
                     textAlign = TextAlign.Center
                 )
+                PaymentReadbackStatus(readback)
+                if (!isTransfer && readback.detail?.entries?.isNotEmpty() == true) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().background(OverlayTokens.control, RoundedCornerShape(8.dp)).padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        TextLabel("领取明细", 11.sp, weight = FontWeight.Normal, color = OverlayTokens.panelPrimaryText, maxLines = 1)
+                        readback.detail.entries.take(8).forEach { entry ->
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                TextLabel(entry.name, 11.sp, color = OverlayTokens.panelSecondaryText, maxLines = 1)
+                                TextLabel(
+                                    entry.amountFen?.let { "¥${com.paifa.ubikitouch.accessibility.scrm.PaymentAmount.formatYuan(it)}" } ?: "已领取",
+                                    11.sp,
+                                    color = OverlayTokens.panelPrimaryText,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                }
                 if (isTransfer) {
                     TextLabel(
-                        text = if (claimed) {
+                        text = if (effectiveClaimed) {
                             paymentCardClaimedStatusLabel(isTransfer = true)
                         } else if (!canClaimTransfer && !message.fromMe) {
                             transferOnlyRecipientCanClaimLabel()
@@ -276,16 +302,32 @@ internal fun PaymentDetailOverlay(
                         maxLines = 1,
                         textAlign = TextAlign.Center
                     )
+                    TextLabel(
+                        text = "收款人：${message.cardName?.takeIf { it.isNotBlank() } ?: selectedAccount.name}",
+                        size = 12.sp,
+                        color = OverlayTokens.panelSecondaryText,
+                        maxLines = 1,
+                        textAlign = TextAlign.Center
+                    )
+                    message.detail?.takeIf { it.isNotBlank() }?.let { note ->
+                        TextLabel(
+                            text = "备注：$note",
+                            size = 11.sp,
+                            color = OverlayTokens.panelSecondaryText,
+                            maxLines = 2,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                     Button(
                         onClick = {
-                            if (!claimed && canClaimTransfer) {
+                            if (!effectiveClaimed && canClaimTransfer) {
                                 onClaim()
                             } else {
                                 onDismiss()
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (claimed || !canClaimTransfer) {
+                            containerColor = if (effectiveClaimed || !canClaimTransfer) {
                                 OverlayTokens.control
                             } else {
                                 OverlayTokens.paymentCard
@@ -294,9 +336,9 @@ internal fun PaymentDetailOverlay(
                         )
                     ) {
                         TextLabel(
-                            text = if (!claimed && canClaimTransfer) "确认收款" else "完成",
+                            text = if (!effectiveClaimed && canClaimTransfer) "确认收款" else "完成",
                             size = 12.sp,
-                            color = if (claimed || !canClaimTransfer) {
+                            color = if (effectiveClaimed || !canClaimTransfer) {
                                 OverlayTokens.panelSecondaryText
                             } else {
                                 OverlayTokens.paymentCardText
@@ -307,11 +349,11 @@ internal fun PaymentDetailOverlay(
                 } else if (canClaimRedPacket) {
                     Button(
                         onClick = {
-                            if (!claimed && !claiming) {
+                            if (!effectiveClaimed && !claiming) {
                                 claiming = true
                             }
                         },
-                        enabled = !claimed,
+                        enabled = !effectiveClaimed,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = OverlayTokens.paymentCard,
                             contentColor = OverlayTokens.paymentCardText,
@@ -323,10 +365,10 @@ internal fun PaymentDetailOverlay(
                             text = if (claiming) {
                                 "领取中..."
                             } else {
-                                redPacketClaimButtonLabel(claimed = claimed, amountText = amountText)
+                                redPacketClaimButtonLabel(claimed = effectiveClaimed, amountText = amountText)
                             },
                             size = 12.sp,
-                            color = if (claimed) OverlayTokens.panelSecondaryText else OverlayTokens.paymentCardText,
+                            color = if (effectiveClaimed) OverlayTokens.panelSecondaryText else OverlayTokens.paymentCardText,
                             maxLines = 1
                         )
                     }
@@ -339,9 +381,47 @@ internal fun PaymentDetailOverlay(
                         textAlign = TextAlign.Center
                     )
                 }
+                Button(
+                    onClick = onRefresh,
+                    enabled = readback.state != PaymentReadbackState.LOADING,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = OverlayTokens.control,
+                        contentColor = OverlayTokens.panelPrimaryText
+                    )
+                ) {
+                    TextLabel(
+                        text = if (readback.state == PaymentReadbackState.LOADING) "查询中..." else "刷新支付状态",
+                        size = 11.sp,
+                        color = OverlayTokens.panelPrimaryText,
+                        maxLines = 1
+                    )
+                }
             }
         }
     }
+}
+
+@Composable
+private fun PaymentReadbackStatus(readback: PaymentReadback) {
+    val text = when (readback.state) {
+        PaymentReadbackState.IDLE -> "尚未查询服务端状态"
+        PaymentReadbackState.LOADING -> "正在查询服务端状态"
+        PaymentReadbackState.PROCESSING -> "支付任务处理中${readback.taskId?.let { " · #$it" }.orEmpty()}"
+        PaymentReadbackState.AVAILABLE -> "可领取"
+        PaymentReadbackState.RECEIVED -> "已领取"
+        PaymentReadbackState.EXPIRED -> "已过期"
+        PaymentReadbackState.EMPTY -> "已被领完"
+        PaymentReadbackState.REFUSED -> "已拒收"
+        PaymentReadbackState.FAILED -> "查询失败"
+        PaymentReadbackState.UNKNOWN -> "状态待人工核对"
+    }
+    TextLabel(
+        text = readback.message?.takeIf { it.isNotBlank() }?.let { "$text · $it" } ?: text,
+        size = 11.sp,
+        color = OverlayTokens.panelSecondaryText,
+        maxLines = 2,
+        textAlign = TextAlign.Center
+    )
 }
 
 internal fun paymentCardUsesWechatStyleLayout(): Boolean = true
@@ -507,4 +587,8 @@ private fun paymentCardKindFor(resourceUrl: String?, appName: String?, text: Str
 
 internal fun FloatingChatMessage.isPaymentCardMessage(): Boolean {
     return paymentCardKindFor(resourceUrl, appName, text) != null
+}
+
+internal fun FloatingChatMessage.isTransferPaymentCard(): Boolean {
+    return paymentCardKindFor(resourceUrl, appName, text) == PaymentCardKind.Transfer
 }

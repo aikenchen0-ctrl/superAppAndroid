@@ -1,6 +1,7 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.message
 
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
+import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 
 internal class MessageLongPressActions(
     private val favoriteMessageIds: MutableMap<String, Boolean>,
@@ -13,11 +14,19 @@ internal class MessageLongPressActions(
     private val onFavoriteChanged: (FloatingChatMessage, Boolean) -> Unit,
     private val onMultiSelectModeChanged: (Boolean) -> Unit,
     private val onQuoteMessage: (FloatingChatMessage) -> Unit,
+    private val onListenMessage: (FloatingChatMessage) -> Unit,
+    private val onZoomMessage: (FloatingChatMessage) -> Unit,
     private val onScrmOperationRequested: (FloatingChatMessage) -> Unit,
     private val onCloseLongPressMenu: () -> Unit
 ) {
     fun performLongPressAction(message: FloatingChatMessage, action: MessageLongPressAction) {
         when (action) {
+            MessageLongPressAction.Listen -> {
+                onListenMessage(message)
+            }
+            MessageLongPressAction.Zoom -> {
+                onZoomMessage(message)
+            }
             MessageLongPressAction.Copy -> {
                 onCopyText(message.longPressCopyText())
                 onShowToast("已复制")

@@ -431,6 +431,20 @@ class UbikiAccessibilityService : AccessibilityService() {
         }
     }
 
+    fun requestFloatingChatScan() {
+        hideFloatingChatForExternalActivity("scan")
+        val intent = Intent()
+            .setClassName(packageName, "com.paifa.ubikitouch.app.FloatingChatCameraActivity")
+            .addFloatingChatBridgeFlags()
+            .putExtra(FloatingChatMediaPickerBridge.EXTRA_SCAN_MODE, true)
+        runCatching {
+            startActivity(intent)
+        }.onFailure {
+            Log.e(TAG, "failed to start scanner", it)
+            onFloatingChatMediaPickerClosed()
+        }
+    }
+
     fun requestFloatingChatBlinkVoiceCapture() {
         hideFloatingChatForExternalActivity("BlinkVoice")
         val intent = Intent()

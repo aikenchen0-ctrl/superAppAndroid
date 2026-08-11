@@ -99,11 +99,9 @@ internal fun MessageRow(
         )?.takeIf { showAttachedAvatar }
     }
     val placement = messageHorizontalPlacement(message.presentation, message.fromMe)
-    val showSenderNickname = shouldShowMessageSenderNickname(
-        isGroupChat = selectedThread.isGroupThread(),
-        fromMe = message.fromMe,
-        isSystem = message.presentation == FloatingChatMessagePresentation.System
-    )
+    val detailedBubble = homeOverviewVisible || selectedThread.isGroupThread()
+    val showSenderNickname = detailedBubble &&
+        message.presentation != FloatingChatMessagePresentation.System
     val senderNickname = remember(message, groupMemberContact, contactsById) {
         val resolvedNickname = groupMemberContact?.name
             ?: message.threadContactId?.let { threadId -> contactsById[threadId]?.name }
@@ -134,13 +132,6 @@ internal fun MessageRow(
             Alignment.Top
         }
     ) {
-        if (multiSelectMode) {
-            MessageSelectionToggle(
-                selected = selected,
-                onClick = onToggleSelection,
-                modifier = Modifier.padding(top = 20.dp, end = 4.dp)
-            )
-        }
         if (groupMemberContact != null && placement == MessageHorizontalPlacement.Start) {
             CompactAvatar(
                 contact = groupMemberContact,
@@ -175,10 +166,10 @@ internal fun MessageRow(
                 Modifier.weight(1f, fill = false)
             } else {
                 Modifier.fillMaxWidth(
-                    when (message.presentation) {
-                        FloatingChatMessagePresentation.Bubble -> 0.99f
-                        FloatingChatMessagePresentation.SpecialCard -> 0.99f
-                        FloatingChatMessagePresentation.MediaStandalone -> 0.99f
+                        when (message.presentation) {
+                        FloatingChatMessagePresentation.Bubble -> 0.88f
+                        FloatingChatMessagePresentation.SpecialCard -> 0.88f
+                        FloatingChatMessagePresentation.MediaStandalone -> 0.88f
                         FloatingChatMessagePresentation.System -> 1f
                     }
                 )
@@ -246,7 +237,7 @@ internal fun MessageBlock(
             else -> Alignment.Start
         }
     ) {
-        Column(horizontalAlignment = Alignment.Start) {
+        Column(horizontalAlignment = if (message.fromMe) Alignment.End else Alignment.Start) {
             Box(modifier = Modifier.padding(top = if (isSystem) 0.dp else 8.dp)) {
                 if (usesBubbleChrome) {
                     Box(
@@ -258,7 +249,16 @@ internal fun MessageBlock(
                                 spotColor = OverlayTokens.glassShadow
                             )
                             .clip(bubbleShape)
-                            .background(bubbleColor)
+                            .background(
+                                if (usesDemoBubble) {
+                                    bubbleColor.copy(
+                                        alpha = (bubbleColor.alpha * imModuleBubbleGlassFillMultiplier())
+                                            .coerceIn(0f, 0.72f)
+                                    )
+                                } else {
+                                    bubbleColor
+                                }
+                            )
                             .then(
                                 if (aiDraftDashedBubble) {
                                     Modifier.aiDraftDashedBorder(bubbleShape)
@@ -285,6 +285,8 @@ internal fun MessageBlock(
                                 onClick = {
                                     if (multiSelectMode) {
                                         onToggleSelection()
+                                    } else if (usesBubbleChrome) {
+                                        onLongPressMessage(message, currentBounds.value)
                                     } else {
                                         onClick()
                                     }
@@ -344,6 +346,8 @@ internal fun MessageBlock(
                                 onClick = {
                                     if (multiSelectMode) {
                                         onToggleSelection()
+                                    } else if (usesBubbleChrome) {
+                                        onLongPressMessage(message, currentBounds.value)
                                     } else {
                                         onClick()
                                     }
@@ -376,12 +380,17 @@ internal fun MessageBlock(
                 if (showSenderNickname) {
                     TextLabel(
                         text = senderNickname,
-                        size = 10.sp,
+                        size = if (showSenderNickname) 7.sp else 10.sp,
                         modifier = Modifier
                             .align(Alignment.TopStart)
-                            .offset(x = 16.dp, y = (-6).dp),
+                            .offset(x = 12.dp, y = (-6).dp)
+                            .background(
+                                color = OverlayTokens.panel.copy(alpha = 0.72f),
+                                shape = RoundedCornerShape(5.dp)
+                            )
+                            .padding(horizontal = 5.dp, vertical = 1.dp),
                         weight = FontWeight.Medium,
-                        color = OverlayTokens.bubbleNameText,
+                        color = OverlayTokens.imModuleBubbleText.copy(alpha = 0.86f),
                         maxLines = 1,
                         shadow = OverlayTokens.imModuleTextShadow
                     )
@@ -391,6 +400,15 @@ internal fun MessageBlock(
                 ScrmSendStatusLabel(
                     text = statusText,
                     modifier = Modifier.padding(start = 2.dp, top = 3.dp)
+                )
+            }
+            if (multiSelectMode) {
+                MessageSelectionToggle(
+                    selected = selected,
+                    onClick = onToggleSelection,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .offset(y = (-5).dp)
                 )
             }
         }

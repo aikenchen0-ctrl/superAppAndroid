@@ -134,13 +134,16 @@ internal fun imModuleSelfBubbleBorderColorArgb(): Int = OverlayTokens.selfBubble
 
 internal fun imModuleOtherBubbleBorderColorArgb(): Int = OverlayTokens.otherBubbleBorder.toArgb()
 
-internal fun imModuleBubbleTextColorArgb(): Int = OverlayTokens.bubbleText.toArgb()
+internal fun imModuleBubbleTextColorArgb(): Int = OverlayTokens.imModuleBubbleText.toArgb()
 
 internal fun imModuleBubbleShadowColorArgb(): Int = OverlayTokens.imModuleTextShadow.color.toArgb()
 
-internal fun imModuleBubbleUsesDemoGlassEffect(): Boolean = false
+internal fun imModuleBubbleUsesDemoGlassEffect(): Boolean = true
 
-internal fun imModuleSelfBubbleBackdropBlurDp(): Int = 0
+internal fun imModuleSelfBubbleBackdropBlurDp(): Int = 8
+
+/** The translucent fill lets the window-level backdrop blur show through the bubble. */
+internal fun imModuleBubbleGlassFillMultiplier(): Float = 0.62f
 
 internal fun imModuleSelfBubbleShadowOffsetYDp(): Int = 0
 

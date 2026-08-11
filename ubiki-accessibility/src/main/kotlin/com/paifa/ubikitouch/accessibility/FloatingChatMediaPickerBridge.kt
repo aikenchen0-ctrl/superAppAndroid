@@ -8,6 +8,7 @@ import com.paifa.ubikitouch.core.model.FloatingChatPrototype
 object FloatingChatMediaPickerBridge {
     const val EXTRA_MEDIA_KIND = "com.paifa.ubikitouch.extra.MEDIA_KIND"
     const val EXTRA_MEDIA_TARGET = "com.paifa.ubikitouch.extra.MEDIA_TARGET"
+    const val EXTRA_SCAN_MODE = "com.paifa.ubikitouch.extra.SCAN_MODE"
 
     fun requestPick(
         mediaKind: FloatingChatPrototype.PickedMediaKind,
@@ -18,6 +19,10 @@ object FloatingChatMediaPickerBridge {
 
     fun requestCapture() {
         UbikiAccessibilityService.instance?.requestFloatingChatMediaCapture()
+    }
+
+    fun requestScan() {
+        UbikiAccessibilityService.instance?.requestFloatingChatScan()
     }
 
     fun requestDocumentPick() {

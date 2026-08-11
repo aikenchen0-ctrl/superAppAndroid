@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -45,6 +46,11 @@ import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingDialog
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.BottomPanelMode
 import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.accessibility.scrm.ScrmFloatingAccountRoute
+import com.paifa.ubikitouch.accessibility.scrm.ScrmSettingsManager
+import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskResult
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private enum class ScrmHubTab(val label: String, val icon: ImageVector) {
     Messages("消息", Icons.Filled.ChatBubbleOutline),
@@ -253,6 +259,7 @@ private fun ScrmHubActionPreview(
     var checked by remember(action.key) { mutableStateOf(false) }
     Text("操作预览", color = OverlayTokens.panelPrimaryText, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
     when {
+        action.key == "message.payment-status" -> PaymentStatusCenterPreview(route, conversationId)
         action.key == "message.forward" -> OutlinedTextField(
             value = value,
             onValueChange = { value = it },
@@ -306,6 +313,60 @@ private fun ScrmHubActionPreview(
     }
 }
 
+@Composable
+private fun PaymentStatusCenterPreview(route: ScrmFloatingAccountRoute?, conversationId: String?) {
+    val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var loading by remember(route) { mutableStateOf(false) }
+    var status by remember(route) { mutableStateOf<String?>(null) }
+    var tasks by remember(route) { mutableStateOf<List<ScrmTaskResult>>(emptyList()) }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("支付状态中心", color = OverlayTokens.panelPrimaryText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        Text("账号：${route?.weChatId ?: "未选择"}", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp)
+        Text("会话：${conversationId ?: "未选择"}", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp)
+        Text("红包详情 / 红包状态 / 转账收款 / 钱包余额", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp)
+        Button(
+            enabled = route != null && !loading,
+            onClick = {
+                val safeRoute = route ?: return@Button
+                loading = true
+                status = "正在读取最近支付任务"
+                scope.launch {
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            ScrmSettingsManager(context.applicationContext)
+                                .loadSelectedSessionOrBootstrap()
+                                .taskApi
+                                .getRecentTasks(safeRoute.deviceUuid, count = 20)
+                                .items
+                                .orEmpty()
+                        }
+                    }.onSuccess { items ->
+                        val paymentTasks = items.filter { item ->
+                            val marker = listOfNotNull(item.resultCode, item.message).joinToString(" ").lowercase()
+                            marker.contains("payment") || marker.contains("红包") || marker.contains("转账") || marker.contains("wallet")
+                        }
+                        tasks = paymentTasks
+                        status = "已读取 ${paymentTasks.size} 条支付任务"
+                    }.onFailure { error ->
+                        status = "读取失败：${error.message ?: "未知错误"}"
+                    }
+                    loading = false
+                }
+            }
+        ) { Text(if (loading) "读取中" else "刷新最近支付任务", fontSize = 10.sp) }
+        status?.let { Text(it, color = Color(0xFF9A6200), fontSize = 10.sp) }
+        tasks.take(5).forEach { task ->
+            Text(
+                "#${task.taskId} · ${task.status ?: "unknown"} · ${task.message ?: task.resultCode ?: "无说明"}",
+                color = OverlayTokens.panelSecondaryText,
+                fontSize = 10.sp,
+                maxLines = 2
+            )
+        }
+    }
+}
+
 private fun existingPanelFor(actionKey: String): BottomPanelMode? = when (actionKey) {
     "message.emoji" -> BottomPanelMode.ScrmEmoji
     "message.weapp-card" -> BottomPanelMode.ScrmWeAppCard
@@ -338,6 +399,7 @@ private fun scrmHubActions(tab: ScrmHubTab): List<ScrmHubAction> = when (tab) {
         ScrmHubAction("撤回消息", "显示消息 ID 与时间", ScrmUiStatus.Preview, "message.revoke"),
         ScrmHubAction("语音转文字", "仅对语音消息启用", ScrmUiStatus.Preview, "message.transcribe"),
         ScrmHubAction("消息详情", "补拉服务端消息信息", ScrmUiStatus.Preview, "message.detail"),
+        ScrmHubAction("支付状态中心", "红包、转账、钱包任务状态", ScrmUiStatus.Preview, "message.payment-status"),
         ScrmHubAction("会话同步与本地记录", "未读、历史、消息 ID 与本地记录清理", ScrmUiStatus.Preview, "message.conversation-operations"),
         ScrmHubAction("媒体下载", "先获取短期访问权限", ScrmUiStatus.Planned, "message.media"),
         ScrmHubAction("收藏表情", "填写表情 MD5 后预览发送", ScrmUiStatus.Preview, "message.emoji"),

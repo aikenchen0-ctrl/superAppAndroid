@@ -22,6 +22,7 @@ import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.Camera
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
@@ -35,14 +36,24 @@ import androidx.camera.video.Recording
 import androidx.camera.video.VideoCapture
 import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -51,7 +62,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FlashlightOff
+import androidx.compose.material.icons.filled.FlashlightOn
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Button
@@ -76,6 +91,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
@@ -95,6 +111,10 @@ class FloatingChatCameraActivity : ComponentActivity() {
     private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
     private lateinit var previewView: PreviewView
+    private val scanMode: Boolean by lazy {
+        intent.getBooleanExtra(FloatingChatMediaPickerBridge.EXTRA_SCAN_MODE, false)
+    }
+    private var camera: Camera? = null
     private var imageCapture: ImageCapture? = null
     private var videoCapture: VideoCapture<Recorder>? = null
     private var activeRecording: Recording? = null
@@ -120,7 +140,7 @@ class FloatingChatCameraActivity : ComponentActivity() {
         window.statusBarColor = android.graphics.Color.BLACK
         window.navigationBarColor = android.graphics.Color.BLACK
         if (!hasPermissions()) {
-            ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CAMERA_PERMISSIONS)
+            ActivityCompat.requestPermissions(this, requiredPermissions(), REQUEST_CAMERA_PERMISSIONS)
         }
         setContentView(cameraContentView())
         if (hasPermissions()) {
@@ -165,17 +185,26 @@ class FloatingChatCameraActivity : ComponentActivity() {
             addView(
                 ComposeView(this@FloatingChatCameraActivity).apply {
                     setContent {
-                        CameraOverlay(
-                            capturedMedia = capturedMedia,
-                            recording = recording,
-                            recordingProgress = recordingProgress,
-                            onClose = ::finishCapture,
-                            onCaptureTap = ::capturePhoto,
-                            onRecordStart = ::startRecording,
-                            onRecordStop = ::stopRecording,
-                            onRetake = { capturedMedia = null },
-                            onSend = ::sendCapturedMedia
-                        )
+                        if (scanMode) {
+                            CameraScanOverlay(
+                                onClose = ::finishCapture,
+                                onFlashlightChanged = { enabled ->
+                                    camera?.cameraControl?.enableTorch(enabled)
+                                }
+                            )
+                        } else {
+                            CameraOverlay(
+                                capturedMedia = capturedMedia,
+                                recording = recording,
+                                recordingProgress = recordingProgress,
+                                onClose = ::finishCapture,
+                                onCaptureTap = ::capturePhoto,
+                                onRecordStart = ::startRecording,
+                                onRecordStop = ::stopRecording,
+                                onRetake = { capturedMedia = null },
+                                onSend = ::sendCapturedMedia
+                            )
+                        }
                     }
                 },
                 FrameLayout.LayoutParams(
@@ -193,24 +222,32 @@ class FloatingChatCameraActivity : ComponentActivity() {
             val preview = Preview.Builder().build().also { preview ->
                 preview.setSurfaceProvider(previewView.surfaceProvider)
             }
-            imageCapture = ImageCapture.Builder()
-                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                .setTargetRotation(displayRotation())
-                .build()
-            val recorder = Recorder.Builder()
-                .setQualitySelector(QualitySelector.from(Quality.HD))
-                .build()
-            videoCapture = VideoCapture.withOutput(recorder)
-                .apply { targetRotation = displayRotation() }
             runCatching {
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
-                    this as LifecycleOwner,
-                    CameraSelector.DEFAULT_BACK_CAMERA,
-                    preview,
-                    imageCapture,
-                    videoCapture
-                )
+                if (scanMode) {
+                    camera = cameraProvider.bindToLifecycle(
+                        this as LifecycleOwner,
+                        CameraSelector.DEFAULT_BACK_CAMERA,
+                        preview
+                    )
+                } else {
+                    imageCapture = ImageCapture.Builder()
+                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                        .setTargetRotation(displayRotation())
+                        .build()
+                    val recorder = Recorder.Builder()
+                        .setQualitySelector(QualitySelector.from(Quality.HD))
+                        .build()
+                    videoCapture = VideoCapture.withOutput(recorder)
+                        .apply { targetRotation = displayRotation() }
+                    camera = cameraProvider.bindToLifecycle(
+                        this as LifecycleOwner,
+                        CameraSelector.DEFAULT_BACK_CAMERA,
+                        preview,
+                        imageCapture,
+                        videoCapture
+                    )
+                }
             }.onFailure {
                 Toast.makeText(this, "相机启动失败", Toast.LENGTH_SHORT).show()
             }
@@ -338,9 +375,15 @@ class FloatingChatCameraActivity : ComponentActivity() {
     }
 
     private fun hasPermissions(): Boolean {
-        return REQUIRED_PERMISSIONS.all { permission ->
+        return requiredPermissions().all { permission ->
             ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
         }
+    }
+
+    private fun requiredPermissions(): Array<String> = if (scanMode) {
+        arrayOf(Manifest.permission.CAMERA)
+    } else {
+        REQUIRED_PERMISSIONS
     }
 
     private fun hasAudioPermission(): Boolean {
@@ -518,6 +561,150 @@ private data class CapturedMediaMeta(
     val orientation: FloatingChatThumbnailOrientation,
     val aspectRatio: Float?
 )
+
+@Composable
+private fun CameraScanOverlay(
+    onClose: () -> Unit,
+    onFlashlightChanged: (Boolean) -> Unit
+) {
+    var flashlightEnabled by remember { mutableStateOf(false) }
+    val scanTransition = rememberInfiniteTransition(label = "cameraScanLine")
+    val scanProgress by scanTransition.animateFloat(
+        initialValue = 0.1f,
+        targetValue = 0.9f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1700, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "cameraScanLineProgress"
+    )
+
+    Box(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .background(Color(0x55000000))
+                    .padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onClose) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "返回",
+                        tint = Color.White
+                    )
+                }
+                Text(
+                    text = "扫一扫",
+                    modifier = Modifier.weight(1f),
+                    color = Color.White,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.size(48.dp))
+            }
+
+            Box(
+                modifier = Modifier.align(Alignment.Center),
+                contentAlignment = Alignment.Center
+            ) {
+                CameraScannerFrame(
+                    scanProgress = scanProgress,
+                    modifier = Modifier.size(264.dp)
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(112.dp)
+                    .background(Color(0x55000000))
+                    .padding(horizontal = 42.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Filled.Image,
+                        contentDescription = "相册",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text("相册", color = Color.White, modifier = Modifier.padding(top = 6.dp))
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    IconButton(
+                        onClick = {
+                            flashlightEnabled = !flashlightEnabled
+                            onFlashlightChanged(flashlightEnabled)
+                        }
+                    ) {
+                        Icon(
+                            imageVector = if (flashlightEnabled) {
+                                Icons.Filled.FlashlightOn
+                            } else {
+                                Icons.Filled.FlashlightOff
+                            },
+                            contentDescription = "闪光灯",
+                            tint = if (flashlightEnabled) Color(0xFF07C160) else Color.White
+                        )
+                    }
+                    Text(
+                        if (flashlightEnabled) "关闭闪光灯" else "闪光灯",
+                        color = Color.White
+                    )
+                }
+            }
+    }
+}
+
+@Composable
+private fun CameraScannerFrame(
+    scanProgress: Float,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier.border(
+            width = 1.dp,
+            color = Color(0x665A625D),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(2.dp)
+        )
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val cornerLength = 34.dp.toPx()
+            val stroke = 3.dp.toPx()
+            val lineY = size.height * scanProgress
+            val corners = listOf(0f to 0f, size.width to 0f, 0f to size.height, size.width to size.height)
+            corners.forEach { (x, y) ->
+                val horizontalDirection = if (x == 0f) 1f else -1f
+                val verticalDirection = if (y == 0f) 1f else -1f
+                drawLine(
+                    color = Color(0xFFE8F1EB),
+                    start = androidx.compose.ui.geometry.Offset(x, y),
+                    end = androidx.compose.ui.geometry.Offset(x + cornerLength * horizontalDirection, y),
+                    strokeWidth = stroke,
+                    cap = StrokeCap.Square
+                )
+                drawLine(
+                    color = Color(0xFFE8F1EB),
+                    start = androidx.compose.ui.geometry.Offset(x, y),
+                    end = androidx.compose.ui.geometry.Offset(x, y + cornerLength * verticalDirection),
+                    strokeWidth = stroke,
+                    cap = StrokeCap.Square
+                )
+            }
+            drawLine(
+                color = Color(0xFF07C160),
+                start = androidx.compose.ui.geometry.Offset(12.dp.toPx(), lineY),
+                end = androidx.compose.ui.geometry.Offset(size.width - 12.dp.toPx(), lineY),
+                strokeWidth = 2.dp.toPx(),
+                cap = StrokeCap.Round
+            )
+        }
+    }
+}
 
 @Composable
 private fun CameraOverlay(

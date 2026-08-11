@@ -136,6 +136,7 @@ import kotlinx.serialization.json.jsonPrimitive
 @Composable
 internal fun ScrmContactsPanel(
     route: ScrmFloatingAccountRoute?,
+    openAddFriend: Boolean = false,
     onClose: () -> Unit,
     onOpenPrivateChat: (ScrmFloatingAccountRoute, ScrmContact) -> Unit,
     onOpenFriendProfile: (ScrmFloatingAccountRoute, ScrmContact) -> Unit
@@ -147,7 +148,12 @@ internal fun ScrmContactsPanel(
     var addWxidText by remember { mutableStateOf("") }
     var addMessageText by remember { mutableStateOf("你好，我是通过只发添加你的") }
     var state by remember { mutableStateOf(ScrmContactsPanelState()) }
-    var panelScreen by remember { mutableStateOf(WechatContactsPanelScreen.Contacts) }
+    var panelScreen by remember(openAddFriend) {
+        mutableStateOf(
+            if (openAddFriend) WechatContactsPanelScreen.AddFriend
+            else WechatContactsPanelScreen.Contacts
+        )
+    }
     var showPlusMenu by remember { mutableStateOf(false) }
     var contactsSearchVisible by remember { mutableStateOf(false) }
     val startGroupSelectedContactIds = remember { mutableStateMapOf<Int, Boolean>() }

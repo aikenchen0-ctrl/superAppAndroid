@@ -16,6 +16,7 @@ internal enum class BottomPanelMode {
     Favorite,
     RedPacket,
     Transfer,
+    SplitBill,
     Location,
     ScrmEmoji,
     ScrmWeAppCard,
@@ -36,6 +37,7 @@ internal fun BottomPanelMode.isCenteredToolFeaturePanel(): Boolean {
         this == BottomPanelMode.Favorite ||
         this == BottomPanelMode.RedPacket ||
         this == BottomPanelMode.Transfer ||
+        this == BottomPanelMode.SplitBill ||
         this == BottomPanelMode.Location ||
         this == BottomPanelMode.ScrmEmoji ||
         this == BottomPanelMode.ScrmWeAppCard ||

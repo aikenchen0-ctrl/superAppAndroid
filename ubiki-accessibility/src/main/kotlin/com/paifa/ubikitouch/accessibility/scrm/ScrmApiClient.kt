@@ -91,6 +91,16 @@ internal interface ScrmTaskApi {
     fun getRecentTasks(deviceUuid: String? = null, count: Int = 20): ScrmRecentTaskResults
 }
 
+internal interface ScrmPaymentApi {
+    fun sendLuckyMoney(request: ScrmSendLuckyMoneyRequest, idempotencyKey: String): ScrmTaskSubmissionResult
+    fun takeLuckyMoney(request: ScrmTakeLuckyMoneyByMessageRequest, idempotencyKey: String): ScrmTaskSubmissionResult
+    fun getRedPacketDetail(request: ScrmRedPacketQueryByMessageRequest): ScrmTaskSubmissionResult
+    fun getRedPacketStatus(request: ScrmRedPacketQueryByMessageRequest): ScrmTaskSubmissionResult
+    fun sendRemittance(request: ScrmSendRemittanceRequest, idempotencyKey: String): ScrmTaskSubmissionResult
+    fun takeTransfer(request: ScrmTakeTransferByMessageRequest, idempotencyKey: String): ScrmTaskSubmissionResult
+    fun getWalletBalance(request: ScrmWalletBalanceRequest): ScrmTaskSubmissionResult
+}
+
 internal interface ScrmMessageApi {
     fun sendText(request: ScrmSendTextMessageRequest): ScrmTaskSubmissionResult
     fun sendImage(request: ScrmSendImageMessageRequest): ScrmTaskSubmissionResult
@@ -221,6 +231,7 @@ internal class ScrmApiClient(
     }
 ) : ScrmReadApi,
     ScrmTaskApi,
+    ScrmPaymentApi,
     ScrmMessageApi,
     ScrmMessageOperationApi,
     ScrmMomentApi,
@@ -354,6 +365,63 @@ internal class ScrmApiClient(
             safeRoute = "/openapi/v1/tasks/recent"
         )
     }
+
+    override fun sendLuckyMoney(
+        request: ScrmSendLuckyMoneyRequest,
+        idempotencyKey: String
+    ): ScrmTaskSubmissionResult = postIdempotent(
+        path = "payments/lucky-money",
+        body = json.encodeToString(request),
+        idempotencyKey = idempotencyKey
+    )
+
+    override fun takeLuckyMoney(
+        request: ScrmTakeLuckyMoneyByMessageRequest,
+        idempotencyKey: String
+    ): ScrmTaskSubmissionResult = postIdempotent(
+        path = "payments/lucky-money/take-by-message",
+        body = json.encodeToString(request),
+        idempotencyKey = idempotencyKey
+    )
+
+    override fun getRedPacketDetail(
+        request: ScrmRedPacketQueryByMessageRequest
+    ): ScrmTaskSubmissionResult = post(
+        path = "payments/red-packets/detail-by-message",
+        body = json.encodeToString(request)
+    )
+
+    override fun getRedPacketStatus(
+        request: ScrmRedPacketQueryByMessageRequest
+    ): ScrmTaskSubmissionResult = post(
+        path = "payments/red-packets/status-by-message",
+        body = json.encodeToString(request)
+    )
+
+    override fun sendRemittance(
+        request: ScrmSendRemittanceRequest,
+        idempotencyKey: String
+    ): ScrmTaskSubmissionResult = postIdempotent(
+        path = "payments/remittance",
+        body = json.encodeToString(request),
+        idempotencyKey = idempotencyKey
+    )
+
+    override fun takeTransfer(
+        request: ScrmTakeTransferByMessageRequest,
+        idempotencyKey: String
+    ): ScrmTaskSubmissionResult = postIdempotent(
+        path = "payments/transfers/take-by-message",
+        body = json.encodeToString(request),
+        idempotencyKey = idempotencyKey
+    )
+
+    override fun getWalletBalance(
+        request: ScrmWalletBalanceRequest
+    ): ScrmTaskSubmissionResult = post(
+        path = "payments/wallet-balance",
+        body = json.encodeToString(request)
+    )
 
     override fun sendText(request: ScrmSendTextMessageRequest): ScrmTaskSubmissionResult {
         return post(

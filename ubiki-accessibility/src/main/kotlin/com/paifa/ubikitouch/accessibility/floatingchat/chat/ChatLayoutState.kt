@@ -77,6 +77,18 @@ internal fun leftRailSessionConnectorAnchorFollowsVirtualOffscreenPosition(): Fl
 
 internal fun leftRailPinsSelectedAvatarWhileScrolledOffscreen(): Boolean = true
 
+internal fun leftRailSelectedActionsDwellMs(): Long = LeftRailSelectedActionsDwellMs
+
+/**
+ * The expanded rail actions are deliberate: scrolling or changing the active session resets
+ * the dwell timer so adjacent avatars cannot be moved by accident.
+ */
+internal fun leftRailSelectionActionsVisible(
+    selectedDurationMs: Long,
+    isSelected: Boolean,
+    isScrolling: Boolean
+): Boolean = isSelected && !isScrolling && selectedDurationMs >= LeftRailSelectedActionsDwellMs
+
 internal fun leftRailScrollableTopPaddingDp(
     itemCount: Int,
     viewportHeightDp: Int
@@ -116,6 +128,10 @@ internal fun leftRailFollowTextStartOffsetDp(): Int = LeftRailFollowTextStartOff
 
 internal fun leftRailFollowTextWidthDp(): Int = LeftRailFollowTextWidthDp
 
+internal fun leftRailFollowTextAvatarGapDp(): Int = LeftRailFollowTextAvatarGapDp
+
+internal fun leftRailFollowTextContainerWidthDp(): Int = LeftRailFollowTextContainerWidthDp
+
 internal fun leftRailFollowTextLayerWidthDp(): Int = LeftRailFollowTextLayerWidthDp
 
 internal fun leftRailTouchableWidthDp(): Int = SessionRailWidthDp
@@ -135,6 +151,12 @@ internal fun leftRailFollowTextNameSizeSp(): Float = LeftRailFollowTextNameSizeS
 internal fun leftRailFollowTextMessageSizeSp(): Float = LeftRailFollowTextMessageSizeSp
 
 internal fun leftRailFollowTextTimeSizeSp(): Float = LeftRailFollowTextTimeSizeSp
+
+internal fun leftRailFollowTextCardHeightDp(): Int = LeftRailFollowTextCardHeightDp
+
+internal fun leftRailFollowTextCardCornerDp(): Int = LeftRailFollowTextCardCornerDp
+
+internal fun leftRailFollowTextCardBackgroundAlpha(): Float = LeftRailFollowTextCardBackgroundAlpha
 
 internal fun leftRailFollowTextStartsAtAvatarRightEdge(): Boolean {
     return LeftRailFollowTextStartOffsetDp + LeftRailFollowTextInnerPaddingDp == RailAvatarSizeDp
@@ -190,7 +212,7 @@ internal fun leftRailFollowTextBoundsUseSingleInvalidationVersion(): Boolean = t
 
 internal fun leftRailFollowTextUsesCompactTypography(): Boolean {
     return LeftRailFollowTextNameSizeSp <= 11f &&
-        LeftRailFollowTextMessageSizeSp <= 9.5f &&
+        LeftRailFollowTextMessageSizeSp <= 13f &&
         LeftRailFollowTextTimeSizeSp <= 8.5f
 }
 
@@ -203,6 +225,7 @@ internal fun leftRailFollowTextUsesDarkTextShadow(): Boolean {
 internal data class LeftRailFollowInfo(
     val contactId: String,
     val name: String,
+    val metaLines: List<String>,
     val lastMessage: String,
     val lastTime: String,
     val avatarColor: Long,
@@ -272,6 +295,15 @@ internal fun leftRailFollowInfoForContact(
     return LeftRailFollowInfo(
         contactId = contact.id,
         name = contact.name,
+        metaLines = buildList {
+            contact.region.trim().takeIf(String::isNotEmpty)?.let(::add)
+            contact.tags.asSequence()
+                .map(String::trim)
+                .filter(String::isNotEmpty)
+                .joinToString(" · ")
+                .takeIf(String::isNotEmpty)
+                ?.let(::add)
+        },
         lastMessage = latestMessage?.text?.ifBlank { contact.description } ?: contact.description,
         lastTime = latestMessage?.time ?: "",
         avatarColor = contact.avatarColor,
@@ -386,17 +418,25 @@ private const val RailAvatarSizeDp = 46
 private const val MessagePaneHorizontalPaddingDp = 4
 private const val LeftRailFollowTextHideDelayMs = 0
 private const val LeftRailFollowTextStartOffsetDp = RailAvatarSizeDp
-private const val LeftRailFollowTextWidthDp = 280
-private const val LeftRailFollowTextLayerWidthDp = LeftRailFollowTextStartOffsetDp + LeftRailFollowTextWidthDp
+// Mirrors iOS leftScrollPreviewView/card sizing: the preview crosses the
+// window midpoint slightly while leaving the right account rail unobstructed.
+private const val LeftRailFollowTextWidthDp = 172
+private const val LeftRailFollowTextAvatarGapDp = 4
+private const val LeftRailFollowTextContainerWidthDp = LeftRailFollowTextWidthDp + LeftRailFollowTextAvatarGapDp
+private const val LeftRailFollowTextLayerWidthDp = LeftRailFollowTextStartOffsetDp + LeftRailFollowTextContainerWidthDp
 private const val LeftRailFollowTextInnerPaddingDp = 0
 private const val LeftRailFollowTextNameSizeSp = 10f
 private const val LeftRailFollowTextMessageSizeSp = 13f
 private const val LeftRailFollowTextTimeSizeSp = 8f
+private const val LeftRailFollowTextCardHeightDp = 48
+private const val LeftRailFollowTextCardCornerDp = 9
+private const val LeftRailFollowTextCardBackgroundAlpha = 0.42f
 private const val LeftRailLeadingSpacerItemCount = 1
 private const val LeftRailShortContentScrollPaddingDp = 96
 private const val LeftRailItemGapDp = 6
 private const val LeftRailMinimumScrollRangeDp = 160
 private const val LeftRailTopOverscrollMaxDp = 18
+private const val LeftRailSelectedActionsDwellMs = 5_000L
 private const val LeftRailTopOverscrollResistance = 0.32f
 private const val LeftRailTopOverscrollReturnMs = 170
 private const val LeftRailLayerZIndex = 30f

@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
+import com.paifa.ubikitouch.accessibility.scrm.PaymentReadback
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 
@@ -21,9 +22,12 @@ internal fun MessageInteractionOverlayHost(
     messageLongPressActions: MessageLongPressActions,
     onPaymentDetailMessageChanged: (FloatingChatMessage?) -> Unit,
     isPaymentClaimed: (FloatingChatMessage) -> Boolean,
+    paymentReadback: PaymentReadback,
+    onRefreshPaymentStatus: (FloatingChatMessage) -> Unit,
     onClaimPayment: (FloatingChatMessage) -> Unit,
     onLongPressMessageChanged: (FloatingChatMessage?) -> Unit,
     onStartForwardingMessages: (List<FloatingChatMessage>) -> Unit,
+    onStartCombinedForwardingMessages: (List<FloatingChatMessage>) -> Unit,
     onClearSelectedMessages: () -> Unit,
     onMultiSelectModeChanged: (Boolean) -> Unit,
     onChatHistoryPreviewMessageChanged: (FloatingChatMessage?) -> Unit,
@@ -36,7 +40,9 @@ internal fun MessageInteractionOverlayHost(
             selectedThread = selectedThread,
             selectedAccount = selectedAccount,
             claimed = isPaymentClaimed(message),
+            readback = paymentReadback,
             onClaim = { onClaimPayment(message) },
+            onRefresh = { onRefreshPaymentStatus(message) },
             onDismiss = { onPaymentDetailMessageChanged(null) },
             modifier = modifier.fillMaxSize()
         )
@@ -52,9 +58,13 @@ internal fun MessageInteractionOverlayHost(
     }
     if (multiSelectMode) {
         MultiSelectActionBar(
-            selectedCount = selectedMessages().size,
             onForward = {
                 onStartForwardingMessages(selectedMessages())
+                onClearSelectedMessages()
+                onMultiSelectModeChanged(false)
+            },
+            onCombinedForward = {
+                onStartCombinedForwardingMessages(selectedMessages())
                 onClearSelectedMessages()
                 onMultiSelectModeChanged(false)
             },

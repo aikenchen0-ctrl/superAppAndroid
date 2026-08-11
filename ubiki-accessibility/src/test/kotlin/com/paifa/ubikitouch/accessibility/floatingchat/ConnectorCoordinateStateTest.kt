@@ -11,7 +11,9 @@ import com.paifa.ubikitouch.accessibility.floatingchat.chat.RailPinnedAvatarEdge
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.RightRailVisibleAccountItem
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.leftRailPinnedSelectedAvatarEdge
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.rightRailPinnedSelectedAccountEdge
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.rightRailVirtualAccountAvatarBounds
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.updateOffscreenConnectorEdges
+import com.paifa.ubikitouch.accessibility.floatingchat.tools.rightRailVirtualAccountFallbackStepPx
 import com.paifa.ubikitouch.core.model.FloatingChatConnectionTarget
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -166,6 +168,25 @@ class ConnectorCoordinateStateTest {
         )
 
         assertEquals(RailPinnedAvatarEdge.Bottom, edge)
+    }
+
+    @Test
+    fun virtualAccountFallbackFollowsReverseLayoutTowardsTop() {
+        assertEquals(-48f, rightRailVirtualAccountFallbackStepPx(48f))
+
+        val bounds = rightRailVirtualAccountAvatarBounds(
+            accountIds = listOf("account-1", "account-2", "account-3", "account-4"),
+            visibleItems = listOf(
+                RightRailVisibleAccountItem(index = 1, offset = 60, size = 42)
+            ),
+            viewport = Rect(200f, 0f, 248f, 120f),
+            fallbackStepPx = rightRailVirtualAccountFallbackStepPx(48f)
+        )
+
+        assertEquals(
+            true,
+            bounds.getValue("account-4").center.y < bounds.getValue("account-2").center.y
+        )
     }
 
     @Test

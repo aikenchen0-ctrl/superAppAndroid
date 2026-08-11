@@ -7,7 +7,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
@@ -74,6 +76,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatToolAction
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.sqrt
 @Composable
@@ -91,12 +94,17 @@ internal fun RightCoordinateRail(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val dedicatedAiAction = rightRailDedicatedAiAction()
     var toolOrder by remember(actions) {
-        mutableStateOf(loadToolActionOrder(context, actions))
+        mutableStateOf(
+            rightRailScrollableToolActions(
+                loadToolActionOrder(context, actions)
+            )
+        )
     }
     val visibleToolActions = toolOrder
     var selectedTool by remember(actions) {
-        mutableStateOf(visibleToolActions.firstOrNull() ?: FloatingChatToolAction.Assistant)
+        mutableStateOf(visibleToolActions.firstOrNull() ?: dedicatedAiAction)
     }
     var reorderMode by remember { mutableStateOf(false) }
     var draggedTool by remember { mutableStateOf<FloatingChatToolAction?>(null) }
@@ -162,11 +170,24 @@ internal fun RightCoordinateRail(
             toolDragStartIndex = -1
             toolDragCurrentIndex = -1
             toolDragOffsetY = 0f
-            saveToolActionOrder(context, toolOrder)
+            saveToolActionOrder(
+                context,
+                if (rightRailUsesDedicatedAiEntry()) {
+                    listOf(dedicatedAiAction) + toolOrder
+                } else {
+                    toolOrder
+                }
+            )
+        }
+    }
+    LaunchedEffect(visibleToolActions, dedicatedAiAction) {
+        if (selectedTool != dedicatedAiAction && selectedTool !in visibleToolActions) {
+            selectedTool = visibleToolActions.firstOrNull() ?: dedicatedAiAction
         }
     }
     var railHeightPx by remember { mutableStateOf(0f) }
     var accountWeight by remember { mutableStateOf(defaultRightRailAccountWeight()) }
+    var sectionInteractionVersion by remember { mutableStateOf(0) }
     val displayedAccountWeight by animateFloatAsState(
         targetValue = accountWeight,
         animationSpec = tween(durationMillis = rightRailSectionResizeMs()),
@@ -174,9 +195,16 @@ internal fun RightCoordinateRail(
     )
     fun expandAccountSection() {
         accountWeight = rightRailAccountWeightForAccountAreaDrag()
+        sectionInteractionVersion += 1
     }
     fun expandToolSection() {
         accountWeight = rightRailAccountWeightForToolAreaDrag()
+        sectionInteractionVersion += 1
+    }
+    LaunchedEffect(sectionInteractionVersion) {
+        if (sectionInteractionVersion == 0) return@LaunchedEffect
+        delay(2_000)
+        accountWeight = defaultRightRailAccountWeight()
     }
     val accountResizeConnection = remember {
         object : NestedScrollConnection {
@@ -274,10 +302,10 @@ internal fun RightCoordinateRail(
                 accountIds = accountIds,
                 visibleItems = visibleItems,
                 viewport = viewport,
-                    // LazyColumn 的 offset 始终以屏幕顶部为正方向；reverseLayout
-                    // 只影响项目排列，不能把虚拟头像的几何步长取反。
-                    fallbackStepPx = accountVirtualFallbackStepPx
+                fallbackStepPx = rightRailVirtualAccountFallbackStepPx(
+                    accountVirtualFallbackStepPx
                 )
+            )
         }
     }
     Column(
@@ -322,6 +350,12 @@ internal fun RightCoordinateRail(
                         modifier = Modifier.padding(end = railScreenEdgeInsetDp)
                     )
                 }
+                item(key = "possession-promotion", contentType = "possession-promotion") {
+                    PossessionPromotionTile(
+                        onClick = { onToolAction(FloatingChatToolAction.Contacts) },
+                        modifier = Modifier.padding(end = railScreenEdgeInsetDp)
+                    )
+                }
             }
             val pinnedEdge = pinnedSelectedAccountEdge
             if (pinnedEdge != null && selectedAccount != null) {
@@ -341,6 +375,20 @@ internal fun RightCoordinateRail(
             }
         }
         RightRailDivider()
+        if (rightRailUsesDedicatedAiEntry()) {
+            Box(modifier = Modifier.padding(end = railScreenEdgeInsetDp)) {
+                PinnedAssistantRailButton(
+                    action = dedicatedAiAction,
+                    selected = selectedTool == dedicatedAiAction,
+                    onClick = {
+                        exitReorderMode()
+                        selectedTool = dedicatedAiAction
+                        onToolAction(dedicatedAiAction)
+                    }
+                )
+            }
+            RightRailDivider()
+        }
         val toolListModifier = Modifier
             .weight(railWeights.toolWeight)
             .fillMaxWidth()
@@ -411,6 +459,35 @@ internal fun RightCoordinateRail(
 }
 
 @Composable
+private fun PinnedAssistantRailButton(
+    action: FloatingChatToolAction,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val toolShape = RoundedCornerShape(8.dp)
+    CompactInteractiveSize {
+        MaterialSurface(
+            modifier = Modifier
+                .size(width = rightRailToolButtonWidthDp().dp, height = rightRailToolButtonHeightDp().dp)
+                .shadow(4.dp, toolShape)
+                .clickable(onClick = onClick),
+            shape = toolShape,
+            color = OverlayTokens.control,
+            shadowElevation = 0.dp,
+            border = BorderStroke(
+                1.dp,
+                if (selected) OverlayTokens.accent else OverlayTokens.hairline
+            )
+        ) {
+            ToolButtonContent(
+                action = action,
+                active = selected
+            )
+        }
+    }
+}
+
+@Composable
 private fun AccountRailAvatarItem(
     account: FloatingChatContact,
     profile: FloatingChatAccountProfile?,
@@ -465,13 +542,36 @@ private fun RightRailDivider() {
             .height(16.dp),
         contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier
-                .width(30.dp)
-                .height(2.dp)
-                .clip(RoundedCornerShape(1.dp))
-                .background(OverlayTokens.railDivider)
+        TextLabel(
+            text = "智囊团",
+            size = 8.sp,
+            weight = FontWeight.SemiBold,
+            color = OverlayTokens.panelSecondaryText,
+            maxLines = 1
         )
+    }
+}
+
+@Composable
+private fun PossessionPromotionTile(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(8.dp)
+    MaterialSurface(
+        onClick = onClick,
+        modifier = modifier.size(rightRailAvatarSizeDp().dp),
+        shape = shape,
+        color = OverlayTokens.control,
+        border = BorderStroke(1.dp, OverlayTokens.hairline)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            TextLabel(
+                text = "附身\n推广",
+                size = 8.sp,
+                weight = FontWeight.SemiBold,
+                color = OverlayTokens.panelPrimaryText,
+                maxLines = 2,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 
@@ -599,29 +699,79 @@ private fun ToolButton(
             shadowElevation = 0.dp,
             border = BorderStroke(1.dp, if (selected || activeForReorder) OverlayTokens.accent else OverlayTokens.hairline)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 2.dp, vertical = 4.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Icon(
-                    imageVector = toolActionIcon(action),
-                    contentDescription = toolActionLabel(action),
-                    tint = if (selected || activeForReorder) OverlayTokens.toolIconActive else OverlayTokens.toolIcon,
-                    modifier = Modifier.size(18.dp)
-                )
-                TextLabel(
-                    text = toolActionLabel(action),
-                    size = 9.sp,
-                    weight = FontWeight.Bold,
-                    color = if (selected || activeForReorder) OverlayTokens.toolIconActive else OverlayTokens.toolIcon,
-                    maxLines = 1,
-                    textAlign = TextAlign.Center
-                )
-            }
+            ToolButtonContent(
+                action = action,
+                active = selected || activeForReorder
+            )
         }
+    }
+}
+
+@Composable
+private fun ToolButtonContent(
+    action: FloatingChatToolAction,
+    active: Boolean
+) {
+    if (action == FloatingChatToolAction.Assistant) {
+        AiffWorkflowContent(active = active)
+        return
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 2.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = toolActionIcon(action),
+            contentDescription = toolActionLabel(action),
+            tint = if (active) OverlayTokens.toolIconActive else OverlayTokens.toolIcon,
+            modifier = Modifier.size(18.dp)
+        )
+        TextLabel(
+            text = rightRailWorkflowLabel(action),
+            size = 9.sp,
+            weight = FontWeight.Bold,
+            color = if (active) OverlayTokens.toolIconActive else OverlayTokens.toolIcon,
+            maxLines = 1,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun AiffWorkflowContent(active: Boolean) {
+    var state by remember { mutableStateOf("在") }
+    LaunchedEffect(Unit) {
+        val states = listOf("在", "洞悉中", "筛选中", "策略中", "等待时机")
+        var index = 0
+        while (true) {
+            state = states[index % states.size]
+            index += 1
+            delay(900)
+        }
+    }
+    Column(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 2.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        TextLabel(
+            text = "Aiff在",
+            size = 9.sp,
+            weight = FontWeight.Bold,
+            color = if (active) OverlayTokens.toolIconActive else OverlayTokens.toolIcon,
+            maxLines = 1
+        )
+        TextLabel(
+            text = state,
+            size = 8.sp,
+            color = if (active) OverlayTokens.toolIconActive else OverlayTokens.toolIcon,
+            maxLines = 1,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.basicMarquee()
+        )
     }
 }
 

@@ -55,6 +55,30 @@ internal fun toolActionLabel(action: FloatingChatToolAction): String {
     }
 }
 
+/** Labels shown in the right SCRM workflow rail. The action enum remains the dispatch key. */
+internal fun rightRailWorkflowLabel(action: FloatingChatToolAction): String {
+    return when (action) {
+        FloatingChatToolAction.Assistant -> "AIFF流程"
+        FloatingChatToolAction.Search -> "筛选KOL"
+        FloatingChatToolAction.Contacts -> "沟通策略"
+        FloatingChatToolAction.Notes -> "人脉画像"
+        FloatingChatToolAction.Card -> "人设策略"
+        FloatingChatToolAction.Reminder -> "择机熟络"
+        FloatingChatToolAction.QuickPhrase -> "请身帮腔"
+        FloatingChatToolAction.MomentMaterials -> "人脉管理"
+        FloatingChatToolAction.Wallet -> "快捷回复"
+        FloatingChatToolAction.Share -> "群发计划"
+        FloatingChatToolAction.Pin -> "记忆编辑"
+        FloatingChatToolAction.Transfer -> "知识编辑"
+        FloatingChatToolAction.Favorite -> "抢单换量"
+        FloatingChatToolAction.Device -> "标价"
+        FloatingChatToolAction.Gallery -> "投流"
+        FloatingChatToolAction.Voice -> "钱包"
+        FloatingChatToolAction.Files -> "文件"
+        else -> toolActionLabel(action)
+    }
+}
+
 internal fun toolActionIcon(action: FloatingChatToolAction): ImageVector {
     return when (action) {
         FloatingChatToolAction.Contacts -> Icons.Filled.Contacts

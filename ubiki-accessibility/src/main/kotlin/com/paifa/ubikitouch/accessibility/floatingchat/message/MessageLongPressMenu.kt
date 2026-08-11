@@ -18,12 +18,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Forward
 import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -47,6 +50,8 @@ import com.paifa.ubikitouch.accessibility.floatingchat.components.TextLabel
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 
 internal enum class MessageLongPressAction(val label: String) {
+    Listen("话外音"),
+    Zoom("放大"),
     Copy("复制"),
     Forward("转发"),
     Favorite("收藏"),
@@ -59,14 +64,14 @@ internal enum class MessageLongPressAction(val label: String) {
 
 internal fun messageLongPressPrimaryActions(): List<MessageLongPressAction> {
     return listOf(
+        MessageLongPressAction.Listen,
+        MessageLongPressAction.Zoom,
         MessageLongPressAction.Copy,
         MessageLongPressAction.Forward,
         MessageLongPressAction.Favorite,
         MessageLongPressAction.Delete,
         MessageLongPressAction.MultiSelect,
-        MessageLongPressAction.Quote,
-        MessageLongPressAction.Reminder,
-        MessageLongPressAction.ScrmOperations
+        MessageLongPressAction.Quote
     )
 }
 
@@ -193,8 +198,8 @@ internal fun MessageLongPressMenu(
 
 @Composable
 internal fun MultiSelectActionBar(
-    selectedCount: Int,
     onForward: () -> Unit,
+    onCombinedForward: () -> Unit,
     onFavorite: () -> Unit,
     onDelete: () -> Unit,
     onCancel: () -> Unit,
@@ -211,18 +216,16 @@ internal fun MultiSelectActionBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            TextLabel(
-                text = multiSelectSelectionCountLabel(selectedCount),
-                size = 11.sp,
-                weight = FontWeight.Bold,
-                color = Color(0xFFF5F8FA),
-                maxLines = 1
-            )
             LongPressBarButton(MessageLongPressAction.Forward, onForward)
+            LongPressBarButton(MessageLongPressAction.Forward, onCombinedForward)
             LongPressBarButton(MessageLongPressAction.Favorite, onFavorite)
             LongPressBarButton(MessageLongPressAction.Delete, onDelete)
+            IconButton(onClick = onCancel, modifier = Modifier.size(30.dp)) {
+                Icon(Icons.Filled.Close, contentDescription = "关闭多选", tint = Color(0xFFF5F8FA))
+            }
             Button(
                 onClick = onCancel,
+                modifier = Modifier.size(0.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color(0xFFF5F8FA)),
                 contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp)
             ) {
@@ -306,6 +309,8 @@ private fun LongPressBarButton(
 
 private fun MessageLongPressAction.icon(): ImageVector {
     return when (this) {
+        MessageLongPressAction.Listen -> Icons.Filled.VolumeUp
+        MessageLongPressAction.Zoom -> Icons.Filled.ZoomIn
         MessageLongPressAction.Copy -> Icons.Filled.ContentCopy
         MessageLongPressAction.Forward -> Icons.AutoMirrored.Filled.Forward
         MessageLongPressAction.Favorite -> Icons.Filled.Star

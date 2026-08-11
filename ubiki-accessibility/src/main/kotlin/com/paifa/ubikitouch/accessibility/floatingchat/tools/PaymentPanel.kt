@@ -8,11 +8,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -22,6 +25,14 @@ import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.PaymentUiEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.PaymentUiState
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactSummary
+import com.paifa.ubikitouch.accessibility.scrm.ScrmFloatingAccountRoute
+import com.paifa.ubikitouch.accessibility.scrm.ScrmPaymentApi
+import com.paifa.ubikitouch.accessibility.scrm.ScrmSettingsManager
+import com.paifa.ubikitouch.accessibility.scrm.ScrmWalletBalanceRequest
+import com.paifa.ubikitouch.accessibility.scrm.WalletBalanceParser
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val PanelBackground = Color(0xFFF7F7F7)
 private val PrimaryText = Color(0xFF222222)
@@ -36,10 +47,20 @@ internal fun PaymentPanel(
     var amount by remember(state.title) { mutableStateOf(state.amount) }
     var note by remember(state.title) { mutableStateOf(state.note.ifBlank { state.defaultNote }) }
     var recipientId by remember(state.title, state.recipients) { mutableStateOf(state.selectedRecipientId) }
+    var packetCount by remember(state.title) { mutableStateOf(1) }
     Column(modifier = modifier.fillMaxWidth().background(PanelBackground).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         TextLabel(state.title, 13.sp, color = PrimaryText, maxLines = 1)
         ToolInput(amount, state.amountLabel) { amount = it; onEvent(PaymentUiEvent.AmountChanged(it)) }
         ToolInput(note, state.noteLabel) { note = it; onEvent(PaymentUiEvent.NoteChanged(it)) }
+        if (state.title == "发红包") {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                TextLabel("红包个数 $packetCount/100", 12.sp, color = SecondaryText, maxLines = 1)
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    TextLabel("−", 18.sp, color = if (packetCount > 1) Color(0xFF1AAD19) else SecondaryText, modifier = Modifier.clickable(enabled = packetCount > 1) { packetCount -= 1 }, maxLines = 1)
+                    TextLabel("+", 18.sp, color = if (packetCount < 100) Color(0xFF1AAD19) else SecondaryText, modifier = Modifier.clickable(enabled = packetCount < 100) { packetCount += 1 }, maxLines = 1)
+                }
+            }
+        }
         if (state.recipients.isNotEmpty()) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 state.recipients.take(6).forEach { recipient ->
@@ -81,8 +102,63 @@ internal fun PaymentComposerPanel(
     defaultNote: String,
     confirmLabel: String,
     recipients: List<FloatingChatContact> = emptyList(),
+    scrmRoute: ScrmFloatingAccountRoute? = null,
     onConfirm: (String, String, FloatingChatContact?) -> Unit
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var confirming by remember(title) { mutableStateOf(false) }
+    var draftAmount by remember(title) { mutableStateOf("") }
+    var draftNote by remember(title) { mutableStateOf(defaultNote) }
+    var draftRecipient by remember(title) { mutableStateOf<FloatingChatContact?>(null) }
+    var walletStatus by remember(title, scrmRoute) { mutableStateOf("零钱 未查询") }
+    var walletLoading by remember(title, scrmRoute) { mutableStateOf(false) }
+    if (confirming) {
+        PaymentConfirmationPanel(
+            title = title,
+            amount = draftAmount,
+            note = draftNote,
+            recipient = draftRecipient,
+            walletStatus = walletStatus,
+            walletLoading = walletLoading,
+            onQueryWallet = {
+                val route = scrmRoute
+                if (route == null) {
+                    walletStatus = "未选择可用 SCRM 账号"
+                } else {
+                    walletLoading = true
+                    walletStatus = "零钱 查询中"
+                    scope.launch {
+                        runCatching {
+                            withContext(Dispatchers.IO) {
+                                val session = ScrmSettingsManager(context.applicationContext)
+                                    .loadSelectedSessionOrBootstrap()
+                                val api = session.readApi as? ScrmPaymentApi
+                                    ?: error("当前 SCRM 客户端不支持零钱查询")
+                                api.getWalletBalance(
+                                    ScrmWalletBalanceRequest(
+                                        deviceUuid = route.deviceUuid,
+                                        weChatId = route.weChatId,
+                                        flag = 0
+                                    )
+                                )
+                            }
+                        }.onSuccess { result ->
+                            val balance = result.data?.let(WalletBalanceParser::parse)
+                            walletStatus = balance?.fen?.let { "零钱 ${balance.displayText}" }
+                                ?: "零钱任务处理中 · #${result.taskId}"
+                        }.onFailure { error ->
+                            walletStatus = "零钱查询失败：${error.message ?: "未知错误"}"
+                        }
+                        walletLoading = false
+                    }
+                }
+            },
+            onBack = { confirming = false },
+            onConfirm = { onConfirm(draftAmount, draftNote, draftRecipient) }
+        )
+        return
+    }
     PaymentPanel(
         state = PaymentUiState(
             title = title,
@@ -94,8 +170,76 @@ internal fun PaymentComposerPanel(
         ),
         onEvent = { event ->
             if (event is PaymentUiEvent.ConfirmRequested) {
-                onConfirm(event.amount, event.note, recipients.firstOrNull { it.id == event.recipientId })
+                draftAmount = event.amount
+                draftNote = event.note
+                draftRecipient = recipients.firstOrNull { it.id == event.recipientId }
+                confirming = event.amount.isNotBlank()
             }
         }
     )
+}
+
+/** iOS confirmation-page equivalent. It only confirms the local request draft. */
+@Composable
+private fun PaymentConfirmationPanel(
+    title: String,
+    amount: String,
+    note: String,
+    recipient: FloatingChatContact?,
+    walletStatus: String,
+    walletLoading: Boolean,
+    onQueryWallet: () -> Unit,
+    onBack: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    var paymentMethod by remember { mutableStateOf("零钱") }
+    var password by remember { mutableStateOf("") }
+    Column(
+        modifier = Modifier.fillMaxWidth().background(PanelBackground).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        TextLabel("确认$title", 16.sp, color = PrimaryText, maxLines = 1)
+        TextLabel("金额  ¥${amount.ifBlank { "0.00" }}", 22.sp, color = PrimaryText, maxLines = 1)
+        TextLabel("备注  ${note.ifBlank { "无" }}", 12.sp, color = SecondaryText, maxLines = 2)
+        recipient?.let { TextLabel("收款人  ${it.name}", 12.sp, color = SecondaryText, maxLines = 1) }
+        TextLabel(
+            walletStatus,
+            12.sp,
+            color = SecondaryText,
+            modifier = Modifier.clickable(enabled = !walletLoading, onClick = onQueryWallet),
+            maxLines = 1
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            listOf("零钱", "银行卡", "经营账户").forEach { method ->
+                TextLabel(
+                    method,
+                    12.sp,
+                    color = if (method == paymentMethod) Color(0xFF1AAD19) else SecondaryText,
+                    modifier = Modifier.clickable { paymentMethod = method },
+                    maxLines = 1
+                )
+            }
+        }
+        BasicTextField(
+            value = password,
+            onValueChange = { password = it.filter(Char::isDigit).take(6) },
+            modifier = Modifier.fillMaxWidth().background(Color.White).padding(12.dp),
+            singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+            decorationBox = { inner ->
+                TextLabel("支付密码  ${"●".repeat(password.length)}${"○".repeat(6 - password.length)}", 13.sp, color = SecondaryText, maxLines = 1)
+                inner()
+            }
+        )
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            TextLabel("返回", 12.sp, color = SecondaryText, modifier = Modifier.clickable(onClick = onBack), maxLines = 1)
+            TextLabel(
+                "确认并生成请求",
+                12.sp,
+                color = if (password.length == 6) Color(0xFF1AAD19) else SecondaryText,
+                modifier = Modifier.padding(start = 18.dp).clickable(enabled = password.length == 6, onClick = onConfirm),
+                maxLines = 1
+            )
+        }
+    }
 }

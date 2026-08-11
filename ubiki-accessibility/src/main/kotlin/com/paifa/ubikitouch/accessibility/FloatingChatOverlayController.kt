@@ -7,6 +7,7 @@ import android.graphics.Rect
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.Gravity
 import android.view.View
@@ -74,6 +75,7 @@ import com.paifa.ubikitouch.accessibility.scrm.withScrmQueueState
 import java.util.concurrent.Executors
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
 
@@ -105,7 +107,10 @@ internal class FloatingChatOverlayController(
     private val scrmSettingsManager = ScrmSettingsManager(context.applicationContext)
     private val scrmConversationRefreshInFlight = AtomicBoolean(false)
     private val scrmConversationRefreshPending = AtomicBoolean(false)
+    /** Monotonically identifies refresh requests so an older response cannot replace a newer account selection. */
+    private val scrmConversationRefreshGeneration = AtomicLong(0L)
     private val cachedScrmAccountConversations = ConcurrentHashMap<String, ScrmFloatingAccountConversation>()
+    private val scrmAccountConversationLoadedAt = ConcurrentHashMap<String, Long>()
     private var scheduledScrmConversationRefresh: Runnable? = null
     private var scheduledScrmBackgroundPrefetch: Runnable? = null
     private val runtimeState = FloatingChatOverlayRuntimeState()
@@ -779,6 +784,8 @@ internal class FloatingChatOverlayController(
     }
 
     private fun refreshScrmConversationFromApi() {
+        val requestGeneration = scrmConversationRefreshGeneration.incrementAndGet()
+        val requestedAccountId = selectedAccountId
         clearScheduledScrmConversationRefresh()
         clearScheduledScrmBackgroundPrefetch()
         if (
@@ -790,11 +797,34 @@ internal class FloatingChatOverlayController(
             return
         }
         scrmConversationExecutor.execute {
-            val result = runCatching { loadScrmConversationFromApi() }
+            val result = runCatching {
+                loadScrmConversationFromApi(requestedAccountId = requestedAccountId)
+            }
             mainHandler.post {
                 result.onSuccess { nextConversation ->
-                    applyScrmConversation(nextConversation)
-                    scheduleScrmConversationBackgroundPrefetch()
+                    scrmAccountConversationLoadedAt[requestedAccountId] = SystemClock.elapsedRealtime()
+                    val latestGeneration = scrmConversationRefreshGeneration.get()
+                    val currentAccountId = selectedAccountId
+                    if (shouldApplyScrmConversationRefreshResult(
+                            requestGeneration = requestGeneration,
+                            latestGeneration = latestGeneration,
+                            requestedAccountId = requestedAccountId,
+                            currentAccountId = currentAccountId
+                        )
+                    ) {
+                        applyScrmConversation(nextConversation)
+                        scheduleScrmConversationBackgroundPrefetch()
+                    } else {
+                        // The response can still populate the per-account cache, but it must
+                        // never replace the account the user selected while it was in flight.
+                        scrmConversationRefreshPending.set(true)
+                        Log.i(
+                            TAG,
+                            "discard stale SCRM conversation refresh requestGeneration=$requestGeneration " +
+                                "latestGeneration=$latestGeneration requestedAccountId=$requestedAccountId " +
+                                "currentAccountId=$currentAccountId"
+                        )
+                    }
                 }.onFailure { error ->
                     Log.w(TAG, "failed to refresh SCRM floating chat conversation", error)
                 }
@@ -808,6 +838,15 @@ internal class FloatingChatOverlayController(
 
     private fun scheduleScrmConversationRefreshAfterAccountSwitch() {
         clearScheduledScrmConversationRefresh()
+        if (
+            scrmAccountConversationCacheIsFresh(
+                lastLoadedAtMillis = scrmAccountConversationLoadedAt[selectedAccountId],
+                nowMillis = SystemClock.elapsedRealtime(),
+                maxAgeMillis = ScrmAccountConversationCacheFreshMillis
+            )
+        ) {
+            return
+        }
         val refresh = Runnable {
             scheduledScrmConversationRefresh = null
             refreshScrmConversationFromApi()
@@ -862,13 +901,21 @@ internal class FloatingChatOverlayController(
         }
     }
 
-    private fun loadScrmConversationFromApi(): com.paifa.ubikitouch.core.model.FloatingChatConversation {
+    private fun loadScrmConversationFromApi(
+        requestedAccountId: String
+    ): com.paifa.ubikitouch.core.model.FloatingChatConversation {
         return try {
-            loadScrmConversationForSession(scrmSettingsManager.loadSelectedSessionOrBootstrap())
+            loadScrmConversationForSession(
+                session = scrmSettingsManager.loadSelectedSessionOrBootstrap(),
+                requestedAccountId = requestedAccountId
+            )
         } catch (error: ScrmAuthenticationException) {
             when (scrmSettingsManager.bootstrapWithBundledAdminCredentials()) {
                 is ScrmAdminBootstrapResult.Success -> {
-                    loadScrmConversationForSession(scrmSettingsManager.loadSelectedSessionOrBootstrap())
+                    loadScrmConversationForSession(
+                        session = scrmSettingsManager.loadSelectedSessionOrBootstrap(),
+                        requestedAccountId = requestedAccountId
+                    )
                 }
                 is ScrmAdminBootstrapResult.Failure,
                 null -> throw error
@@ -914,12 +961,13 @@ internal class FloatingChatOverlayController(
     }
 
     private fun loadScrmConversationForSession(
-        session: ScrmSelectedSession
+        session: ScrmSelectedSession,
+        requestedAccountId: String
     ): com.paifa.ubikitouch.core.model.FloatingChatConversation {
         val devices = session.readApi.getDevices()
         val accounts = session.readApi.getWechatAccounts()
         val selectedRoute = scrmFloatingAccountRouteForSelection(
-            selectedAccountId = selectedAccountId,
+            selectedAccountId = requestedAccountId,
             fallbackDeviceUuid = session.deviceUuid,
             fallbackWeChatId = session.weChatId
         )
@@ -1137,7 +1185,10 @@ internal class FloatingChatOverlayController(
         nextConversation: com.paifa.ubikitouch.core.model.FloatingChatConversation
     ) {
         conversation = nextConversation
-        selectedAccountId = nextConversation.accountContacts.firstOrNull { account -> account.selected }?.id
+        selectedAccountId = nextConversation.accountContacts.firstOrNull { account ->
+            account.id == selectedAccountId
+        }?.id
+            ?: nextConversation.accountContacts.firstOrNull { account -> account.selected }?.id
             ?: nextConversation.accountContacts.firstOrNull()?.id
             ?: selectedAccountId
         if (!toolThreadSelectionExists(nextConversation, selectedThread)) {
@@ -1630,7 +1681,29 @@ internal fun scrmConversationRefreshGateDecision(inFlight: Boolean): ScrmConvers
     }
 }
 
+/** A refresh response is authoritative only for the account that initiated its request. */
+internal fun shouldApplyScrmConversationRefreshResult(
+    requestGeneration: Long,
+    latestGeneration: Long,
+    requestedAccountId: String,
+    currentAccountId: String
+): Boolean {
+    return requestGeneration == latestGeneration && requestedAccountId == currentAccountId
+}
+
 internal fun scrmAccountSwitchRefreshDebounceMillis(): Int = 260
+
+internal fun scrmAccountConversationCacheIsFresh(
+    lastLoadedAtMillis: Long?,
+    nowMillis: Long,
+    maxAgeMillis: Long
+): Boolean {
+    val loadedAt = lastLoadedAtMillis ?: return false
+    if (maxAgeMillis <= 0L || nowMillis < loadedAt) return false
+    return nowMillis - loadedAt <= maxAgeMillis
+}
+
+private const val ScrmAccountConversationCacheFreshMillis = 15_000L
 
 internal fun scrmBackgroundPrefetchDelayMillis(): Int = 700
 

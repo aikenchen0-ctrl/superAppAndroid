@@ -43,6 +43,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.tools.GiftPanel
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.LocationPickerPanel
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.MoreToolPanel
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.PaymentComposerPanel
+import com.paifa.ubikitouch.accessibility.floatingchat.tools.SplitBillPanel
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.QuickPhrasePanel
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.RealVoiceInputPanel
 import com.paifa.ubikitouch.core.model.FloatingChatContact
@@ -66,6 +67,7 @@ internal fun toolFeaturePanelMaxHeightDp(): Int = ToolFeaturePanelMaxHeightDp
 internal fun FloatingBottomPanel(
     mode: BottomPanelMode,
     scrmContactsRoute: ScrmFloatingAccountRoute?,
+    contactsOpenAddFriend: Boolean,
     scrmMomentsRoute: ScrmFloatingAccountRoute?,
     scrmMessageRoute: ScrmFloatingAccountRoute?,
     scrmMessageConversationId: String?,
@@ -237,6 +239,7 @@ internal fun FloatingBottomPanel(
                 )
                 BottomPanelMode.Contacts -> ScrmContactsPanel(
                     route = scrmContactsRoute,
+                    openAddFriend = contactsOpenAddFriend,
                     onClose = onClose,
                     onOpenPrivateChat = onOpenPrivateChat,
                     onOpenFriendProfile = onOpenFriendProfile
@@ -259,6 +262,7 @@ internal fun FloatingBottomPanel(
                     defaultNote = "恭喜发财，大吉大利",
                     confirmLabel = "塞钱进红包",
                     recipients = emptyList(),
+                    scrmRoute = scrmMessageRoute,
                     onConfirm = { amount, note, _ -> onSendRedPacket(amount, note) }
                 )
                 BottomPanelMode.Transfer -> PaymentComposerPanel(
@@ -268,8 +272,10 @@ internal fun FloatingBottomPanel(
                     defaultNote = "转账给你，请查收",
                     confirmLabel = "确认转账",
                     recipients = transferRecipients,
+                    scrmRoute = scrmMessageRoute,
                     onConfirm = onSendTransfer
                 )
+                BottomPanelMode.SplitBill -> SplitBillPanel(transferRecipients)
                 BottomPanelMode.Location -> LocationPickerPanel(
                     permissionRequestToken = locationPermissionRequestToken,
                     onSendLocation = onSendLocation

@@ -277,6 +277,7 @@ import com.paifa.ubikitouch.core.model.FloatingChatContactCardKind
 import com.paifa.ubikitouch.core.model.FloatingChatConversation
 import com.paifa.ubikitouch.core.model.FloatingChatFileFormat
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
+import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 import com.paifa.ubikitouch.core.model.FloatingChatPrototype
 import com.paifa.ubikitouch.core.model.FloatingChatSendState
 import com.paifa.ubikitouch.core.model.FloatingChatThumbnailOrientation
@@ -295,6 +296,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingChatVi
 import com.paifa.ubikitouch.accessibility.floatingchat.media.DocumentReaderStatus
 import com.paifa.ubikitouch.accessibility.floatingchat.message.RedPacketPaymentGlyph as MessageRedPacketPaymentGlyph
 import com.paifa.ubikitouch.accessibility.floatingchat.message.TransferPaymentGlyph as MessageTransferPaymentGlyph
+import com.paifa.ubikitouch.accessibility.floatingchat.message.isTransferPaymentCard
 import com.paifa.ubikitouch.core.model.GestureType
 import com.paifa.ubikitouch.accessibility.data.LocalMomentComment
 import com.paifa.ubikitouch.accessibility.data.LocalMomentPost
@@ -316,6 +318,11 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskApi
 import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskPollState
 import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskResult
 import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskSubmissionResult
+import com.paifa.ubikitouch.accessibility.scrm.ScrmPaymentApi
+import com.paifa.ubikitouch.accessibility.scrm.ScrmRedPacketQueryByMessageRequest
+import com.paifa.ubikitouch.accessibility.scrm.PaymentDetailParser
+import com.paifa.ubikitouch.accessibility.scrm.PaymentReadback
+import com.paifa.ubikitouch.accessibility.scrm.PaymentReadbackState
 import com.paifa.ubikitouch.accessibility.scrm.scrmContactsPanelRouteForSelectedAccount
 import com.paifa.ubikitouch.accessibility.scrm.resolveScrmTaskResult
 import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingAccountId
@@ -328,7 +335,9 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -383,6 +392,8 @@ internal fun FloatingChatOverlay(
     var inputFocused by remember { mutableStateOf(false) }
     var bottomPanelMode by remember { mutableStateOf(BottomPanelMode.None) }
     var displayedBottomPanelMode by remember { mutableStateOf(BottomPanelMode.None) }
+    var contactsOpenAddFriend by remember { mutableStateOf(false) }
+    var displayedContactsOpenAddFriend by remember { mutableStateOf(false) }
     val bottomPanelVisibility = remember { MutableTransitionState(false) }
     val imeInsets = WindowInsets.ime
     val imeVisible by remember(imeInsets, density) {
@@ -392,7 +403,13 @@ internal fun FloatingChatOverlay(
         if (bottomPanelMode != BottomPanelMode.None) {
             displayedBottomPanelMode = bottomPanelMode
         }
+        if (bottomPanelMode == BottomPanelMode.Contacts) {
+            displayedContactsOpenAddFriend = contactsOpenAddFriend
+        }
         bottomPanelVisibility.targetState = bottomPanelMode != BottomPanelMode.None
+        if (bottomPanelMode != BottomPanelMode.Contacts) {
+            contactsOpenAddFriend = false
+        }
     }
     LaunchedEffect(imeVisible) {
         if (imeVisible && bottomPanelMode.isBottomComposerDrawer()) {
@@ -432,6 +449,7 @@ internal fun FloatingChatOverlay(
     var longPressMessage by remember { mutableStateOf<FloatingChatMessage?>(null) }
     var longPressAnchorBounds by remember { mutableStateOf<Rect?>(null) }
     var paymentDetailMessage by remember { mutableStateOf<FloatingChatMessage?>(null) }
+    var paymentReadback by remember { mutableStateOf(PaymentReadback()) }
     var forwardMessage by remember { mutableStateOf<FloatingChatMessage?>(null) }
     var forwardModeMessages by remember { mutableStateOf<List<FloatingChatMessage>>(emptyList()) }
     var pendingForwardMessages by remember { mutableStateOf<List<FloatingChatMessage>>(emptyList()) }
@@ -527,10 +545,14 @@ internal fun FloatingChatOverlay(
             }
             .forEach(onPersistMomentPost)
     }
-    val effectiveAccountContacts = liveConversation.accountContacts.map { account ->
-        (accountProfiles[account.id] ?: defaultAccountProfileFor(account)).toContact(account)
+    val accountProfileList = accountProfiles.values.toList()
+    val profiledConversation = remember(liveConversation, accountProfileList) {
+        liveConversation.copy(
+            accountContacts = liveConversation.accountContacts.map { account ->
+                (accountProfiles[account.id] ?: defaultAccountProfileFor(account)).toContact(account)
+            }
+        )
     }
-    val profiledConversation = liveConversation.copy(accountContacts = effectiveAccountContacts)
     val accountIds = remember(liveConversation.accountContacts) {
         liveConversation.accountContacts.map { account -> account.id }
     }
@@ -551,11 +573,11 @@ internal fun FloatingChatOverlay(
             ?: accountIds.firstOrNull()
             ?: ""
     }
-    val effectiveConversation = remember(profiledConversation, activeAccountId) {
-        accountScopedConversation(
-            conversation = profiledConversation,
-            activeAccountId = activeAccountId
-        )
+    val accountConversationCache = remember(profiledConversation) {
+        AccountScopedConversationCache(profiledConversation)
+    }
+    val effectiveConversation = remember(accountConversationCache, activeAccountId) {
+        accountConversationCache.conversationFor(activeAccountId)
     }
     val groupProfileList = groupProfiles.values.toList()
     val groupProfiledConversation = remember(effectiveConversation, groupProfileList, activeAccountId) {
@@ -938,6 +960,28 @@ internal fun FloatingChatOverlay(
             quotedMessage = message
             inputFocused = true
         },
+        onListenMessage = { message -> mediaOverlayState.openActions(message) },
+        onZoomMessage = { message ->
+            when (message.type) {
+                FloatingChatMessageType.ImageThumbnail,
+                FloatingChatMessageType.CapturedPhoto,
+                FloatingChatMessageType.VideoPreview,
+                FloatingChatMessageType.ChannelsVideo -> {
+                    val previewIndex = previewableMedia.indexOfFirst { preview -> preview.id == message.id }
+                    if (previewIndex >= 0) {
+                        FloatingChatMediaPreviewBridge.open(
+                            mediaMessages = previewableMedia,
+                            initialIndex = previewIndex,
+                            runtimeState = runtimeState,
+                            accountId = selectedAccount.id
+                        )
+                    } else {
+                        Toast.makeText(context, "媒体资源暂不可用", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                else -> Toast.makeText(context, "该消息类型暂不支持放大", Toast.LENGTH_SHORT).show()
+            }
+        },
         onScrmOperationRequested = { message -> scrmMessageOperationTarget = message },
         onCloseLongPressMenu = { longPressMessage = null }
     )
@@ -1055,16 +1099,27 @@ internal fun FloatingChatOverlay(
                 contactEditorTarget = ContactEditorTarget.User(contact)
             },
             onAccountAvatarClick = { account ->
+                if (!shouldHandleAccountAvatarClick(activeAccountId, account.id)) {
+                    return@CoordinateChatBody
+                }
                 val nextAccountId = selectedAccountIdAfterAccountAvatarClick(
                     currentAccountId = activeAccountId,
                     clickedAccountId = account.id
                 )
-                selectedThread = selectedThreadAfterAccountAvatarClick(
+                val nextThread = selectedThreadAfterAccountAvatarClick(
                     conversation = profiledConversation,
                     clickedAccountId = nextAccountId,
                     currentThread = selectedThread
                 )
+                // Commit the account choice before the next frame. Waiting for
+                // ChatThreadEffects' LaunchedEffect leaves a window in which an
+                // older refresh response can still restore the previous account.
+                runtimeState.conversationUpdateEvent?.let { pendingUpdate ->
+                    runtimeState.clearConversationUpdate(pendingUpdate.token)
+                }
+                selectedThread = nextThread
                 activeAccountId = nextAccountId
+                onThreadContextChanged(nextThread, nextAccountId)
                 homeOverviewVisible = false
                 bottomPanelMode = BottomPanelMode.None
             },
@@ -1097,6 +1152,12 @@ internal fun FloatingChatOverlay(
                 aiDraftActionMessage = message
                 bottomPanelMode = BottomPanelMode.None
             },
+            onMessageClick = { message ->
+                // Reuse the existing in-tree action group; this is presentation-only.
+                longPressMessage = message
+                longPressAnchorBounds = null
+                bottomPanelMode = BottomPanelMode.None
+            },
             onLongPressMessage = { message, bounds ->
                 longPressMessage = message
                 longPressAnchorBounds = bounds
@@ -1115,6 +1176,13 @@ internal fun FloatingChatOverlay(
             },
             onBlankAreaTap = hideKeyboardFromBlankArea,
             onCloseChat = onCollapse,
+            onScanClick = {
+                FloatingChatMediaPickerBridge.requestScan()
+            },
+            onAddFriendClick = {
+                contactsOpenAddFriend = true
+                bottomPanelMode = BottomPanelMode.Contacts
+            },
             modifier = Modifier.fillMaxSize()
         )
         },
@@ -1205,6 +1273,7 @@ internal fun FloatingChatOverlay(
                     fallbackDeviceUuid = null,
                     fallbackWeChatId = null
                 ),
+                contactsOpenAddFriend = displayedContactsOpenAddFriend,
                 scrmMomentsRoute = scrmContactsPanelRouteForSelectedAccount(
                     selectedAccountId = selectedAccount.id,
                     fallbackDeviceUuid = null,
@@ -1597,11 +1666,71 @@ internal fun FloatingChatOverlay(
             selectedAccount = selectedAccount,
             selectedMessages = selectedMessagesForCurrentAction,
             messageLongPressActions = messageLongPressActions,
-            onPaymentDetailMessageChanged = { message -> paymentDetailMessage = message },
+            onPaymentDetailMessageChanged = { message ->
+                paymentDetailMessage = message
+                paymentReadback = PaymentReadback()
+            },
             isPaymentClaimed = { message -> claimedPaymentMessageIds[message.id] == true },
-            onClaimPayment = { message -> claimedPaymentMessageIds[message.id] = true },
+            paymentReadback = paymentReadback,
+            onRefreshPaymentStatus = { message ->
+                if (message.isTransferPaymentCard()) {
+                    paymentReadback = PaymentReadback(
+                        state = PaymentReadbackState.UNKNOWN,
+                        message = "转账状态需使用支付任务回读；当前接口文档未提供按消息查询转账详情的只读接口"
+                    )
+                    return@MessageInteractionOverlayHost
+                }
+                val route = scrmFloatingAccountRouteForContactId(selectedAccount.id)
+                val messageId = message.remoteMessageServerId?.toLongOrNull()
+                    ?: message.id.substringAfterLast(':').toLongOrNull()
+                if (route == null || messageId == null || messageId <= 0L) {
+                    paymentReadback = PaymentReadback(
+                        state = PaymentReadbackState.FAILED,
+                        message = "缺少 SCRM 账号路由或服务端消息 ID"
+                    )
+                } else {
+                    paymentReadback = PaymentReadback(state = PaymentReadbackState.LOADING)
+                    coroutineScope.launch {
+                        runCatching {
+                            withContext(Dispatchers.IO) {
+                                val session = ScrmSettingsManager(context.applicationContext)
+                                    .loadSelectedSessionOrBootstrap()
+                                val api = session.readApi as? ScrmPaymentApi
+                                    ?: error("当前 SCRM 客户端不支持支付状态查询")
+                                api.getRedPacketDetail(
+                                    ScrmRedPacketQueryByMessageRequest(
+                                        deviceUuid = route.deviceUuid,
+                                        messageId = messageId
+                                    )
+                                )
+                            }
+                        }.onSuccess { result ->
+                            paymentReadback = result.data?.let(PaymentDetailParser::parseRedPacket)
+                                ?.let(PaymentReadback::fromDetail)
+                                ?: PaymentReadback.fromSubmission(result)
+                        }.onFailure { error ->
+                            paymentReadback = PaymentReadback(
+                                state = PaymentReadbackState.FAILED,
+                                message = error.message ?: "支付状态查询失败"
+                            )
+                        }
+                    }
+                }
+            },
+            onClaimPayment = { _ ->
+                paymentReadback = PaymentReadback(
+                    state = PaymentReadbackState.UNKNOWN,
+                    message = "领取/收款为写接口，当前仅保留人工验收"
+                )
+            },
             onLongPressMessageChanged = { message -> longPressMessage = message },
             onStartForwardingMessages = startForwardingMessages,
+            onStartCombinedForwardingMessages = { messages ->
+                if (messages.isNotEmpty()) {
+                    pendingForwardMessages = messages
+                    pendingForwardMode = MultiForwardMode.Combined
+                }
+            },
             onClearSelectedMessages = { selectedMessageIds.clear() },
             onMultiSelectModeChanged = { enabled -> multiSelectMode = enabled },
             onChatHistoryPreviewMessageChanged = { message -> chatHistoryPreviewMessage = message },

@@ -1,6 +1,7 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.tools
 
 import com.paifa.ubikitouch.core.model.FloatingChatContact
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 internal data class RightRailWeights(
@@ -152,6 +153,9 @@ internal fun rightRailSelectedAccountFirstVisibleIndex(
         .coerceAtLeast(0)
 }
 
+/** Right rail uses LazyColumn(reverseLayout = true), so higher indexes render upward. */
+internal fun rightRailVirtualAccountFallbackStepPx(itemStepPx: Float): Float = -abs(itemStepPx)
+
 internal fun rightRailScrollsSelectedAccountIntoViewForConnectors(): Boolean = true
 
 private fun rightRailNormalizeAccountWeight(weight: Float): Float {
@@ -167,7 +171,7 @@ private const val RightRailItemGapDp = 6
 private const val RightRailExpansionSlackDp = 10
 private const val RightRailMinimumVisibleToolCount = 3
 private const val RightRailDefaultAccountWeight = 0.42f
-private const val RightRailMinAccountWeight = 0.24f
-private const val RightRailMaxAccountWeight = 0.70f
-private const val RightRailSectionShiftFraction = 0.25f
+private const val RightRailMinAccountWeight = 0.10f
+private const val RightRailMaxAccountWeight = 0.90f
+private const val RightRailSectionShiftFraction = 0.48f
 private const val RightRailSectionResizeMs = 140
