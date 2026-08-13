@@ -41,6 +41,7 @@ import com.paifa.ubikitouch.accessibility.data.toLocalChatMessage
 import com.paifa.ubikitouch.accessibility.floatingchat.media.mediaPreviewCoversSystemBars
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.toChatThreadSelection
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.toPrototypeToolSelection
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.navigationStateAfterOutgoingMessage
 import com.paifa.ubikitouch.accessibility.floatingchat.moments.toAppMomentPost
 import com.paifa.ubikitouch.accessibility.floatingchat.moments.toLocalMomentPost
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.FloatingChatOverlayRuntimeState
@@ -77,6 +78,7 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.ConcurrentHashMap
+import java.security.MessageDigest
 import kotlin.math.roundToInt
 
 internal class FloatingChatOverlayController(
@@ -149,6 +151,7 @@ internal class FloatingChatOverlayController(
     }
 
     init {
+        logFloatingChatConversationData(stage = "initial_state", value = conversation)
         scrmOperationRunner.requestRun()
         refreshScrmConversationFromApi()
     }
@@ -345,6 +348,7 @@ internal class FloatingChatOverlayController(
             accountId = selectedAccountId,
             sequence = localMessageSequence
         )
+        markCurrentUnreadSummaryReplied(selectedThread.toLocalThreadId())
         localMessages += message
         persistLocalMessage(message, selectedThread.toLocalThreadId())
         showState(FloatingChatOverlayState.Expanded, force = true)
@@ -370,6 +374,7 @@ internal class FloatingChatOverlayController(
         )
         val threadId = selectedThread.toLocalThreadId()
         val message = prepareOutgoingMessageForScrm(baseMessage, threadId)
+        markCurrentUnreadSummaryReplied(threadId)
         localMessages += message
         persistLocalMessage(message, threadId)
         showState(FloatingChatOverlayState.Expanded, force = true)
@@ -683,6 +688,16 @@ internal class FloatingChatOverlayController(
         return message.withScrmQueueState(clientRequestId)
     }
 
+    private fun markCurrentUnreadSummaryReplied(threadId: String) {
+        runtimeState.chatNavigationState = navigationStateAfterOutgoingMessage(
+            current = runtimeState.chatNavigationState,
+            conversation = conversation,
+            localMessages = localMessages,
+            accountId = selectedAccountId,
+            threadId = threadId
+        )
+    }
+
     private fun persistLocalMessage(message: FloatingChatMessage, threadId: String) {
         messageDatabaseExecutor.execute {
             runCatching {
@@ -786,6 +801,12 @@ internal class FloatingChatOverlayController(
     private fun refreshScrmConversationFromApi() {
         val requestGeneration = scrmConversationRefreshGeneration.incrementAndGet()
         val requestedAccountId = selectedAccountId
+        Log.i(
+            CHAT_DATA_TAG,
+            "stage=refresh_requested generation=$requestGeneration " +
+                "account=${floatingChatDiagnosticId(requestedAccountId)} " +
+                "visibleSource=${floatingChatConversationDataSource(conversation).logValue}"
+        )
         clearScheduledScrmConversationRefresh()
         clearScheduledScrmBackgroundPrefetch()
         if (
@@ -794,6 +815,7 @@ internal class FloatingChatOverlayController(
             ) == ScrmConversationRefreshGate.QueuePending
         ) {
             scrmConversationRefreshPending.set(true)
+            Log.i(CHAT_DATA_TAG, "stage=refresh_queued generation=$requestGeneration reason=in_flight")
             return
         }
         scrmConversationExecutor.execute {
@@ -819,14 +841,22 @@ internal class FloatingChatOverlayController(
                         // never replace the account the user selected while it was in flight.
                         scrmConversationRefreshPending.set(true)
                         Log.i(
-                            TAG,
+                            CHAT_DATA_TAG,
                             "discard stale SCRM conversation refresh requestGeneration=$requestGeneration " +
-                                "latestGeneration=$latestGeneration requestedAccountId=$requestedAccountId " +
-                                "currentAccountId=$currentAccountId"
+                                "latestGeneration=$latestGeneration " +
+                                "requestedAccount=${floatingChatDiagnosticId(requestedAccountId)} " +
+                                "currentAccount=${floatingChatDiagnosticId(currentAccountId)}"
                         )
                     }
                 }.onFailure { error ->
-                    Log.w(TAG, "failed to refresh SCRM floating chat conversation", error)
+                    Log.w(
+                        CHAT_DATA_TAG,
+                        "stage=refresh_failed generation=$requestGeneration " +
+                            "account=${floatingChatDiagnosticId(requestedAccountId)} " +
+                            "visibleSource=${floatingChatConversationDataSource(conversation).logValue} " +
+                            "error=${error.javaClass.simpleName} message=${error.message.orEmpty().take(160)}",
+                        error
+                    )
                 }
                 scrmConversationRefreshInFlight.set(false)
                 if (scrmConversationRefreshPending.getAndSet(false)) {
@@ -927,11 +957,18 @@ internal class FloatingChatOverlayController(
         val session = scrmSettingsManager.loadSelectedSessionOrBootstrap()
         val devices = session.readApi.getDevices()
         val accounts = session.readApi.getWechatAccounts()
+        logFloatingChatMetadata(stage = "metadata_response", devices = devices, accounts = accounts)
         Log.i(AVATAR_DIAGNOSTICS_TAG, "api metadata devices=${devices.size} accounts=${accounts.size} accountAvatars=${accounts.count { !it.displayAvatarUrl.isNullOrBlank() }}")
         val selectedRoute = scrmFloatingAccountRouteForSelection(
             selectedAccountId = selectedAccountId,
             fallbackDeviceUuid = session.deviceUuid,
             fallbackWeChatId = session.weChatId
+        )
+        Log.i(
+            CHAT_DATA_TAG,
+            "stage=route_selected account=${floatingChatDiagnosticId(selectedAccountId)} " +
+                "device=${floatingChatDiagnosticId(selectedRoute.deviceUuid)} " +
+                "wechat=${floatingChatDiagnosticId(selectedRoute.weChatId)}"
         )
         val route = scrmBackgroundPrefetchRoutesToLoad(
             accounts = accounts,
@@ -966,10 +1003,17 @@ internal class FloatingChatOverlayController(
     ): com.paifa.ubikitouch.core.model.FloatingChatConversation {
         val devices = session.readApi.getDevices()
         val accounts = session.readApi.getWechatAccounts()
+        logFloatingChatMetadata(stage = "metadata_response", devices = devices, accounts = accounts)
         val selectedRoute = scrmFloatingAccountRouteForSelection(
             selectedAccountId = requestedAccountId,
             fallbackDeviceUuid = session.deviceUuid,
             fallbackWeChatId = session.weChatId
+        )
+        Log.i(
+            CHAT_DATA_TAG,
+            "stage=route_selected account=${floatingChatDiagnosticId(requestedAccountId)} " +
+                "device=${floatingChatDiagnosticId(selectedRoute.deviceUuid)} " +
+                "wechat=${floatingChatDiagnosticId(selectedRoute.weChatId)}"
         )
         val loadedAccountConversations = scrmInitialConversationRoutesToLoad(
             accounts = accounts,
@@ -1011,6 +1055,7 @@ internal class FloatingChatOverlayController(
                 "groupMemberAvatars=${nextConversation.groupContacts.sumOf { group -> group.groupMemberContacts.count { !it.avatarUrl.isNullOrBlank() } }} " +
                 "accounts=${nextConversation.accountContacts.size} accountAvatars=${nextConversation.accountContacts.count { !it.avatarUrl.isNullOrBlank() }}"
         )
+        logFloatingChatConversationData(stage = "bridge_mapped", value = nextConversation)
         return nextConversation
     }
 
@@ -1020,6 +1065,12 @@ internal class FloatingChatOverlayController(
     ): ScrmFloatingAccountConversation {
         val cacheKey = scrmAccountRouteCacheKey(route)
         cachedScrmAccountConversations[cacheKey]?.let { cached ->
+            Log.i(
+                CHAT_DATA_TAG,
+                "stage=account_cache_hit route=${floatingChatDiagnosticId(cacheKey)} " +
+                    "contacts=${cached.contacts.size} groups=${cached.chatRooms.size} " +
+                    "history=${cached.messagesByConversation.values.sumOf { it.size }}"
+            )
             return loadScrmAccountChanges(session, route, cached)
         }
         val chatRooms = loadAllScrmChatRooms(session, route.weChatId)
@@ -1027,18 +1078,31 @@ internal class FloatingChatOverlayController(
             deviceUuid = route.deviceUuid,
             weChatId = route.weChatId
         )
+        Log.i(
+            CHAT_DATA_TAG,
+            "stage=bootstrap_response route=${floatingChatDiagnosticId(cacheKey)} " +
+                "conversations=${bootstrap.conversations.size} baseline=${bootstrap.baselineSequence} " +
+                "withAvatar=${bootstrap.conversations.count { !it.displayAvatar.isNullOrBlank() }} " +
+                "unread=${bootstrap.conversations.sumOf { it.unreadCount }}"
+        )
         // Load the read-only history for each conversation returned by bootstrap.
         // Sending and other mutating endpoints remain outside this refresh path.
         val messagesByConversation = bootstrap.conversations.mapNotNull { summary ->
             val conversationWxid = summary.conversationWxid?.takeIf { it.isNotBlank() }
                 ?: return@mapNotNull null
-            conversationWxid to session.readApi.getChatHistory(
+            val history = session.readApi.getChatHistory(
                 deviceUuid = route.deviceUuid,
                 weChatId = route.weChatId,
                 conversationWxid = conversationWxid,
                 conversationId = summary.id,
                 pageSize = ScrmConversationHistoryPageSize
             ).messages
+            Log.i(
+                CHAT_DATA_TAG,
+                "stage=history_response route=${floatingChatDiagnosticId(cacheKey)} " +
+                    "conversation=${floatingChatDiagnosticId(conversationWxid)} messages=${history.size}"
+            )
+            conversationWxid to history
         }.toMap()
         val conversationWxidByBackendId = bootstrap.conversations.mapNotNull { summary ->
             summary.conversationWxid?.takeIf { it.isNotBlank() }
@@ -1142,6 +1206,11 @@ internal class FloatingChatOverlayController(
                     pageNumber = pageNumber
                 )
             )
+            Log.i(
+                CHAT_DATA_TAG,
+                "stage=contacts_page account=${floatingChatDiagnosticId(weChatId)} " +
+                    "page=$pageNumber items=${page.items.size} total=${page.totalCount}"
+            )
             allContacts += page.items
             pageNumber += 1
         } while (shouldRequestNextScrmConversationPage(
@@ -1169,6 +1238,11 @@ internal class FloatingChatOverlayController(
                     includeDeleted = false
                 )
             )
+            Log.i(
+                CHAT_DATA_TAG,
+                "stage=groups_page account=${floatingChatDiagnosticId(weChatId)} " +
+                    "page=$pageNumber items=${page.items.size} total=${page.totalCount}"
+            )
             allChatRooms += page.items
             pageNumber += 1
         } while (shouldRequestNextScrmConversationPage(
@@ -1184,6 +1258,7 @@ internal class FloatingChatOverlayController(
     private fun applyScrmConversation(
         nextConversation: com.paifa.ubikitouch.core.model.FloatingChatConversation
     ) {
+        logFloatingChatConversationData(stage = "ui_apply", value = nextConversation)
         conversation = nextConversation
         selectedAccountId = nextConversation.accountContacts.firstOrNull { account ->
             account.id == selectedAccountId
@@ -1564,6 +1639,7 @@ internal class FloatingChatOverlayController(
     private companion object {
         const val TAG = "UbikiTouch"
         const val AVATAR_DIAGNOSTICS_TAG = "UbikiAvatar"
+        const val CHAT_DATA_TAG = "UbikiChatData"
         const val EXTRA_EXTERNAL_DOCUMENT_URI = "floating_chat_external_document_uri"
         const val EXTRA_EXTERNAL_DOCUMENT_MIME_TYPE = "floating_chat_external_document_mime_type"
         const val ScrmConversationPageSize = 200
@@ -1571,6 +1647,67 @@ internal class FloatingChatOverlayController(
         const val ScrmConversationChangesLimit = 200
         const val ScrmGroupMemberPageSize = 200
     }
+}
+
+internal enum class FloatingChatDataSource(val logValue: String) {
+    Prototype("prototype"),
+    Backend("backend"),
+    BackendEmpty("backend_empty"),
+    Unknown("unknown")
+}
+
+internal fun floatingChatDiagnosticId(value: String): String {
+    return MessageDigest.getInstance("SHA-256")
+        .digest(value.toByteArray(Charsets.UTF_8))
+        .take(4)
+        .joinToString(separator = "") { byte -> "%02x".format(byte) }
+}
+
+internal fun floatingChatDataSource(
+    peerName: String,
+    contactIds: List<String>,
+    accountIds: List<String>
+): FloatingChatDataSource {
+    val ids = contactIds + accountIds
+    return when {
+        peerName == "SCRM Contacts" && ids.isEmpty() -> FloatingChatDataSource.BackendEmpty
+        peerName == "SCRM Contacts" || ids.any { it.startsWith("scrm-") } -> FloatingChatDataSource.Backend
+        ids.any { it in setOf("li-si", "account-main", "account-work") } -> FloatingChatDataSource.Prototype
+        else -> FloatingChatDataSource.Unknown
+    }
+}
+
+private fun floatingChatConversationDataSource(
+    value: com.paifa.ubikitouch.core.model.FloatingChatConversation
+): FloatingChatDataSource = floatingChatDataSource(
+    peerName = value.peerName,
+    contactIds = value.contacts.map { it.id },
+    accountIds = value.accountContacts.map { it.id }
+)
+
+private fun logFloatingChatConversationData(
+    stage: String,
+    value: com.paifa.ubikitouch.core.model.FloatingChatConversation
+) {
+    Log.i(
+        "UbikiChatData",
+        "stage=$stage source=${floatingChatConversationDataSource(value).logValue} " +
+            "accounts=${value.accountContacts.size} contacts=${value.contacts.size} " +
+            "groups=${value.groupContacts.size} history=${value.messages.size} " +
+            "clientDemoUnread=${value.homeUnreadDemoMessages.size}"
+    )
+}
+
+private fun logFloatingChatMetadata(
+    stage: String,
+    devices: List<ScrmDevice>,
+    accounts: List<ScrmWechatAccount>
+) {
+    Log.i(
+        "UbikiChatData",
+        "stage=$stage devices=${devices.size} accounts=${accounts.size} " +
+            "routableAccounts=${accounts.count { !it.wxid.isNullOrBlank() }}"
+    )
 }
 
 private enum class FloatingChatOverlayState {

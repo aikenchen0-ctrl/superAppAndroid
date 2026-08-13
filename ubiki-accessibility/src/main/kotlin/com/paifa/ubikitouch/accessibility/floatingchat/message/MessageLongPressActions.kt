@@ -3,9 +3,57 @@ package com.paifa.ubikitouch.accessibility.floatingchat.message
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 
+internal data class MessageAsideAnalysis(
+    val emotion: String,
+    val stance: String,
+    val subtext: String
+)
+
+internal enum class MessageZoomMode {
+    Text,
+    Media,
+    Unsupported
+}
+
+internal fun messageZoomMode(type: FloatingChatMessageType): MessageZoomMode {
+    return when (type) {
+        FloatingChatMessageType.Text,
+        FloatingChatMessageType.MixedText -> MessageZoomMode.Text
+        FloatingChatMessageType.ImageThumbnail,
+        FloatingChatMessageType.CapturedPhoto,
+        FloatingChatMessageType.VideoPreview,
+        FloatingChatMessageType.ChannelsVideo -> MessageZoomMode.Media
+        else -> MessageZoomMode.Unsupported
+    }
+}
+
+internal fun parseMessageAsideAnalysis(response: String): MessageAsideAnalysis {
+    val fields = response.lineSequence()
+        .map(String::trim)
+        .filter(String::isNotBlank)
+        .mapNotNull { line ->
+            val normalized = line
+                .removePrefix("-")
+                .removePrefix("*")
+                .trim()
+                .replace("**", "")
+            val separatorIndex = normalized.indexOfFirst { char -> char == '：' || char == ':' }
+            if (separatorIndex <= 0) return@mapNotNull null
+            normalized.substring(0, separatorIndex).trim() to normalized.substring(separatorIndex + 1).trim()
+        }
+        .filter { (_, value) -> value.isNotBlank() }
+        .toMap()
+    val emotion = fields["情绪"]
+    val stance = fields["立场"]
+    val subtext = fields["话外音"]
+    if (emotion == null || stance == null || subtext == null) {
+        throw IllegalStateException("AI 分析结果缺少情绪、立场或话外音")
+    }
+    return MessageAsideAnalysis(emotion = emotion, stance = stance, subtext = subtext)
+}
+
 internal class MessageLongPressActions(
     private val favoriteMessageIds: MutableMap<String, Boolean>,
-    private val reminderMessageIds: MutableMap<String, Boolean>,
     private val hiddenMessageIds: MutableMap<String, Boolean>,
     private val selectedMessageIds: MutableMap<String, Boolean>,
     private val onCopyText: (String) -> Unit,
@@ -52,11 +100,6 @@ internal class MessageLongPressActions(
             }
             MessageLongPressAction.Quote -> {
                 onQuoteMessage(message)
-            }
-            MessageLongPressAction.Reminder -> {
-                val nextReminder = reminderMessageIds[message.id] != true
-                reminderMessageIds[message.id] = nextReminder
-                onShowToast(if (nextReminder) "已提醒" else "已取消提醒")
             }
             MessageLongPressAction.ScrmOperations -> {
                 // UI test: long-press a message -> More. This only opens a request preview.

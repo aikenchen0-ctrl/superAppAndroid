@@ -1,5 +1,12 @@
 # 工作进度
 
+## 2026-08-12 长按菜单补齐
+
+- 已完成：8 项菜单顺序、提醒入口移除、话外音 AI 状态链路、异形弹层锚定、图片/视频媒体放大、文本大字号放大。
+- 已验证：新增长按菜单/AI/请求取消定向测试通过；`:ubiki-accessibility:compileDebugKotlin` 通过。
+- 最终验证：定向长按/AI 测试、`:ubiki-accessibility:compileDebugKotlin`、`:app:compileDebugKotlin`、`:app:assembleDebug`、`git diff --check` 均通过。
+- 待验证：宽回归仍有 3 个既有 UI 契约失败；真实 AI 配置、媒体资源和设备视觉交互尚未验收。
+
 ## 2026-08-11 客户运营工作台设计
 
 - 已启动：围绕客户画像、联系人标签和朋友圈权限设计正式 UI 闭环。
@@ -220,3 +227,139 @@
 - 真机复测前提：需安装本次编译产物后，再用 ADB 连续点击右侧账号头像，对比 `AndroidRuntime` 崩溃栈和跳帧日志；当前证据已确认并优化的是重复重组、重复只读刷新和旧回包覆盖风险。
 - 追加 ANR 根因证据：设备日志出现 `signal 3`、`Wrote stack traces to tombstoned`，随后进程结束；主线程热点位于 `FloatingChatPrototype.pairedAccountFor` 的账号与消息嵌套扫描。已改为单次消息遍历建立账号集合和线程账号映射，避免账号数乘消息数的扫描放大；`:ubiki-core:test` 与 `:app:compileDebugKotlin` 已通过。当前设备尚未安装包含本次修复的新 APK。
 - 已按 `C:\WorkSpace\ios-float` 的 `API_FRONTEND_INTEGRATION_PROGRESS.md`、`AppKitRegistry.swift`、Payments/Wallet/Calls/Search/Moments/OpenAPIWorkbench/OperationLab/MessageRender 模块重新盘点 Android SCRM。`完成进度.md` 顶部新增 2026-08-11 权威结论、模块状态总表、接口优先的 P0-P3 计划和验收口径；旧百分比表已标为历史快照。未修改功能代码、未调用接口、未构建 APK。
+# 2026-08-11 右侧头像大量消息 ANR 修复
+
+- 已恢复仓库上下文，确认工作区只有用户既有的 `项目会话.txt` 修改，本轮不会触碰。
+- 已定位头像点击入口，并发现仓库中已有两轮相关性能优化记录；当前进入根因复核，不把历史记录直接视为修复完成。
+- 已建立本轮阶段计划、成功标准和接口测试约束。
+- 已确认当前提交包含 `pairedAccountFor` 单遍消息扫描优化，但仍需核对同一头像切换帧中的调用次数和其他全量消息派生计算。
+- RED 证据：20,000 条消息回归测试在旧实现下超过 60 秒测试上限。
+- 已实现单次消息线程索引与点击/重组共享账号会话缓存；首次 GREEN 被既有测试签名兼容问题阻断，已补回纯逻辑重载。
+- GREEN 证据：20,000 条消息定向回归测试通过，测试体耗时 0.089 秒；消息列表只遍历一次。
+- 回归验证：`AccountAvatarSwitchPolicyTest` 5 项和 `FloatingChatMessageUiContractTest.accountAvatarClickSwitchesToIndependentAccountWorkspace` 通过。
+- 构建验证：`:app:compileDebugKotlin`、`:app:assembleDebug`、`git diff --check` 通过，Debug APK 已安装到 `d0512adb`。
+- 真机验证：现有只读数据约 20 个账号、286 个联系人；右侧头像快速轮换点击 40 次后进程 PID 保持 `30835`，日志无 ANR、`signal 3`、`FATAL EXCEPTION` 和 Choreographer 跳帧记录。
+- 接口边界：未点击或测试发送消息、支付、红包、转账及其他写操作。
+- 独立审查发现私聊回退初版遗漏“最近 6 条”和“全局连接消息前 4 条”语义；两个新增测试已先验证 RED，随后修正有界索引策略。
+- 私聊两项回退测试已转为 GREEN；完整头像策略、账号工作区契约和最终 Debug APK 构建均通过，复审未发现新问题。
+- 最终 APK 已覆盖安装到 `d0512adb`；追加 20 次头像轮换后 PID `2098` 存活，ANR/崩溃/signal 3/跳帧日志匹配数为 0。
+# 2026-08-12 聊天消息内容与格式审计
+
+- [x] 完成主消息渲染链路和消息类型分组静态审计。
+- [x] 确认结构化字段内容判定与媒体类型判定存在覆盖缺口。
+- [in_progress] 添加失败测试并实施最小修复。
+- [x] 完成定向测试、模块测试、编译/APK 构建和只读验证（完整回归的既有基线失败另行记录）。
+
+## 本轮交付
+
+- 修复结构化消息字段误判为空：位置、名片、引用、聊天记录、文件名、链接标题等字段现在可作为有效显示内容。
+- 修复媒体失效判定覆盖：拍摄照片、视频号视频与普通图片/视频一致；动态表情有资源时走图片预览，无资源时保留 GIF 占位卡。
+- 修复卡片格式：链接地址不再伪装成缩略图；链接、小程序、接龙、动态表情、文件均有稳定标题；位置地址、文件大小、名片副标题/详情为空时不绘制空行；无引用源时不绘制空引用块。
+- 新增 `MessageDisplayPolicyTest`，覆盖结构化位置、媒体类型、引用/聊天记录、链接缩略图和卡片标题回退。
+
+## 验证证据
+
+- 通过：`:ubiki-accessibility:testDebugUnitTest --tests ...MessageDisplayPolicyTest`。
+- 通过：消息渲染分组、详细气泡、SCRM 浮窗桥接与消息提取相关定向测试（消息显示相关新增/既有测试均通过）。
+- 通过：`:app:compileDebugKotlin`、`:app:assembleDebug`；Debug APK 已安装到 `d0512adb`。
+- 通过：设备只读启动检查，进程保持存活，最近日志无 `FATAL EXCEPTION` / `ANR`；未点击发送、支付、红包领取、转账等写操作。
+- 已知基线失败：完整回归中的 `ChatExtractionContractTest` 2 项和 `FloatingChatMessageUiContractTest` 3 项为工作区既有迁移/UI 断言，未由本轮消息格式改动引入。
+# 2026-08-12 Android 支付模块真对接
+
+- 已读取 Android 支付 UI、SCRM 客户端/模型/任务状态解析与 iOS `PaymentKit.swift` 入口。
+- 已只读下载后端 OpenAPI spec，确认 7 条支付路由、请求字段、异步任务返回和幂等键规则；未调用任何真实支付业务接口。
+- 已定位假成功根因：发送仍创建本地工具消息，领取未进入服务端任务，零钱/红包详情仅提交查询任务但缺少统一终态编排。
+- 下一步：先添加契约与编排失败测试并确认 RED，再修改生产代码。
+
+# 2026-08-12 视频号 Finder 模块与头像 ANR 收尾
+
+- 已从交接状态恢复工作区，读取 `task_plan.md`、`findings.md`、`progress.md` 并核对大量并行用户改动；本轮不回滚无关内容。
+- 已复核头像点击数据流、账号会话缓存和 20,000 条消息性能回归测试，确认生产点击使用共享缓存版本。
+- 已核对 Finder 契约、API、任务等待、四个页面、右侧工具枚举和底部面板，确认主要缺口是消息可信路由、SCRM 映射、工作区与宿主接线。
+- 已加载产品设计上下文；Finder 采用现有居中底部工作区和 `OverlayTokens`，不新增视觉体系或自动网络请求。
+- 未调用发布、点赞、评论、导航、发送消息、支付等真实写接口。
+
+# 2026-08-12 悬浮聊天头像显示与异步缓存
+
+- 已加载调试、设计澄清、TDD、文件规划、UI 质量和完成前验证工作流。
+- 已检查工作区、最近提交和现有任务记录；确认存在大量用户未提交修改，本轮不会回滚。
+- 已加载 `PRODUCT.md`，确认头像修复应保持现有悬浮工作台布局与组件语言。
+- 已开始检索头像字段、SCRM 映射、Compose 渲染和媒体加载缓存链路；尚未修改业务代码。
+- 已确认主要头像 UI 入口共用现有异步加载器；下一步聚焦统一加载器、URL 标准化和数据映射，而不是逐个头像组件重复补逻辑。
+- 一次只读源码聚合命令因 PowerShell 数组类型不匹配失败，未修改业务文件；后续改为明确行区间读取。
+
+# 2026-08-12 iOS 对 Android 全量功能与样式差异审计
+
+- 已读取并应用 `using-superpowers`、`planning-with-files`、`brainstorming`、`dispatching-parallel-agents`、`writing-plans`、`impeccable`、`verification-before-completion` 和 `task` 的相关流程。
+- 已检查 Git 工作区和两端根目录，确认 Android 当前状态包含大量用户/其他任务的未提交改动，本轮只做只读审计和目标文档编辑。
+- 已并行启动 Android 实现、iOS 参考实现、文档与 UI 三条独立审计线。
+- 已加载 `PRODUCT.md`；未发现 `DESIGN.md`，视觉结论将使用两端源码与现有 artifacts 交叉验证。
+- 已确立状态分层、平台专属处理和禁止真实写请求的审计边界。
+- 已完成两端生产/测试文件索引，并读取 Android 最近提交和 iOS 文件更新时间；`ios-float` 不是 Git 仓库，无法使用其提交历史。
+- 已抽取既有完成/缺失声明、Android 占位信号和 iOS 演示信号，确认旧完成率口径与当前源码存在冲突。
+- 已开始沿 Android 工具分派和底部面板检查宿主可达性，发现部分动作仍显式走 `AddSimulatedMessage`。
+- 已进一步确认 `simulatedMessageToolActions()` 当前为空；右侧多项可见工作流实际落入 `None`，属于无反馈入口。
+- 已核对聊天搜索、联系人搜索和转发链路：聊天搜索仍为 Preview；联系人搜索有真实 SCRM 路径；合并转发仍仅本地生成。
+- 已将 Finder 状态从旧文档的“完全缺失”修正为“已接宿主、需继续核验字段/终态/真机”。
+- 已抽查通话视觉 artifact，确认其为本地状态预览而非 Android 生产界面，后续只作为辅助视觉线索。
+- 已完成第一轮 token、布局常量和无障碍语义检索；Android 有集中 token，但仍存在硬编码分散与语义覆盖不足风险。
+- 独立文档/UI 审计已报告旧进度矛盾、无效/重复截图、性能证据边界和当前可见对比度/缺字问题；已纳入最终证据口径。
+- 已完成 Android、`C:\WorkSpace\ios-float`、现有文档、OpenAPI、样式、交互和无障碍的静态审计，交付文件为 `任务进度.md`。
+- 已整理 F-01 至 F-55 共 55 个功能差异、U-01 至 U-20 共 20 个样式/交互/无障碍差异、6 个开发波次、29 个唯一主任务和 45 个原子检查点。
+- 已写入 AI 总控提示词、A-K 11 个任务族提示词和人工验收模板；每次执行被限制为一个内部前置已完成且启动门禁满足的原子检查点。
+- 已补齐 F-55/A3：区分直接 DTO、顶层 `TaskResult`、批量 `items[]` 任务引用，以及 `task_result/external_state/untracked` 三种发现合同、合法 `taskId=0`、精确同源 URL 和独立 `final` 终结语义。
+- 已将 D1 前置改为 A3/C1/C3，并在 E/F/G/H/I 的真实写状态链中统一复用 A3；不允许业务层自行拼任务 URL或把 HTTP/聚合受理状态当最终成功。
+- 最终反对者审阅提出 3 项 Important：跨波次主任务状态不可机器判定、K1 ADR 与迁移边界冲突、H 的两个 iOS 路径不完整；均已修复。二次复核又发现 K1 无迁移分支和 A2 冻结聚合歧义，也已修复。
+- 最新结构校验：F=55、U=20、主任务=29、原子检查点=45、提示词=11，75 个差异 ID 无重复/遗漏；45 个节点、108 条显式依赖边可完整拓扑排序且无环；Markdown 围栏成对。
+- 最终文件校验：`任务进度.md` 为 UTF-8 无 BOM，1303 行、137958 字节，SHA-256 为 `EEB2CA2E15E2EEB14629E965FD8989092FC68E375952C720A2E5CE58B866FC6D`；无替换字符、tab、尾随空白或占位词，末尾换行存在。
+- 同一 SHA-256 快照的最终内容门禁为 Critical 0、Important 0；29 个主任务、45 个检查点和 108 条依赖边均有效，A2@R3 固定集合、K1 无代码决议分支及 H 的 4 个 iOS 路径复核通过。
+- 路径复核覆盖 108 个重点文件型 token，确定缺失且会误导执行 AI 的路径为 0；Android/iOS 独立复核均为 Critical 0、Important 0。
+- 本轮未运行 Android 完整 Gradle 构建/测试、真机或真实 SCRM 验收，也未调用发送、发布、点赞、评论、加删好友、群管理、支付、领取或转账接口。
+
+# 2026-08-13 iOS 对 Android 差异文档增量完善
+
+- 已从交接摘要、现有三份规划文件和 Git 状态恢复现场；确认 `任务进度.md` 为未跟踪文件，工作区还有大量其他任务改动，本轮不回滚或格式化无关内容。
+- 已增量复核 Android 的 TalkBack 双重屏蔽、Finder 身份持久化、朋友圈素材生产入口和 Finder 状态页，以及 iOS 的消息来源、长按排序、好友主页、群搜索能力边界。
+- 已完善 `任务进度.md` 的下一检查点确定性选择规则、单检查点执行卡、并发认领/释放/接管规则、审计快照刷新协议和文档结构门禁。
+- 已明确所有真实写操作只能由人类测试者执行；AI 只能准备代码、本地 fixture/Mock、验收步骤并接收证据，用户授权不改变该边界。
+- 已校正 A1 与 F3 的 Finder 身份持久化所有权：A1 建立合同，F3 只消费和验证；没有升级任何 F/U 状态，也没有重排六个开发波次。
+- 已启动三条只读独立复核：源码事实与依赖、A-K 提示词可执行性、结构/DAG/编码；代理不得修改文件，主线程统一处理结果。
+- 当前尚未宣称最终验收通过；待复核意见汇总后将重新计算编号、所有权、依赖图、编码/空白规则、行数、字节数和 SHA-256。
+- 本轮没有运行 Android Gradle、Xcode、真机或真实服务验收，没有调用任何真实写接口。
+- 已接收第一路提示词/调度审阅，核对后修正 5 类 Important：初始受阻状态、波次双层前置、HUMAN_WRITE 自动段 TDD、统一交付证据格式、K 与普通通话所有权。
+- 已把 `D2@D0`、`E2@A3`、`I3@D5`、`K2@D5` 恢复为“未开始”并预登记外部门禁；第 9.1 节 D2/K2 派生状态同步为“未开始”。没有升级任何 F/U 状态，也没有重排六个波次。
+- 已补全提示词 F 的 F-35 素材分页/加载/空/错误/图片失效/刷新恢复，提示词 G 的 F-44 Wallet 零钱读取或禁用二选一，提示词 J 的 U-19 伪证据失败测试，以及提示词 K 的三个互斥分支。
+- 工具错误已补记到 `task_plan.md`：聚合 `rg` 无匹配、JavaScript 反引号解析、PowerShell 字母范围和 F/G 组合补丁锚点失败；这些失败均未造成业务代码或不完整文档写入。
+- 当前仍在等待三路只读复核的最终结果，尚未运行最终结构/编码/哈希验收，也未宣称完成。
+# 2026-08-13 悬浮聊天错误数据与头像缺失诊断
+
+- 已读取并应用系统化调试、根因追踪、文件规划和代码质量规则。
+- 已检查 Git 状态：悬浮聊天、SCRM、测试和规划文件均存在大量既有修改，本轮不会回滚。
+- 已建立本轮诊断阶段、成功标准和只读接口边界。
+- 已完成首轮头像符号检索，定位 DTO、桥接映射、UI 加载器和接口总览文档；尚未修改业务代码。
+
+## 本轮诊断结论
+
+- [x] 对照 OpenAPI JSON、Android DTO、SCRM API client 和 iOS bootstrap 消费方式。
+- [x] 追踪 bootstrap 摘要到 history/bridge/UI 的字段流，确认摘要字段在控制器组装时丢失。
+- [x] 追踪头像 URL 到 `normalizedRemoteImageUri` 和 `MediaThumbnailBitmapLoader`，排除统一 URL 过滤为首要根因。
+- [x] 确认首页未读使用固定 30 条 `scrmUnreadDemoMessages`，不是服务端 `unreadCount`。
+- [x] 读取真机只读日志：仅出现 `UbikiAvatar host=aiff.app` 样例资源；未出现真实头像域名。
+- [x] 运行定向单测命令；被既有 `FinderContractsTest.kt:99` 编译错误阻断，未声称测试通过。
+
+## 本轮交付判断
+
+问题根因已定位到“bootstrap 摘要数据未进入 Android 运行时模型”和“真实刷新失败时样例会话仍可见”两处；头像加载器不是首要故障点。下一轮修复必须先写失败测试，再修改摘要模型/映射和样例失败状态。
+# 2026-08-13 悬浮聊天数据来源诊断日志
+
+- 仅修改悬浮聊天数据刷新诊断链路，不改现有后端映射、fallback 或界面行为。
+- 新增统一日志标签 `UbikiChatData`，覆盖初始 prototype、刷新请求/排队/失败、账号与设备响应、路由选择、联系人/群分页、bootstrap、历史消息、缓存命中、bridge 映射与 UI 状态提交。
+- 账号、设备、微信号、会话号只记录 SHA-256 的 8 位短指纹；不记录 API Key、密码、联系人名称或原始标识。
+- 新增 `FloatingChatDataDiagnosticsTest`，先确认辅助函数缺失的 RED，再实现数据来源判定与标识脱敏。
+- `:ubiki-accessibility:compileDebugKotlin` 在禁用 Kotlin 增量编译后通过；首次增量构建遇到共享缓存占用并回退失败。
+- 定向测试通过，但使用现有 init script 排除了工作区原有且缺少 `validatedFinderPostRequest` 的 `FinderContractsTest.kt`；未声称完整测试套件通过。
+- 最终复跑时又被工作区并发出现的 `BottomToolPanels.kt:16` Compose `weight` 访问错误阻断；本轮不越界修改该工具面板，最终状态不声称全模块最新快照编译通过。
+- 2026-08-13 用户提供设备日志后确认：SCRM `devices=21/accounts=20` 正常，刷新失败根因是 `ScrmFloatingChatBridge.kt:408` 对 JSON 数组调用 `jsonPrimitive`，导致 `JsonArray ... is not a JsonPrimitive`，界面因此保留 prototype 数据。
+- 按 TDD 新增数组字段回归测试，先 RED 后 GREEN；修复 `scrmFloatingJsonUrlValue`，仅对 `JsonPrimitive` 读取 URL，并递归遍历 `JsonObject`/`JsonArray`。
+- `ScrmFloatingChatBridgeTest` 全类通过。
+- 2026-08-13 继续诊断“十年账号未回列表末尾出现公众号卡片”：当前源码的未回筛选严格要求 `Text + Bubble + 非本人`，卡片类型不应进入该视图。新增 `stage=rendered_messages`，记录实际 route、总览状态和渲染消息类型计数，用于区分未回组装异常、导航误入普通会话或设备 APK 版本不一致；诊断摘要单测通过。

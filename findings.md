@@ -1,5 +1,13 @@
 # 调研发现与决策
 
+## 2026-08-12 长按菜单补齐
+
+- `MessageLongPressMenu.kt` 原实现顺序是话外音、放大、复制、转发、收藏、删除、多选、引用，并含提醒；已按规格固定 8 项顺序并移除提醒入口。
+- `FloatingChatAiClient.generateDraft` 是现有唯一 AI 请求边界；话外音通过专用提示词和同一客户端完成，不新增 mock/fallback。
+- `IrregularBalloonPopup` 已支持坐标状态、连接线和边缘避让；话外音通过透明消息锚点复用该机制。
+- 文本放大没有现成宿主，新增独立全屏 Compose 阅读层；媒体放大继续走 `FloatingChatMediaPreviewBridge`。
+- 真实 AI 结果必须包含情绪、立场、话外音三字段，缺失时显式失败。
+
 ## 2026-08-11 客户运营工作台设计初始发现
 
 - Android 当前联系人资料页已展示客户画像、标签、共同群，但画像保存和批量标签仍是“仅 UI 预览”；设计不能把确认按钮直接绑定网络请求。
@@ -127,3 +135,128 @@
 - 旧文档把“31 种消息类型存在枚举/渲染分支”直接记为 100%，没有区分真实 SCRM 类型映射、素材可用性、交互闭环和真机视觉验收。
 - 后续统一使用五层状态：接口契约、正式 UI、真实调用/回读、自动验证、真机人工验收。
 - iOS 顶层功能证据包括 `Features/Payments`、`Wallet`、`Calls`、`Search`、`Favorites`、`Moments`、`OpenAPIWorkbench`、`OperationLab`、`Modules/MessageRender`；Android 需要逐项寻找正式入口，不能仅按文件名判断。
+# 2026-08-11 右侧头像大量消息 ANR 初始发现
+
+- 当前点击入口位于 `FloatingChatOverlayUi.kt` 的 `onAccountAvatarClick`，会计算目标账号、目标线程并更新选中状态。
+- 既有进度记录表明此前已观察到连续点击时 18-72ms 主线程帧耗时，并做过账号作用域会话缓存与 15 秒只读刷新新鲜期优化。
+- 既有设备证据还记录过 `signal 3`、tombstoned 栈抓取，主线程热点曾位于 `FloatingChatPrototype.pairedAccountFor` 的账号与消息嵌套扫描；当前提交已声称改为单次消息遍历，但尚需从源码、测试与当前 APK 基线重新确认。
+- 仍需重点排查：点击时是否重建所有账号作用域会话、对全量消息执行 `copy/filter/groupBy/distinct`，以及 Compose 状态切换是否让这些计算同步发生在主线程。
+- 本轮不调用真实接口，尤其禁止发送消息和其他写请求。
+- 已确认剩余根因：头像点击回调直接调用 `accountScopedConversation`，随后 Compose 重组又经 `AccountScopedConversationCache` 再构建一次；单次构建内部还会按最多 2 个群和 5 个联系人分别全量过滤消息，形成重复主线程扫描。
+- 20,000 条历史消息、2 个账号的回归测试在旧实现下超过 60 秒；改为单次线程索引后，测试体执行时间为 0.089 秒，计数列表恰好读取 20,000 个元素一次。
+- 索引保持原有语义：默认群合并无 thread ID 与默认群 ID 并保持源顺序；私聊优先精确 thread，缺失时按 User/Account/None 连接目标取最近 6 条，完全无匹配时回退全局 User/Account 前 4 条；群聊缺失时回退无 thread ID，再回退源消息前 4 条。
+- 独立审查发现私聊回退初版有语义偏差：旧实现应从目标匹配消息中显示最近 6 条，完全无匹配时再使用全局 User/Account 消息前 4 条。已用两个 RED 用例确认，并改为有界保留各类别最近 6 条及全局前 4 条。
+## 2026-08-12 聊天消息内容与格式审计
+
+- 主消息区入口为 `MessageRow` -> `MessageContent`，按 `MessageRendererGroup` 分发到文本、媒体、文件、位置、资料、链接、聊天记录、支付、通话和通知卡片。
+- `messageUnavailableStateFor` 原先只检查 `text/detail/resourceUrl`。位置标题、名片名称、文件名、引用内容、聊天记录预览行、缩略图等结构化字段有值时，仍可能被错误判定为“消息暂不可查看”。
+- 媒体失效判断原先只包含 `ImageThumbnail` 和 `VideoPreview`，没有覆盖 `CapturedPhoto`、`StickerGif`、`ChannelsVideo`，与实际渲染分组不一致。
+- 本轮只修改只读显示判定与显示格式，不调用发送、支付、红包领取或转账写接口。
+# 2026-08-12 支付真对接发现
+
+- 后端实际 Swagger spec：`http://112.74.164.233:42718/openapi/docs/openapi-v1/swagger.json`，已只读保存为 `后端支付OpenAPI.json`。
+- 7 个支付接口均返回 `TaskResult`；`success=true` 仅代表请求被受理，最终结果必须通过 task result 或业务状态读取确认。
+- `/payments/lucky-money` 与 `/payments/remittance` 请求字段为 `deviceUuid/weChatId/friendId[/roomId]/moneyFen/paymentPassword/wish|memo`；金额由调用者提供，服务端约束红包 1-20000 分、个数 1-100，转账金额大于 0。
+- `/payments/wallet-balance` 是只读 POST，字段 `deviceUuid/weChatId/flag`。
+- 红包状态、详情、领取和转账收取 DTO 只接受 `deviceUuid` + 服务端 `messageId`（int64）；OpenAPI 明确禁止外部传递原始支付链接/交易号。
+- `Idempotency-Key` 必须用于发送红包、发送转账、领取红包、收转账；同一业务意图重试必须复用原键，最长 128 字符。
+- Android `ScrmApiClient` 已具备 7 条路由和 `postIdempotent`，但 `PaymentComposerPanel` 的确认结果仍回到 `FloatingChatOverlayUi` 的 `addToolMessage` 本地演示卡片，领取回调目前只显示人工验收提示。
+- 当前消息同步模型已有 `remoteMessageServerId`；本地工具卡片没有真实服务端消息 ID，不能用于查询或领取。
+
+# 2026-08-12 Finder 与头像 ANR 收尾发现
+
+- 当前头像点击生产路径已使用 `remember(profiledConversation) { AccountScopedConversationCache(...) }`，点击与后续重组共享缓存，不再在同一帧重复构造账号作用域会话。
+- `AccountScopedMessageIndex` 将 20,000 条消息单次遍历为线程索引，并保留私聊“匹配目标取最近 6 条、无匹配取全局连接消息前 4 条”的旧语义。
+- Finder 独立模块已包含 6 条 `/openapi/v1/finder/*` 契约、四个 Compose 页面和任务终态等待器，但尚未接入 `FloatingBottomPanel` 和 `FloatingChatOverlayUi`。
+- `FloatingChatMessage` 已增加 `finderUserName`；现有 SCRM 桥接尚未识别 appmsg type 51/63，也未把原始 JSON/XML 的 `sphUserName` 映射到模型。
+- 右侧工具策略、显示名称、图标、顺序和 `BottomPanelMode.Finder` 已加入；实际底部面板缺 Finder 分支，因此入口仍不可用。
+- 当前产品上下文要求克制、可靠、可确认；Finder 应复用现有 `OverlayTokens` 和底部工作区，所有写操作保持显式确认与可见错误。
+
+# 2026-08-12 悬浮聊天头像显示与异步缓存发现
+
+- 仓库已有头像数据字段 `FloatingChatContact.avatarUrl`，SCRM 桥接也存在联系人、群成员和账号头像派生映射；因此需要判断缺失发生在字段取数、URI 标准化、模型映射还是 Compose 加载层，不能直接归因于后端无数据。
+- 仓库已有自研 `MediaThumbnailBitmapLoader`，搜索结果显示其包含内存缓存、持久化头像缓存、并发信号量和 in-flight 合并；本轮应优先复用/修正该链路，避免引入第二套图片框架。
+- 当前产品为 Android 悬浮工作台，视觉目标是稳定、可扫描；头像加载态应维持固定尺寸并使用现有首字/颜色占位，不做视觉重设计。
+- `PRODUCT.md` 已加载；仓库没有 `DESIGN.md`。本轮沿用现有组件和 tokens，不创建新视觉体系。
+- 工作区已有大量悬浮聊天与头像相关未提交修改，后续修改必须逐文件核对差异并只做最小增量。
+- 会话轨道、群头像九宫格、群成员选择、联系人头像和右侧账号头像均已接入 `rememberAsyncAvatarBitmap` 或 `rememberAsyncImageThumbnailBitmap`；头像完全不显示不是单一入口遗漏，更像共享加载器或共享 URI 处理问题。
+- 当前测试主要断言 URI 识别、解码尺寸和源码结构，尚未看到对异步请求状态迁移、并发合并、失败后重试、磁盘缓存命中的行为级覆盖。
+- `MediaThumbnailBitmapLoader` 的搜索证据显示它会先标准化 URI，再查持久化缓存，然后远程解码并写入内存/磁盘；需重点核对 Compose effect 键、缓存命名空间、失败冷却和实际 HTTP 行为。
+
+# 2026-08-12 iOS 对 Android 全量功能与样式差异审计发现
+
+- 当前审计必须以磁盘工作区为准：Android 存在大量未提交的悬浮聊天、Finder、支付、消息渲染和弹层改动，`HEAD` 不能代表真实现状。
+- 根目录已有 `功能对照.md`、`完成进度.md`、`界面标准.txt`、`悬浮聊天界面优化方案.md`、`侧边手势未实现功能清单.md` 等线索文档，但历史记录明确存在状态滞后，需逐项回查生产入口。
+- iOS 参考项目包含 `Features`、`Modules`、`Services`、`Shared` 以及多个大型聊天控制器/消息组件文件；需要区分生产可达能力与实验、演示、仅模型实现。
+- `PRODUCT.md` 定义产品为克制、可靠、可确认的 Android 悬浮工作台；项目没有 `DESIGN.md`，样式审计不能凭空创造新视觉体系。
+- 本轮“未实现”不仅包括没有源码，还包括有 API/模型但 UI 不可达、有 UI 但只生成请求预览/本地假成功、缺少任务终态/错误恢复、以及关键视觉/交互状态不等价。
+- 纯 iOS 平台能力需要映射成 Android 平台等价方案，不能机械复制 Live Activity、UIKit window 等实现细节。
+- `完成进度.md` 同时包含 2026-08-11 历史百分比和 2026-08-12 新增实现；同一文件内仍有“Finder 域和页面缺失”与磁盘已有 `floatingchat/finder/` 全套文件的冲突，因此旧百分比和后半段静态表不能作为当前真值。
+- `完成进度.md` 自己已提出五层状态：接口契约、正式 UI、真实调用/回读、自动验证、真机验收；本轮继续沿用，但新增“宿主可达性”单独检查，避免页面存在却没有入口。
+- Android `ToolActionDispatch` 明确把一组工具动作分派为 `AddSimulatedMessage`，说明工具名称、图标和卡片渲染不等价于业务完成；需逐项追到真实端口或明确禁用态。
+- Android `finder/`、支付、消息 renderer 等目录是 2026-08-12 工作区新状态，旧对照文件尚未同步；所有结论需以当前文件和宿主接线为准。
+- iOS 的 OpenAPI Workbench 也包含 demo ID、防误发送校验和本地模拟交互；这些演示/验收页面不能整体作为 Android 产品端必须复制的“已完成用户功能”，只抽取其中已有真实 API 闭环。
+- Android 项目最近提交说明消息渲染曾进行大规模追赶，但当前工作区又有大量未提交演进；静态文件数量和提交信息都不能替代逐入口验证。
+- Android Finder 已实际接入 `BottomPanelMode.Finder`、`FloatingBottomPanel` 和主 `FloatingChatOverlayUi`，旧文档“域和页面缺失”已过期；剩余应审计真实消息字段映射、配置错误、任务终态和真机写操作，而不是从零重建。
+- Android 右侧固定显示 18 项工作流动作，但 `toolActionDispatchFor` 只为 Assistant、Search 之外的少数标准工具建立分派；Search、Notes、Reminder、Wallet、Share、Pin、Device、Voice 等可见动作当前落入 `ToolActionDispatch.None`，点击无行为。
+- `simulatedMessageToolActions()` 当前为空，因此旧的“模拟工具动作”分支已不再被显式使用；更严重的现状是未覆盖动作静默 `None`，需要显式实现、禁用或从可见列表移除，不能保留无反馈入口。
+- Android 会话内搜索位于 `CoordinateChatBody.kt`，结果源仍是硬编码 `PreviewChatSearchResults` 4 条；联系人面板搜索已经有真实 SCRM 加载路径，两者状态必须分开记录。
+- Android 单条和逐条转发已调用 `MessageForwardingActions.addForwardedMessage` 并提示以消息状态为准；合并转发明确提示“已生成合并聊天记录（本地）”，尚不是真实 SCRM 合并转发。
+- Android 未找到 iOS `MergedForwardDetailViewController` 的等价只读详情页，也未找到 `RelayEditorViewController` 的顺序编辑、备注和删除条目能力。
+- Android 通话消息渲染、联系人/群成员“语音/视频通话”入口和 AI 实时语音是三件不同能力；普通联系人通话入口部分回调仍为空，不能用 AI 语音能力替代普通音视频通话闭环。
+- `artifacts/calls-ui-final-desktop.png` 是桌面审阅原型，页面文案明确说明“不接 SCRM 或 WebRTC”；它可用于状态枚举和布局讨论，但不能作为 Android 生产通话已实现的证据。
+- 文档/UI 独立审计发现：根目录 `任务计划.md` 当前为 0 字节，但 Git 差异显示这是相对 `HEAD` 的整文件未提交删除；既有文档仍链接它。本轮不恢复或覆盖该用户改动，只在最终文档提示导航断链风险。
+- `完成进度.md` 内部自相矛盾：顶部写长按 8 项已完成，历史表仍写缺“话外音/放大”；一处写 31 类消息 100%，`悬浮聊天消息渲染对照.md` 又明确多类仅部分对齐且待真机视觉验收。
+- `docs/FLOATING_CHAT_PERFORMANCE_BASELINE.md` 明确缺 P95 设备数据和发布门禁测量，不能把单一 ANR 回归修复扩展为整体性能已完成。
+- 历史视觉证据存在重复/无效：`debug-current.png` 实际不是有效 PNG；若干截图哈希相同；标称 IME 的截图未显示键盘。后续不得用这些文件证明视觉或输入法验收。
+- 现有截图可见发送失败提示在浅色背景上对比不足、部分图标出现缺字方框，左右轨道/连线/工具区会和消息主体竞争空间；需进入视觉与可访问性修复波次。
+- Android 已有集中 `OverlayTokens`，但大量功能文件仍各自定义尺寸/颜色；项目没有 `DESIGN.md`，应先整理现有 token/组件映射，再做跨端样式对齐，避免逐页复制 iOS 硬编码值。
+- iOS 自身的组件化文档也说明首阶段多为包装旧 Bubble，且参考目录缺 Xcode 工程文件、非 Git 仓库，无法在当前环境复现 iOS 构建；因此 iOS 只作为静态源码参考，不宣称其全部功能已运行验证。
+- OpenAPI 写响应至少分三类：直接业务 DTO、顶层 `TaskResult`、批量 envelope 内的 `items[].taskId/taskResultUrl`。直接 DTO 不进入任务发现器；批量响应不能被强制解码成顶层 taskId，也不能把 `successCount` 当最终业务成功数。
+- 顶层 `TaskResult` 的结果发现合同分为三支：`task_result` 只轮询服务端返回并经同源校验的精确 `taskResultUrl`；`external_state` 即使 `taskId=0` 也读取 `resultResource`；`untracked` 或合同为空且 `taskId=0` 进入接口指定的业务权威回读。`taskId=0` 合法，HTTP `success` 不等于业务成功。
+- `OpenApiTaskResultDto.final` 独立于 `status`。`success/failed/unknown` 可以停止当前轮询，但只有 `final=true` 才表示任务整体终结并能从持久 pending/resync 集合删除；`unknown + final=false` 必须保留为可恢复、可人工只读核对且禁止重提的未终结状态。
+- Android `ScrmTaskResult` 当前未建模 `final`，`resolveScrmTaskResult()` 只看 `status/resultUnknown`，`toTaskRecord()` 又会对非 Pending 结果写 `completedAt`；这会让尚未终结的 unknown 任务丢失后续 resync，是 F-55/A3 的 P0 根因。
+- D1 的只读 renderer/字段矩阵本身不依赖结果发现，但任何真实发送能力声明必须以前置 A3 为准；D1 主路由已调整为 `A3/C1/C3`。
+- 最终反对者审阅确认，29 行唯一 ID 路由不能同时承担跨波次执行状态；已保留 29 个主任务管理 75 个差异 ID 的唯一所有权，新增 45 个原子检查点管理阶段状态、证据和机器可判定依赖。
+- 检查点状态固定为未开始、进行中、待人工、受阻、已完成；普通前置只接受已完成。`启动需` 缺失时不允许选择，`完成需` 缺失时允许完成代码/Mock 后停在待人工，不会授权真实写操作。
+- 45 个检查点和 108 条显式依赖边可完整拓扑排序，无未定义引用或依赖环；初始可执行检查点为 A2@R0、B2@A0、G1@S0。
+- K1 已拆为纯文档 ADR 的 K1@D0 和独立决议 K1@M4；后者支持“评审确认无需迁移/删除”的无代码完成分支，不会为了推进质量门禁强制造代码改动。
+- H 提示词中的四个 iOS 参考均改为 `C:\WorkSpace\ios-float` 下真实存在的绝对路径。
+
+# 2026-08-13 差异文档增量复核发现
+
+- Android 当前源码没有提供足以将任一 F/U 差异升级为“已完成”的新证据，现有六个开发波次仍满足契约基础、核心消息、联系人/群、业务工作流、视觉交互、质量收口的依赖顺序。
+- TalkBack 缺口是双重屏蔽：`FloatingChatOverlayController.kt` 将悬浮根节点设为 `IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS`，`FloatingChatOverlayUi.kt` 又使用空的 `clearAndSetSemantics { }`；U-01 不能只修其中一处。
+- Finder 在线消息路由虽已接入，但 `finderUserName` 没有完整进入 `LocalChatMessage` 及数据库双向转换；进程重启后的离线路由身份仍不完整。该合同归 `A1/F-04`，`F3/F-39` 只负责消费和验证。
+- 朋友圈素材域已有真实 API 函数，但生产按钮仍只生成预览；因此 F-36 保持“部分实现”，不能用 API 存在替代可达真实闭环。
+- Finder 页面仍缺统一加载、离线、错误和恢复状态，U-13 保持未完成。
+- iOS 普通消息 SQLite 没有生产/Demo 来源和新鲜度标记，启动流程仍会安装 Demo 附件；F-01/F-04 必须先建立可信来源和离线身份合同。
+- iOS 0.45 秒长按排序仅存在于当前会话控制器内，控制器重建后恢复默认；F-09 仍是未持久化的局部交互。
+- iOS 好友主页已移除“发消息/电话/跟进”按钮，AI 跟进仍是本地演示；F-16 的 Android 对齐目标不能假设这些入口在参考端已有真实闭环。
+- iOS 全局搜索可以命中群消息，但群资料页没有群内查找、清空和举报闭环；F-21 继续按拆分能力验收。
+- `C:\WorkSpace\ios-float` 没有 Xcode 工程或 Swift Package 元数据，本环境只能做静态源码审计，不能声称 iOS 构建或运行验证。
+- 单检查点执行卡需要同时记录认领前状态、源码基线、文件范围、RED/GREEN、自动门禁、人工证据和释放/接管，才能防止多个 AI 把行政状态更新误当成功能事实变化。
+- 认领没有自动过期；原执行者释放，或协调者/用户确认后显式接管，是避免陈旧心跳造成错误并发执行的最低治理要求。
+- `任务进度.md` 自身 SHA-256 不能写回文件内部作为同一快照证明，否则形成自引用哈希；最终指纹只放在外部验收记录和交付回复中。
+- 即使用户授权真实业务验收，AI 也只准备代码、Mock、步骤并接收人类证据，不直接调用真实写接口。
+- “受阻”只能在普通内部前置已满足自动实施条件后，由当前检查点自身缺少“启动需”触发；预先知道未来缺产品/后端/设备时仍应保持“未开始”，否则确定性选择算法会反复扫描尚未到阶段的远期项。
+- 波次表是阶段摘要，不是检查点门禁。前一波次的“待人工”可以在自动证据完整时解锁后续代码、Mock、fixture 和文档准备，但真实设备、真实服务、人工写入以及 F/U 最终关闭仍要求普通前置全部“已完成”。
+- `HUMAN_WRITE` 不是免测试档案：其中任何生产行为实现都必须像 CODE 一样先有行为/状态 RED，再做 GREEN 和 Mock；只有只消费新人类证据的回合不制造新 RED。
+- F-35 的可执行验收必须包括分页去重、首屏/追加错误、离线缓存、刷新恢复以及图片 URL 失效；F-44 只能接真实零钱读取或禁用/隐藏，不能复制 iOS `demoItems`；U-19 必须让无效 PNG、重复哈希冒充不同状态和无真实键盘的 IME 证据确定性失败。
+- K1、K2 与普通通话是不同所有权：K1 只处理 F-07 架构，K2 只处理 F-10/F-11/F-31，普通通话仅由 I3@D5/F-50 决策；ActivityKit、伪灵动岛、拖放/套索/3D 气泡只是平台背景，不是 K 的新交付项。
+# 2026-08-13 悬浮聊天错误数据与头像缺失诊断
+
+- 工作区已有大量用户未提交修改，本轮保留所有现状，根因确认前只做只读诊断和任务记录。
+- 文档 `docs/FLOATING_CHAT_COMPONENT_API.md` 将 `/devices`、`/wechat-accounts`、`/contacts`、`/chatrooms` 和 `/chat/bootstrap` 标为账号/会话/头像数据源。
+- 生产映射集中在 `ScrmFloatingChatBridge.kt`，头像 UI 共用 `MediaThumbnailBitmapLoader.kt`；加载器已有 `UbikiAvatar` 诊断日志，可用于区分数据缺失与网络/解码失败。
+- 初步假设：所有入口同时无头像，优先检查上游 DTO 字段兼容和 URL 标准化/加载策略，不先逐个修改 UI 组件。
+
+## 证据闭环
+
+- OpenAPI JSON 的 `OpenApiChatConversationDto` 字段为 `id(Int32)`、`conversationWxid`、`conversationType`、`displayName`、`displayAvatar`、`unreadCount`、`messageCount`、置顶/免打扰及最后消息摘要；Android DTO 字段一致，`ScrmApiClientTest` fixture 已验证 `displayAvatar` 和 `unreadCount` 可解析。
+- OpenAPI 的联系人、群聊、群成员 DTO 只有单一 `avatar` 字段；Android 额外兼容 `avatarUrl/headImgUrl/headimgurl/imageUrl` 不会造成字段丢失。`normalizedRemoteImageUri` 只转换微信头像域名的 HTTP -> HTTPS，不会过滤普通 HTTPS URL。
+- `FloatingChatOverlayController.kt:1039-1067` 的 bootstrap 消费只创建 history 和 backend ID 映射；未保存 `displayName/displayAvatar/unreadCount/lastMessageContent`。
+- `ScrmFloatingChatBridge.kt:178,418-447` 用固定 `ScrmUnreadDemoMessageCount = 30` 生成首页未读演示消息；`CoordinateChatBody.kt:185-200` 和 `ChatThreadState.kt:736-796` 直接消费该字段。
+- `FloatingChatOverlayController.kt:99` 初始 conversation 是 `FloatingChatPrototype.sampleConversation()`；刷新失败只日志记录，未设置错误状态。样例模型包含大量 `https://aiff.app/...` 资源，真机 `UbikiAvatar` 只看到 `host=aiff.app`，没有真实头像域名。
+- iOS 对照实现 `OpenAPIChatSynchronizer.swift` 解析并保留 bootstrap descriptor，`ChatWindow+OpenApiMessageSync.swift:505-520` 将 `descriptor.displayAvatar` 写入会话上下文；Android 当前少了这一层。
+- 本轮定向 Gradle 测试被工作区既有错误阻断：`FinderContractsTest.kt:99` 的 `validatedFinderPostRequest` 未解析，未进入目标测试体。

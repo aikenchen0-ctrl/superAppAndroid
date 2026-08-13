@@ -54,19 +54,21 @@ internal fun LocationMessageContent(message: FloatingChatMessage) {
         verticalArrangement = Arrangement.spacedBy(5.dp)
     ) {
         TextLabel(
-            text = message.locationTitle ?: message.text,
+            text = locationMessageTitle(message),
             size = 11.sp,
             weight = FontWeight.Normal,
             color = OverlayTokens.locationMapText,
             maxLines = 1
         )
-        TextLabel(
-            text = message.locationAddress.orEmpty(),
-            size = 10.sp,
-            weight = FontWeight.Normal,
-            color = OverlayTokens.locationMapSubtext,
-            maxLines = 1
-        )
+        message.locationAddress?.takeIf { it.isNotBlank() }?.let { address ->
+            TextLabel(
+                text = address,
+                size = 10.sp,
+                weight = FontWeight.Normal,
+                color = OverlayTokens.locationMapSubtext,
+                maxLines = 1
+            )
+        }
         LocationMapPreviewCanvas(
             modifier = Modifier
                 .fillMaxWidth()
@@ -78,7 +80,7 @@ internal fun LocationMessageContent(message: FloatingChatMessage) {
 
 @Composable
 internal fun ContactLinkCardContent(message: FloatingChatMessage) {
-    val name = message.cardName ?: message.text
+    val name = contactCardDisplayName(message)
     AccountCardPreviewContent(
         name = name,
         subtitle = message.cardSubtitle.orEmpty(),
@@ -108,7 +110,7 @@ internal fun InlineContactContent(message: FloatingChatMessage) {
         )
         Spacer(modifier = Modifier.width(7.dp))
         TextLabel(
-            text = message.text,
+            text = inlineContactDisplayText(message),
             size = 11.sp,
             weight = FontWeight.Bold,
             color = OverlayTokens.cardPrimaryText,
@@ -134,20 +136,22 @@ internal fun InlineLocationContent(message: FloatingChatMessage) {
         Spacer(modifier = Modifier.width(7.dp))
         Column(modifier = Modifier.weight(1f)) {
             TextLabel(
-                text = message.locationTitle ?: message.text,
+                text = locationMessageTitle(message),
                 size = 10.5.sp,
                 weight = FontWeight.Bold,
                 color = OverlayTokens.cardPrimaryText,
                 maxLines = 1,
                 shadow = OverlayTokens.imModuleTextShadow
             )
-            TextLabel(
-                text = message.locationAddress.orEmpty(),
-                size = 8.5.sp,
-                color = OverlayTokens.cardSecondaryText,
-                maxLines = 1,
-                shadow = OverlayTokens.imModuleTextShadow
-            )
+            message.locationAddress?.takeIf { it.isNotBlank() }?.let { address ->
+                TextLabel(
+                    text = address,
+                    size = 8.5.sp,
+                    color = OverlayTokens.cardSecondaryText,
+                    maxLines = 1,
+                    shadow = OverlayTokens.imModuleTextShadow
+                )
+            }
         }
     }
 }
@@ -212,7 +216,7 @@ internal fun StickerMessageCard(message: FloatingChatMessage) {
         }
         Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             TextLabel(text = "动态表情", size = 11.sp, weight = FontWeight.Bold, color = OverlayTokens.cardKindText, maxLines = 1)
-            TextLabel(text = message.text, size = 10.sp, color = OverlayTokens.bubbleTextMuted, maxLines = 1)
+            TextLabel(text = message.text.ifBlank { "动态表情" }, size = 10.sp, color = OverlayTokens.bubbleTextMuted, maxLines = 1)
         }
     }
 }
@@ -229,7 +233,7 @@ internal fun LinkMessageCard(message: FloatingChatMessage) {
             .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (message.thumbnailUrl != null || message.resourceUrl != null) {
+        if (linkMessageCardUsesThumbnail(message)) {
             Box(
                 modifier = Modifier
                     .size(54.dp)
@@ -252,11 +256,46 @@ internal fun LinkMessageCard(message: FloatingChatMessage) {
         Spacer(modifier = Modifier.width(9.dp))
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             TextLabel(text = message.appName?.ifBlank { null } ?: kind.sourceLabel, size = 9.sp, color = OverlayTokens.cardSecondaryText, maxLines = 1)
-            TextLabel(text = message.text.ifBlank { message.detail.orEmpty() }, size = 12.sp, weight = FontWeight.Bold, color = OverlayTokens.cardKindText, maxLines = 2, lineHeight = 15.sp)
+            TextLabel(text = linkMessageTitle(message), size = 12.sp, weight = FontWeight.Bold, color = OverlayTokens.cardKindText, maxLines = 2, lineHeight = 15.sp)
             MessageMetaLine(kind.sourceLabel, message.detail?.takeIf { it != message.text })
             ResourceUrlLine(message.resourceUrl)
         }
     }
+}
+
+internal fun linkMessageCardUsesThumbnail(message: FloatingChatMessage): Boolean {
+    return !message.thumbnailUrl.isNullOrBlank()
+}
+
+internal fun locationMessageTitle(message: FloatingChatMessage): String {
+    return listOf(message.locationTitle, message.text, message.locationAddress)
+        .filterNotNull()
+        .map(String::trim)
+        .firstOrNull(String::isNotBlank)
+        ?: "位置消息"
+}
+
+internal fun inlineContactDisplayText(message: FloatingChatMessage): String {
+    return listOf(message.text, message.cardName, message.cardSubtitle)
+        .filterNotNull()
+        .map(String::trim)
+        .firstOrNull(String::isNotBlank)
+        ?: "名片"
+}
+
+internal fun linkMessageTitle(message: FloatingChatMessage): String {
+    val kind = linkMessageCardKindFor(message.type)
+    return message.text.trim().ifBlank {
+        message.detail?.trim().orEmpty().ifBlank { kind.sourceLabel }
+    }
+}
+
+internal fun contactCardDisplayName(message: FloatingChatMessage): String {
+    return listOf(message.cardName, message.text, message.cardSubtitle)
+        .filterNotNull()
+        .map(String::trim)
+        .firstOrNull(String::isNotBlank)
+        ?: "名片"
 }
 
 @Composable
@@ -320,7 +359,7 @@ internal fun CallMessageCard(message: FloatingChatMessage) {
 internal fun StackedMessageCard(message: FloatingChatMessage) {
     Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp)).background(OverlayTokens.specialCard).border(1.dp, OverlayTokens.specialCardBorder, RoundedCornerShape(9.dp)).padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         TextLabel(text = "接龙", size = 9.sp, color = OverlayTokens.cardSecondaryText, maxLines = 1)
-        TextLabel(text = message.text, size = 12.sp, weight = FontWeight.Bold, color = OverlayTokens.cardKindText, maxLines = 2)
+        TextLabel(text = message.text.ifBlank { "接龙消息" }, size = 12.sp, weight = FontWeight.Bold, color = OverlayTokens.cardKindText, maxLines = 2)
         message.filePreviewLines.take(3).forEachIndexed { index, line -> TextLabel(text = "${index + 1}. $line", size = 10.sp, color = OverlayTokens.bubbleTextMuted, maxLines = 1) }
         TextLabel(text = "${message.filePreviewLines.size.coerceAtLeast(1)} 条接龙内容", size = 9.sp, color = OverlayTokens.cardSecondaryText, maxLines = 1)
     }
@@ -402,7 +441,7 @@ internal fun MiniProgramLinkContent(
         Spacer(modifier = Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {
             TextLabel(
-                text = message.text,
+                text = linkMessageTitle(message),
                 size = 11.sp,
                 weight = FontWeight.Bold,
                 color = OverlayTokens.cardPrimaryText,
@@ -411,7 +450,7 @@ internal fun MiniProgramLinkContent(
                 shadow = OverlayTokens.imModuleTextShadow
             )
             TextLabel(
-                text = message.appName.orEmpty(),
+                text = message.appName?.takeIf { it.isNotBlank() } ?: "小程序",
                 size = 10.sp,
                 color = OverlayTokens.cardSecondaryText,
                 maxLines = 1,

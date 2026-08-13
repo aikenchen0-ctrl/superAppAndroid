@@ -239,6 +239,26 @@ internal data class LeftRailFollowTextColors(
     val time: Color
 )
 
+internal data class LeftRailProfilePlaceholder(
+    val name: String,
+    val region: String,
+    val tags: List<String>,
+    val summary: String
+)
+
+internal fun leftRailFollowMetaText(info: LeftRailFollowInfo): String {
+    return info.metaLines.joinToString("  ·  ")
+}
+
+internal fun leftRailProfilePlaceholder(contact: FloatingChatContact): LeftRailProfilePlaceholder {
+    return LeftRailProfilePlaceholder(
+        name = contact.name,
+        region = contact.region.trim(),
+        tags = contact.tags.map(String::trim).filter(String::isNotEmpty),
+        summary = contact.description.trim()
+    )
+}
+
 internal fun leftRailFollowTextColors(avatarColor: Long): LeftRailFollowTextColors {
     val base = Color(avatarColor)
     return LeftRailFollowTextColors(
@@ -296,13 +316,13 @@ internal fun leftRailFollowInfoForContact(
         contactId = contact.id,
         name = contact.name,
         metaLines = buildList {
-            contact.region.trim().takeIf(String::isNotEmpty)?.let(::add)
+            contact.region.trim().takeIf(String::isNotEmpty)?.let { region -> add("地区 $region") }
             contact.tags.asSequence()
                 .map(String::trim)
                 .filter(String::isNotEmpty)
                 .joinToString(" · ")
                 .takeIf(String::isNotEmpty)
-                ?.let(::add)
+                ?.let { tags -> add("标签 $tags") }
         },
         lastMessage = latestMessage?.text?.ifBlank { contact.description } ?: contact.description,
         lastTime = latestMessage?.time ?: "",
@@ -428,7 +448,7 @@ private const val LeftRailFollowTextInnerPaddingDp = 0
 private const val LeftRailFollowTextNameSizeSp = 10f
 private const val LeftRailFollowTextMessageSizeSp = 13f
 private const val LeftRailFollowTextTimeSizeSp = 8f
-private const val LeftRailFollowTextCardHeightDp = 48
+private const val LeftRailFollowTextCardHeightDp = 62
 private const val LeftRailFollowTextCardCornerDp = 9
 private const val LeftRailFollowTextCardBackgroundAlpha = 0.42f
 private const val LeftRailLeadingSpacerItemCount = 1

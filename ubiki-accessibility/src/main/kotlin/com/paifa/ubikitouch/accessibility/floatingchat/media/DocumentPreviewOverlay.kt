@@ -74,11 +74,11 @@ internal fun DocumentPreviewOverlay(
         ) {
             FileFormatIcon(
                 format = message.fileFormat,
-                fileName = message.fileName ?: message.text
+                fileName = fileDisplayName(message)
             )
             Column(modifier = Modifier.weight(1f)) {
                 TextLabel(
-                    text = message.fileName ?: message.text,
+                    text = fileDisplayName(message),
                     size = 14.sp,
                     weight = FontWeight.SemiBold,
                     color = OverlayTokens.mediaActionIcon,

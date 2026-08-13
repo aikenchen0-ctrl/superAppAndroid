@@ -153,6 +153,35 @@ internal fun buildFloatingChatAiDraftPrompt(
     }
 }
 
+internal fun buildFloatingChatMessageAsidePrompt(
+    messages: List<FloatingChatMessage>,
+    targetMessage: FloatingChatMessage,
+    selectedAccountName: String,
+    maxMessages: Int = DefaultAiMaxPromptMessages
+): String {
+    val context = buildFloatingChatAiDraftPrompt(
+        messages = messages,
+        selectedAccountName = selectedAccountName,
+        maxMessages = maxMessages
+    ).substringBefore("Generate one natural")
+    return buildString {
+        append(context)
+        appendLine("Target message:")
+        appendLine("${targetMessage.senderName.ifBlank { "Contact" }}: ${targetMessage.aiPromptContent()}")
+        appendLine("分析目标消息在上述聊天中的情绪、立场和没有明说的话外音。")
+        appendLine("必须严格输出三行，不要 markdown，不要增加其他字段：")
+        appendLine("情绪：<简洁结论>")
+        appendLine("立场：<简洁结论>")
+        append("话外音：<简洁结论>")
+    }
+}
+
+internal fun floatingChatMessageAsideConfig(config: FloatingChatAiConfig): FloatingChatAiConfig {
+    return config.copy(
+        systemPrompt = "你是聊天语境分析助手。只根据给定消息和上下文，输出情绪、立场和话外音三行分析，不要生成回复。"
+    )
+}
+
 internal fun buildFloatingChatAiConfigTestPrompt(): String {
     return "ping. Reply with pong only."
 }

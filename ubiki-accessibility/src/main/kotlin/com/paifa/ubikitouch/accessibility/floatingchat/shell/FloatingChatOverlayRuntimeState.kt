@@ -4,6 +4,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatNavigationState
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.syncChatNavigationState
 import com.paifa.ubikitouch.accessibility.FloatingChatMediaPreviewSession
 import com.paifa.ubikitouch.accessibility.FloatingChatMediaTarget
 import com.paifa.ubikitouch.accessibility.FloatingChatPickedDocument
@@ -16,7 +18,12 @@ internal class FloatingChatOverlayRuntimeState {
     var previewVisible by mutableStateOf(false)
     var mediaActionSheetVisible by mutableStateOf(false)
     var dismissSignal by mutableStateOf(0L)
-    var selectedThread by mutableStateOf<ChatThreadSelection>(ChatThreadSelection.Group)
+    var chatNavigationState by mutableStateOf(ChatNavigationState())
+    var selectedThread: ChatThreadSelection
+        get() = chatNavigationState.selectedThread
+        set(value) {
+            chatNavigationState = chatNavigationState.copy(selectedThread = value)
+        }
     var pickedMediaEvent by mutableStateOf<FloatingChatPickedMediaEvent?>(null)
     var pickedDocumentEvent by mutableStateOf<FloatingChatPickedDocumentEvent?>(null)
     var blinkVoiceResultEvent by mutableStateOf<FloatingChatBlinkVoiceResultEvent?>(null)
@@ -101,7 +108,12 @@ internal class FloatingChatOverlayRuntimeState {
         selectedThread: ChatThreadSelection
     ) {
         val nextToken = (conversationUpdateEvent?.token ?: 0L) + 1L
-        this.selectedThread = selectedThread
+        chatNavigationState = syncChatNavigationState(
+            current = chatNavigationState,
+            conversation = conversation,
+            controllerAccountId = selectedAccountId,
+            controllerThread = selectedThread
+        )
         conversationUpdateEvent = FloatingChatConversationUpdateEvent(
             token = nextToken,
             conversation = conversation,

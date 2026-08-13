@@ -200,7 +200,7 @@ internal fun ChatConnectorLayer(
     }
 }
 
-private fun Paint.configureConnectorPaint(cap: Paint.Cap) {
+internal fun Paint.configureConnectorPaint(cap: Paint.Cap) {
     style = Paint.Style.STROKE
     strokeWidth = imModuleConnectionLineStrokeWidthPx()
     strokeCap = cap

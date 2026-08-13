@@ -25,4 +25,21 @@ class EmojiPanelCategoryContractTest {
             categoryBlock.indexOf(first) in 0 until categoryBlock.indexOf(second)
         })
     }
+
+    @Test
+    fun emojiPanelUsesIndependentLazyScrollingGridForEachCategory() {
+        val relativePath = "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/BottomToolPanels.kt"
+        val sourceFile = listOf(
+            File(relativePath),
+            File("ubiki-accessibility", relativePath)
+        ).firstOrNull(File::exists)
+            ?: error("Cannot locate BottomToolPanels.kt")
+        val source = sourceFile.readText()
+
+        assertTrue(source.contains("LazyVerticalGrid"))
+        assertTrue(source.contains("GridCells.Fixed(8)"))
+        assertTrue(source.contains("rememberLazyGridState"))
+        assertTrue(source.contains("Modifier.weight(1f)"))
+        assertTrue(source.contains("key = { index, _ -> \"\$selectedCategoryIndex-\$index\" }"))
+    }
 }

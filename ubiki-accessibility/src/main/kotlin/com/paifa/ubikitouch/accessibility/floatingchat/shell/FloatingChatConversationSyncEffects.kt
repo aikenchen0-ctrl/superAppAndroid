@@ -2,9 +2,8 @@ package com.paifa.ubikitouch.accessibility.floatingchat.shell
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
-import com.paifa.ubikitouch.accessibility.floatingchat.chat.accountScopedConversation
-import com.paifa.ubikitouch.accessibility.floatingchat.chat.initialChatThreadSelection
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatNavigationState
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.syncChatNavigationState
 import com.paifa.ubikitouch.core.model.FloatingChatConversation
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 
@@ -13,9 +12,8 @@ internal fun FloatingChatConversationSyncEffects(
     conversation: FloatingChatConversation,
     runtimeState: FloatingChatOverlayRuntimeState,
     onLiveConversationChanged: (FloatingChatConversation) -> Unit,
-    onActiveAccountIdChanged: (String) -> Unit,
-    onSelectedThreadChanged: (ChatThreadSelection) -> Unit,
-    onHomeOverviewVisibleChanged: (Boolean) -> Unit,
+    chatNavigationState: ChatNavigationState,
+    onChatNavigationStateChanged: (ChatNavigationState) -> Unit,
     onLocalMessagesReplaced: (List<FloatingChatMessage>) -> Unit,
     onLocalMessageSequenceChanged: (Int) -> Unit,
     onLocalMessagesSynced: () -> Unit
@@ -27,17 +25,14 @@ internal fun FloatingChatConversationSyncEffects(
     LaunchedEffect(runtimeState.conversationUpdateEvent) {
         val event = runtimeState.conversationUpdateEvent ?: return@LaunchedEffect
         onLiveConversationChanged(event.conversation)
-        onActiveAccountIdChanged(event.selectedAccountId)
-        onSelectedThreadChanged(
-            initialChatThreadSelection(
-                conversation = accountScopedConversation(
-                    conversation = event.conversation,
-                    activeAccountId = event.selectedAccountId
-                ),
-                preferredSelection = event.selectedThread
+        onChatNavigationStateChanged(
+            syncChatNavigationState(
+                current = chatNavigationState,
+                conversation = event.conversation,
+                controllerAccountId = event.selectedAccountId,
+                controllerThread = event.selectedThread
             )
         )
-        onHomeOverviewVisibleChanged(false)
         runtimeState.clearConversationUpdate(event.token)
     }
 

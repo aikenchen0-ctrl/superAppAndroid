@@ -145,6 +145,24 @@ class FloatingChatAiContractTest {
     }
 
     @Test
+    fun asideAnalysisOverridesReplyDraftSystemPrompt() {
+        val config = FloatingChatAiConfig(
+            baseUrl = "https://api.example.com/v1",
+            apiKey = "sk-test",
+            model = "gpt-test",
+            systemPrompt = "只输出一条可直接发送的回复"
+        )
+
+        val analysisConfig = floatingChatMessageAsideConfig(config)
+
+        assertTrue(analysisConfig.systemPrompt.contains("情绪、立场和话外音"))
+        assertFalse(analysisConfig.systemPrompt.contains("可直接发送的回复"))
+        assertEquals(config.baseUrl, analysisConfig.baseUrl)
+        assertEquals(config.apiKey, analysisConfig.apiKey)
+        assertEquals(config.model, analysisConfig.model)
+    }
+
+    @Test
     fun aiResponseParserSupportsProxyDataString() {
         assertEquals(
             "pong",

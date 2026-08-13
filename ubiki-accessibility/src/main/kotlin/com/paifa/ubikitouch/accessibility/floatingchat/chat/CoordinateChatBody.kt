@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalDensity
+import android.util.Log
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -134,6 +135,7 @@ internal fun CoordinateChatBody(
     conversation: FloatingChatConversation,
     homeOverviewConversations: List<AccountScopedConversation>,
     accountProfiles: Map<String, FloatingChatAccountProfile>,
+    navigationState: ChatNavigationState,
     activeAccountId: String,
     selectedThread: ChatThreadSelection,
     homeOverviewVisible: Boolean,
@@ -165,6 +167,9 @@ internal fun CoordinateChatBody(
     onCloseChat: () -> Unit,
     onScanClick: () -> Unit,
     onAddFriendClick: () -> Unit,
+    showTopToolbar: Boolean = true,
+    onMessageScrollStateChanged: (Boolean) -> Unit = {},
+    openSearchRequestKey: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val connectorState = remember { ConnectorCoordinateState() }
@@ -176,10 +181,16 @@ internal fun CoordinateChatBody(
             activeAccountId = activeAccountId
         )
     }
-    val homeUnreadSummaries = remember(homeOverviewConversations, conversation.homeUnreadDemoMessages) {
+    val homeUnreadSummaries = remember(
+        homeOverviewConversations,
+        conversation.homeUnreadDemoMessages,
+        navigationState
+    ) {
         if (shouldBuildAllAccountHomeOverview(homeOverviewVisible)) {
-            homeUnreadThreadSummaries(accountConversations = homeOverviewConversations) +
-                homeUnreadDemoThreadSummaries(conversation)
+            navigationState.visibleUnreadSummaries(
+                homeUnreadThreadSummaries(accountConversations = homeOverviewConversations) +
+                    homeUnreadDemoThreadSummaries(conversation)
+            )
         } else {
             emptyList()
         }
@@ -217,6 +228,16 @@ internal fun CoordinateChatBody(
         } else {
             threadMessages
         }
+    }
+    LaunchedEffect(navigationState.route, homeOverviewVisible, visibleMessages) {
+        Log.i(
+            "UbikiChatData",
+            "stage=rendered_messages " + homeUnreadRenderDiagnostics(
+                route = navigationState.route,
+                homeOverviewVisible = homeOverviewVisible,
+                messages = visibleMessages
+            )
+        )
     }
     val homeOverviewConnectorGroupIds = remember(
         homeOverviewVisible,
@@ -291,8 +312,17 @@ internal fun CoordinateChatBody(
     }
     var chatSearchVisible by remember { mutableStateOf(false) }
     var chatSearchQuery by remember { mutableStateOf("") }
+    LaunchedEffect(openSearchRequestKey) {
+        if (openSearchRequestKey > 0) {
+            chatSearchQuery = ""
+            chatSearchVisible = true
+        }
+    }
     LaunchedEffect(visibleMessageIds) {
         connectorState.retainMessageBounds(visibleMessageIds)
+    }
+    LaunchedEffect(messageListState.isScrollInProgress) {
+        onMessageScrollStateChanged(messageListState.isScrollInProgress)
     }
     LaunchedEffect(viewportKey, visibleMessages.size) {
         if (!homeOverviewVisible && visibleMessages.size > viewportTracker.messageCount && visibleMessages.isNotEmpty()) {
@@ -329,24 +359,43 @@ internal fun CoordinateChatBody(
                 is ChatThreadSelection.Private -> null
             }
         }
-        ChatTopToolbar(
-            title = toolbarTitle,
-            accountName = selectedAccount.name,
-            hasUnreadIndicator = unreadThreadIds.isNotEmpty(),
-            onNavigationClick = onCloseChat,
-            onEditClick = {
-                toolbarEditableContact?.let(onContactAvatarLongClick)
-                    ?: toolbarEditableGroup?.let(onGroupAvatarLongClick)
-            },
-            onScanClick = onScanClick,
-            onAddFriendClick = onAddFriendClick,
-            onSearchClick = {
-                chatSearchQuery = ""
-                chatSearchVisible = true
-            }
-        )
+        if (showTopToolbar) {
+            ChatTopToolbar(
+                title = toolbarTitle,
+                accountName = selectedAccount.name,
+                hasUnreadIndicator = unreadThreadIds.isNotEmpty(),
+                onNavigationClick = onCloseChat,
+                onEditClick = {
+                    toolbarEditableContact?.let(onContactAvatarLongClick)
+                        ?: toolbarEditableGroup?.let(onGroupAvatarLongClick)
+                },
+                onScanClick = onScanClick,
+                onAddFriendClick = onAddFriendClick,
+                onSearchClick = {
+                    chatSearchQuery = ""
+                    chatSearchVisible = true
+                }
+            )
+        }
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            MessageCoordinatePane(
+            if (homeOverviewVisible && visibleMessages.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .fillMaxSize()
+                        .padding(
+                            start = FloatingContentSideInset + EdgeGestureSafeInset,
+                            end = FloatingContentSideInset + EdgeGestureSafeInset
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "暂无未回消息",
+                        color = OverlayTokens.panelSecondaryText,
+                        fontSize = 14.sp
+                    )
+                }
+            } else MessageCoordinatePane(
                 messages = visibleMessages,
                 selectedThread = selectedThread,
                 homeOverviewVisible = homeOverviewVisible,
@@ -465,7 +514,7 @@ internal fun CoordinateChatBody(
                 onClose = { chatSearchVisible = false },
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = ChatStatusBarHeightDp.dp)
+                    .padding(top = if (showTopToolbar) ChatStatusBarHeightDp.dp else 0.dp)
                     .zIndex(40f)
             )
         }

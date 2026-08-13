@@ -46,12 +46,25 @@ internal class AccountScopedConversationCache(
     private val source: FloatingChatConversation
 ) {
     private val conversations = mutableMapOf<String, FloatingChatConversation>()
+    private val messageIndex = AccountScopedMessageIndex(source)
 
     fun conversationFor(accountId: String): FloatingChatConversation {
         return conversations.getOrPut(accountId) {
-            accountScopedConversation(source, accountId)
+            accountScopedConversation(source, accountId, messageIndex)
         }
     }
+}
+
+internal fun selectedThreadAfterAccountAvatarClick(
+    conversationCache: AccountScopedConversationCache,
+    clickedAccountId: String,
+    currentThread: ChatThreadSelection
+): ChatThreadSelection {
+    val scopedConversation = conversationCache.conversationFor(clickedAccountId)
+    return initialChatThreadSelection(
+        conversation = scopedConversation,
+        preferredSelection = currentThread
+    )
 }
 
 internal fun selectedThreadAfterAccountAvatarClick(
@@ -59,19 +72,16 @@ internal fun selectedThreadAfterAccountAvatarClick(
     clickedAccountId: String,
     currentThread: ChatThreadSelection
 ): ChatThreadSelection {
-    val scopedConversation = accountScopedConversation(
-        conversation = conversation,
-        activeAccountId = clickedAccountId
-    )
     return initialChatThreadSelection(
-        conversation = scopedConversation,
+        conversation = accountScopedConversation(conversation, clickedAccountId),
         preferredSelection = currentThread
     )
 }
 
 internal fun accountScopedConversation(
     conversation: FloatingChatConversation,
-    activeAccountId: String
+    activeAccountId: String,
+    messageIndex: AccountScopedMessageIndex = AccountScopedMessageIndex(conversation)
 ): FloatingChatConversation {
     val activeAccount = conversation.accountContacts.firstOrNull { account -> account.id == activeAccountId }
         ?: conversation.accountContacts.firstOrNull()
@@ -95,14 +105,7 @@ internal fun accountScopedConversation(
     val contactsByBaseId = scopedContacts.associateBy { contact -> contact.base.id }
     val messages = buildList {
         scopedGroups.forEachIndexed { groupIndex, scopedGroup ->
-            val baseMessages = FloatingChatPrototype.groupMessagesFor(
-                conversation = conversation,
-                groupId = scopedGroup.base.id
-            ).ifEmpty {
-                FloatingChatPrototype.groupMessagesFor(conversation)
-            }.ifEmpty {
-                conversation.messages.take(4)
-            }
+            val baseMessages = messageIndex.groupMessagesFor(scopedGroup.base.id)
             baseMessages.takeLast(8).forEachIndexed { messageIndex, message ->
                 val sender = if (scopedContacts.isNotEmpty()) {
                     scopedContacts[(groupIndex + messageIndex) % scopedContacts.size]
@@ -120,16 +123,10 @@ internal fun accountScopedConversation(
             }
         }
         scopedContacts.forEach { scopedContact ->
-            val baseMessages = FloatingChatPrototype.privateMessagesFor(
-                conversation = conversation,
+            val baseMessages = messageIndex.privateMessagesFor(
                 contactId = scopedContact.base.id,
                 accountId = activeAccount.id
-            ).ifEmpty {
-                conversation.messages.filter { message ->
-                    message.connectionTarget == FloatingChatConnectionTarget.User ||
-                        message.connectionTarget == FloatingChatConnectionTarget.Account
-                }.take(4)
-            }
+            )
             baseMessages.takeLast(6).forEachIndexed { messageIndex, message ->
                 add(
                     message.toAccountScopedMessage(
@@ -162,15 +159,106 @@ internal data class AccountScopedConversation(
 internal fun accountScopedConversations(
     conversation: FloatingChatConversation
 ): List<AccountScopedConversation> {
+    val messageIndex = AccountScopedMessageIndex(conversation)
     return conversation.accountContacts.map { account ->
         AccountScopedConversation(
             accountId = account.id,
             conversation = accountScopedConversation(
                 conversation = conversation,
-                activeAccountId = account.id
+                activeAccountId = account.id,
+                messageIndex = messageIndex
             )
         )
     }
+}
+
+/**
+ * Indexes immutable source messages once so an account switch never performs one
+ * full-history scan per visible contact and group on the main thread.
+ */
+internal class AccountScopedMessageIndex(conversation: FloatingChatConversation) {
+    private data class IndexedMessage(val sourceIndex: Int, val message: FloatingChatMessage)
+
+    private val messagesByThreadId = mutableMapOf<String?, MutableList<FloatingChatMessage>>()
+    private val lastFallbackUserMessages = mutableMapOf<String, MutableList<IndexedMessage>>()
+    private val lastFallbackAccountMessages = mutableMapOf<String, MutableList<IndexedMessage>>()
+    private val lastFallbackNeutralMessages = mutableListOf<IndexedMessage>()
+    private val firstGlobalConnectedMessages = mutableListOf<FloatingChatMessage>()
+    private val firstSourceMessages = mutableListOf<FloatingChatMessage>()
+    private val defaultGroupId = conversation.groupContacts.firstOrNull { group -> group.selected }?.id
+        ?: conversation.groupContacts.firstOrNull()?.id
+    private val defaultGroupMessages = mutableListOf<FloatingChatMessage>()
+
+    init {
+        conversation.messages.forEachIndexed { index, message ->
+            messagesByThreadId.getOrPut(message.threadContactId) { mutableListOf() }.add(message)
+            if (message.threadContactId == null || message.threadContactId == defaultGroupId) {
+                defaultGroupMessages.add(message)
+            }
+            if (firstSourceMessages.size < AccountScopedFallbackMessageCount) {
+                firstSourceMessages.add(message)
+            }
+            if (
+                firstGlobalConnectedMessages.size < AccountScopedFallbackMessageCount &&
+                (message.connectionTarget == FloatingChatConnectionTarget.User ||
+                    message.connectionTarget == FloatingChatConnectionTarget.Account)
+            ) {
+                firstGlobalConnectedMessages.add(message)
+            }
+            if (message.threadContactId == null) {
+                when (message.connectionTarget) {
+                    FloatingChatConnectionTarget.User -> message.connectionTargetId?.let { contactId ->
+                        lastFallbackUserMessages.addFallback(contactId, index, message)
+                    }
+                    FloatingChatConnectionTarget.Account -> message.connectionTargetId?.let { accountId ->
+                        lastFallbackAccountMessages.addFallback(accountId, index, message)
+                    }
+                    FloatingChatConnectionTarget.None -> {
+                        lastFallbackNeutralMessages.addBounded(IndexedMessage(index, message))
+                    }
+                }
+            }
+        }
+    }
+
+    fun groupMessagesFor(groupId: String): List<FloatingChatMessage> {
+        val directMessages = if (groupId == defaultGroupId) {
+            defaultGroupMessages
+        } else {
+            messagesByThreadId[groupId].orEmpty()
+        }
+        return directMessages.ifEmpty {
+            messagesByThreadId[null].orEmpty().ifEmpty { firstSourceMessages }
+        }
+    }
+
+    fun privateMessagesFor(contactId: String, accountId: String): List<FloatingChatMessage> {
+        messagesByThreadId[contactId]?.takeIf { messages -> messages.isNotEmpty() }?.let { return it }
+        val matchingMessages = buildList {
+            addAll(lastFallbackUserMessages[contactId].orEmpty())
+            addAll(lastFallbackAccountMessages[accountId].orEmpty())
+            addAll(lastFallbackNeutralMessages)
+        }.sortedBy { indexed -> indexed.sourceIndex }
+            .map { indexed -> indexed.message }
+        return matchingMessages.ifEmpty { firstGlobalConnectedMessages }
+    }
+
+    private fun MutableMap<String, MutableList<IndexedMessage>>.addFallback(
+        key: String,
+        sourceIndex: Int,
+        message: FloatingChatMessage
+    ) {
+        val messages = getOrPut(key) { mutableListOf() }
+        messages.addBounded(IndexedMessage(sourceIndex, message))
+    }
+
+    private fun MutableList<IndexedMessage>.addBounded(message: IndexedMessage) {
+        if (size == AccountScopedPrivateMessageCount) {
+            removeAt(0)
+        }
+        add(message)
+    }
+
 }
 
 internal fun applyContactProfilesToConversation(
@@ -467,6 +555,19 @@ internal data class HomeOverviewMessageGroup(
     val messages: List<FloatingChatMessage>
 ) {
     val key: String = messages.firstOrNull()?.id ?: "home-overview-empty"
+}
+
+internal fun homeUnreadRenderDiagnostics(
+    route: ChatNavigationRoute,
+    homeOverviewVisible: Boolean,
+    messages: List<FloatingChatMessage>
+): String {
+    val types = messages.groupingBy { message -> message.type.name }
+        .eachCount()
+        .toSortedMap()
+        .entries
+        .joinToString(separator = ",") { (type, count) -> "$type:$count" }
+    return "route=${route.name} overview=$homeOverviewVisible messages=${messages.size} types=$types"
 }
 
 internal fun homeOverviewMessageGroups(
@@ -834,6 +935,8 @@ internal fun groupMemberContactForMessage(
 }
 
 private const val AccountScopedThreadSeparator = "__"
+private const val AccountScopedFallbackMessageCount = 4
+private const val AccountScopedPrivateMessageCount = 6
 private const val AccountScopedContactCount = 5
 private const val AccountScopedGroupCount = 2
 private const val StoreServiceAccountId = "account-store"

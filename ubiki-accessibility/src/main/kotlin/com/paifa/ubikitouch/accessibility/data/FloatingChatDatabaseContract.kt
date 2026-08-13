@@ -2,7 +2,7 @@ package com.paifa.ubikitouch.accessibility.data
 
 internal object FloatingChatDatabaseContract {
     const val databaseName: String = "floating_chat.db"
-    const val databaseVersion: Int = 6
+    const val databaseVersion: Int = 7
 
     const val tableThreads: String = "chat_threads"
     const val tableMessages: String = "chat_messages"
@@ -65,6 +65,7 @@ internal object FloatingChatDatabaseContract {
                 media_mime_type TEXT,
                 inline_tokens TEXT,
                 metadata_json TEXT,
+                remote_message_id INTEGER,
                 remote_msg_svr_id TEXT,
                 remote_task_id INTEGER,
                 send_state TEXT NOT NULL DEFAULT 'LOCAL_ONLY',
@@ -229,6 +230,7 @@ internal object FloatingChatDatabaseContract {
         """.trimIndent(),
         "CREATE INDEX IF NOT EXISTS idx_chat_messages_thread_created ON $tableMessages(thread_id, created_at)",
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_messages_client_request ON $tableMessages(client_request_id) WHERE client_request_id IS NOT NULL",
+        "CREATE INDEX IF NOT EXISTS idx_chat_messages_remote_id ON $tableMessages(remote_message_id)",
         "CREATE INDEX IF NOT EXISTS idx_chat_messages_remote_svr ON $tableMessages(remote_msg_svr_id)",
         "CREATE INDEX IF NOT EXISTS idx_chat_threads_remote ON $tableThreads(account_wechat_id, remote_conversation_id)",
         "CREATE INDEX IF NOT EXISTS idx_chat_message_files_file ON $tableMessageFiles(file_id)",
@@ -282,6 +284,10 @@ internal object FloatingChatDatabaseContract {
             if (oldVersion < 6 && newVersion >= 6) {
                 add("ALTER TABLE $tableMomentPosts ADD COLUMN account_id TEXT NOT NULL DEFAULT ''")
                 add("CREATE INDEX IF NOT EXISTS idx_moment_posts_account_created ON $tableMomentPosts(account_id, created_at DESC)")
+            }
+            if (oldVersion < 7 && newVersion >= 7) {
+                add("ALTER TABLE $tableMessages ADD COLUMN remote_message_id INTEGER")
+                add("CREATE INDEX IF NOT EXISTS idx_chat_messages_remote_id ON $tableMessages(remote_message_id)")
             }
         }
     }

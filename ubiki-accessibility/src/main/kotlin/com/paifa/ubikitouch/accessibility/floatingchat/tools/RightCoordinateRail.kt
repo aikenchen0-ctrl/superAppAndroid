@@ -67,6 +67,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.components.CompactAvatar
 import com.paifa.ubikitouch.accessibility.floatingchat.components.CompactInteractiveSize
 import com.paifa.ubikitouch.accessibility.floatingchat.components.TextLabel
 import com.paifa.ubikitouch.accessibility.floatingchat.account.FloatingChatAccountProfile
+import com.paifa.ubikitouch.accessibility.FloatingChatCouponWalletBridge
 import com.paifa.ubikitouch.accessibility.floatingchat.account.toContact
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ConnectorCoordinateState
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.RailPinnedAvatarEdge
@@ -103,6 +104,8 @@ internal fun RightCoordinateRail(
         )
     }
     val visibleToolActions = toolOrder
+    val catalogTools = rightRailToolCatalog
+    var selectedCatalogToolIndex by remember { mutableStateOf<Int?>(null) }
     var selectedTool by remember(actions) {
         mutableStateOf(visibleToolActions.firstOrNull() ?: dedicatedAiAction)
     }
@@ -396,63 +399,71 @@ internal fun RightCoordinateRail(
         LazyColumn(
             modifier = toolListModifier,
             state = toolListState,
-            userScrollEnabled = draggedTool == null,
+            userScrollEnabled = true,
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             itemsIndexed(
-                items = visibleToolActions,
-                key = { _, action -> action.name }
-            ) { _, action ->
-                val isDraggingTool = draggedTool == action
+                items = catalogTools,
+                key = { index, item -> "$index-${item.label}" }
+            ) { index, item ->
                 Box(modifier = Modifier.padding(end = railScreenEdgeInsetDp)) {
-                    ToolButton(
-                        modifier = if (isDraggingTool) {
-                            Modifier
-                        } else {
-                            Modifier.animateItem(
-                                placementSpec = spring(
-                                    dampingRatio = Spring.DampingRatioNoBouncy,
-                                    stiffness = Spring.StiffnessMediumLow
-                                )
-                            )
-                        },
-                        action = action,
-                        selected = action == selectedTool,
-                        reorderMode = reorderMode,
-                        dragging = isDraggingTool,
-                        dragTranslationY = if (isDraggingTool) {
-                            toolReorderDraggedTranslationY(
-                                dragOffsetY = toolDragOffsetY,
-                                startIndex = toolDragStartIndex,
-                                currentIndex = toolDragCurrentIndex,
-                                itemSlotHeightPx = toolSlotHeightPx
-                            )
-                        } else {
-                            0f
-                        },
+                    CatalogToolButton(
+                        item = item,
+                        selected = selectedCatalogToolIndex == index,
                         onClick = {
-                            if (reorderMode) {
-                                exitReorderMode()
+                            selectedCatalogToolIndex = index
+                            if (item.opensCouponWallet) {
+                                FloatingChatCouponWalletBridge.open()
                             } else {
-                                selectedTool = action
-                                onToolAction(action)
+                                item.action?.let(onToolAction)
                             }
-                        },
-                        onLongClick = {
-                            enterReorderMode()
-                        },
-                        onDragStart = {
-                            beginToolDrag(action)
-                        },
-                        onDrag = { dragAmountY ->
-                            reorderDraggedTool(action, dragAmountY)
-                        },
-                        onDragEnd = {
-                            finishToolDrag(action)
                         }
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CatalogToolButton(
+    item: RightRailToolCatalogItem,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(8.dp)
+    CompactInteractiveSize {
+        MaterialSurface(
+            onClick = onClick,
+            modifier = Modifier.size(
+                width = rightRailToolButtonWidthDp().dp,
+                height = rightRailToolButtonHeightDp().dp
+            ),
+            shape = shape,
+            color = OverlayTokens.control,
+            border = BorderStroke(1.dp, if (selected) OverlayTokens.accent else OverlayTokens.hairline)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 2.dp, vertical = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = item.icon,
+                    contentDescription = item.label,
+                    tint = if (selected) OverlayTokens.toolIconActive else OverlayTokens.toolIcon,
+                    modifier = Modifier.size(18.dp)
+                )
+                TextLabel(
+                    text = item.label,
+                    size = 8.sp,
+                    weight = FontWeight.Bold,
+                    color = if (selected) OverlayTokens.toolIconActive else OverlayTokens.toolIcon,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.basicMarquee()
+                )
             }
         }
     }

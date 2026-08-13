@@ -116,6 +116,13 @@ class ScrmSettingsManager(context: Context) {
 
     fun clear(): ScrmSettingsSummary = service.clear()
 
+    /** Exposes only the existing authenticated transport configuration, never its raw secret. */
+    internal fun loadApiConfig(): ScrmApiConfig {
+        val stored = credentials.load()
+            ?: throw ScrmConfigurationException("请先保存 SCRM API 配置")
+        return ScrmApiConfig(stored.baseUrl, stored.apiKey)
+    }
+
     fun selectAccount(deviceUuid: String, weChatId: String): ScrmSettingsSummary {
         return service.selectAccount(deviceUuid, weChatId)
     }

@@ -42,28 +42,38 @@ internal fun FilePreviewContent(message: FloatingChatMessage) {
     ) {
         Column(modifier = Modifier.weight(1f)) {
             TextLabel(
-                text = message.fileName ?: message.text,
+                text = fileDisplayName(message),
                 size = fileWechatTitleTextSizeSp().sp,
                 weight = FontWeight.Normal,
                 color = OverlayTokens.fileWechatTitle,
                 maxLines = 2,
                 lineHeight = 13.sp
             )
-            TextLabel(
-                text = message.fileSizeLabel.orEmpty(),
-                size = fileWechatSizeTextSizeSp().sp,
-                weight = FontWeight.Normal,
-                color = OverlayTokens.fileWechatSize,
-                maxLines = 1,
-                lineHeight = 10.sp
-            )
+            message.fileSizeLabel?.takeIf { it.isNotBlank() }?.let { sizeLabel ->
+                TextLabel(
+                    text = sizeLabel,
+                    size = fileWechatSizeTextSizeSp().sp,
+                    weight = FontWeight.Normal,
+                    color = OverlayTokens.fileWechatSize,
+                    maxLines = 1,
+                    lineHeight = 10.sp
+                )
+            }
         }
         Spacer(modifier = Modifier.width(6.dp))
         FileFormatIcon(
             format = message.fileFormat,
-            fileName = message.fileName ?: message.text
+            fileName = fileDisplayName(message)
         )
     }
+}
+
+internal fun fileDisplayName(message: FloatingChatMessage): String {
+    return listOf(message.fileName, message.text, message.detail)
+        .filterNotNull()
+        .map(String::trim)
+        .firstOrNull(String::isNotBlank)
+        ?: "文件"
 }
 
 @Composable

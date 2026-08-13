@@ -12,6 +12,7 @@ internal enum class BottomPanelMode {
     QuickPhrase,
     Card,
     Moments,
+    Finder,
     MomentMaterials,
     Favorite,
     RedPacket,
@@ -33,6 +34,7 @@ internal fun BottomPanelMode.isCenteredToolFeaturePanel(): Boolean {
         this == BottomPanelMode.QuickPhrase ||
         this == BottomPanelMode.Card ||
         this == BottomPanelMode.Moments ||
+        this == BottomPanelMode.Finder ||
         this == BottomPanelMode.MomentMaterials ||
         this == BottomPanelMode.Favorite ||
         this == BottomPanelMode.RedPacket ||

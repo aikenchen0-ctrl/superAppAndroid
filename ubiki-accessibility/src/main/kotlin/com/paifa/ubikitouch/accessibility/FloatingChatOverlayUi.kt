@@ -22,6 +22,8 @@ import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AiVoicePanel
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AiVoiceState
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AiConfigTestActions
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AiDraftOverlayHost
+import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.MessageAsideAnalysisActions
+import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.MessageAsideAnalysisState
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.BlinkInputAiActions
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.FloatingChatBlinkInputEffects
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AiDraftGenerationActions
@@ -41,6 +43,11 @@ import com.paifa.ubikitouch.accessibility.floatingchat.tools.*
 import com.paifa.ubikitouch.accessibility.floatingchat.message.*
 import com.paifa.ubikitouch.accessibility.floatingchat.media.*
 import com.paifa.ubikitouch.accessibility.floatingchat.moments.*
+import com.paifa.ubikitouch.accessibility.floatingchat.finder.FinderSession
+import com.paifa.ubikitouch.accessibility.floatingchat.finder.FinderWorkspaceView
+import com.paifa.ubikitouch.accessibility.floatingchat.finder.ScrmFinderApi
+import com.paifa.ubikitouch.accessibility.floatingchat.finder.finderUserNameForMessage
+import com.paifa.ubikitouch.accessibility.floatingchat.finder.isFinderMessage
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.BottomPanelMode
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.FloatingBottomPanel
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.FloatingChatConversationSyncEffects
@@ -136,6 +143,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.automirrored.filled.Forward
@@ -153,6 +162,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.Collections
@@ -170,9 +180,11 @@ import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.PersonAddAlt1
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
@@ -286,6 +298,8 @@ import com.paifa.ubikitouch.core.model.FloatingChatVisibilityScope
 import com.paifa.ubikitouch.core.model.GestureData
 import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingChatExpandedBottomGestureBar
 import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingChatRuntimeSections
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingChatHeaderIcon
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingChatUnreadDot
 import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingChatImageActionPill
 import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingChatMediaStatusPill
 import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingChatTinyChip
@@ -321,8 +335,14 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskSubmissionResult
 import com.paifa.ubikitouch.accessibility.scrm.ScrmPaymentApi
 import com.paifa.ubikitouch.accessibility.scrm.ScrmRedPacketQueryByMessageRequest
 import com.paifa.ubikitouch.accessibility.scrm.PaymentDetailParser
+import com.paifa.ubikitouch.accessibility.scrm.PaymentIdempotencyRegistry
+import com.paifa.ubikitouch.accessibility.scrm.PaymentMessageIds
 import com.paifa.ubikitouch.accessibility.scrm.PaymentReadback
 import com.paifa.ubikitouch.accessibility.scrm.PaymentReadbackState
+import com.paifa.ubikitouch.accessibility.scrm.PaymentRequestFactory
+import com.paifa.ubikitouch.accessibility.scrm.PaymentTaskRunner
+import com.paifa.ubikitouch.accessibility.scrm.PaymentTaskState
+import com.paifa.ubikitouch.accessibility.scrm.toPaymentReadback
 import com.paifa.ubikitouch.accessibility.scrm.scrmContactsPanelRouteForSelectedAccount
 import com.paifa.ubikitouch.accessibility.scrm.resolveScrmTaskResult
 import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingAccountId
@@ -336,12 +356,188 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
+
+internal enum class FloatingChatHeaderRoute {
+    AllAccountsUnread,
+    SingleAccountUnread,
+    Conversation
+}
+
+private const val FloatingChatHeaderRestoreDelayMillis = 1_000L
+
+internal data class FloatingChatHeaderState(
+    val leadingLabel: String,
+    val title: String,
+    val showUnreadDot: Boolean,
+    val showEdit: Boolean,
+    val compact: Boolean
+)
+
+internal fun floatingChatHeaderState(
+    route: FloatingChatHeaderRoute,
+    accountName: String,
+    conversationTitle: String,
+    unreadCount: Int,
+    messageScrollInProgress: Boolean,
+    editable: Boolean
+): FloatingChatHeaderState {
+    return when (route) {
+        FloatingChatHeaderRoute.AllAccountsUnread -> FloatingChatHeaderState(
+            leadingLabel = "返回",
+            title = "全部未回消息",
+            showUnreadDot = false,
+            showEdit = false,
+            compact = false
+        )
+        FloatingChatHeaderRoute.SingleAccountUnread -> FloatingChatHeaderState(
+            leadingLabel = "返回",
+            title = "${accountName.ifBlank { "当前账号" }}的未回消息",
+            showUnreadDot = false,
+            showEdit = false,
+            compact = false
+        )
+        FloatingChatHeaderRoute.Conversation -> FloatingChatHeaderState(
+            leadingLabel = if (unreadCount > 0) "未回 $unreadCount" else "未回",
+            title = conversationTitle.ifBlank { "消息" },
+            showUnreadDot = true,
+            showEdit = editable,
+            compact = messageScrollInProgress
+        )
+    }
+}
+
+@Composable
+internal fun FloatingChatWorkspaceHeader(
+    state: FloatingChatHeaderState,
+    accountName: String,
+    onLeadingClick: () -> Unit,
+    onEditClick: (() -> Unit)?,
+    onSearchClick: () -> Unit,
+    onScanClick: () -> Unit,
+    onAddFriendClick: () -> Unit
+) {
+    var utilityMenuExpanded by remember { mutableStateOf(false) }
+    val compactOffset by animateFloatAsState(
+        targetValue = if (state.compact) -76f else 0f,
+        animationSpec = tween(durationMillis = 180),
+        label = "floating-chat-header-compact"
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height((chatStatusBarHeightDp() + chatToolbarHeightDp()).dp)
+            .background(OverlayTokens.toolbarSurface)
+            .padding(start = 8.dp, top = chatStatusBarHeightDp().dp, end = 8.dp)
+            .clipToBounds(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            modifier = Modifier
+                .graphicsLayer {
+                    translationX = compactOffset.dp.toPx()
+                    alpha = if (state.compact) 0f else 1f
+                }
+                .clickable(onClick = onLeadingClick)
+                .padding(horizontal = 4.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = state.leadingLabel,
+                tint = OverlayTokens.panelPrimaryText,
+                modifier = Modifier.size(17.dp)
+            )
+            Text(
+                text = state.leadingLabel,
+                color = OverlayTokens.panelPrimaryText,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1
+            )
+            if (state.showUnreadDot) FloatingChatUnreadDot()
+        }
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .graphicsLayer { translationX = compactOffset.dp.toPx() }
+                .padding(start = 6.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = state.title,
+                modifier = Modifier.weight(1f),
+                color = OverlayTokens.panelPrimaryText,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                    text = accountName,
+                modifier = Modifier.width(62.dp),
+                color = OverlayTokens.panelSecondaryText,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.End,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (state.showEdit) {
+                FloatingChatHeaderIcon(
+                    imageVector = Icons.Filled.Edit,
+                    contentDescription = "编辑会话备注",
+                    onClick = onEditClick
+                )
+            }
+            FloatingChatHeaderIcon(
+                imageVector = Icons.Filled.Search,
+                contentDescription = "搜索聊天记录",
+                onClick = onSearchClick
+            )
+            Box {
+                FloatingChatHeaderIcon(
+                    imageVector = Icons.Filled.QrCodeScanner,
+                    contentDescription = "扫一扫与添加朋友",
+                    onClick = { utilityMenuExpanded = true }
+                )
+                DropdownMenu(
+                    expanded = utilityMenuExpanded,
+                    onDismissRequest = { utilityMenuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("扫一扫") },
+                        leadingIcon = { Icon(Icons.Filled.QrCodeScanner, contentDescription = null) },
+                        onClick = {
+                            utilityMenuExpanded = false
+                            onScanClick()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("添加朋友") },
+                        leadingIcon = { Icon(Icons.Filled.PersonAddAlt1, contentDescription = null) },
+                        onClick = {
+                            utilityMenuExpanded = false
+                            onAddFriendClick()
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
 
 @Composable
 internal fun FloatingChatOverlay(
@@ -448,8 +644,13 @@ internal fun FloatingChatOverlay(
     val mediaOverlayState = rememberFloatingChatMediaOverlayState()
     var longPressMessage by remember { mutableStateOf<FloatingChatMessage?>(null) }
     var longPressAnchorBounds by remember { mutableStateOf<Rect?>(null) }
+    var asideAnalysisState by remember { mutableStateOf<MessageAsideAnalysisState?>(null) }
+    var textZoomMessage by remember { mutableStateOf<FloatingChatMessage?>(null) }
     var paymentDetailMessage by remember { mutableStateOf<FloatingChatMessage?>(null) }
     var paymentReadback by remember { mutableStateOf(PaymentReadback()) }
+    var paymentOperationStatus by remember { mutableStateOf<String?>(null) }
+    var paymentOperationInProgress by remember { mutableStateOf(false) }
+    val paymentIdempotencyRegistry = remember { PaymentIdempotencyRegistry() }
     var forwardMessage by remember { mutableStateOf<FloatingChatMessage?>(null) }
     var forwardModeMessages by remember { mutableStateOf<List<FloatingChatMessage>>(emptyList()) }
     var pendingForwardMessages by remember { mutableStateOf<List<FloatingChatMessage>>(emptyList()) }
@@ -556,22 +757,52 @@ internal fun FloatingChatOverlay(
     val accountIds = remember(liveConversation.accountContacts) {
         liveConversation.accountContacts.map { account -> account.id }
     }
-    var activeAccountId by remember {
-        mutableStateOf(
-            initialSelectedAccountId
-                ?.takeIf { accountId -> accountIds.contains(accountId) }
-                ?: profiledConversation.accountContacts.firstOrNull { account -> account.selected }?.id
-                ?: profiledConversation.accountContacts.firstOrNull()?.id
+    var chatNavigationState by remember(runtimeState) {
+        val restored = runtimeState.chatNavigationState
+        val initialAccountId = restored.activeAccountId.takeIf(accountIds::contains)
+            ?: initialSelectedAccountId?.takeIf(accountIds::contains)
+            ?: profiledConversation.accountContacts.firstOrNull { account -> account.selected }?.id
+            ?: profiledConversation.accountContacts.firstOrNull()?.id
             ?: ""
+        val initialConversation = accountScopedConversation(profiledConversation, initialAccountId)
+        mutableStateOf(
+            restored.copy(
+                activeAccountId = initialAccountId,
+                selectedThread = initialChatThreadSelection(
+                    conversation = initialConversation,
+                    preferredSelection = restored.selectedThread
+                )
+            ).also { initial -> runtimeState.chatNavigationState = initial }
         )
+    }
+    fun updateChatNavigationState(next: ChatNavigationState) {
+        chatNavigationState = next
+        runtimeState.chatNavigationState = next
+    }
+    val activeAccountId = chatNavigationState.activeAccountId
+    val selectedThread = chatNavigationState.selectedThread
+    val homeOverviewVisible = chatNavigationState.route != ChatNavigationRoute.Conversation
+    val homeOverviewAccountId = chatNavigationState.activeAccountId.takeIf {
+        chatNavigationState.route == ChatNavigationRoute.SingleAccountUnread
     }
     LaunchedEffect(accountIds) {
         if (activeAccountId.isNotBlank() && activeAccountId in accountIds) return@LaunchedEffect
-        activeAccountId = initialSelectedAccountId
+        val nextAccountId = initialSelectedAccountId
             ?.takeIf { accountId -> accountId in accountIds }
             ?: profiledConversation.accountContacts.firstOrNull { account -> account.selected }?.id
             ?: accountIds.firstOrNull()
             ?: ""
+        val nextThread = initialChatThreadSelection(
+            conversation = accountScopedConversation(profiledConversation, nextAccountId),
+            preferredSelection = selectedThread
+        )
+        updateChatNavigationState(
+            chatNavigationState.copy(
+                activeAccountId = nextAccountId,
+                selectedThread = nextThread,
+                unreadSourceAccountId = null
+            )
+        )
     }
     val accountConversationCache = remember(profiledConversation) {
         AccountScopedConversationCache(profiledConversation)
@@ -594,16 +825,26 @@ internal fun FloatingChatOverlay(
             profiles = contactProfileList
         )
     }
-    var selectedThread by remember {
-        mutableStateOf(initialChatThreadSelection(contactProfiledConversation, runtimeState.selectedThread))
+    var finderUserPageRequestKey by remember { mutableIntStateOf(0) }
+    var finderInitialUserName by remember { mutableStateOf<String?>(null) }
+    var messageListScrolling by remember { mutableStateOf(false) }
+    var headerCompact by remember { mutableStateOf(false) }
+    var openChatSearchRequestKey by remember { mutableIntStateOf(0) }
+    LaunchedEffect(messageListScrolling, selectedThread, homeOverviewVisible) {
+        if (homeOverviewVisible || selectedThread !is ChatThreadSelection.Private) {
+            headerCompact = false
+        } else if (messageListScrolling) {
+            headerCompact = true
+        } else {
+            delay(FloatingChatHeaderRestoreDelayMillis)
+            headerCompact = false
+        }
     }
-    var homeOverviewVisible by remember { mutableStateOf(false) }
     val unreadThreadIds = remember { mutableStateMapOf<String, Boolean>() }
     val chatNavigationActions = ChatNavigationActions(
         unreadThreadIds = unreadThreadIds,
-        onActiveAccountIdChanged = { accountId -> activeAccountId = accountId },
-        onSelectedThreadChanged = { thread -> selectedThread = thread },
-        onHomeOverviewVisibleChanged = { visible -> homeOverviewVisible = visible }
+        state = { chatNavigationState },
+        onStateChanged = ::updateChatNavigationState
     )
     val localMessages = remember(liveConversation, initialLocalMessages) {
         mutableStateListOf<FloatingChatMessage>().apply {
@@ -686,13 +927,18 @@ internal fun FloatingChatOverlay(
             )
         }
     }
-    val homeDisplayConversation = remember(profiledConversation, accountScopedDisplayConversations) {
-        if (accountScopedDisplayConversations.isEmpty()) {
+    val visibleHomeOverviewConversations = remember(accountScopedDisplayConversations, homeOverviewAccountId) {
+        homeOverviewAccountId?.let { accountId ->
+            accountScopedDisplayConversations.filter { scoped -> scoped.accountId == accountId }
+        } ?: accountScopedDisplayConversations
+    }
+    val homeDisplayConversation = remember(profiledConversation, visibleHomeOverviewConversations) {
+        if (visibleHomeOverviewConversations.isEmpty()) {
             profiledConversation
         } else {
             allAccountHomeConversation(
                 baseConversation = profiledConversation,
-                accountConversations = accountScopedDisplayConversations
+                accountConversations = visibleHomeOverviewConversations
             )
         }
     }
@@ -753,13 +999,19 @@ internal fun FloatingChatOverlay(
         localMessageVersion += 1
         onLocalMessagesChanged(localMessages.toList(), localMessageSequence)
     }
+    fun markUnreadSummaryReplied(threadId: String) {
+        homeUnreadThreadSummaries(displayConversation)
+            .firstOrNull { summary ->
+                summary.accountId == activeAccountId && summary.threadId == threadId
+            }
+            ?.let(chatNavigationActions::markReplied)
+    }
     FloatingChatConversationSyncEffects(
         conversation = conversation,
         runtimeState = runtimeState,
         onLiveConversationChanged = { nextConversation -> liveConversation = nextConversation },
-        onActiveAccountIdChanged = { accountId -> activeAccountId = accountId },
-        onSelectedThreadChanged = { thread -> selectedThread = thread },
-        onHomeOverviewVisibleChanged = { visible -> homeOverviewVisible = visible },
+        chatNavigationState = chatNavigationState,
+        onChatNavigationStateChanged = ::updateChatNavigationState,
         onLocalMessagesReplaced = { messages ->
             localMessages.clear()
             localMessages.addAll(messages)
@@ -777,6 +1029,7 @@ internal fun FloatingChatOverlay(
         },
         prepareOutgoingMessage = onPrepareOutgoingMessage,
         onOutgoingMessageCreated = { message, threadId ->
+            markUnreadSummaryReplied(threadId)
             localMessages += message
             syncLocalMessageState()
             onPersistLocalMessage(message, threadId)
@@ -792,6 +1045,7 @@ internal fun FloatingChatOverlay(
         },
         prepareOutgoingMessage = onPrepareOutgoingMessage,
         onPickedMessageCreated = { message, threadId ->
+            markUnreadSummaryReplied(threadId)
             localMessages += message
             syncLocalMessageState()
             onPersistLocalMessage(message, threadId)
@@ -847,6 +1101,63 @@ internal fun FloatingChatOverlay(
         onAiVoicePanelOpened = {
             aiVoiceState = AiVoiceState.Menu
             bottomPanelMode = BottomPanelMode.AiVoice
+        },
+        onTransferRequested = {
+            val requiresRecipientSelection = selectedThread is ChatThreadSelection.Group ||
+                selectedThread is ChatThreadSelection.GroupChat
+            val recipients = when (val thread = selectedThread) {
+                is ChatThreadSelection.Private -> displayConversation.contacts
+                    .firstOrNull { contact -> contact.id == thread.contactId }
+                    ?.let(::listOf).orEmpty()
+                else -> transferRecipientCandidatesForThread(
+                    conversation = displayConversation,
+                    selectedThread = thread,
+                    selectedAccountId = selectedAccount.id
+                ).ifEmpty {
+                    (thread as? ChatThreadSelection.GroupChat)
+                        ?.let { groupThread -> displayConversation.groupContacts.firstOrNull { it.id == groupThread.groupId } }
+                        ?.groupMemberContacts.orEmpty()
+                }
+            }.map { contact ->
+                FloatingChatTransferRecipient(
+                    id = contact.id,
+                    name = contact.name,
+                    weChatId = contact.description,
+                    avatarUri = contact.avatarUrl
+                )
+            }
+            FloatingChatTransferBridge.open(
+                FloatingChatTransferSession(
+                    accountName = selectedAccount.name,
+                    recipients = recipients,
+                    requiresRecipientSelection = requiresRecipientSelection,
+                    accountId = selectedAccount.id,
+                    roomId = (selectedThread as? ChatThreadSelection.GroupChat)
+                        ?.let { thread -> scrmFloatingContactConversationId(thread.groupId) }
+                )
+            )
+        },
+        onRedPacketRequested = {
+            val recipients = when (val thread = selectedThread) {
+                is ChatThreadSelection.Private -> displayConversation.contacts
+                    .firstOrNull { contact -> contact.id == thread.contactId }
+                    ?.let(::listOf).orEmpty()
+                else -> transferRecipientCandidatesForThread(
+                    conversation = displayConversation,
+                    selectedThread = thread,
+                    selectedAccountId = selectedAccount.id
+                ).ifEmpty {
+                    (thread as? ChatThreadSelection.GroupChat)
+                        ?.let { groupThread -> displayConversation.groupContacts.firstOrNull { it.id == groupThread.groupId } }
+                        ?.groupMemberContacts.orEmpty()
+                }
+            }
+            FloatingChatRedPacketBridge.open(
+                FloatingChatRedPacketSession(
+                    accountName = selectedAccount.name,
+                    recipientNames = recipients.map { contact -> contact.name }.filter { name -> name.isNotBlank() }.take(3)
+                )
+            )
         }
     )
     val aiDraftMessageActions = AiDraftMessageActions(
@@ -862,6 +1173,7 @@ internal fun FloatingChatOverlay(
         onDraftMessagesChanged = ::syncLocalMessageState,
         prepareOutgoingMessage = onPrepareOutgoingMessage,
         onPersistLocalMessage = onPersistLocalMessage,
+        onOutgoingMessageCreated = { _, threadId -> markUnreadSummaryReplied(threadId) },
         onDraftOverlaysClosed = {
             aiDraftActionMessage = null
             aiDraftEditMessage = null
@@ -887,6 +1199,19 @@ internal fun FloatingChatOverlay(
         onOpenAssistantPanel = { bottomPanelMode = BottomPanelMode.Assistant },
         onCloseAssistantPanel = { bottomPanelMode = BottomPanelMode.None },
         onShowToast = { message -> Toast.makeText(context, message, Toast.LENGTH_SHORT).show() }
+    )
+    val messageAsideAnalysisActions = MessageAsideAnalysisActions(
+        coroutineScope = coroutineScope,
+        aiConfig = { aiConfig },
+        displayConversation = { displayConversation },
+        selectedThread = { selectedThread },
+        selectedAccountId = { selectedAccount.id },
+        selectedAccountName = { selectedAccount.name },
+            onStateChanged = { state -> asideAnalysisState = state },
+        onOpenAssistantPanel = {
+            aiConfigStatus = "请先配置 AI API"
+            bottomPanelMode = BottomPanelMode.Assistant
+        }
     )
     val blinkInputAiActions = BlinkInputAiActions(
         coroutineScope = coroutineScope,
@@ -929,6 +1254,7 @@ internal fun FloatingChatOverlay(
         },
         prepareOutgoingMessage = onPrepareOutgoingMessage,
         onForwardMessageCreated = { message, threadId ->
+            markUnreadSummaryReplied(threadId)
             localMessages += message
             syncLocalMessageState()
             onPersistLocalMessage(message, threadId)
@@ -946,7 +1272,6 @@ internal fun FloatingChatOverlay(
     var scrmMessageOperationTarget by remember { mutableStateOf<FloatingChatMessage?>(null) }
     val messageLongPressActions = MessageLongPressActions(
         favoriteMessageIds = favoriteMessageIds,
-        reminderMessageIds = reminderMessageIds,
         hiddenMessageIds = hiddenMessageIds,
         selectedMessageIds = selectedMessageIds,
         onCopyText = { text -> clipboardManager.setText(AnnotatedString(text)) },
@@ -960,13 +1285,11 @@ internal fun FloatingChatOverlay(
             quotedMessage = message
             inputFocused = true
         },
-        onListenMessage = { message -> mediaOverlayState.openActions(message) },
+        onListenMessage = { message -> messageAsideAnalysisActions.analyze(message) },
         onZoomMessage = { message ->
-            when (message.type) {
-                FloatingChatMessageType.ImageThumbnail,
-                FloatingChatMessageType.CapturedPhoto,
-                FloatingChatMessageType.VideoPreview,
-                FloatingChatMessageType.ChannelsVideo -> {
+            when (messageZoomMode(message.type)) {
+                MessageZoomMode.Text -> textZoomMessage = message
+                MessageZoomMode.Media -> {
                     val previewIndex = previewableMedia.indexOfFirst { preview -> preview.id == message.id }
                     if (previewIndex >= 0) {
                         FloatingChatMediaPreviewBridge.open(
@@ -979,7 +1302,9 @@ internal fun FloatingChatOverlay(
                         Toast.makeText(context, "媒体资源暂不可用", Toast.LENGTH_SHORT).show()
                     }
                 }
-                else -> Toast.makeText(context, "该消息类型暂不支持放大", Toast.LENGTH_SHORT).show()
+                MessageZoomMode.Unsupported -> {
+                    Toast.makeText(context, "该消息类型暂不支持放大", Toast.LENGTH_SHORT).show()
+                }
             }
         },
         onScrmOperationRequested = { message -> scrmMessageOperationTarget = message },
@@ -1042,13 +1367,41 @@ internal fun FloatingChatOverlay(
         inputFocused = false
         bottomPanelMode = BottomPanelMode.None
     }
+    val headerRoute = when (chatNavigationState.route) {
+        ChatNavigationRoute.SingleAccountUnread -> FloatingChatHeaderRoute.SingleAccountUnread
+        ChatNavigationRoute.AllAccountsUnread -> FloatingChatHeaderRoute.AllAccountsUnread
+        ChatNavigationRoute.Conversation -> FloatingChatHeaderRoute.Conversation
+    }
+    val headerEditableContact = (selectedThread as? ChatThreadSelection.Private)?.let { thread ->
+        displayConversation.contacts.firstOrNull { contact -> contact.id == thread.contactId }
+    }
+    val headerTitle = chatToolbarTitle(
+        conversation = displayConversation,
+        selectedThread = selectedThread,
+        homeOverviewVisible = false
+    )
+    val currentUnreadCount = unreadThreadIds.values.count { unread -> unread }
+    val headerState = floatingChatHeaderState(
+        route = headerRoute,
+        accountName = selectedAccount.name,
+        conversationTitle = headerTitle,
+        unreadCount = currentUnreadCount,
+        messageScrollInProgress = headerCompact,
+        editable = headerEditableContact != null
+    )
+    val openUnreadOverview = {
+        chatNavigationActions.openAllAccountsUnread()
+        bottomPanelMode = BottomPanelMode.None
+    }
     ChatThreadEffects(
         effectiveConversation = effectiveConversation,
         selectedThread = selectedThread,
         selectedAccountId = selectedAccount.id,
         unreadThreadIds = unreadThreadIds,
         runtimeState = runtimeState,
-        onSelectedThreadChanged = { thread -> selectedThread = thread },
+        onSelectedThreadChanged = { thread ->
+            updateChatNavigationState(chatNavigationState.copy(selectedThread = thread))
+        },
         onThreadContextChanged = onThreadContextChanged
     )
     FloatingChatPreviewChromeEffects(
@@ -1078,11 +1431,34 @@ internal fun FloatingChatOverlay(
                 blurRadiusDp = blurRadiusDp,
                 backgroundColorRgb = backgroundColorRgb
             ),
+        topContent = {
+            FloatingChatWorkspaceHeader(
+                state = headerState,
+                accountName = selectedAccount.name,
+                onLeadingClick = {
+                    when (chatNavigationActions.back()) {
+                        ChatNavigationBackResult.Collapse -> onCollapse()
+                        is ChatNavigationBackResult.Navigate -> Unit
+                    }
+                    bottomPanelMode = BottomPanelMode.None
+                },
+                onEditClick = headerEditableContact?.let { contact ->
+                    { contactEditorTarget = ContactEditorTarget.User(contact) }
+                },
+                onSearchClick = { openChatSearchRequestKey += 1 },
+                onScanClick = { FloatingChatMediaPickerBridge.requestScan() },
+                onAddFriendClick = {
+                    contactsOpenAddFriend = true
+                    bottomPanelMode = BottomPanelMode.Contacts
+                }
+            )
+        },
         mainContent = {
             CoordinateChatBody(
             conversation = if (homeOverviewVisible) homeDisplayConversation else displayConversation,
-            homeOverviewConversations = accountScopedDisplayConversations,
+            homeOverviewConversations = visibleHomeOverviewConversations,
             accountProfiles = accountProfiles,
+            navigationState = chatNavigationState,
             activeAccountId = selectedAccount.id,
             selectedThread = selectedThread,
             homeOverviewVisible = homeOverviewVisible,
@@ -1099,6 +1475,14 @@ internal fun FloatingChatOverlay(
                 contactEditorTarget = ContactEditorTarget.User(contact)
             },
             onAccountAvatarClick = { account ->
+                if (homeOverviewVisible) {
+                    if (chatNavigationState.route == ChatNavigationRoute.AllAccountsUnread) {
+                        chatNavigationActions.openSingleAccountUnread(account.id)
+                    } else {
+                        chatNavigationActions.switchUnreadAccount(account.id)
+                    }
+                    return@CoordinateChatBody
+                }
                 if (!shouldHandleAccountAvatarClick(activeAccountId, account.id)) {
                     return@CoordinateChatBody
                 }
@@ -1107,7 +1491,7 @@ internal fun FloatingChatOverlay(
                     clickedAccountId = account.id
                 )
                 val nextThread = selectedThreadAfterAccountAvatarClick(
-                    conversation = profiledConversation,
+                    conversationCache = accountConversationCache,
                     clickedAccountId = nextAccountId,
                     currentThread = selectedThread
                 )
@@ -1117,16 +1501,20 @@ internal fun FloatingChatOverlay(
                 runtimeState.conversationUpdateEvent?.let { pendingUpdate ->
                     runtimeState.clearConversationUpdate(pendingUpdate.token)
                 }
-                selectedThread = nextThread
-                activeAccountId = nextAccountId
+                chatNavigationActions.switchConversationAccount(nextAccountId, nextThread)
                 onThreadContextChanged(nextThread, nextAccountId)
-                homeOverviewVisible = false
                 bottomPanelMode = BottomPanelMode.None
             },
             onAccountAvatarLongClick = { account ->
                 accountEditorTarget = account
             },
             onPreviewMedia = { message ->
+                if (isFinderMessage(message)) {
+                    finderInitialUserName = finderUserNameForMessage(message)
+                    finderUserPageRequestKey += 1
+                    bottomPanelMode = BottomPanelMode.Finder
+                    return@CoordinateChatBody
+                }
                 val previewIndex = previewableMedia.indexOfFirst { preview -> preview.id == message.id }
                     .takeIf { it >= 0 }
                     ?: return@CoordinateChatBody
@@ -1153,12 +1541,22 @@ internal fun FloatingChatOverlay(
                 bottomPanelMode = BottomPanelMode.None
             },
             onMessageClick = { message ->
+                if (isFinderMessage(message)) {
+                    finderInitialUserName = finderUserNameForMessage(message)
+                    finderUserPageRequestKey += 1
+                    bottomPanelMode = BottomPanelMode.Finder
+                    return@CoordinateChatBody
+                }
                 // Reuse the existing in-tree action group; this is presentation-only.
+                messageAsideAnalysisActions.dismiss()
+                textZoomMessage = null
                 longPressMessage = message
                 longPressAnchorBounds = null
                 bottomPanelMode = BottomPanelMode.None
             },
             onLongPressMessage = { message, bounds ->
+                messageAsideAnalysisActions.dismiss()
+                textZoomMessage = null
                 longPressMessage = message
                 longPressAnchorBounds = bounds
             },
@@ -1183,6 +1581,9 @@ internal fun FloatingChatOverlay(
                 contactsOpenAddFriend = true
                 bottomPanelMode = BottomPanelMode.Contacts
             },
+            showTopToolbar = false,
+            onMessageScrollStateChanged = { scrolling -> messageListScrolling = scrolling },
+            openSearchRequestKey = openChatSearchRequestKey,
             modifier = Modifier.fillMaxSize()
         )
         },
@@ -1280,6 +1681,23 @@ internal fun FloatingChatOverlay(
                     fallbackWeChatId = null
                 ),
                 scrmMessageRoute = scrmFloatingAccountRouteForContactId(selectedAccount.id),
+                finderSession = scrmFloatingAccountRouteForContactId(selectedAccount.id)?.let { route ->
+                    FinderSession(deviceUuid = route.deviceUuid, weChatId = route.weChatId)
+                },
+                finderApi = remember(selectedAccount.id) {
+                    runCatching {
+                        ScrmFinderApi(
+                            ScrmSettingsManager(context.applicationContext).loadApiConfig()
+                        )
+                    }.getOrNull()
+                },
+                finderConfigurationError = remember(selectedAccount.id) {
+                    runCatching {
+                        ScrmSettingsManager(context.applicationContext).loadApiConfig()
+                    }.exceptionOrNull()?.message
+                },
+                finderInitialSphUserName = finderInitialUserName,
+                finderUserPageRequestKey = finderUserPageRequestKey,
                 scrmMessageConversationId = when (val thread = selectedThread) {
                     is ChatThreadSelection.Private -> scrmFloatingContactConversationId(thread.contactId)
                     is ChatThreadSelection.GroupChat -> scrmFloatingContactConversationId(thread.groupId)
@@ -1478,6 +1896,8 @@ internal fun FloatingChatOverlay(
                     selectedThread = selectedThread,
                     selectedAccountId = selectedAccount.id
                 ),
+                paymentOperationStatus = paymentOperationStatus,
+                paymentOperationInProgress = paymentOperationInProgress,
                 onSaveAiConfig = { nextConfig ->
                     aiConfig = nextConfig
                     saveFloatingChatAiConfig(context, nextConfig)
@@ -1516,35 +1936,124 @@ internal fun FloatingChatOverlay(
                     selectedFavoriteItemIds.clear()
                     favoriteMultiSelectMode = false
                 },
-                onSendRedPacket = { amount, greeting ->
-                    val safeAmount = amount.ifBlank { "8.88" }
-                    val safeGreeting = greeting.ifBlank { "恭喜发财，大吉大利" }
-                    toolMessageActions.addToolMessage(FloatingChatToolAction.RedPacket) { message ->
-                        message.copy(
-                            text = "浮窗红包 ¥$safeAmount",
-                            appName = "浮窗红包",
-                            detail = safeGreeting
-                        )
+                onSendRedPacket = { amount, greeting, paymentPassword, packetCount ->
+                    val route = scrmFloatingAccountRouteForContactId(selectedAccount.id)
+                    val conversationId = when (val thread = selectedThread) {
+                        is ChatThreadSelection.Private -> scrmFloatingContactConversationId(thread.contactId)
+                        is ChatThreadSelection.GroupChat -> scrmFloatingContactConversationId(thread.groupId)
+                        ChatThreadSelection.Group -> null
+                    }
+                    if (route == null || conversationId.isNullOrBlank()) {
+                        paymentOperationStatus = "未提交：缺少真实 SCRM 账号或会话 wxid"
+                        return@FloatingBottomPanel
+                    }
+                    paymentOperationInProgress = true
+                    paymentOperationStatus = "正在提交红包并等待设备任务终态"
+                    coroutineScope.launch {
+                        val intent = "lucky:${route.deviceUuid}:${route.weChatId}:$conversationId:$amount:$packetCount:$greeting"
+                        val result = runCatching {
+                            withContext(Dispatchers.IO) {
+                                val session = ScrmSettingsManager(context.applicationContext)
+                                    .loadSelectedSessionOrBootstrap()
+                                val api = session.readApi as? ScrmPaymentApi
+                                    ?: error("当前 SCRM 客户端不支持发送红包")
+                                val request = PaymentRequestFactory.sendLuckyMoney(
+                                    route = route,
+                                    conversationId = conversationId,
+                                    amountText = amount,
+                                    packetCount = packetCount,
+                                    paymentPassword = paymentPassword,
+                                    wish = greeting
+                                )
+                                val key = paymentIdempotencyRegistry.keyFor(intent, paymentPassword)
+                                PaymentTaskRunner(session.taskApi).submitAndAwait {
+                                    api.sendLuckyMoney(request, key)
+                                }
+                            }
+                        }
+                        paymentOperationInProgress = false
+                        result.onSuccess { outcome ->
+                            paymentOperationStatus = outcome.message
+                            if (outcome.completed) {
+                                paymentIdempotencyRegistry.complete(intent, paymentPassword)
+                                toolMessageActions.addToolMessage(FloatingChatToolAction.RedPacket) { message ->
+                                    message.copy(
+                                        text = "红包 ¥$amount",
+                                        appName = "微信红包",
+                                        detail = greeting.trim().ifBlank { "恭喜发财，大吉大利" },
+                                        remoteTaskId = outcome.taskId,
+                                        sendState = FloatingChatSendState.Succeeded
+                                    )
+                                }
+                            }
+                        }.onFailure { error ->
+                            paymentOperationStatus = "红包提交失败：${error.message ?: "未知错误"}"
+                        }
                     }
                 },
-                onSendTransfer = { amount, note, recipient ->
-                    val safeAmount = amount.ifBlank { "88.00" }
+                onSendTransfer = { amount, note, recipient, paymentPassword ->
                     val privateRecipient = (selectedThread as? ChatThreadSelection.Private)?.let { thread ->
                         displayConversation.contacts.firstOrNull { contact -> contact.id == thread.contactId }
                     }
                     val targetRecipient = recipient ?: privateRecipient
-                    toolMessageActions.addToolMessage(FloatingChatToolAction.Transfer) { message ->
-                        message.copy(
-                            text = "转账 ¥$safeAmount",
-                            appName = "浮窗转账",
-                            detail = transferMessageDetailForRecipient(targetRecipient?.name, note),
-                            cardName = targetRecipient?.name,
-                            cardSubtitle = targetRecipient?.description,
-                            resourceUrl = transferResourceUrlWithRecipient(
-                                resourceUrl = message.resourceUrl,
-                                recipientId = targetRecipient?.id
-                            )
-                        )
+                    val route = scrmFloatingAccountRouteForContactId(selectedAccount.id)
+                    val recipientId = targetRecipient?.id?.let(::scrmFloatingContactConversationId)
+                    val roomId = (selectedThread as? ChatThreadSelection.GroupChat)
+                        ?.let { thread -> scrmFloatingContactConversationId(thread.groupId) }
+                    if (route == null || recipientId.isNullOrBlank() ||
+                        (selectedThread is ChatThreadSelection.GroupChat && roomId.isNullOrBlank())
+                    ) {
+                        paymentOperationStatus = "未提交：缺少真实 SCRM 账号、收款人或群聊 wxid"
+                        return@FloatingBottomPanel
+                    }
+                    paymentOperationInProgress = true
+                    paymentOperationStatus = "正在提交转账并等待设备任务终态"
+                    coroutineScope.launch {
+                        val intent = "transfer:${route.deviceUuid}:${route.weChatId}:$recipientId:${roomId.orEmpty()}:$amount:$note"
+                        val result = runCatching {
+                            withContext(Dispatchers.IO) {
+                                val session = ScrmSettingsManager(context.applicationContext)
+                                    .loadSelectedSessionOrBootstrap()
+                                val api = session.readApi as? ScrmPaymentApi
+                                    ?: error("当前 SCRM 客户端不支持发送转账")
+                                val request = PaymentRequestFactory.sendRemittance(
+                                    route = route,
+                                    recipientId = recipientId,
+                                    roomId = roomId,
+                                    amountText = amount,
+                                    paymentPassword = paymentPassword,
+                                    memo = note
+                                )
+                                val key = paymentIdempotencyRegistry.keyFor(intent, paymentPassword)
+                                PaymentTaskRunner(session.taskApi).submitAndAwait {
+                                    api.sendRemittance(request, key)
+                                }
+                            }
+                        }
+                        paymentOperationInProgress = false
+                        result.onSuccess { outcome ->
+                            paymentOperationStatus = outcome.message
+                            if (outcome.completed) {
+                                paymentIdempotencyRegistry.complete(intent, paymentPassword)
+                                toolMessageActions.addToolMessage(FloatingChatToolAction.Transfer) { message ->
+                                    message.copy(
+                                        text = "转账 ¥$amount",
+                                        appName = "微信转账",
+                                        detail = transferMessageDetailForRecipient(targetRecipient?.name, note),
+                                        cardName = targetRecipient?.name,
+                                        cardSubtitle = targetRecipient?.description,
+                                        resourceUrl = transferResourceUrlWithRecipient(
+                                            resourceUrl = message.resourceUrl,
+                                            recipientId = targetRecipient?.id
+                                        ),
+                                        remoteTaskId = outcome.taskId,
+                                        sendState = FloatingChatSendState.Succeeded
+                                    )
+                                }
+                            }
+                        }.onFailure { error ->
+                            paymentOperationStatus = "转账提交失败：${error.message ?: "未知错误"}"
+                        }
                     }
                 },
                 onSendLocation = { location ->
@@ -1660,6 +2169,8 @@ internal fun FloatingChatOverlay(
             paymentDetailMessage = paymentDetailMessage,
             longPressMessage = longPressMessage,
             longPressAnchorBounds = longPressAnchorBounds,
+            asideAnalysisState = asideAnalysisState,
+            textZoomMessage = textZoomMessage,
             multiSelectMode = multiSelectMode,
             chatHistoryPreviewMessage = chatHistoryPreviewMessage,
             selectedThread = selectedThread,
@@ -1681,12 +2192,12 @@ internal fun FloatingChatOverlay(
                     return@MessageInteractionOverlayHost
                 }
                 val route = scrmFloatingAccountRouteForContactId(selectedAccount.id)
-                val messageId = message.remoteMessageServerId?.toLongOrNull()
-                    ?: message.id.substringAfterLast(':').toLongOrNull()
-                if (route == null || messageId == null || messageId <= 0L) {
+                val messageId = message.remoteMessageId
+                val msgSvrId = message.remoteMessageServerId
+                if (route == null || messageId == null || messageId <= 0L || msgSvrId.isNullOrBlank()) {
                     paymentReadback = PaymentReadback(
                         state = PaymentReadbackState.FAILED,
-                        message = "缺少 SCRM 账号路由或服务端消息 ID"
+                        message = "缺少 SCRM 账号、messageId 或真实 msgSvrId，已阻止查询"
                     )
                 } else {
                     paymentReadback = PaymentReadback(state = PaymentReadbackState.LOADING)
@@ -1697,17 +2208,21 @@ internal fun FloatingChatOverlay(
                                     .loadSelectedSessionOrBootstrap()
                                 val api = session.readApi as? ScrmPaymentApi
                                     ?: error("当前 SCRM 客户端不支持支付状态查询")
-                                api.getRedPacketDetail(
-                                    ScrmRedPacketQueryByMessageRequest(
-                                        deviceUuid = route.deviceUuid,
-                                        messageId = messageId
-                                    )
+                                val runner = PaymentTaskRunner(session.taskApi)
+                                val request = PaymentRequestFactory.redPacketQuery(
+                                    route = route,
+                                    serverMessageId = messageId,
+                                    msgSvrId = msgSvrId
+                                )
+                                val status = runner.submitAndAwait { api.getRedPacketStatus(request) }
+                                if (!status.completed) return@withContext status.toPaymentReadback()
+                                val detail = runner.submitAndAwait { api.getRedPacketDetail(request) }
+                                detail.toPaymentReadback(
+                                    detail = detail.data?.let(PaymentDetailParser::parseRedPacket)
                                 )
                             }
-                        }.onSuccess { result ->
-                            paymentReadback = result.data?.let(PaymentDetailParser::parseRedPacket)
-                                ?.let(PaymentReadback::fromDetail)
-                                ?: PaymentReadback.fromSubmission(result)
+                        }.onSuccess { readback ->
+                            paymentReadback = readback
                         }.onFailure { error ->
                             paymentReadback = PaymentReadback(
                                 state = PaymentReadbackState.FAILED,
@@ -1717,13 +2232,72 @@ internal fun FloatingChatOverlay(
                     }
                 }
             },
-            onClaimPayment = { _ ->
+            onClaimPayment = { message ->
+                val route = scrmFloatingAccountRouteForContactId(selectedAccount.id)
+                val messageId = message.remoteMessageId
+                val msgSvrId = message.remoteMessageServerId
+                if (route == null || messageId == null || messageId <= 0L || msgSvrId.isNullOrBlank()) {
+                    paymentReadback = PaymentReadback(
+                        state = PaymentReadbackState.FAILED,
+                        message = "缺少 SCRM 账号、messageId 或真实 msgSvrId，已阻止领取"
+                    )
+                    return@MessageInteractionOverlayHost
+                }
                 paymentReadback = PaymentReadback(
-                    state = PaymentReadbackState.UNKNOWN,
-                    message = "领取/收款为写接口，当前仅保留人工验收"
+                    state = PaymentReadbackState.PROCESSING,
+                    message = "正在提交领取任务并等待设备终态"
                 )
+                coroutineScope.launch {
+                    val intent = if (message.isTransferPaymentCard()) {
+                        "take-transfer:${route.deviceUuid}:${messageId}"
+                    } else {
+                        "take-lucky:${route.deviceUuid}:${messageId}"
+                    }
+                    val result = runCatching {
+                        withContext(Dispatchers.IO) {
+                            val session = ScrmSettingsManager(context.applicationContext)
+                                .loadSelectedSessionOrBootstrap()
+                            val api = session.readApi as? ScrmPaymentApi
+                                ?: error("当前 SCRM 客户端不支持领取支付任务")
+                            val key = paymentIdempotencyRegistry.keyFor(intent)
+                            val outcome = PaymentTaskRunner(session.taskApi).submitAndAwait {
+                                if (message.isTransferPaymentCard()) {
+                                    api.takeTransfer(
+                                        PaymentRequestFactory.takeTransfer(route, messageId, msgSvrId),
+                                        key
+                                    )
+                                } else {
+                                    api.takeLuckyMoney(
+                                        PaymentRequestFactory.takeLuckyMoney(route, messageId, msgSvrId),
+                                        key
+                                    )
+                                }
+                            }
+                            outcome
+                        }
+                    }
+                    result.onSuccess { outcome ->
+                        paymentReadback = outcome.toPaymentReadback()
+                        if (outcome.completed) {
+                            paymentIdempotencyRegistry.complete(intent)
+                            claimedPaymentMessageIds[message.id] = true
+                            paymentReadback = PaymentReadback(
+                                state = PaymentReadbackState.RECEIVED,
+                                taskId = outcome.taskId,
+                                message = outcome.message
+                            )
+                        }
+                    }.onFailure { error ->
+                        paymentReadback = PaymentReadback(
+                            state = PaymentReadbackState.FAILED,
+                            message = error.message ?: "领取支付任务失败"
+                        )
+                    }
+                }
             },
             onLongPressMessageChanged = { message -> longPressMessage = message },
+            onAsideAnalysisDismissed = { messageAsideAnalysisActions.dismiss() },
+            onTextZoomDismissed = { textZoomMessage = null },
             onStartForwardingMessages = startForwardingMessages,
             onStartCombinedForwardingMessages = { messages ->
                 if (messages.isNotEmpty()) {

@@ -25,6 +25,9 @@ import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AiVoiceEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AiVoicePanel
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AiVoiceState
 import com.paifa.ubikitouch.accessibility.floatingchat.contacts.ScrmContactsPanel
+import com.paifa.ubikitouch.accessibility.floatingchat.finder.FinderApi
+import com.paifa.ubikitouch.accessibility.floatingchat.finder.FinderSession
+import com.paifa.ubikitouch.accessibility.floatingchat.finder.FinderWorkspaceView
 import com.paifa.ubikitouch.accessibility.floatingchat.input.BottomGestureTouchClearanceDp
 import com.paifa.ubikitouch.accessibility.floatingchat.input.BottomEmojiPanelHeightDp
 import com.paifa.ubikitouch.accessibility.floatingchat.input.BottomInputBarMaxHeightDp
@@ -71,6 +74,11 @@ internal fun FloatingBottomPanel(
     scrmMomentsRoute: ScrmFloatingAccountRoute?,
     scrmMessageRoute: ScrmFloatingAccountRoute?,
     scrmMessageConversationId: String?,
+    finderSession: FinderSession?,
+    finderApi: FinderApi?,
+    finderConfigurationError: String?,
+    finderInitialSphUserName: String?,
+    finderUserPageRequestKey: Int,
     voicePermissionRequestToken: Int,
     locationPermissionRequestToken: Int,
     onClose: () -> Unit,
@@ -95,6 +103,8 @@ internal fun FloatingBottomPanel(
     aiPredicting: Boolean,
     aiConfigTesting: Boolean,
     transferRecipients: List<FloatingChatContact>,
+    paymentOperationStatus: String?,
+    paymentOperationInProgress: Boolean,
     onSaveAiConfig: (FloatingChatAiConfig) -> Unit,
     onTestAiConfig: (FloatingChatAiConfig) -> Unit,
     onSendQuickPhrase: (String) -> Unit,
@@ -113,8 +123,8 @@ internal fun FloatingBottomPanel(
     onForwardSelectedFavorites: () -> Unit,
     onDeleteSelectedFavorites: () -> Unit,
     onCancelFavoriteSelection: () -> Unit,
-    onSendRedPacket: (String, String) -> Unit,
-    onSendTransfer: (String, String, FloatingChatContact?) -> Unit,
+    onSendRedPacket: (String, String, String, Int) -> Unit,
+    onSendTransfer: (String, String, FloatingChatContact?, String) -> Unit,
     onSendLocation: (AppLocationOption) -> Unit,
     onSendAccountCard: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -132,6 +142,7 @@ internal fun FloatingBottomPanel(
         BottomPanelMode.QuickPhrase -> 0.78f
         BottomPanelMode.Card -> 0.82f
         BottomPanelMode.Moments -> 0.92f
+        BottomPanelMode.Finder -> 0.92f
         BottomPanelMode.MomentMaterials -> 0.92f
         BottomPanelMode.Contacts -> 0.92f
         BottomPanelMode.Favorite -> 0.86f
@@ -153,6 +164,7 @@ internal fun FloatingBottomPanel(
         BottomPanelMode.QuickPhrase -> 310.dp
         BottomPanelMode.Card -> 360.dp
         BottomPanelMode.Moments -> 520.dp
+        BottomPanelMode.Finder -> 520.dp
         BottomPanelMode.MomentMaterials -> 520.dp
         BottomPanelMode.Contacts -> 520.dp
         BottomPanelMode.Favorite -> 380.dp
@@ -233,6 +245,13 @@ internal fun FloatingBottomPanel(
                         remotePosts.forEach(onUpdateMomentPost)
                     }
                 )
+                BottomPanelMode.Finder -> FinderWorkspaceView(
+                    session = finderSession,
+                    api = finderApi,
+                    initialSphUserName = finderInitialSphUserName,
+                    userPageRequestKey = finderUserPageRequestKey,
+                    configurationError = finderConfigurationError
+                )
                 BottomPanelMode.MomentMaterials -> MomentMaterialsPanel(
                     route = scrmMomentsRoute,
                     onClose = onClose
@@ -263,7 +282,11 @@ internal fun FloatingBottomPanel(
                     confirmLabel = "塞钱进红包",
                     recipients = emptyList(),
                     scrmRoute = scrmMessageRoute,
-                    onConfirm = { amount, note, _ -> onSendRedPacket(amount, note) }
+                    operationStatus = paymentOperationStatus,
+                    operationInProgress = paymentOperationInProgress,
+                    onConfirm = { amount, note, _, paymentPassword, packetCount ->
+                        onSendRedPacket(amount, note, paymentPassword, packetCount)
+                    }
                 )
                 BottomPanelMode.Transfer -> PaymentComposerPanel(
                     title = "转账",
@@ -273,7 +296,11 @@ internal fun FloatingBottomPanel(
                     confirmLabel = "确认转账",
                     recipients = transferRecipients,
                     scrmRoute = scrmMessageRoute,
-                    onConfirm = onSendTransfer
+                    operationStatus = paymentOperationStatus,
+                    operationInProgress = paymentOperationInProgress,
+                    onConfirm = { amount, note, recipient, paymentPassword, _ ->
+                        onSendTransfer(amount, note, recipient, paymentPassword)
+                    }
                 )
                 BottomPanelMode.SplitBill -> SplitBillPanel(transferRecipients)
                 BottomPanelMode.Location -> LocationPickerPanel(

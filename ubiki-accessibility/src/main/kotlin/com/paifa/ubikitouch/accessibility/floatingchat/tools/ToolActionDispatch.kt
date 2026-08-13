@@ -22,6 +22,7 @@ internal fun toolActionDispatchFor(action: FloatingChatToolAction): ToolActionDi
         FloatingChatToolAction.Camera -> ToolActionDispatch.CaptureCameraMedia
         FloatingChatToolAction.QuickPhrase -> ToolActionDispatch.OpenBottomPanel(BottomPanelMode.QuickPhrase)
         FloatingChatToolAction.Moments -> ToolActionDispatch.OpenBottomPanel(BottomPanelMode.Moments)
+        FloatingChatToolAction.Finder -> ToolActionDispatch.OpenBottomPanel(BottomPanelMode.Finder)
         FloatingChatToolAction.MomentMaterials -> ToolActionDispatch.OpenBottomPanel(BottomPanelMode.MomentMaterials)
         FloatingChatToolAction.RedPacket -> ToolActionDispatch.OpenBottomPanel(BottomPanelMode.RedPacket)
         FloatingChatToolAction.Transfer -> ToolActionDispatch.OpenBottomPanel(BottomPanelMode.Transfer)

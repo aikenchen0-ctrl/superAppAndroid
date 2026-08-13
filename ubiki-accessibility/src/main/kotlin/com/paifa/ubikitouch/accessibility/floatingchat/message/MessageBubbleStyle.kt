@@ -1,5 +1,8 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.message
 
+import android.graphics.RenderEffect
+import android.graphics.Shader
+import android.os.Build
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -11,7 +14,11 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.isGroupThread
 import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.core.model.FloatingChatAccessState
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
@@ -219,3 +226,48 @@ internal fun aiDraftMessageUsesSolidBubbleBorder(message: FloatingChatMessage): 
 internal fun aiDraftBubbleDashedBorderColorArgb(): Int = OverlayTokens.aiDashedBorder.toArgb()
 
 internal fun messageBlockUsesNegativePadding(): Boolean = false
+
+internal fun usesDetailedMessageBubble(
+    homeOverviewVisible: Boolean,
+    selectedThread: ChatThreadSelection
+): Boolean = homeOverviewVisible || selectedThread.isGroupThread()
+
+internal fun detailedBubbleSenderNameSizeSp(messageContentSizeSp: Float): Float =
+    messageContentSizeSp * 0.5f
+
+internal fun detailedBubbleSenderNameTopOffsetDp(): Float = -6f
+
+internal fun detailedBubbleSenderNameBadgeHeightDp(): Float = 12f
+
+internal fun detailedBubbleSenderNameBlurRadiusPx(): Float = 18f
+
+internal fun shouldShowDetailedBubbleSenderName(
+    detailedBubble: Boolean,
+    presentation: FloatingChatMessagePresentation
+): Boolean = detailedBubble && messageUsesBubbleChrome(presentation)
+
+internal fun detailedBubbleTextUsesShadow(): Boolean {
+    return OverlayTokens.imModuleTextShadow.color.alpha > 0f
+}
+
+internal fun messageContentTextSizeSp(message: FloatingChatMessage): Float {
+    return when (message.type) {
+        FloatingChatMessageType.Text,
+        FloatingChatMessageType.Quote -> 14f
+        FloatingChatMessageType.MixedText -> 11f
+        else -> 12f
+    }
+}
+
+internal fun Modifier.detailedBubbleSenderNameBlur(): Modifier {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return this
+    val effect = RenderEffect.createBlurEffect(
+        detailedBubbleSenderNameBlurRadiusPx(),
+        detailedBubbleSenderNameBlurRadiusPx(),
+        Shader.TileMode.CLAMP
+    ).asComposeRenderEffect()
+    return graphicsLayer {
+        renderEffect = effect
+        alpha = 0.84f
+    }
+}

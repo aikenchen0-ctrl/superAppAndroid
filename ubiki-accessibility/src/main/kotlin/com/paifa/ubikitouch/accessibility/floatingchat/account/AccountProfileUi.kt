@@ -409,20 +409,24 @@ internal fun AccountCardPreviewContent(
                 maxLines = 1,
                 shadow = OverlayTokens.imModuleTextShadow
             )
-            TextLabel(
-                text = subtitle,
-                size = 10.sp,
-                color = OverlayTokens.cardSecondaryText,
-                maxLines = 1,
-                shadow = OverlayTokens.imModuleTextShadow
-            )
-            TextLabel(
-                text = detail,
-                size = 9.sp,
-                color = OverlayTokens.cardSecondaryText,
-                maxLines = 1,
-                shadow = OverlayTokens.imModuleTextShadow
-            )
+            subtitle.takeIf { it.isNotBlank() }?.let { subtitleText ->
+                TextLabel(
+                    text = subtitleText,
+                    size = 10.sp,
+                    color = OverlayTokens.cardSecondaryText,
+                    maxLines = 1,
+                    shadow = OverlayTokens.imModuleTextShadow
+                )
+            }
+            detail.takeIf { it.isNotBlank() }?.let { detailText ->
+                TextLabel(
+                    text = detailText,
+                    size = 9.sp,
+                    color = OverlayTokens.cardSecondaryText,
+                    maxLines = 1,
+                    shadow = OverlayTokens.imModuleTextShadow
+                )
+            }
         }
     }
 }

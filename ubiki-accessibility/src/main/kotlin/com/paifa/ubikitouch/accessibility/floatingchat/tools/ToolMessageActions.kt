@@ -23,7 +23,9 @@ internal class ToolMessageActions(
     private val onPendingAvatarAccountIdChanged: (String?) -> Unit,
     private val onBottomPanelModeChanged: (BottomPanelMode) -> Unit,
     private val onAssistantPanelOpened: () -> Unit,
-    private val onAiVoicePanelOpened: () -> Unit
+    private val onAiVoicePanelOpened: () -> Unit,
+    private val onTransferRequested: () -> Unit,
+    private val onRedPacketRequested: () -> Unit
 ) {
     fun pickAccountAvatar(accountId: String) {
         onPendingAvatarAccountIdChanged(accountId)
@@ -61,6 +63,14 @@ internal class ToolMessageActions(
     }
 
     fun sendToolMessage(action: FloatingChatToolAction) {
+        if (action == FloatingChatToolAction.Transfer) {
+            onTransferRequested()
+            return
+        }
+        if (action == FloatingChatToolAction.RedPacket) {
+            onRedPacketRequested()
+            return
+        }
         when (val dispatch = toolActionDispatchFor(action)) {
             ToolActionDispatch.PickGalleryMedia -> {
                 onBottomPanelModeChanged(BottomPanelMode.None)

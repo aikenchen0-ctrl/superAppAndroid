@@ -48,13 +48,77 @@ internal fun messageUnavailableStateFor(message: FloatingChatMessage): MessageUn
     ) {
         return MessageUnavailableState.MediaExpired
     }
-    if (message.text.isBlank() &&
-        message.detail.isNullOrBlank() &&
-        message.resourceUrl.isNullOrBlank()
-    ) {
+    if (!message.hasDisplayableContent()) {
         return MessageUnavailableState.ContentUnavailable
     }
     return null
+}
+
+/**
+ * Remote messages do not always put their visible value in `text`. Cards can
+ * legitimately contain only structured fields such as a location title,
+ * quoted text, or a file name, so those fields must participate in the
+ * availability decision before the generic placeholder is shown.
+ */
+private fun FloatingChatMessage.hasDisplayableContent(): Boolean {
+    if (listOfNotNull(
+            text,
+            detail,
+            quoteAuthor,
+            quoteText,
+            cardName,
+            cardSubtitle,
+            appName,
+            locationTitle,
+            locationAddress,
+            resourceUrl,
+            fileName,
+            fileSizeLabel,
+            thumbnailUrl
+        ).any { it.isNotBlank() }
+    ) {
+        return true
+    }
+    if (filePreviewLines.any(String::isNotBlank) || inlineTokens.isNotEmpty() || mediaDurationMs != null) {
+        return true
+    }
+
+    // These cards have an explicit type title and useful empty-state copy.
+    // They remain renderable even when the backend omits optional payload text.
+    return when (type) {
+        FloatingChatMessageType.Emoji,
+        FloatingChatMessageType.StickerGif,
+        FloatingChatMessageType.MiniProgramLink,
+        FloatingChatMessageType.WebLink,
+        FloatingChatMessageType.Article,
+        FloatingChatMessageType.ChannelsLive,
+        FloatingChatMessageType.Music,
+        FloatingChatMessageType.Favorite,
+        FloatingChatMessageType.RedPacket,
+        FloatingChatMessageType.Transfer,
+        FloatingChatMessageType.SplitBill,
+        FloatingChatMessageType.Coupon,
+        FloatingChatMessageType.VoiceCall,
+        FloatingChatMessageType.VideoCall,
+        FloatingChatMessageType.ChatHistory,
+        FloatingChatMessageType.Relay,
+        FloatingChatMessageType.GroupNotice -> true
+        FloatingChatMessageType.Location,
+        FloatingChatMessageType.LiveLocation,
+        FloatingChatMessageType.InlineLocation,
+        FloatingChatMessageType.ContactLink,
+        FloatingChatMessageType.GroupInvite,
+        FloatingChatMessageType.InlineContact,
+        FloatingChatMessageType.FilePreview,
+        FloatingChatMessageType.Voice,
+        FloatingChatMessageType.ImageThumbnail,
+        FloatingChatMessageType.CapturedPhoto,
+        FloatingChatMessageType.VideoPreview,
+        FloatingChatMessageType.ChannelsVideo,
+        FloatingChatMessageType.Text,
+        FloatingChatMessageType.MixedText,
+        FloatingChatMessageType.Quote -> false
+    }
 }
 
 internal fun messageDisplayGroupUsesBubbleChrome(group: MessageDisplayGroup): Boolean {
@@ -63,5 +127,7 @@ internal fun messageDisplayGroupUsesBubbleChrome(group: MessageDisplayGroup): Bo
 
 private fun FloatingChatMessageType.isMediaMessage(): Boolean {
     return this == FloatingChatMessageType.ImageThumbnail ||
-        this == FloatingChatMessageType.VideoPreview
+        this == FloatingChatMessageType.CapturedPhoto ||
+        this == FloatingChatMessageType.VideoPreview ||
+        this == FloatingChatMessageType.ChannelsVideo
 }

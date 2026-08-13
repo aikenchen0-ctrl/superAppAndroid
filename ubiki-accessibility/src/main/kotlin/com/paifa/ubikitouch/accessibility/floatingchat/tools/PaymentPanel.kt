@@ -28,7 +28,9 @@ import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactSummary
 import com.paifa.ubikitouch.accessibility.scrm.ScrmFloatingAccountRoute
 import com.paifa.ubikitouch.accessibility.scrm.ScrmPaymentApi
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSettingsManager
-import com.paifa.ubikitouch.accessibility.scrm.ScrmWalletBalanceRequest
+import com.paifa.ubikitouch.accessibility.scrm.PaymentRequestFactory
+import com.paifa.ubikitouch.accessibility.scrm.PaymentTaskRunner
+import com.paifa.ubikitouch.accessibility.scrm.PaymentTaskState
 import com.paifa.ubikitouch.accessibility.scrm.WalletBalanceParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -75,7 +77,15 @@ internal fun PaymentPanel(
             }
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            TextLabel(state.confirmLabel, 12.sp, color = Color(0xFF49679E), modifier = Modifier.clickable { onEvent(PaymentUiEvent.ConfirmRequested(amount.trim(), note.trim(), recipientId)) }, maxLines = 1)
+            TextLabel(
+                state.confirmLabel,
+                12.sp,
+                color = Color(0xFF49679E),
+                modifier = Modifier.clickable {
+                    onEvent(PaymentUiEvent.ConfirmRequested(amount.trim(), note.trim(), recipientId, packetCount))
+                },
+                maxLines = 1
+            )
         }
     }
 }
@@ -103,7 +113,9 @@ internal fun PaymentComposerPanel(
     confirmLabel: String,
     recipients: List<FloatingChatContact> = emptyList(),
     scrmRoute: ScrmFloatingAccountRoute? = null,
-    onConfirm: (String, String, FloatingChatContact?) -> Unit
+    operationStatus: String? = null,
+    operationInProgress: Boolean = false,
+    onConfirm: (String, String, FloatingChatContact?, String, Int) -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -111,6 +123,7 @@ internal fun PaymentComposerPanel(
     var draftAmount by remember(title) { mutableStateOf("") }
     var draftNote by remember(title) { mutableStateOf(defaultNote) }
     var draftRecipient by remember(title) { mutableStateOf<FloatingChatContact?>(null) }
+    var draftPacketCount by remember(title) { mutableStateOf(1) }
     var walletStatus by remember(title, scrmRoute) { mutableStateOf("零钱 未查询") }
     var walletLoading by remember(title, scrmRoute) { mutableStateOf(false) }
     if (confirming) {
@@ -121,6 +134,8 @@ internal fun PaymentComposerPanel(
             recipient = draftRecipient,
             walletStatus = walletStatus,
             walletLoading = walletLoading,
+            operationStatus = operationStatus,
+            operationInProgress = operationInProgress,
             onQueryWallet = {
                 val route = scrmRoute
                 if (route == null) {
@@ -135,18 +150,19 @@ internal fun PaymentComposerPanel(
                                     .loadSelectedSessionOrBootstrap()
                                 val api = session.readApi as? ScrmPaymentApi
                                     ?: error("当前 SCRM 客户端不支持零钱查询")
-                                api.getWalletBalance(
-                                    ScrmWalletBalanceRequest(
-                                        deviceUuid = route.deviceUuid,
-                                        weChatId = route.weChatId,
-                                        flag = 0
-                                    )
-                                )
+                                PaymentTaskRunner(session.taskApi).submitAndAwait {
+                                    api.getWalletBalance(PaymentRequestFactory.walletBalance(route))
+                                }
                             }
-                        }.onSuccess { result ->
-                            val balance = result.data?.let(WalletBalanceParser::parse)
+                        }.onSuccess { outcome ->
+                            val balance = outcome.data?.let(WalletBalanceParser::parse)
                             walletStatus = balance?.fen?.let { "零钱 ${balance.displayText}" }
-                                ?: "零钱任务处理中 · #${result.taskId}"
+                                ?: when (outcome.state) {
+                                    PaymentTaskState.PROCESSING -> "零钱任务处理中 · #${outcome.taskId}"
+                                    PaymentTaskState.FAILED -> "零钱查询失败：${outcome.message}"
+                                    PaymentTaskState.UNKNOWN -> "零钱状态待人工核对 · #${outcome.taskId}"
+                                    PaymentTaskState.SUCCESS -> "零钱结果未包含余额 · #${outcome.taskId}"
+                                }
                         }.onFailure { error ->
                             walletStatus = "零钱查询失败：${error.message ?: "未知错误"}"
                         }
@@ -155,7 +171,9 @@ internal fun PaymentComposerPanel(
                 }
             },
             onBack = { confirming = false },
-            onConfirm = { onConfirm(draftAmount, draftNote, draftRecipient) }
+            onConfirm = { paymentPassword ->
+                onConfirm(draftAmount, draftNote, draftRecipient, paymentPassword, draftPacketCount)
+            }
         )
         return
     }
@@ -173,6 +191,7 @@ internal fun PaymentComposerPanel(
                 draftAmount = event.amount
                 draftNote = event.note
                 draftRecipient = recipients.firstOrNull { it.id == event.recipientId }
+                draftPacketCount = event.packetCount
                 confirming = event.amount.isNotBlank()
             }
         }
@@ -188,11 +207,12 @@ private fun PaymentConfirmationPanel(
     recipient: FloatingChatContact?,
     walletStatus: String,
     walletLoading: Boolean,
+    operationStatus: String?,
+    operationInProgress: Boolean,
     onQueryWallet: () -> Unit,
     onBack: () -> Unit,
-    onConfirm: () -> Unit
+    onConfirm: (String) -> Unit
 ) {
-    var paymentMethod by remember { mutableStateOf("零钱") }
     var password by remember { mutableStateOf("") }
     Column(
         modifier = Modifier.fillMaxWidth().background(PanelBackground).padding(16.dp),
@@ -209,16 +229,13 @@ private fun PaymentConfirmationPanel(
             modifier = Modifier.clickable(enabled = !walletLoading, onClick = onQueryWallet),
             maxLines = 1
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            listOf("零钱", "银行卡", "经营账户").forEach { method ->
-                TextLabel(
-                    method,
-                    12.sp,
-                    color = if (method == paymentMethod) Color(0xFF1AAD19) else SecondaryText,
-                    modifier = Modifier.clickable { paymentMethod = method },
-                    maxLines = 1
-                )
-            }
+        operationStatus?.takeIf { it.isNotBlank() }?.let { status ->
+            TextLabel(
+                status,
+                12.sp,
+                color = if (operationInProgress) Color(0xFF49679E) else SecondaryText,
+                maxLines = 3
+            )
         }
         BasicTextField(
             value = password,
@@ -234,10 +251,13 @@ private fun PaymentConfirmationPanel(
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             TextLabel("返回", 12.sp, color = SecondaryText, modifier = Modifier.clickable(onClick = onBack), maxLines = 1)
             TextLabel(
-                "确认并生成请求",
+                if (operationInProgress) "任务处理中..." else "确认并提交",
                 12.sp,
-                color = if (password.length == 6) Color(0xFF1AAD19) else SecondaryText,
-                modifier = Modifier.padding(start = 18.dp).clickable(enabled = password.length == 6, onClick = onConfirm),
+                color = if (password.length == 6 && !operationInProgress) Color(0xFF1AAD19) else SecondaryText,
+                modifier = Modifier.padding(start = 18.dp).clickable(
+                    enabled = password.length == 6 && !operationInProgress,
+                    onClick = { onConfirm(password) }
+                ),
                 maxLines = 1
             )
         }

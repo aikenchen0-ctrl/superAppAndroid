@@ -41,6 +41,14 @@
         <activity android:name=".EdgeStyleSettingsActivity" android:exported="false" />
         <activity android:name=".EdgeFunctionSettingsActivity" android:exported="false" />
         <activity android:name=".GlobalControlsActivity" android:exported="false" />
+        <activity android:name=".TransferFlowActivity" android:excludeFromRecents="true" android:exported="false" android:taskAffinity="com.paifa.ubikitouch.floatingchat" android:theme="@style/Theme.UbikiTouch" />
+        <activity android:name=".RedPacketActivity" android:excludeFromRecents="true" android:exported="false" android:taskAffinity="com.paifa.ubikitouch.floatingchat" android:theme="@style/Theme.UbikiTouch" />
+        <activity
+            android:name=".CouponWalletActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity="com.paifa.ubikitouch.floatingchat"
+            android:theme="@style/Theme.UbikiTouch" />
 
         <activity
             android:name=".MainActivity"

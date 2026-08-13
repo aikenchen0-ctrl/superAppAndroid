@@ -39,6 +39,7 @@ internal fun toolActionLabel(action: FloatingChatToolAction): String {
         FloatingChatToolAction.Files -> "\u6587\u6863"
         FloatingChatToolAction.Card -> "\u63a8\u540d\u7247"
         FloatingChatToolAction.Moments -> "\u670b\u53cb\u5708"
+        FloatingChatToolAction.Finder -> "\u89c6\u9891\u53f7"
         FloatingChatToolAction.MomentMaterials -> "\u670b\u53cb\u5708\u7d20\u6750"
         FloatingChatToolAction.QuickPhrase -> "\u5feb\u6377\u8bed"
         FloatingChatToolAction.Voice -> "\u8bed\u97f3"
@@ -66,6 +67,7 @@ internal fun rightRailWorkflowLabel(action: FloatingChatToolAction): String {
         FloatingChatToolAction.Reminder -> "择机熟络"
         FloatingChatToolAction.QuickPhrase -> "请身帮腔"
         FloatingChatToolAction.MomentMaterials -> "人脉管理"
+        FloatingChatToolAction.Finder -> "视频号"
         FloatingChatToolAction.Wallet -> "快捷回复"
         FloatingChatToolAction.Share -> "群发计划"
         FloatingChatToolAction.Pin -> "记忆编辑"
@@ -94,6 +96,7 @@ internal fun toolActionIcon(action: FloatingChatToolAction): ImageVector {
         FloatingChatToolAction.Files -> Icons.Filled.Article
         FloatingChatToolAction.Card -> Icons.Filled.CreditCard
         FloatingChatToolAction.Moments -> Icons.Filled.VideoLibrary
+        FloatingChatToolAction.Finder -> Icons.Filled.VideoLibrary
         FloatingChatToolAction.MomentMaterials -> Icons.Filled.Collections
         FloatingChatToolAction.QuickPhrase -> Icons.Filled.Textsms
         FloatingChatToolAction.Voice -> Icons.Filled.Mic

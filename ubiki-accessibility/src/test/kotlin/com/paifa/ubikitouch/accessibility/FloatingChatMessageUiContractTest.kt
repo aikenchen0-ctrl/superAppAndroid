@@ -3612,24 +3612,24 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
-    fun messageLongPressMenuMatchesWechatWithoutSearchOrListen() {
+    fun messageLongPressMenuMatchesTheEightActionProductSpecification() {
         assertEquals(
             listOf(
+                MessageLongPressAction.Listen,
                 MessageLongPressAction.Copy,
                 MessageLongPressAction.Forward,
                 MessageLongPressAction.Favorite,
-                MessageLongPressAction.Delete,
                 MessageLongPressAction.MultiSelect,
                 MessageLongPressAction.Quote,
-                MessageLongPressAction.Reminder
+                MessageLongPressAction.Zoom,
+                MessageLongPressAction.Delete
             ),
             messageLongPressPrimaryActions()
         )
         assertEquals(true, messageLongPressUsesWechatFloatingPanel())
         assertEquals(true, messageLongPressSupportsInternalForwarding())
-        assertEquals(true, messageLongPressReminderUsesUiStateOnly())
         assertEquals(false, messageLongPressIncludesSearch())
-        assertEquals(false, messageLongPressIncludesListenFromHere())
+        assertEquals(true, messageLongPressIncludesAsideAnalysis())
         assertEquals(true, messageLongPressSupportsMultiSelectMode())
         assertEquals(true, messageLongPressQuoteShowsComposerPreview())
         assertEquals(true, messageLongPressMenuAnchorsToMessageBounds())

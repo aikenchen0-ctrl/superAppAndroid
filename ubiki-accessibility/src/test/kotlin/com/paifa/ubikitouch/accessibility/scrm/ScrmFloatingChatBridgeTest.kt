@@ -9,9 +9,57 @@ import com.paifa.ubikitouch.accessibility.floatingchat.media.normalizedRemoteIma
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ScrmFloatingChatBridgeTest {
+    @Test
+    fun floatingChatMapsFinderAppMessagesAndTrustedUsernameMetadata() {
+        val conversation = scrmFloatingChatConversation(
+            base = FloatingChatPrototype.sampleConversation(),
+            contacts = emptyList(),
+            accountConversations = listOf(
+                ScrmFloatingAccountConversation(
+                    deviceUuid = "device-1",
+                    weChatId = "wxid_account",
+                    contacts = emptyList(),
+                    messagesByConversation = mapOf(
+                        "wxid_friend" to listOf(
+                            ScrmChatMessage(
+                                messageId = 1,
+                                messageType = 754974769,
+                                content = "{\"sphUserName\":\"sph_video\"}"
+                            ),
+                            ScrmChatMessage(
+                                messageId = 2,
+                                messageType = 973078577,
+                                content = "{\"title\":\"直播\"}",
+                                extensions = listOf(ScrmChatExtension("sphUserName", "sph_live"))
+                            ),
+                            ScrmChatMessage(
+                                messageId = 3,
+                                messageType = 754974769,
+                                content = "{\"title\":\"sph_not_metadata\"}"
+                            )
+                        )
+                    )
+                )
+            ),
+            accounts = listOf(ScrmWechatAccount("wxid_account", "Account", "device-1")),
+            devices = listOf(device("device-1", "wxid_account", online = true)),
+            selectedDeviceUuid = "device-1",
+            selectedWeChatId = "wxid_account"
+        )
+
+        assertEquals(
+            listOf("ChannelsVideo", "ChannelsLive", "ChannelsVideo"),
+            conversation.messages.map { it.type.name }
+        )
+        assertEquals("sph_video", conversation.messages[0].finderUserName)
+        assertEquals("sph_live", conversation.messages[1].finderUserName)
+        assertNull(conversation.messages[2].finderUserName)
+    }
+
     @Test
     fun floatingChatPreservesRemoteMessageTypesInsteadOfDowngradingThemToText() {
         val conversation = scrmFloatingChatConversation(
@@ -44,6 +92,69 @@ class ScrmFloatingChatBridgeTest {
             conversation.messages.map { it.type.name }
         )
         assertEquals(listOf("[图片]", "[语音]", "[表情]", "[位置]", "[语音通话]"), conversation.messages.map { it.text })
+    }
+
+    @Test
+    fun floatingChatExtractsStickerThumbForChatRenderingButKeepsPreviewTextAsPlaceholder() {
+        val thumb = "http://vweixinf.tc.qq.com/sticker/thumb.png"
+        val conversation = scrmFloatingChatConversation(
+            base = FloatingChatPrototype.sampleConversation(),
+            contacts = emptyList(),
+            accountConversations = listOf(
+                ScrmFloatingAccountConversation(
+                    deviceUuid = "device-1",
+                    weChatId = "wxid_account",
+                    contacts = emptyList(),
+                    messagesByConversation = mapOf(
+                        "wxid_friend" to listOf(
+                            ScrmChatMessage(
+                                messageId = 7,
+                                messageType = 47,
+                                content = "{\"Md5\":\"abc\",\"Thumb\":\"$thumb\",\"Size\":23770}"
+                            )
+                        )
+                    )
+                )
+            ),
+            accounts = listOf(ScrmWechatAccount("wxid_account", "Account", "device-1")),
+            devices = listOf(device("device-1", "wxid_account", online = true)),
+            selectedDeviceUuid = "device-1",
+            selectedWeChatId = "wxid_account"
+        )
+
+        assertEquals("[表情]", conversation.messages.single().text)
+        assertEquals(thumb, conversation.messages.single().thumbnailUrl)
+    }
+
+    @Test
+    fun floatingChatIgnoresJsonArraysWhileExtractingStickerThumb() {
+        val thumb = "http://vweixinf.tc.qq.com/sticker/thumb-array-safe.png"
+        val conversation = scrmFloatingChatConversation(
+            base = FloatingChatPrototype.sampleConversation(),
+            contacts = emptyList(),
+            accountConversations = listOf(
+                ScrmFloatingAccountConversation(
+                    deviceUuid = "device-1",
+                    weChatId = "wxid_account",
+                    contacts = emptyList(),
+                    messagesByConversation = mapOf(
+                        "wxid_friend" to listOf(
+                            ScrmChatMessage(
+                                messageId = 8,
+                                messageType = 47,
+                                content = "{\"emoticonMd5\":\"abc\",\"items\":[1,2,3],\"Thumb\":\"$thumb\"}"
+                            )
+                        )
+                    )
+                )
+            ),
+            accounts = listOf(ScrmWechatAccount("wxid_account", "Account", "device-1")),
+            devices = listOf(device("device-1", "wxid_account", online = true)),
+            selectedDeviceUuid = "device-1",
+            selectedWeChatId = "wxid_account"
+        )
+
+        assertEquals(thumb, conversation.messages.single().thumbnailUrl)
     }
 
     @Test

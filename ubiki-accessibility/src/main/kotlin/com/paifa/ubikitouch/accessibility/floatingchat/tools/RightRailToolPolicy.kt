@@ -29,6 +29,7 @@ internal fun rightRailScrollableToolActions(
         FloatingChatToolAction.Reminder,
         FloatingChatToolAction.QuickPhrase,
         FloatingChatToolAction.MomentMaterials,
+        FloatingChatToolAction.Finder,
         FloatingChatToolAction.Wallet,
         FloatingChatToolAction.Share,
         FloatingChatToolAction.Pin,

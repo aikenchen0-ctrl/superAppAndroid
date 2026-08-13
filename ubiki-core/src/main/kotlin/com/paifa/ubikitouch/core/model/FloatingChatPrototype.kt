@@ -70,12 +70,15 @@ data class FloatingChatMessage(
     val mediaDurationMs: Int? = null,
     val mediaMimeType: String? = null,
     val inlineTokens: List<FloatingChatInlineToken> = emptyList(),
+    /** SCRM chat-message primary key. It is distinct from the WeChat msgSvrId below. */
+    val remoteMessageId: Long? = null,
     val remoteMessageServerId: String? = null,
     val remoteTaskId: Long? = null,
     val sendState: FloatingChatSendState = FloatingChatSendState.LocalOnly,
     val sendErrorCode: String? = null,
     val sendErrorMessage: String? = null,
-    val clientRequestId: String? = null
+    val clientRequestId: String? = null,
+    val finderUserName: String? = null
 )
 
 enum class FloatingChatSendState {
@@ -213,6 +216,7 @@ enum class FloatingChatToolAction {
     RedPacket,
     Transfer,
     Moments,
+    Finder,
     MomentMaterials,
     QuickPhrase,
     Search,

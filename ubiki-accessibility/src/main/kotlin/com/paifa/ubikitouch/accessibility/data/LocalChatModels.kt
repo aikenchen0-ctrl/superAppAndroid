@@ -47,6 +47,7 @@ internal data class LocalChatMessage(
     val mediaMimeType: String? = null,
     val inlineTokens: String? = null,
     val metadataJson: String? = null,
+    val remoteMessageId: Long? = null,
     val remoteMessageServerId: String? = null,
     val remoteTaskId: Long? = null,
     val sendState: String = "LOCAL_ONLY",

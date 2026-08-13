@@ -184,13 +184,12 @@ class ChatExtractionContractTest {
         assertTrue("Missing extracted chat navigation actions", actions.isFile)
 
         val text = actions.readText()
+        assertTrue(text.contains("package com.paifa.ubikitouch.accessibility.floatingchat.chat"))
         assertTrue(text.contains("class ChatNavigationActions("))
-        assertTrue(text.contains("fun openChatThread("))
-        assertTrue(text.contains("fun openHomeUnread("))
-        assertTrue(text.contains("unreadThreadIds.remove(thread.toLocalThreadId())"))
         assertFalse(text.contains("import androidx.compose."))
 
         val legacy = sourceFile("FloatingChatOverlayUi.kt").readText()
+        assertFalse(legacy.contains("class ChatNavigationActions("))
         assertFalse(legacy.contains("fun openChatThread("))
         assertFalse(legacy.contains("fun openHomeUnread("))
     }

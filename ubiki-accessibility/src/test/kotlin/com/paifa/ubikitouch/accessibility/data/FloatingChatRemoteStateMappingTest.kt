@@ -18,6 +18,7 @@ class FloatingChatRemoteStateMappingTest {
             senderName = "Tester",
             time = "10:00",
             remoteMessageServerId = "server-message-1",
+            remoteMessageId = 71L,
             remoteTaskId = 42L,
             sendState = FloatingChatSendState.Processing,
             sendErrorCode = "WAITING",
@@ -32,10 +33,12 @@ class FloatingChatRemoteStateMappingTest {
         val restored = local.toFloatingChatMessage()
 
         assertEquals("server-message-1", local.remoteMessageServerId)
+        assertEquals(71L, local.remoteMessageId)
         assertEquals(42L, local.remoteTaskId)
         assertEquals("PROCESSING", local.sendState)
         assertEquals("request-1", local.clientRequestId)
         assertEquals(message.remoteMessageServerId, restored.remoteMessageServerId)
+        assertEquals(message.remoteMessageId, restored.remoteMessageId)
         assertEquals(message.remoteTaskId, restored.remoteTaskId)
         assertEquals(message.sendState, restored.sendState)
         assertEquals(message.sendErrorCode, restored.sendErrorCode)
@@ -56,6 +59,7 @@ class FloatingChatRemoteStateMappingTest {
 
         assertEquals(FloatingChatSendState.LocalOnly, message.sendState)
         assertNull(message.remoteMessageServerId)
+        assertNull(message.remoteMessageId)
         assertNull(message.remoteTaskId)
         assertNull(message.clientRequestId)
     }

@@ -1,5 +1,6 @@
 package com.paifa.ubikitouch.accessibility.scrm
 
+import android.util.Log
 import com.paifa.ubikitouch.accessibility.floatingchat.media.normalizedRemoteImageUri
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatConversation
@@ -9,7 +10,9 @@ import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 import com.paifa.ubikitouch.core.model.FloatingChatMessagePresentation
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import java.net.URLDecoder
@@ -23,6 +26,8 @@ private const val ScrmGroupAvatarMemberLimit = 9
 private const val ScrmChatRoomMemberOwnerRole = 1
 private const val ScrmChatRoomMemberAdminRole = 2
 private val ScrmMessageJson = Json { isLenient = true; ignoreUnknownKeys = true }
+private const val ScrmFinderVideoMessageType = 754974769
+private val ScrmFinderLiveMessageTypes = setOf(973078577, 975175729)
 
 private val ScrmAvatarPalette = longArrayOf(
     0xFFFFB4AB,
@@ -197,7 +202,16 @@ private fun scrmFloatingHistoryMessages(
                     ?: message.localMessageId
                     ?: return@mapNotNull null
                 val fromMe = message.direction == 1 || message.senderWxid == account.weChatId
-                scrmFloatingMappedMessage(
+                Log.i(
+                    "UbikiChatData",
+                    "stage=raw_message " +
+                        "accountNickname=${account.weChatId} accountWeChatId=${account.weChatId} " +
+                        "conversationWeChatId=$conversationWxid senderWeChatId=${message.senderWxid.orEmpty()} " +
+                        "messageId=${message.messageId} messageServerId=${message.messageServerId} " +
+                        "direction=${message.direction} messageType=${message.messageType} " +
+                        "content=${message.content}"
+                )
+                val mapped = scrmFloatingMappedMessage(
                     remote = message,
                     id = "scrm-message:$accountId:$remoteId",
                     fromMe = fromMe,
@@ -207,6 +221,17 @@ private fun scrmFloatingHistoryMessages(
                     connectionTargetId = threadId,
                     threadContactId = threadId
                 )
+                Log.i(
+                    "UbikiChatData",
+                    "stage=mapped_message " +
+                        "accountNickname=${account.weChatId} accountWeChatId=${account.weChatId} " +
+                        "conversationWeChatId=$conversationWxid senderWeChatId=${message.senderWxid.orEmpty()} " +
+                        "messageId=${message.messageId} sourceMessageType=${message.messageType} " +
+                        "mappedType=${mapped.type} presentation=${mapped.presentation} " +
+                        "fromMe=${mapped.fromMe} text=${mapped.text} detail=${mapped.detail.orEmpty()} " +
+                        "resourceUrl=${mapped.resourceUrl.orEmpty()} thumbnailUrl=${mapped.thumbnailUrl.orEmpty()}"
+                )
+                mapped
             }
         }
     }
@@ -225,6 +250,11 @@ private fun scrmFloatingMappedMessage(
     val type = scrmFloatingMessageType(remote.messageType, remote.content)
     val text = scrmFloatingMessageText(type, remote.content)
     val system = remote.messageType == 10000 || remote.messageType == 10002
+    val mediaUrl = remote.media.firstOrNull()?.resolvedUrl
+        ?: remote.extensions.firstNotNullOfOrNull { extension ->
+            extension.value.takeIf { extension.key.lowercase() in ScrmMediaUrlKeys && it.isNotBlank() }
+        }
+    val thumbnailUrl = mediaUrl ?: scrmFloatingMessageThumbnailUrl(remote.content)
     return FloatingChatMessage(
         id = id,
         type = type,
@@ -237,14 +267,13 @@ private fun scrmFloatingMappedMessage(
         connectionTargetId = connectionTargetId,
         threadContactId = threadContactId,
         detail = scrmFloatingMessageDetail(type, remote.content, remote.voiceText),
-        resourceUrl = remote.media.firstOrNull()?.resolvedUrl
-            ?: remote.extensions.firstNotNullOfOrNull { extension ->
-                extension.value.takeIf { extension.key.lowercase() in ScrmMediaUrlKeys && it.isNotBlank() }
-            }
-            ?: scrmFloatingMessageUrl(remote.content),
+        resourceUrl = mediaUrl ?: scrmFloatingMessageUrl(remote.content),
+        thumbnailUrl = thumbnailUrl,
         fileName = remote.media.firstOrNull()?.fileExtension?.takeIf { it.isNotBlank() },
         fileSizeLabel = remote.media.firstOrNull()?.fileSize?.takeIf { it > 0L }?.let(::scrmFormatFileSize),
-        remoteMessageServerId = remote.messageServerId?.toString()
+        remoteMessageId = remote.messageId.takeIf { it > 0L },
+        remoteMessageServerId = remote.messageServerId?.toString(),
+        finderUserName = scrmFinderUserName(remote.content, remote.extensions)
     )
 }
 
@@ -252,6 +281,9 @@ private fun scrmFloatingMappedMessage(
 private fun scrmFloatingMessageType(messageType: Int, content: String): FloatingChatMessageType {
     val lower = content.lowercase()
     return when (messageType) {
+        // Full WeChat outer types are required. Do not infer Finder messages from appmsg internals.
+        ScrmFinderVideoMessageType -> FloatingChatMessageType.ChannelsVideo
+        in ScrmFinderLiveMessageTypes -> FloatingChatMessageType.ChannelsLive
         1 -> FloatingChatMessageType.Text
         3 -> FloatingChatMessageType.ImageThumbnail
         34 -> FloatingChatMessageType.Voice
@@ -315,6 +347,7 @@ private fun scrmFloatingMessageDetail(
 }
 
 private val ScrmMediaUrlKeys = setOf("url", "mediaurl", "downloadurl", "fileurl", "imageurl", "videourl", "voiceurl", "path")
+private val ScrmStickerThumbnailKeys = setOf("thumb", "thumbnail", "thumbnailurl", "thumburl")
 
 private fun scrmFormatFileSize(size: Long): String {
     return when {
@@ -344,6 +377,35 @@ private fun JsonElement.scrmTextValue(): String? {
     return null
 }
 
+private fun scrmFinderUserName(content: String, extensions: List<ScrmChatExtension>): String? {
+    extensions.firstNotNullOfOrNull { extension ->
+        extension.value.trim().takeIf {
+            extension.key.equals("sphUserName", ignoreCase = true) && it.isNotEmpty()
+        }
+    }?.let { return it }
+
+    val start = content.indexOfFirst { it == '{' || it == '[' }
+    val jsonUserName = if (start >= 0) {
+        runCatching { ScrmMessageJson.parseToJsonElement(content.substring(start)) }.getOrNull()
+            ?.scrmFinderUserNameValue()
+    } else {
+        null
+    }
+    return jsonUserName
+}
+
+private fun JsonElement.scrmFinderUserNameValue(): String? {
+    if (this !is JsonObject) return null
+    entries.firstNotNullOfOrNull { (key, value) ->
+        if (key.equals("sphUserName", ignoreCase = true)) {
+            value.jsonPrimitive.contentOrNull?.trim()?.takeIf(String::isNotEmpty)
+        } else {
+            null
+        }
+    }?.let { return it }
+    return values.firstNotNullOfOrNull(JsonElement::scrmFinderUserNameValue)
+}
+
 private fun scrmFloatingMessageUrl(content: String): String? {
     val start = content.indexOfFirst { it == '{' || it == '[' }
     if (start < 0) return null
@@ -351,6 +413,34 @@ private fun scrmFloatingMessageUrl(content: String): String? {
         ?: return null
     return listOf("url", "mediaUrl", "downloadUrl", "fileUrl", "imageUrl", "videoUrl", "voiceUrl", "Url")
         .firstNotNullOfOrNull { key -> element[key]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } }
+}
+
+/** Extracts the WeChat sticker preview URL without treating the JSON as visible message text. */
+private fun scrmFloatingMessageThumbnailUrl(content: String): String? {
+    val start = content.indexOfFirst { it == '{' || it == '[' }
+    if (start < 0) return null
+    val element = runCatching {
+        ScrmMessageJson.parseToJsonElement(content.substring(start))
+    }.getOrNull() ?: return null
+    return scrmFloatingJsonUrlValue(element, ScrmStickerThumbnailKeys)
+}
+
+private fun scrmFloatingJsonUrlValue(element: JsonElement, keys: Set<String>): String? {
+    if (element is JsonObject) {
+        element.entries.firstNotNullOfOrNull { (key, value) ->
+            (value as? JsonPrimitive)?.contentOrNull
+                ?.takeIf { key.lowercase() in keys && it.isNotBlank() }
+        }?.let { return it }
+        element.values.firstNotNullOfOrNull { child ->
+            scrmFloatingJsonUrlValue(child, keys)
+        }?.let { return it }
+    }
+    if (element is JsonArray) {
+        element.firstNotNullOfOrNull { child ->
+            scrmFloatingJsonUrlValue(child, keys)
+        }?.let { return it }
+    }
+    return null
 }
 
 private fun scrmUnreadDemoMessages(

@@ -101,6 +101,7 @@ internal class FloatingChatMessageStore(
                 isFromMe = true,
                 connectionTarget = FloatingChatConnectionTarget.Account.name,
                 connectionTargetId = senderId,
+                remoteMessageId = null,
                 remoteMessageServerId = null,
                 remoteTaskId = null,
                 sendState = FloatingChatSendState.LocalOnly.toStorageValue(),
@@ -449,6 +450,7 @@ internal fun FloatingChatMessage.toLocalChatMessage(
         mediaDurationMs = mediaDurationMs,
         mediaMimeType = mediaMimeType,
         inlineTokens = inlineTokens.joinToString("\n") { token -> "${token.type.name}\t${token.text}" },
+        remoteMessageId = remoteMessageId,
         remoteMessageServerId = remoteMessageServerId,
         remoteTaskId = remoteTaskId,
         sendState = sendState.toStorageValue(),
@@ -495,6 +497,7 @@ internal fun LocalChatMessage.toFloatingChatMessage(): FloatingChatMessage {
         mediaDurationMs = mediaDurationMs,
         mediaMimeType = mediaMimeType,
         inlineTokens = inlineTokens.toInlineTokens(),
+        remoteMessageId = remoteMessageId,
         remoteMessageServerId = remoteMessageServerId,
         remoteTaskId = remoteTaskId,
         sendState = floatingChatSendStateFromStorage(sendState),
@@ -605,6 +608,7 @@ internal fun LocalChatMessage.toContentValues(): ContentValues {
         put("media_mime_type", mediaMimeType)
         put("inline_tokens", inlineTokens)
         put("metadata_json", metadataJson)
+        remoteMessageId?.let { put("remote_message_id", it) } ?: putNull("remote_message_id")
         put("remote_msg_svr_id", remoteMessageServerId)
         remoteTaskId?.let { put("remote_task_id", it) } ?: putNull("remote_task_id")
         put("send_state", sendState)
@@ -739,6 +743,7 @@ private fun Cursor.toLocalChatMessage(): LocalChatMessage {
         mediaMimeType = getNullableString("media_mime_type"),
         inlineTokens = getNullableString("inline_tokens"),
         metadataJson = getNullableString("metadata_json"),
+        remoteMessageId = getNullableLong("remote_message_id"),
         remoteMessageServerId = getNullableString("remote_msg_svr_id"),
         remoteTaskId = getNullableLong("remote_task_id"),
         sendState = getNullableString("send_state") ?: FloatingChatSendState.LocalOnly.toStorageValue(),

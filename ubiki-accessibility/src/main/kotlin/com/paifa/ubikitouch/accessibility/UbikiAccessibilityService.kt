@@ -487,6 +487,41 @@ class UbikiAccessibilityService : AccessibilityService() {
         }
     }
 
+    fun requestFloatingChatCouponWallet() {
+        hideFloatingChatForExternalActivity("coupon wallet")
+        val intent = Intent()
+            .setClassName(packageName, "com.paifa.ubikitouch.app.CouponWalletActivity")
+            .addFloatingChatBridgeFlags()
+        runCatching {
+            startActivity(intent)
+        }.onFailure {
+            Log.e(TAG, "failed to start coupon wallet", it)
+            onFloatingChatCouponWalletClosed()
+        }
+    }
+
+    fun requestFloatingChatTransfer() {
+        hideFloatingChatForExternalActivity("transfer")
+        val intent = Intent()
+            .setClassName(packageName, "com.paifa.ubikitouch.app.TransferFlowActivity")
+            .addFloatingChatBridgeFlags()
+        runCatching { startActivity(intent) }.onFailure {
+            Log.e(TAG, "failed to start transfer", it)
+            onFloatingChatTransferClosed()
+        }
+    }
+
+    fun requestFloatingChatRedPacket() {
+        hideFloatingChatForExternalActivity("red packet")
+        val intent = Intent()
+            .setClassName(packageName, "com.paifa.ubikitouch.app.RedPacketActivity")
+            .addFloatingChatBridgeFlags()
+        runCatching { startActivity(intent) }.onFailure {
+            Log.e(TAG, "failed to start red packet", it)
+            onFloatingChatRedPacketClosed()
+        }
+    }
+
     private fun hideFloatingChatForExternalActivity(source: String) {
         if (!::floatingChatOverlayController.isInitialized) return
         runCatching {
@@ -575,6 +610,18 @@ class UbikiAccessibilityService : AccessibilityService() {
             runCatching { floatingChatOverlayController.restoreAfterMediaPicker() }
                 .onFailure { Log.w(TAG, "failed to restore floating chat after media picker", it) }
         }
+    }
+
+    fun onFloatingChatCouponWalletClosed() {
+        onFloatingChatMediaPickerClosed()
+    }
+
+    fun onFloatingChatTransferClosed() {
+        onFloatingChatMediaPickerClosed()
+    }
+
+    fun onFloatingChatRedPacketClosed() {
+        onFloatingChatMediaPickerClosed()
     }
 
     fun requestFloatingChatMediaPreview() {

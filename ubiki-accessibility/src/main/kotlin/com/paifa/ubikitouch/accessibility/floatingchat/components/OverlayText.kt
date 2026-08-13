@@ -3,6 +3,7 @@ package com.paifa.ubikitouch.accessibility.floatingchat.components
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
@@ -12,6 +13,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
+
+internal val LocalOverlayTextShadow = staticCompositionLocalOf<Shadow?> { null }
+
 @Composable
 internal fun CompactInteractiveSize(content: @Composable () -> Unit) {
     CompositionLocalProvider(
@@ -32,6 +36,7 @@ internal fun TextLabel(
     textAlign: TextAlign? = null,
     shadow: Shadow? = null
 ) {
+    val resolvedShadow = shadow ?: LocalOverlayTextShadow.current
     androidx.compose.foundation.text.BasicText(
         text = text,
         modifier = modifier,
@@ -43,7 +48,7 @@ internal fun TextLabel(
             fontWeight = weight,
             lineHeight = lineHeight,
             textAlign = textAlign ?: TextAlign.Unspecified,
-            shadow = shadow
+            shadow = resolvedShadow
         )
     )
 }

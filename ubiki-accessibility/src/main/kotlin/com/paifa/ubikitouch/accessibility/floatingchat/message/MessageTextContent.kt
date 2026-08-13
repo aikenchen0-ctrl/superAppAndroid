@@ -49,7 +49,7 @@ internal fun SimpleTextMessageContent(message: FloatingChatMessage, index: Int) 
         maxLines = if (isSystem) 2 else if (index < 2) 3 else 4,
         shadow = OverlayTokens.imModuleTextShadow
     )
-    message.detail?.let { detail ->
+    message.detail?.takeIf { it.isNotBlank() }?.let { detail ->
         Spacer(modifier = Modifier.height(2.dp))
         TextLabel(
             text = detail,
@@ -103,7 +103,9 @@ internal fun MixedTextMessageContent(message: FloatingChatMessage) {
 
 @Composable
 internal fun QuoteMessageContent(message: FloatingChatMessage) {
-    QuoteBlock(message)
+    if (message.quoteAuthor.orEmpty().isNotBlank() || message.quoteText.orEmpty().isNotBlank()) {
+        QuoteBlock(message)
+    }
     TextLabel(
         text = chatBubbleDisplayText(message.text),
         size = 14.sp,

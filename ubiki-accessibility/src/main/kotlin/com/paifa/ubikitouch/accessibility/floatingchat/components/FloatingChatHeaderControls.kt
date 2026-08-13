@@ -7,12 +7,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.paifa.ubikitouch.accessibility.floatingchat.components.CompactInteractiveSize
@@ -42,6 +44,34 @@ internal fun FloatingChatHeaderIcon(label: String, onClick: (() -> Unit)? = null
             )
         ) {
             TextLabel(label, 11.sp, color = OverlayTokens.primaryText, weight = FontWeight.Bold, textAlign = TextAlign.Center)
+        }
+    }
+}
+
+@Composable
+internal fun FloatingChatHeaderIcon(
+    imageVector: ImageVector,
+    contentDescription: String,
+    onClick: (() -> Unit)? = null
+) {
+    CompactInteractiveSize {
+        FilledTonalIconButton(
+            onClick = { onClick?.invoke() },
+            enabled = onClick != null,
+            modifier = Modifier.size(25.dp).border(1.dp, OverlayTokens.hairline, CircleShape),
+            shape = CircleShape,
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = OverlayTokens.control,
+                contentColor = OverlayTokens.primaryText,
+                disabledContainerColor = OverlayTokens.control,
+                disabledContentColor = OverlayTokens.primaryText
+            )
+        ) {
+            Icon(
+                imageVector = imageVector,
+                contentDescription = contentDescription,
+                modifier = Modifier.size(14.dp)
+            )
         }
     }
 }

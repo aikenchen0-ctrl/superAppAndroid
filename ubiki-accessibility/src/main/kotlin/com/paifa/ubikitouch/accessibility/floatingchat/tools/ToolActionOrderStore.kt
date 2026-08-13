@@ -22,6 +22,7 @@ internal fun referenceToolActionsFor(actions: List<FloatingChatToolAction>): Lis
         FloatingChatToolAction.Files,
         FloatingChatToolAction.Card,
         FloatingChatToolAction.Moments,
+        FloatingChatToolAction.Finder,
         FloatingChatToolAction.MomentMaterials,
         FloatingChatToolAction.QuickPhrase
     ).filter { action -> action in availableActions }
@@ -44,6 +45,7 @@ private fun toolActionBottomPanelMode(action: FloatingChatToolAction): BottomPan
         FloatingChatToolAction.AiVoice -> BottomPanelMode.AiVoice
         FloatingChatToolAction.QuickPhrase -> BottomPanelMode.QuickPhrase
         FloatingChatToolAction.Moments -> BottomPanelMode.Moments
+        FloatingChatToolAction.Finder -> BottomPanelMode.Finder
         FloatingChatToolAction.MomentMaterials -> BottomPanelMode.MomentMaterials
         FloatingChatToolAction.RedPacket -> BottomPanelMode.RedPacket
         FloatingChatToolAction.Transfer -> BottomPanelMode.Transfer

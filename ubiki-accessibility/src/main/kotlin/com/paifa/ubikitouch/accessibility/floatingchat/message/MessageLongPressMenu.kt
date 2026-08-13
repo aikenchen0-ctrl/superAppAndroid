@@ -3,12 +3,17 @@ package com.paifa.ubikitouch.accessibility.floatingchat.message
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -22,17 +27,18 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FormatQuote
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface as MaterialSurface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -45,33 +51,38 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.IntOffset
+import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.MessageAsideAnalysisState
 import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.accessibility.floatingchat.components.TextLabel
+import com.paifa.ubikitouch.accessibility.floatingchat.popup.BalloonCoordinateState
+import com.paifa.ubikitouch.accessibility.floatingchat.popup.BalloonPopupState
+import com.paifa.ubikitouch.accessibility.floatingchat.popup.IrregularBalloonPopup
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
+import kotlin.math.roundToInt
 
 internal enum class MessageLongPressAction(val label: String) {
     Listen("话外音"),
-    Zoom("放大"),
     Copy("复制"),
     Forward("转发"),
     Favorite("收藏"),
-    Delete("删除"),
     MultiSelect("多选"),
     Quote("引用"),
-    Reminder("提醒"),
+    Zoom("放大"),
+    Delete("删除"),
     ScrmOperations("更多")
 }
 
 internal fun messageLongPressPrimaryActions(): List<MessageLongPressAction> {
     return listOf(
         MessageLongPressAction.Listen,
-        MessageLongPressAction.Zoom,
         MessageLongPressAction.Copy,
         MessageLongPressAction.Forward,
         MessageLongPressAction.Favorite,
-        MessageLongPressAction.Delete,
         MessageLongPressAction.MultiSelect,
-        MessageLongPressAction.Quote
+        MessageLongPressAction.Quote,
+        MessageLongPressAction.Zoom,
+        MessageLongPressAction.Delete
     )
 }
 
@@ -79,11 +90,9 @@ internal fun messageLongPressUsesWechatFloatingPanel(): Boolean = true
 
 internal fun messageLongPressSupportsInternalForwarding(): Boolean = true
 
-internal fun messageLongPressReminderUsesUiStateOnly(): Boolean = true
-
 internal fun messageLongPressIncludesSearch(): Boolean = false
 
-internal fun messageLongPressIncludesListenFromHere(): Boolean = false
+internal fun messageLongPressIncludesAsideAnalysis(): Boolean = true
 
 internal fun messageLongPressSupportsMultiSelectMode(): Boolean = true
 
@@ -148,6 +157,181 @@ internal fun MessageLongPressMenuOverlay(
                     y = with(density) { clampedY.toDp() }
                 )
         )
+    }
+}
+
+@Composable
+internal fun MessageAsideAnalysisOverlay(
+    state: MessageAsideAnalysisState,
+    messageBounds: Rect?,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    BoxWithConstraints(modifier = modifier) {
+        val density = LocalDensity.current
+        val fallbackSize = with(density) { 48.dp.toPx() }
+        val anchorWidthPx = messageBounds?.width?.coerceAtLeast(1f) ?: fallbackSize
+        val anchorHeightPx = messageBounds?.height?.coerceAtLeast(1f) ?: fallbackSize
+        val anchorX = messageBounds?.left ?: ((with(density) { maxWidth.toPx() } - anchorWidthPx) / 2f)
+        val anchorY = messageBounds?.top ?: ((with(density) { maxHeight.toPx() } - anchorHeightPx) / 2f)
+        val popupState = remember(state.message.id) { BalloonPopupState(initiallyVisible = true) }
+        val coordinateState = remember(state.message.id) { BalloonCoordinateState() }
+
+        IrregularBalloonPopup(
+            state = popupState,
+            coordinateState = coordinateState,
+            onDismiss = onDismiss,
+            containerColor = Color(0xF2F4FAFC),
+            modifier = Modifier.fillMaxSize(),
+            trigger = { triggerModifier ->
+                Box(
+                    Modifier
+                        .offset { IntOffset(anchorX.roundToInt(), anchorY.roundToInt()) }
+                        .size(
+                            width = with(density) { anchorWidthPx.toDp() },
+                            height = with(density) { anchorHeightPx.toDp() }
+                        )
+                        .then(triggerModifier)
+                )
+            }
+        ) {
+            MessageAsideAnalysisContent(
+                state = state,
+                modifier = Modifier
+                    .width(280.dp)
+                    .heightIn(min = 150.dp, max = 330.dp)
+                    .padding(horizontal = 22.dp, vertical = 20.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun MessageAsideAnalysisContent(
+    state: MessageAsideAnalysisState,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        TextLabel(
+            text = "话外音",
+            size = 16.sp,
+            color = OverlayTokens.panelPrimaryText,
+            weight = FontWeight.SemiBold,
+            maxLines = 1
+        )
+        when (state) {
+            is MessageAsideAnalysisState.Loading -> {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = OverlayTokens.panelPrimaryText
+                    )
+                    TextLabel(
+                        text = "AI 正在分析当前消息...",
+                        size = 12.sp,
+                        color = OverlayTokens.panelSecondaryText
+                    )
+                }
+            }
+            is MessageAsideAnalysisState.Ready -> {
+                MessageAsideAnalysisField("情绪", state.analysis.emotion)
+                MessageAsideAnalysisField("立场", state.analysis.stance)
+                MessageAsideAnalysisField("话外音", state.analysis.subtext)
+            }
+            is MessageAsideAnalysisState.Failed -> {
+                TextLabel(
+                    text = state.reason,
+                    size = 12.sp,
+                    lineHeight = 18.sp,
+                    color = Color(0xFFB3261E)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MessageAsideAnalysisField(label: String, value: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        TextLabel(
+            text = label,
+            size = 10.sp,
+            color = OverlayTokens.panelSecondaryText,
+            weight = FontWeight.SemiBold,
+            maxLines = 1
+        )
+        TextLabel(
+            text = value,
+            size = 13.sp,
+            lineHeight = 19.sp,
+            color = OverlayTokens.panelPrimaryText
+        )
+    }
+}
+
+@Composable
+internal fun MessageTextZoomOverlay(
+    message: FloatingChatMessage,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .background(Color(0xF2181D20))
+            .pointerInput(message.id) { detectTapGestures { onDismiss() } }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 28.dp, vertical = 36.dp)
+                .verticalScroll(rememberScrollState())
+                .pointerInput(message.id) { detectTapGestures(onTap = {}) },
+            verticalArrangement = Arrangement.Center
+        ) {
+            TextLabel(
+                text = message.senderName.ifBlank { "消息" },
+                size = 13.sp,
+                color = Color(0xFFB7C6CC),
+                weight = FontWeight.SemiBold,
+                maxLines = 1
+            )
+            TextLabel(
+                text = message.longPressCopyText(),
+                size = 28.sp,
+                lineHeight = 39.sp,
+                color = Color(0xFFF4F7F8),
+                modifier = Modifier.padding(top = 14.dp)
+            )
+            if (message.time.isNotBlank()) {
+                TextLabel(
+                    text = message.time,
+                    size = 11.sp,
+                    color = Color(0xFF91A3AA),
+                    maxLines = 1,
+                    modifier = Modifier.padding(top = 18.dp)
+                )
+            }
+        }
+        IconButton(
+            onClick = onDismiss,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(12.dp)
+                .size(40.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Close,
+                contentDescription = "关闭放大查看",
+                tint = Color(0xFFF4F7F8)
+            )
+        }
     }
 }
 
@@ -317,7 +501,6 @@ private fun MessageLongPressAction.icon(): ImageVector {
         MessageLongPressAction.Delete -> Icons.Filled.Delete
         MessageLongPressAction.MultiSelect -> Icons.Filled.Checklist
         MessageLongPressAction.Quote -> Icons.Filled.FormatQuote
-        MessageLongPressAction.Reminder -> Icons.Filled.Notifications
         MessageLongPressAction.ScrmOperations -> Icons.Filled.MoreHoriz
     }
 }

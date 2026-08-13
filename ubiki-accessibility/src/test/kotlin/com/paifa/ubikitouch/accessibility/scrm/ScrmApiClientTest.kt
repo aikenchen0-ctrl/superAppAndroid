@@ -1588,6 +1588,48 @@ class ScrmApiClientTest {
     }
 
     @Test
+    fun allPaymentEndpointsUseDocumentedPostRoutesAndWriteHeaders() {
+        val transport = QueueTransport(*Array(7) {
+            ok("""{"taskId":${600 + it},"success":true,"message":"queued"}""")
+        })
+        val client = ScrmApiClient(config, transport)
+
+        client.sendLuckyMoney(
+            ScrmSendLuckyMoneyRequest("device-1", "wxid-me", "wxid-friend", 100, 1, "123456", "wish"),
+            "lucky-key"
+        )
+        client.sendRemittance(
+            ScrmSendRemittanceRequest("device-1", "wxid-me", "wxid-friend", null, 200, "123456", "memo"),
+            "remittance-key"
+        )
+        client.getWalletBalance(ScrmWalletBalanceRequest("device-1", "wxid-me", 0))
+        client.getRedPacketStatus(ScrmRedPacketQueryByMessageRequest("device-1", 71L))
+        client.getRedPacketDetail(ScrmRedPacketQueryByMessageRequest("device-1", 71L))
+        client.takeLuckyMoney(ScrmTakeLuckyMoneyByMessageRequest("device-1", 71L, false), "take-lucky-key")
+        client.takeTransfer(ScrmTakeTransferByMessageRequest("device-1", 72L, false), "take-transfer-key")
+
+        assertEquals(
+            listOf(
+                "payments/lucky-money",
+                "payments/remittance",
+                "payments/wallet-balance",
+                "payments/red-packets/status-by-message",
+                "payments/red-packets/detail-by-message",
+                "payments/lucky-money/take-by-message",
+                "payments/transfers/take-by-message"
+            ).map { "https://api.example.com/openapi/v1/$it" },
+            transport.requests.map { it.url }
+        )
+        assertTrue(transport.requests.all { it.method == "POST" })
+        assertEquals(
+            listOf("lucky-key", "remittance-key", null, null, null, "take-lucky-key", "take-transfer-key"),
+            transport.requests.map { it.headers["Idempotency-Key"] }
+        )
+        assertFalse(transport.requests[0].toString().contains("123456"))
+        assertFalse(transport.requests[1].toString().contains("123456"))
+    }
+
+    @Test
     fun statusCodesMapToActionableApiErrors() {
         val cases = listOf(
             401 to ScrmAuthenticationException::class.java,

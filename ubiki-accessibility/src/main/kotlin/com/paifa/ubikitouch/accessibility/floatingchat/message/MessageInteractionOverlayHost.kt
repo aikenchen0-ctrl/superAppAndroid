@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
+import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.MessageAsideAnalysisState
 import com.paifa.ubikitouch.accessibility.scrm.PaymentReadback
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
@@ -14,6 +15,8 @@ internal fun MessageInteractionOverlayHost(
     paymentDetailMessage: FloatingChatMessage?,
     longPressMessage: FloatingChatMessage?,
     longPressAnchorBounds: Rect?,
+    asideAnalysisState: MessageAsideAnalysisState?,
+    textZoomMessage: FloatingChatMessage?,
     multiSelectMode: Boolean,
     chatHistoryPreviewMessage: FloatingChatMessage?,
     selectedThread: ChatThreadSelection,
@@ -26,6 +29,8 @@ internal fun MessageInteractionOverlayHost(
     onRefreshPaymentStatus: (FloatingChatMessage) -> Unit,
     onClaimPayment: (FloatingChatMessage) -> Unit,
     onLongPressMessageChanged: (FloatingChatMessage?) -> Unit,
+    onAsideAnalysisDismissed: () -> Unit,
+    onTextZoomDismissed: () -> Unit,
     onStartForwardingMessages: (List<FloatingChatMessage>) -> Unit,
     onStartCombinedForwardingMessages: (List<FloatingChatMessage>) -> Unit,
     onClearSelectedMessages: () -> Unit,
@@ -53,6 +58,21 @@ internal fun MessageInteractionOverlayHost(
             messageBounds = longPressAnchorBounds,
             onDismiss = { onLongPressMessageChanged(null) },
             onAction = { action -> messageLongPressActions.performLongPressAction(message, action) },
+            modifier = modifier.fillMaxSize()
+        )
+    }
+    asideAnalysisState?.let { state ->
+        MessageAsideAnalysisOverlay(
+            state = state,
+            messageBounds = longPressAnchorBounds,
+            onDismiss = onAsideAnalysisDismissed,
+            modifier = modifier.fillMaxSize()
+        )
+    }
+    textZoomMessage?.let { message ->
+        MessageTextZoomOverlay(
+            message = message,
+            onDismiss = onTextZoomDismissed,
             modifier = modifier.fillMaxSize()
         )
     }

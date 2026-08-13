@@ -41,6 +41,7 @@ internal class AiDraftMessageActions(
     private val onDraftMessagesChanged: () -> Unit,
     private val prepareOutgoingMessage: (FloatingChatMessage, String) -> FloatingChatMessage,
     private val onPersistLocalMessage: (FloatingChatMessage, String) -> Unit,
+    private val onOutgoingMessageCreated: (FloatingChatMessage, String) -> Unit,
     private val onDraftOverlaysClosed: () -> Unit
 ) {
     fun upsertDraftMessage(draft: FloatingChatMessage, replaceMessageId: String? = null) {
@@ -102,6 +103,7 @@ internal class AiDraftMessageActions(
             localMessages += sentMessage
         }
         onDraftMessagesChanged()
+        onOutgoingMessageCreated(sentMessage, threadId)
         onPersistLocalMessage(sentMessage, threadId)
         onDraftOverlaysClosed()
     }

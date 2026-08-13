@@ -35,6 +35,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Forward
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -173,6 +174,7 @@ private fun ScrollableSessionRail(
     var showFollowText by remember { mutableStateOf(false) }
     var railIsScrolling by remember { mutableStateOf(false) }
     var selectedActionsExpanded by remember(selectedThread) { mutableStateOf(false) }
+    var profilePlaceholderContact by remember { mutableStateOf<FloatingChatContact?>(null) }
     val avatarBoundsByContactId = remember { mutableMapOf<String, Rect>() }
     var avatarBoundsVersion by remember { mutableIntStateOf(0) }
     fun updateAvatarBounds(id: String, bounds: Rect) {
@@ -270,6 +272,7 @@ private fun ScrollableSessionRail(
             }
     }
     LaunchedEffect(selectedThread, railIsScrolling) {
+        profilePlaceholderContact = null
         selectedActionsExpanded = false
         if (!railIsScrolling) {
             delay(leftRailSelectedActionsDwellMs())
@@ -428,6 +431,7 @@ private fun ScrollableSessionRail(
                     onGroupAvatarLongClick = onGroupAvatarLongClick,
                     onContactAvatarLongClick = onContactAvatarLongClick,
                     onToolAction = onToolAction,
+                    onOpenProfile = { contact -> profilePlaceholderContact = contact },
                     selectedActionsExpanded = leftRailSelectionActionsVisible(
                         selectedDurationMs = if (selectedActionsExpanded) leftRailSelectedActionsDwellMs() else 0L,
                         isSelected = item.toThreadSelection() == selectedThread,
@@ -454,6 +458,7 @@ private fun ScrollableSessionRail(
                 onGroupAvatarLongClick = onGroupAvatarLongClick,
                 onContactAvatarLongClick = onContactAvatarLongClick,
                 onToolAction = onToolAction,
+                onOpenProfile = { contact -> profilePlaceholderContact = contact },
                 selectedActionsExpanded = leftRailSelectionActionsVisible(
                     selectedDurationMs = if (selectedActionsExpanded) leftRailSelectedActionsDwellMs() else 0L,
                     isSelected = true,
@@ -475,6 +480,16 @@ private fun ScrollableSessionRail(
                 .requiredWidth(leftRailFollowTextContainerWidthDp().dp)
                 .zIndex(12f)
         )
+        profilePlaceholderContact?.let { contact ->
+            LeftRailProfilePlaceholderCard(
+                contact = contact,
+                onDismiss = { profilePlaceholderContact = null },
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .offset(x = (leftRailTouchableWidthDp() + 4).dp)
+                    .zIndex(16f)
+            )
+        }
     }
 }
 
@@ -493,6 +508,7 @@ private fun SessionRailAvatarItem(
     onGroupAvatarLongClick: (FloatingChatContact) -> Unit,
     onContactAvatarLongClick: (FloatingChatContact) -> Unit,
     onToolAction: (FloatingChatToolAction) -> Unit,
+    onOpenProfile: (FloatingChatContact) -> Unit,
     selectedActionsExpanded: Boolean,
     removeBoundsOnDispose: Boolean,
     modifier: Modifier = Modifier
@@ -577,7 +593,7 @@ private fun SessionRailAvatarItem(
             }
             if (isSelected) {
                 SessionRailAvatarAnchoredActions(
-                    onOpenProfile = openProfileOrSettings,
+                    onOpenProfile = { onOpenProfile(item.contact) },
                     onOpenSettings = openProfileOrSettings,
                     modifier = Modifier.align(Alignment.Center)
                 )
@@ -718,6 +734,17 @@ private fun LeftRailFollowTextOverlay(
                         maxLines = 1,
                         shadow = OverlayTokens.leftRailFollowTextShadow
                     )
+                    val metaText = leftRailFollowMetaText(info)
+                    if (metaText.isNotBlank()) {
+                        TextLabel(
+                            text = metaText,
+                            size = leftRailFollowTextTimeSizeSp().sp,
+                            weight = FontWeight.Medium,
+                            color = Color.Black.copy(alpha = 0.66f),
+                            maxLines = 1,
+                            shadow = OverlayTokens.leftRailFollowTextShadow
+                        )
+                    }
                     TextLabel(
                         text = info.lastMessage.ifBlank { "信息" },
                         size = leftRailFollowTextMessageSizeSp().sp,
@@ -743,6 +770,56 @@ private fun LeftRailFollowTextOverlay(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LeftRailProfilePlaceholderCard(
+    contact: FloatingChatContact,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val profile = remember(contact) { leftRailProfilePlaceholder(contact) }
+    MaterialSurface(
+        modifier = modifier.width(172.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = OverlayTokens.panel,
+        border = BorderStroke(1.dp, OverlayTokens.panelBorder),
+        shadowElevation = 6.dp
+    ) {
+        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextLabel(
+                    text = "用户画像",
+                    size = 11.sp,
+                    weight = FontWeight.Bold,
+                    color = OverlayTokens.panelPrimaryText,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1
+                )
+                IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
+                    Icon(
+                        Icons.Filled.Close,
+                        contentDescription = "关闭用户画像",
+                        tint = OverlayTokens.panelSecondaryText,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+            TextLabel(profile.name, 13.sp, weight = FontWeight.SemiBold, color = OverlayTokens.panelPrimaryText, maxLines = 1)
+            if (profile.region.isNotBlank()) {
+                TextLabel("地区 ${profile.region}", 9.sp, color = OverlayTokens.panelSecondaryText, maxLines = 1)
+            }
+            if (profile.tags.isNotEmpty()) {
+                TextLabel("标签 ${profile.tags.joinToString(" · ")}", 9.sp, color = OverlayTokens.panelSecondaryText, maxLines = 2)
+            }
+            if (profile.summary.isNotBlank()) {
+                TextLabel(profile.summary, 10.sp, color = OverlayTokens.panelPrimaryText, maxLines = 2)
             }
         }
     }

@@ -11,12 +11,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -34,10 +36,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.paifa.ubikitouch.accessibility.floatingchat.components.AvatarRole
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
-import com.paifa.ubikitouch.accessibility.floatingchat.chat.isGroupThread
 import com.paifa.ubikitouch.accessibility.floatingchat.components.CompactAvatar
 import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.accessibility.floatingchat.components.TextLabel
+import com.paifa.ubikitouch.accessibility.floatingchat.components.LocalOverlayTextShadow
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.groupMemberContactForMessage
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.groupMemberAvatarBubbleCenterOffsetDp
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.groupMemberAvatarSizeDp
@@ -81,7 +83,8 @@ internal fun MessageRow(
     onClick: () -> Unit,
     onBubbleBoundsChanged: (Rect) -> Unit,
     onGroupMemberAvatarBoundsChanged: (Rect) -> Unit,
-    onGroupMemberAvatarRemoved: () -> Unit
+    onGroupMemberAvatarRemoved: () -> Unit,
+    detailedBubble: Boolean = usesDetailedMessageBubble(homeOverviewVisible, selectedThread)
 ) {
     val groupMemberContact = remember(
         message,
@@ -99,9 +102,10 @@ internal fun MessageRow(
         )?.takeIf { showAttachedAvatar }
     }
     val placement = messageHorizontalPlacement(message.presentation, message.fromMe)
-    val detailedBubble = homeOverviewVisible || selectedThread.isGroupThread()
-    val showSenderNickname = detailedBubble &&
-        message.presentation != FloatingChatMessagePresentation.System
+    val showSenderNickname = shouldShowDetailedBubbleSenderName(
+        detailedBubble = detailedBubble,
+        presentation = message.presentation
+    )
     val senderNickname = remember(message, groupMemberContact, contactsById) {
         val resolvedNickname = groupMemberContact?.name
             ?: message.threadContactId?.let { threadId -> contactsById[threadId]?.name }
@@ -285,6 +289,8 @@ internal fun MessageBlock(
                                 onClick = {
                                     if (multiSelectMode) {
                                         onToggleSelection()
+                                    } else if (homeOverviewVisible) {
+                                        onClick()
                                     } else if (usesBubbleChrome) {
                                         onLongPressMessage(message, currentBounds.value)
                                     } else {
@@ -307,16 +313,20 @@ internal fun MessageBlock(
                                 }
                             )
                     ) {
-                        MessageContent(
-                            message = message,
-                            index = index,
-                            onPreviewMedia = onPreviewMedia,
-                            onOpenMediaActions = onOpenMediaActions,
-                            onLongPressMessage = onLongPressMessage,
-                            multiSelectMode = multiSelectMode,
-                            onToggleSelection = onToggleSelection,
-                            claimed = claimed
-                        )
+                        CompositionLocalProvider(
+                            LocalOverlayTextShadow provides OverlayTokens.imModuleTextShadow
+                        ) {
+                            MessageContent(
+                                message = message,
+                                index = index,
+                                onPreviewMedia = onPreviewMedia,
+                                onOpenMediaActions = onOpenMediaActions,
+                                onLongPressMessage = onLongPressMessage,
+                                multiSelectMode = multiSelectMode,
+                                onToggleSelection = onToggleSelection,
+                                claimed = claimed
+                            )
+                        }
                     }
                     if (homeOverviewVisible && homeOverviewAccountColor != null) {
                         Box(
@@ -346,6 +356,8 @@ internal fun MessageBlock(
                                 onClick = {
                                     if (multiSelectMode) {
                                         onToggleSelection()
+                                    } else if (homeOverviewVisible) {
+                                        onClick()
                                     } else if (usesBubbleChrome) {
                                         onLongPressMessage(message, currentBounds.value)
                                     } else {
@@ -378,22 +390,38 @@ internal fun MessageBlock(
                     )
                 }
                 if (showSenderNickname) {
-                    TextLabel(
-                        text = senderNickname,
-                        size = if (showSenderNickname) 7.sp else 10.sp,
+                    val senderNameSize = detailedBubbleSenderNameSizeSp(
+                        messageContentTextSizeSp(message)
+                    ).sp
+                    Box(
                         modifier = Modifier
                             .align(Alignment.TopStart)
-                            .offset(x = 12.dp, y = (-6).dp)
-                            .background(
-                                color = OverlayTokens.panel.copy(alpha = 0.72f),
-                                shape = RoundedCornerShape(5.dp)
+                            .offset(
+                                x = 12.dp,
+                                y = detailedBubbleSenderNameTopOffsetDp().dp
                             )
-                            .padding(horizontal = 5.dp, vertical = 1.dp),
-                        weight = FontWeight.Medium,
-                        color = OverlayTokens.imModuleBubbleText.copy(alpha = 0.86f),
-                        maxLines = 1,
-                        shadow = OverlayTokens.imModuleTextShadow
-                    )
+                            .height(detailedBubbleSenderNameBadgeHeightDp().dp),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .background(
+                                    color = OverlayTokens.panel.copy(alpha = 0.46f),
+                                    shape = RoundedCornerShape(5.dp)
+                                )
+                                .detailedBubbleSenderNameBlur()
+                        )
+                        TextLabel(
+                            text = senderNickname,
+                            size = senderNameSize,
+                            modifier = Modifier.padding(horizontal = 5.dp),
+                            weight = FontWeight.Medium,
+                            color = OverlayTokens.imModuleBubbleText.copy(alpha = 0.90f),
+                            maxLines = 1,
+                            shadow = OverlayTokens.imModuleTextShadow
+                        )
+                    }
                 }
             }
             scrmSendStatusTextFor(message)?.let { statusText ->

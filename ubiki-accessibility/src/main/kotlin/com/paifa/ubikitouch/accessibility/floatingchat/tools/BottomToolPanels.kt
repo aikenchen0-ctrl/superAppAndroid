@@ -14,6 +14,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -114,6 +118,12 @@ internal fun moreToolPanelUsesUniqueDestinations(): Boolean {
 internal fun EmojiPanel(onInsertText: (String) -> Unit) {
     var selectedCategoryIndex by remember { mutableIntStateOf(0) }
     val selectedCategory = EmojiCategories[selectedCategoryIndex]
+    val categoryGridStates = listOf(
+        rememberLazyGridState(),
+        rememberLazyGridState(),
+        rememberLazyGridState(),
+        rememberLazyGridState()
+    )
 
     Column(
         modifier = Modifier
@@ -159,18 +169,24 @@ internal fun EmojiPanel(onInsertText: (String) -> Unit) {
             }
         }
 
-        selectedCategory.emojis.chunked(8).forEach { rowItems ->
-            Row(modifier = Modifier.fillMaxWidth()) {
-                rowItems.forEach { emoji ->
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(40.dp)
-                            .clickable { onInsertText(emoji) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(text = emoji, fontSize = 22.sp)
-                    }
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(8),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            state = categoryGridStates[selectedCategoryIndex]
+        ) {
+            itemsIndexed(
+                items = selectedCategory.emojis,
+                key = { index, _ -> "$selectedCategoryIndex-$index" }
+            ) { _, emoji ->
+                Box(
+                    modifier = Modifier
+                        .height(40.dp)
+                        .clickable { onInsertText(emoji) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = emoji, fontSize = 22.sp)
                 }
             }
         }
