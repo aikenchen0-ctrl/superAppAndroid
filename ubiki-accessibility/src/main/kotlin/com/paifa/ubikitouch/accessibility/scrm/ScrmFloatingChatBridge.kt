@@ -1,6 +1,5 @@
 package com.paifa.ubikitouch.accessibility.scrm
 
-import android.util.Log
 import com.paifa.ubikitouch.accessibility.floatingchat.media.normalizedRemoteImageUri
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatConversation
@@ -171,7 +170,6 @@ internal fun scrmFloatingChatConversation(
     val selectedAccount = floatingAccounts.firstOrNull { account -> account.selected }
         ?: floatingAccounts.firstOrNull()
     val historyMessages = scrmFloatingHistoryMessages(accountConversations)
-
     return base.copy(
         peerName = "SCRM Contacts",
         accountName = selectedAccount?.name ?: selectedWeChatId.ifBlank { base.accountName },
@@ -202,16 +200,7 @@ private fun scrmFloatingHistoryMessages(
                     ?: message.localMessageId
                     ?: return@mapNotNull null
                 val fromMe = message.direction == 1 || message.senderWxid == account.weChatId
-                Log.i(
-                    "UbikiChatData",
-                    "stage=raw_message " +
-                        "accountNickname=${account.weChatId} accountWeChatId=${account.weChatId} " +
-                        "conversationWeChatId=$conversationWxid senderWeChatId=${message.senderWxid.orEmpty()} " +
-                        "messageId=${message.messageId} messageServerId=${message.messageServerId} " +
-                        "direction=${message.direction} messageType=${message.messageType} " +
-                        "content=${message.content}"
-                )
-                val mapped = scrmFloatingMappedMessage(
+                scrmFloatingMappedMessage(
                     remote = message,
                     id = "scrm-message:$accountId:$remoteId",
                     fromMe = fromMe,
@@ -221,17 +210,6 @@ private fun scrmFloatingHistoryMessages(
                     connectionTargetId = threadId,
                     threadContactId = threadId
                 )
-                Log.i(
-                    "UbikiChatData",
-                    "stage=mapped_message " +
-                        "accountNickname=${account.weChatId} accountWeChatId=${account.weChatId} " +
-                        "conversationWeChatId=$conversationWxid senderWeChatId=${message.senderWxid.orEmpty()} " +
-                        "messageId=${message.messageId} sourceMessageType=${message.messageType} " +
-                        "mappedType=${mapped.type} presentation=${mapped.presentation} " +
-                        "fromMe=${mapped.fromMe} text=${mapped.text} detail=${mapped.detail.orEmpty()} " +
-                        "resourceUrl=${mapped.resourceUrl.orEmpty()} thumbnailUrl=${mapped.thumbnailUrl.orEmpty()}"
-                )
-                mapped
             }
         }
     }
@@ -514,7 +492,8 @@ private fun scrmFloatingContact(contact: ScrmContact, accountId: String): Floati
         description = "WeChat friend / $conversationId",
         avatarColor = scrmStableColor(conversationId),
         avatarUrl = normalizedRemoteImageUri(contact.displayAvatarUrl),
-        online = contact.isBlocked == 0
+        online = contact.isBlocked == 0,
+        isFriend = contact.isFriend == 1
     )
 }
 

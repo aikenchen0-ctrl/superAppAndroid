@@ -7,7 +7,7 @@ internal class QuickPhraseActions(
     private val context: Context,
     private val quickPhrases: () -> List<String>,
     private val onQuickPhrasesChanged: (List<String>) -> Unit,
-    private val onSendText: (String) -> Unit,
+    private val onApplyToInput: (String) -> Unit,
     private val onBottomPanelModeChanged: (BottomPanelMode) -> Unit
 ) {
     fun updateQuickPhrases(nextPhrases: List<String>) {
@@ -19,7 +19,7 @@ internal class QuickPhraseActions(
     fun sendQuickPhrase(phrase: String) {
         val text = phrase.trim()
         if (text.isNotEmpty()) {
-            onSendText(text)
+            onApplyToInput(text)
             updateQuickPhrases(listOf(text) + quickPhrases().filterNot { it == text })
             onBottomPanelModeChanged(BottomPanelMode.None)
         }

@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface as MaterialSurface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.paifa.ubikitouch.accessibility.AppLocationOption
 import com.paifa.ubikitouch.accessibility.AppMomentMedia
@@ -36,6 +38,9 @@ import com.paifa.ubikitouch.accessibility.floatingchat.moments.MomentsTimelinePa
 import com.paifa.ubikitouch.accessibility.floatingchat.message.ScrmComposerKind
 import com.paifa.ubikitouch.accessibility.floatingchat.message.ScrmMessageComposerPanel
 import com.paifa.ubikitouch.accessibility.floatingchat.scrm.ScrmOperationsHubPanel
+import com.paifa.ubikitouch.accessibility.floatingchat.scrm.AccountDevicePanel
+import com.paifa.ubikitouch.accessibility.floatingchat.scrm.CustomerProfilePanel
+import com.paifa.ubikitouch.accessibility.scrm.ScrmSettingsManager
 import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.AiConfigPanel
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.CompactNoticePanel
@@ -130,6 +135,7 @@ internal fun FloatingBottomPanel(
     modifier: Modifier = Modifier,
     composerHeader: (@Composable () -> Unit)? = null
 ) {
+    val context = LocalContext.current
     val isBottomDrawer = mode == BottomPanelMode.Emoji || mode == BottomPanelMode.More
     val shape = if (isBottomDrawer) {
         RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
@@ -145,6 +151,8 @@ internal fun FloatingBottomPanel(
         BottomPanelMode.Finder -> 0.92f
         BottomPanelMode.MomentMaterials -> 0.92f
         BottomPanelMode.Contacts -> 0.92f
+        BottomPanelMode.AccountDevice -> 0.92f
+        BottomPanelMode.CustomerProfile -> 0.92f
         BottomPanelMode.Favorite -> 0.86f
         BottomPanelMode.Assistant,
         BottomPanelMode.AiVoice -> 0.86f
@@ -167,6 +175,8 @@ internal fun FloatingBottomPanel(
         BottomPanelMode.Finder -> 520.dp
         BottomPanelMode.MomentMaterials -> 520.dp
         BottomPanelMode.Contacts -> 520.dp
+        BottomPanelMode.AccountDevice -> 520.dp
+        BottomPanelMode.CustomerProfile -> 520.dp
         BottomPanelMode.Favorite -> 380.dp
         BottomPanelMode.Assistant,
         BottomPanelMode.AiVoice -> 430.dp
@@ -263,6 +273,14 @@ internal fun FloatingBottomPanel(
                     onOpenPrivateChat = onOpenPrivateChat,
                     onOpenFriendProfile = onOpenFriendProfile
                 )
+                BottomPanelMode.AccountDevice -> AccountDevicePanel(
+                    manager = remember(context) { ScrmSettingsManager(context.applicationContext) },
+                    onClose = onClose
+                )
+                BottomPanelMode.CustomerProfile -> CustomerProfilePanel(
+                    manager = remember(context) { ScrmSettingsManager(context.applicationContext) },
+                    onClose = onClose
+                )
                 BottomPanelMode.Favorite -> FavoriteCollectionPanel(
                     items = favoriteItems,
                     multiSelectMode = favoriteMultiSelectMode,
@@ -331,7 +349,7 @@ internal fun FloatingBottomPanel(
                     conversationId = scrmMessageConversationId,
                     onBack = { onOpenToolPanel(BottomPanelMode.More) }
                 )
-                BottomPanelMode.ScrmOperations -> ScrmOperationsHubPanel(
+        BottomPanelMode.ScrmOperations -> ScrmOperationsHubPanel(
                     route = scrmMessageRoute,
                     conversationId = scrmMessageConversationId,
                     onOpenPanel = onOpenToolPanel,

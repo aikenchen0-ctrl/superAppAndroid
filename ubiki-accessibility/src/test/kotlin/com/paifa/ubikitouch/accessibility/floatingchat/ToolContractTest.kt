@@ -18,6 +18,6 @@ class ToolContractTest {
     fun aiAndQuickPhraseEventsCarryOnlyUiData() {
         assertEquals("https://example.invalid", (AiUiEvent.BaseUrlChanged("https://example.invalid")).value)
         assertEquals("hello", (QuickPhraseUiEvent.DraftChanged("hello")).value)
-        assertEquals(2, (QuickPhraseUiEvent.EditRequested(2)).index)
+        assertEquals(2, (QuickPhraseUiEvent.DeleteRequested(2)).index)
     }
 }

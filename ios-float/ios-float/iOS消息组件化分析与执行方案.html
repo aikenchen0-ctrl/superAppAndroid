@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>iOS Float 消息组件化分析与执行方案</title>
+  <style>
+    :root {
+      --ink: #17212b;
+      --muted: #637083;
+      --line: #dce2e8;
+      --paper: #ffffff;
+      --canvas: #f4f6f7;
+      --green: #087f5b;
+      --green-soft: #e7f5ef;
+      --blue: #2463a7;
+      --blue-soft: #eaf2fb;
+      --amber: #a45b08;
+      --amber-soft: #fff4df;
+      --red: #a43b3b;
+      --red-soft: #fcecec;
+      --code: #20262e;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--canvas);
+      font: 15px/1.7 -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+      letter-spacing: 0;
+    }
+    header {
+      color: white;
+      background: #17212b;
+      border-bottom: 5px solid #20a879;
+    }
+    .header-inner, .layout { width: min(1180px, calc(100% - 40px)); margin: 0 auto; }
+    .header-inner { padding: 46px 0 38px; }
+    .eyebrow { color: #74d4b3; font-size: 13px; font-weight: 700; }
+    h1 { margin: 7px 0 10px; font-size: 34px; line-height: 1.2; font-weight: 750; }
+    .lead { max-width: 820px; margin: 0; color: #cbd4dc; font-size: 17px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 24px; color: #aab8c5; font-size: 13px; }
+    .layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 28px; padding: 30px 0 70px; }
+    nav { position: sticky; top: 20px; align-self: start; padding: 12px 0; border-left: 2px solid var(--line); }
+    nav a { display: block; padding: 7px 14px; color: #4f5e6e; text-decoration: none; font-size: 13px; }
+    nav a:hover { color: var(--green); background: var(--green-soft); }
+    main { min-width: 0; }
+    section { margin-bottom: 22px; padding: 28px 30px; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; }
+    h2 { margin: 0 0 17px; font-size: 22px; line-height: 1.3; }
+    h3 { margin: 24px 0 9px; font-size: 17px; }
+    h4 { margin: 18px 0 7px; font-size: 15px; }
+    p { margin: 8px 0 13px; }
+    ul, ol { padding-left: 22px; }
+    li { margin: 5px 0; }
+    code { padding: 2px 5px; color: #154b3b; background: #edf5f2; border-radius: 3px; font: 13px/1.5 "SFMono-Regular", Consolas, monospace; }
+    pre { overflow: auto; margin: 12px 0; padding: 17px 19px; color: #e7edf2; background: var(--code); border-radius: 5px; font: 12.5px/1.65 "SFMono-Regular", Consolas, monospace; white-space: pre-wrap; }
+    table { width: 100%; border-collapse: collapse; margin: 13px 0; font-size: 13.5px; }
+    th, td { padding: 10px 11px; text-align: left; vertical-align: top; border: 1px solid var(--line); }
+    th { background: #f2f5f6; font-weight: 700; }
+    .callout { margin: 15px 0; padding: 13px 16px; border-left: 4px solid var(--blue); background: var(--blue-soft); }
+    .warning { border-left-color: var(--amber); background: var(--amber-soft); }
+    .danger { border-left-color: var(--red); background: var(--red-soft); }
+    .success { border-left-color: var(--green); background: var(--green-soft); }
+    .badge { display: inline-block; margin-right: 6px; padding: 2px 7px; border: 1px solid #b9c5cf; border-radius: 3px; color: #475563; font-size: 11px; font-weight: 700; }
+    .flow { overflow-x: auto; padding: 18px; background: #f5f8f7; border: 1px solid var(--line); border-radius: 5px; font: 13px/1.8 "SFMono-Regular", Consolas, monospace; }
+    .phase { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 14px; padding: 14px 0; border-top: 1px solid var(--line); }
+    .phase:first-of-type { border-top: 0; }
+    .phase-id { color: var(--green); font-weight: 800; }
+    .checklist li::marker { color: var(--green); }
+    .prompt { max-height: 760px; }
+    footer { color: var(--muted); font-size: 12px; text-align: center; padding: 12px 20px 38px; }
+    @media (max-width: 820px) {
+      .header-inner, .layout { width: min(100% - 24px, 1180px); }
+      .header-inner { padding: 32px 0 28px; }
+      h1 { font-size: 27px; }
+      .layout { display: block; padding-top: 16px; }
+      nav { position: static; display: flex; overflow-x: auto; margin-bottom: 16px; border-left: 0; border-bottom: 1px solid var(--line); }
+      nav a { flex: 0 0 auto; }
+      section { padding: 21px 18px; }
+      table { display: block; overflow-x: auto; white-space: nowrap; }
+    }
+    @media print {
+      body { background: white; font-size: 11px; }
+      header { color: var(--ink); background: white; }
+      .lead, .meta { color: var(--muted); }
+      nav { display: none; }
+      .layout { display: block; width: 100%; padding: 10px; }
+      section { break-inside: avoid; border: 0; padding: 14px 0; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <div class="eyebrow">CURRENT-STATE AUDIT / REFACTOR RUNBOOK</div>
+    <h1>iOS Float 消息组件化分析与执行方案</h1>
+    <p class="lead">目标是在现有功能、UIKit 生命周期、事件语义和视觉尺寸不变的前提下，把消息类型、气泡渲染、交互、状态、样式、字体、边距与事件绑定拆成可独立调用、可验证、可逐步迁移的组件。</p>
+    <div class="meta"><span>分析日期：2026-07-16</span><span>范围：当前目录全部 Swift 源码</span><span>性质：只分析与规划，未修改业务代码</span></div>
+  </div>
+</header>
+
+<div class="layout">
+  <nav aria-label="文档目录">
+    <a href="#conclusion">结论</a>
+    <a href="#inventory">项目盘点</a>
+    <a href="#coupling">耦合与风险</a>
+    <a href="#target">目标架构</a>
+    <a href="#contracts">组件契约</a>
+    <a href="#inheritance">继承与生命周期</a>
+    <a href="#migration">迁移路线</a>
+    <a href="#verification">验证与回滚</a>
+    <a href="#prompt">GPT-5.6 提示词</a>
+  </nav>
+
+  <main>
+    <section id="conclusion">
+      <h2>1. 分析结论</h2>
+      <div class="callout success"><strong>可以拆，但必须采用“外部接口不变、内部逐步替换”的绞杀式迁移。</strong>第一阶段不改变 <code>ChatMessageCell.configure(...)</code>、<code>ChatMessageBubbleView.configure(...)</code>、Collection View 数据源与 delegate 行为，仅把计算和分派抽到纯 Swift 对象中。</div>
+      <p>当前工程已经创建 <code>Modules/MessageRender</code>、<code>Modules/Interaction</code>、<code>Modules/Data</code> 等目录及协议，但多数仍是薄 facade。真正的消息组件仍集中在两个巨型文件：</p>
+      <table>
+        <thead><tr><th>文件</th><th>规模</th><th>当前职责</th><th>判断</th></tr></thead>
+        <tbody>
+          <tr><td><code>ChatWindowViewController.swift</code></td><td>36,470 行</td><td>窗口、消息列表、状态、发送、语音、引用、多选、拖拽、OpenAPI、众多业务页面</td><td>严重多职责，是迁移风险中心</td></tr>
+          <tr><td><code>ChatCells.swift</code></td><td>5,009 行</td><td>侧栏、气泡、30 类消息渲染、高度估算、字体颜色、媒体加载、点击命中、输入栏</td><td>气泡实现高度耦合</td></tr>
+          <tr><td><code>ChatModels.swift</code></td><td>1,069 行</td><td>领域模型，同时包含 UIKit 颜色、图标、布局模板和高度</td><td>领域层与展示层混合</td></tr>
+          <tr><td><code>Modules/MessageRender/MessageRenderKit.swift</code></td><td>37 行</td><td>高度估算、schema facade</td><td>接口存在，但反向依赖巨型 View</td></tr>
+        </tbody>
+      </table>
+      <p><span class="badge">关键事实</span><code>ChatMessageType</code> 共 30 种；<code>ChatMessageBubbleView</code> 从约第 930 行延续至第 4,810 行；气泡内同时存在约束状态、媒体任务、交互命中目标、视觉状态和静态高度算法。</p>
+    </section>
+
+    <section id="inventory">
+      <h2>2. 当前制作方式与调用链</h2>
+      <h3>2.1 数据与展示模型</h3>
+      <ul>
+        <li><code>ChatMessage</code> 是持久化与 UI 共用实体，包含 sender、正文、附件、AI、群聊、富元素、引用与合并转发。</li>
+        <li><code>ChatMessageType</code> 同时定义业务枚举、标题、SF Symbol、强调色、布局类型和推荐高度。</li>
+        <li><code>MessageBubbleSchema</code> 已具备成为稳定渲染输入的基础，但目前渲染 View 仍直接读取 <code>ChatMessage</code>。</li>
+        <li><code>ChatDemoState</code> 既是页面状态，也是筛选/选择账号/可见消息的派生逻辑容器。</li>
+      </ul>
+
+      <h3>2.2 实际渲染链</h3>
+      <div class="flow">ChatWindowViewController.state
+  → renderedMessages / 缓存
+  → UICollectionViewDataSource
+  → ChatMessageCell.configure(... 11 个输入)
+  → ChatMessageBubbleView.configure(... 9 个输入)
+  → type.template + mode(for:) + palette(for:)
+  → applyDirection / applyConversation / applyPalette / applyContent
+  → 具体消息 configureXxxPreview(...)</div>
+      <p>高度计算走另一条平行链：控制器的 <code>MessageHeightCacheKey</code> → <code>AppKits.registry.messageRenderKit</code> → <code>ChatMessageBubbleView.estimatedHeight</code>。这意味着“显示布局”和“估高逻辑”仍可能漂移，拆分时必须让二者共享同一份 Layout Spec。</p>
+
+      <h3>2.3 交互链</h3>
+      <p>Cell 不直接发业务事件，而是提供 <code>detectedLink</code>、<code>detectedInlineCard</code>、<code>detectedRichMedia</code> 等坐标命中接口；控制器在 Collection View 点击、长按、drag/drop delegate 中判定并执行业务跳转。优点是业务动作仍在控制器，缺点是事件种类没有统一类型，坐标转换与展示实现紧密绑定。</p>
+
+      <h3>2.4 已有模块边界的真实状态</h3>
+      <table>
+        <thead><tr><th>模块</th><th>已有能力</th><th>缺口</th></tr></thead>
+        <tbody>
+          <tr><td>MessageRenderKit</td><td>估高、schema</td><td>没有 renderer registry、style/token、typed event、state input</td></tr>
+          <tr><td>InteractionKit</td><td>全局交互安装、快照标题</td><td>未承接消息 tap/long-press/drag 事件</td></tr>
+          <tr><td>DataLayer</td><td>SQLite facade</td><td>消息 UI 状态与持久化状态仍未区分</td></tr>
+          <tr><td>FloatingIMKit</td><td>会话快照和闭包适配</td><td>与主控制器的列表状态整合有限</td></tr>
+        </tbody>
+      </table>
+      <div class="callout warning"><strong>工程元数据缺失：</strong>当前目录未发现 <code>.xcodeproj</code>、<code>.xcworkspace</code>、<code>Package.swift</code>，也不是 Git 仓库。因此现在无法执行真实编译、单元测试和提交级回滚。实施前必须先确认这些 Swift 文件在宿主 Xcode target 中的 membership。</div>
+    </section>
+
+    <section id="coupling">
+      <h2>3. 耦合点与功能回归风险</h2>
+      <table>
+        <thead><tr><th>风险</th><th>证据</th><th>拆分时的保护措施</th></tr></thead>
+        <tbody>
+          <tr><td>复用污染</td><td>气泡持有大量 hidden、constraint、task、hit-target 状态</td><td>先定义完整 <code>resetForReuse()</code> 契约；每次 render 前 reset；异步回调校验 messageID/URL</td></tr>
+          <tr><td>估高与显示不一致</td><td>heuristic、fittedHeight、Auto Layout 并存</td><td>建立唯一 <code>MessageLayoutSpec</code>，renderer 的 measure/render 共用它</td></tr>
+          <tr><td>事件语义丢失</td><td>点击通过点坐标查 link/card/media</td><td>保持旧命中 API，内部转换成 <code>MessageAction</code>；第二阶段才切控制器</td></tr>
+          <tr><td>继承生命周期失效</td><td>Cell/View 依赖 <code>prepareForReuse</code>、<code>layoutSubviews</code>、<code>isHighlighted</code></td><td>UIKit 子类壳保留；纯对象不继承 UIView；override 调用 super 的顺序写入测试清单</td></tr>
+          <tr><td>视觉漂移</td><td>颜色、字体、边距散落在数百个方法中</td><td>先“照抄数值”形成 Legacy Tokens，不在拆分阶段重新设计</td></tr>
+          <tr><td>状态爆炸</td><td><code>configure</code> 带 voice/stream/blur/3D/delivery/group 等布尔参数</td><td>归并成可 Hash 的 <code>MessageRenderState</code>，禁止新增布尔参数</td></tr>
+          <tr><td>模型兼容性</td><td>SQLite 直接编码/解码现有 Codable 模型</td><td>第一轮不修改 enum rawValue、CodingKeys、字段类型及数据库 schema</td></tr>
+          <tr><td>跨文件访问控制</td><td>大量 <code>private</code> 类型和方法</td><td>只将必要符号提升为 internal；不为拆分而 public；编译通过后再收紧</td></tr>
+        </tbody>
+      </table>
+      <div class="callout danger"><strong>禁止一次性重写：</strong>直接把 3,800 行气泡类拆成 30 个 View，会同时改变约束激活顺序、复用状态、估高与点击命中，缺少工程和测试时无法判断回归来源。</div>
+    </section>
+
+    <section id="target">
+      <h2>4. 建议目标架构</h2>
+      <p>采用“领域模型 → 展示映射 → renderer → UIKit 容器 → 页面协调器”单向依赖。消息种类使用组合与注册，不建立 30 层 View 继承树。</p>
+      <div class="flow">ChatCore（无 UIKit，保留 Codable）
+  └─ ChatMessage / ChatMessageType / RichElement
+         ↓ MessagePresentationMapper
+MessagePresentation（可测试、尽量值类型）
+  ├─ MessageRenderModel
+  ├─ MessageRenderState
+  ├─ MessageLayoutSpec
+  ├─ MessageStyleTokens
+  └─ MessageAction
+         ↓
+MessageRenderKit
+  ├─ MessageRendererRegistry
+  ├─ TextRenderer / MediaRenderer / CardRenderer / PaymentRenderer ...
+  ├─ MessageMeasurer
+  └─ MediaLoading
+         ↓
+UIKit Shell
+  ├─ ChatMessageBubbleView（兼容 facade）
+  └─ ChatMessageCell（复用、选中、高亮）
+         ↓ typed events
+ChatScene
+  ├─ ChatMessageListAdapter（data source/delegate）
+  ├─ ChatViewStateStore（选择、引用、播放等）
+  └─ ChatActionCoordinator（导航与副作用）</div>
+
+      <h3>4.1 推荐目录</h3>
+      <pre>Modules/MessageRender/
+  Public/
+    MessageRenderKit.swift
+    MessageRenderModel.swift
+    MessageRenderState.swift
+    MessageAction.swift
+  Foundation/
+    MessageStyleTokens.swift
+    MessageLayoutSpec.swift
+    MessagePresentationMapper.swift
+    MessageRendererRegistry.swift
+    MessageMeasurer.swift
+  Renderers/
+    TextMessageRenderer.swift
+    MediaMessageRenderer.swift
+    VoiceMessageRenderer.swift
+    CardMessageRenderer.swift
+    PaymentMessageRenderer.swift
+    SystemMessageRenderer.swift
+    RichElementsRenderer.swift
+  Views/
+    MessageBubbleContainerView.swift
+    MessageAvatarView.swift
+    MessageMetaView.swift
+    MessageSelectionView.swift
+  Services/
+    MessageMediaLoading.swift
+
+Features/ChatScene/
+  ChatViewState.swift
+  ChatViewStateStore.swift
+  ChatMessageListAdapter.swift
+  ChatActionCoordinator.swift
+  ChatComposerController.swift</pre>
+
+      <h3>4.2 Renderer 分组，而不是每类型一个大类</h3>
+      <table>
+        <thead><tr><th>Renderer</th><th>覆盖消息</th><th>共享能力</th></tr></thead>
+        <tbody>
+          <tr><td>Text</td><td>text、emoji、quotedReply、relay、groupNotice</td><td>文本排版、链接、引用块</td></tr>
+          <tr><td>Media</td><td>image、capturedPhoto、stickerGif、video、channelsVideo</td><td>比例、缩略图、隐私遮罩、播放标识</td></tr>
+          <tr><td>Voice/Call</td><td>voice、voiceCall、videoCall</td><td>播放状态、波形、通话记录</td></tr>
+          <tr><td>Card</td><td>file、location、contactCard、groupInvite、webLink、article、miniProgram、channelsLive、music、favorite、mergedForward、coupon</td><td>卡片容器、图标、footer、跳转事件</td></tr>
+          <tr><td>Payment</td><td>redPacket、transfer、splitBill</td><td>金额、进度、完成态</td></tr>
+          <tr><td>System</td><td>system</td><td>居中提示，无普通气泡方向</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="contracts">
+      <h2>5. 必要组件模块与契约</h2>
+      <h3>5.1 状态逻辑</h3>
+      <pre>struct MessageRenderState: Hashable {
+    var isVoicePlaying: Bool
+    var isAIStreaming: Bool
+    var screenshotMediaBlurEnabled: Bool
+    var mediaPrivacyBlurEnabled: Bool
+    var uses3DAppearance: Bool
+    var deliveryStatusText: String?
+    var selection: SelectionState
+    var groupDisplay: GroupDisplayState
+}</pre>
+      <p>页面级状态另放 <code>ChatViewState</code>：当前账号/会话、引用消息、多选集合、正在播放的消息、分页上限、输入面板状态。View 不能直接写页面状态，只通过事件上报。</p>
+
+      <h3>5.2 事件绑定</h3>
+      <pre>enum MessageAction: Equatable {
+    case openURL(URL)
+    case openInlineCard(kind: BubbleCardKind, url: URL?)
+    case openMedia(messageID: UUID, source: MediaSource)
+    case playVoice(messageID: UUID)
+    case openContact(UUID?)
+    case openMergedForward(messageID: UUID)
+    case longPress(messageID: UUID, sourceRect: CGRect)
+    case beginDrag(messageID: UUID)
+    case toggleSelection(messageID: UUID)
+}
+
+protocol MessageRendering: AnyObject {
+    var onAction: ((MessageAction) -> Void)? { get set }
+    func render(model: MessageRenderModel, state: MessageRenderState, style: MessageStyleTokens)
+    func measure(model: MessageRenderModel, state: MessageRenderState, width: CGFloat) -> CGFloat
+    func resetForReuse()
+}</pre>
+      <p>实现早期可保留坐标命中函数作为 compatibility bridge，统一事件稳定后再删除旧接口。闭包必须由 Cell/adapter 持有并避免形成 retain cycle。</p>
+
+      <h3>5.3 样式、字体与边距</h3>
+      <p>不要用散落的 <code>CGFloat</code> 和 <code>UIFont.systemFont</code>。建立语义 token，同时第一版数值严格等于旧实现：</p>
+      <pre>struct MessageStyleTokens {
+    struct Typography { let body, detail, meta, sender, cardTitle: UIFont }
+    struct Spacing { let row, bubbleContent, avatarGap, cardContent: NSDirectionalEdgeInsets }
+    struct Radius { let bubble, card, media: CGFloat }
+    struct Colors { let incoming, outgoing, text, detail, link, ai, muted: UIColor }
+    struct Metrics { let avatarSize, maxBubbleWidth, selectionInset: CGFloat }
+}</pre>
+      <p>支持 Dynamic Type 时要作为后续独立需求；组件化第一阶段若直接切换动态字体，会导致高度和截图基线同时变化。</p>
+
+      <h3>5.4 渲染注册与正常调用</h3>
+      <pre>let registry = MessageRendererRegistry.default
+let model = mapper.makeRenderModel(from: message)
+let renderer = registry.renderer(for: model.kind)
+cell.render(model: model, state: renderState, renderer: renderer)
+
+// 过渡期继续支持现有调用，内部转发到新管线：
+cell.configure(with: message, isVoicePlaying: ..., showsGroupAvatar: ...)</pre>
+      <p>Registry 启动时应断言 <code>Set(ChatMessageType.allCases)</code> 与已注册类型完全相等，避免新增消息类型出现空白 Cell。</p>
+    </section>
+
+    <section id="inheritance">
+      <h2>6. 如何保证继承类、协议与 UIKit 生命周期继续生效</h2>
+      <div class="callout"><strong>原则：</strong>继承只保留在 UIKit 边界，业务变化用组合。现有 <code>UIView</code>/<code>UICollectionViewCell</code> 子类先保留类名、父类和初始化入口，避免 storyboard、注册和运行时行为断裂。</div>
+      <table>
+        <thead><tr><th>生命周期/协议</th><th>必须保留的语义</th><th>验证点</th></tr></thead>
+        <tbody>
+          <tr><td><code>init(frame:)</code> / <code>init(coder:)</code></td><td>二者都进入同一 setup；不可重复添加子视图/约束</td><td>实例化两种路径，无重复约束告警</td></tr>
+          <tr><td><code>prepareForReuse()</code></td><td>先调用 super；取消图片任务；清空 closure、hit targets、transform、hidden 与约束状态</td><td>快速滚动后无错图、错事件、残留选择态</td></tr>
+          <tr><td><code>layoutSubviews()</code></td><td>先 super，再更新依赖 bounds 的外观；不得持续创建约束</td><td>旋转/改宽度后无 layout loop</td></tr>
+          <tr><td><code>isHighlighted</code></td><td>保留多选态下禁止缩放的逻辑</td><td>普通点击和多选高亮分别对比</td></tr>
+          <tr><td>Collection View protocols</td><td>item 数、index 映射、prefetch、drag/drop、selection 顺序不变</td><td>用 adapter 迁移时逐方法转发，不一次搬完</td></tr>
+          <tr><td>手势/坐标</td><td>Cell → bubble → hit view 的 convert 链不变</td><td>对 link/card/media 边界点做命中测试</td></tr>
+          <tr><td>异步资源</td><td>任务取消 + represented URL/messageID 双重校验 + 主线程 UI</td><td>复用压力测试、失败重试测试</td></tr>
+        </tbody>
+      </table>
+      <h3>访问控制策略</h3>
+      <ol>
+        <li>同一 target 拆文件时，原 <code>private</code> 符号不能跨文件使用；优先通过协议/小型输入模型消除访问，不要整批改成 public。</li>
+        <li>确需共享的实现标记为默认 <code>internal</code>；只有真正作为模块 API 的协议和模型才 <code>public</code>。</li>
+        <li>若未来拆为 Swift Package，UIKit API 需补齐 public init/method，且 Core target 不得 import UIKit。</li>
+        <li>不要依赖“子类覆盖 private 方法”；renderer 使用协议组合，避免脆弱基类。</li>
+      </ol>
+    </section>
+
+    <section id="migration">
+      <h2>7. 安全迁移路线</h2>
+      <div class="phase"><div class="phase-id">P0</div><div><strong>补齐可构建环境与基线。</strong>找到宿主 project/workspace、记录 scheme 与 iOS deployment target；建立分支；让当前代码零错误构建；采集 30 种消息 × 收发方向 × 群聊开关的截图和高度清单。</div></div>
+      <div class="phase"><div class="phase-id">P1</div><div><strong>Characterization Tests。</strong>不改变实现，覆盖 Codable 往返、每类 schema、估高、消息类型注册完整性、Cell 复用、链接/卡片/媒体命中。记录当前行为，包括看似不合理但产品已依赖的行为。</div></div>
+      <div class="phase"><div class="phase-id">P2</div><div><strong>抽取输入与 Tokens。</strong>增加 <code>MessageRenderState</code>、<code>MessageStyleTokens.legacy</code>、<code>MessageLayoutSpec</code>；旧 configure 签名组装新 state 后仍调用旧内容。此阶段截图必须像素级基本不变。</div></div>
+      <div class="phase"><div class="phase-id">P3</div><div><strong>抽取纯逻辑。</strong>先迁移 mode、palette、字体、卡片类型映射、文本测量等 static/pure 函数。新旧路径做 debug 双算断言，高度差超过容差即报告。</div></div>
+      <div class="phase"><div class="phase-id">P4</div><div><strong>引入 Renderer Registry。</strong>按 System → Text → Voice → Payment → Card → Media 的顺序逐组迁移。每组通过测试和截图后才删除旧分支；未迁移类型继续走 LegacyRenderer。</div></div>
+      <div class="phase"><div class="phase-id">P5</div><div><strong>统一 typed events。</strong>View 发 <code>MessageAction</code>，兼容层继续响应旧 hit-test API；控制器逐个动作切换到 <code>ChatActionCoordinator</code>。</div></div>
+      <div class="phase"><div class="phase-id">P6</div><div><strong>拆页面状态。</strong>先抽 <code>ChatMessageListAdapter</code>，再抽选中/引用/播放状态，最后抽输入与发送；每次仅迁移一个 delegate 族或状态族。</div></div>
+      <div class="phase"><div class="phase-id">P7</div><div><strong>清理兼容层。</strong>只有当所有类型、状态和事件都在新路径且回归通过后，才删除旧 helper；重新收紧访问控制和更新模块文档。</div></div>
+
+      <h3>每个阶段的完成定义</h3>
+      <ul class="checklist">
+        <li>Debug 与 Release 均构建成功，无新增 Auto Layout 警告。</li>
+        <li>30 种 <code>ChatMessageType</code> 均有 renderer，未知/缺失时有明确 fallback。</li>
+        <li>原有公开/内部调用签名仍可编译，或已提供迁移适配器。</li>
+        <li>旧数据可解码、SQLite 可读写，不改 enum rawValue。</li>
+        <li>滚动、复用、旋转、群聊头像/名字、3D、AI 流式、隐私遮罩状态通过。</li>
+        <li>一次提交只完成一个阶段，可单独 revert。</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2>8. 验证矩阵与回滚机制</h2>
+      <h3>8.1 最低测试矩阵</h3>
+      <table>
+        <thead><tr><th>维度</th><th>组合</th><th>检查内容</th></tr></thead>
+        <tbody>
+          <tr><td>消息</td><td>30 types × incoming/outgoing</td><td>内容、方向、颜色、字体、边距、高度</td></tr>
+          <tr><td>会话</td><td>单聊；群聊头像/名字四组合</td><td>头像、名字、top spacing、最大宽度</td></tr>
+          <tr><td>状态</td><td>普通、选中、播放、AI streaming、blur、3D、delivery</td><td>状态切换后无残留</td></tr>
+          <tr><td>尺寸</td><td>窄/宽窗口、旋转、内容字号基准</td><td>估高与实际 fitting height 差值</td></tr>
+          <tr><td>复用</td><td>连续滚动 200+ 次、类型交替</td><td>无错图、错卡、旧 closure、约束告警</td></tr>
+          <tr><td>交互</td><td>tap、long press、link、card、media、drag/drop、多选</td><td>messageID 和 action payload 正确</td></tr>
+          <tr><td>持久化</td><td>旧 JSON/SQLite 样本 round-trip</td><td>字段与 rawValue 不变</td></tr>
+        </tbody>
+      </table>
+
+      <h3>8.2 自动化建议</h3>
+      <ul>
+        <li>单元测试：mapper、registry completeness、layout spec、action mapping、Codable。</li>
+        <li>快照测试：固定 trait、固定宽度、固定日期和本地资源，按消息类型命名 golden image。</li>
+        <li>集成测试：用真实 Collection View 滚动与复用，而非只截图单个 View。</li>
+        <li>性能：记录首次渲染、滚动帧率、高度缓存命中率、图片任务数和内存峰值。</li>
+      </ul>
+
+      <h3>8.3 Feature Flag 与回滚</h3>
+      <pre>enum MessageRendererVersion { case legacy, componentized }
+
+// Debug 可逐消息类型开启；Release 初期可总开关回退。
+registry.setVersion(.componentized, for: [.system, .text])</pre>
+      <p>每组 renderer 在稳定前保留 LegacyRenderer。若出现线上问题，只切 flag 回旧路径，不回滚模型和 SQLite。完成全部迁移并稳定一个版本周期后再移除 legacy。</p>
+    </section>
+
+    <section id="prompt">
+      <h2>9. 可直接交给 GPT-5.6 的执行提示词</h2>
+      <p>下列提示词刻意限制一次只执行一个阶段。首次建议把 <code>{{PHASE}}</code> 设置为 <code>P0 + P1</code>；在没有宿主 Xcode 工程时，不应让模型直接大规模拆文件。</p>
+      <pre class="prompt">你是资深 iOS/UIKit 架构师与重构执行者。请在当前 ios-float 项目中执行“消息组件化”工作。
+
+【总目标】
+在现有行为、视觉、数据兼容性、事件语义和 UIKit 生命周期保持正常的前提下，将消息类型、气泡渲染、交互逻辑、状态逻辑、样式、字体、边距、事件绑定拆成可独立调用和测试的组件。禁止一次性重写。
+
+【先读资料】
+1. 完整阅读当前目录的《iOS消息组件化分析与执行方案.html》。
+2. 阅读 ChatModels.swift、ChatCells.swift、ChatWindowViewController.swift。
+3. 阅读 Modules/AppKitRegistry.swift、Modules/MessageRender/MessageRenderKit.swift、Modules/Interaction/InteractionKit.swift、Modules/Data/ChatDataLayerKit.swift。
+4. 搜索并确认宿主 .xcodeproj/.xcworkspace、scheme、target membership、deployment target 和测试 target。若当前目录没有，向父目录查找；仍不存在则只做不依赖编译的最小准备，并明确报告阻塞，绝不假装测试通过。
+
+【本轮只执行】
+阶段：{{PHASE}}
+不要提前执行后续阶段。先给出本阶段文件级计划，再修改代码；计划必须列出兼容接口、验证命令和回滚点。
+
+【不可破坏的约束】
+- 不改变 ChatMessageType 的 rawValue、ChatMessage Codable 字段/CodingKeys、SQLite schema 和现有数据语义。
+- 第一阶段保留 ChatMessageCell、ChatMessageBubbleView 的类名、父类、init(frame:)、init(coder:)、prepareForReuse、layoutSubviews、isHighlighted 及现有 configure 调用入口。
+- 所有 UIKit override 正确调用 super；不得在 layoutSubviews 中重复创建约束。
+- 异步媒体加载必须取消旧任务，并使用 represented messageID/URL 防止 Cell 复用错图；UI 更新回主线程。
+- 保持 UICollectionView 的 item-index 映射、prefetch、didSelect、drag/drop、多选与坐标转换语义。
+- 不在组件化同时重新设计 UI、调整字体、颜色、圆角、边距或启用 Dynamic Type。先把现有数值原样收敛到 legacy tokens。
+- 不将大量 private 符号粗暴改成 public；优先用输入模型和协议解耦，必要共享默认 internal。
+- 不引入 30 层 UIView 继承树；UIKit 边界使用继承，消息差异使用 renderer 组合与 registry。
+- 每次只迁移一组消息类型，未迁移类型必须走 LegacyRenderer。
+- 不删除旧实现，直到对应新路径的单测、快照、集成与编译均通过。
+- 保留用户已有改动，不执行 git reset --hard、checkout 覆盖或无关格式化。
+
+【目标公共模型】
+- MessageRenderModel：由 ChatMessage 映射出的稳定展示输入。
+- MessageRenderState：voicePlaying、AIStreaming、两种 blur、3D、delivery、selection、groupDisplay 的值类型集合。
+- MessageStyleTokens.legacy：字体、颜色、圆角、间距、尺寸的唯一来源，初值严格等于旧 UI。
+- MessageLayoutSpec：measure 与 render 共享，防止估高和实际布局漂移。
+- MessageAction：openURL、openCard、openMedia、playVoice、openContact、openMergedForward、longPress、beginDrag、toggleSelection 等强类型事件。
+- MessageRendererRegistry：启动/测试时断言 ChatMessageType.allCases 全覆盖，并提供 LegacyRenderer fallback。
+
+【推荐执行顺序】
+P0：建立可构建基线，确认工程/target/scheme，记录构建命令和当前警告；采集 30 类消息基线。
+P1：添加 characterization tests：Codable 往返、schema、估高、registry 完整性、Cell 复用、link/card/media 命中。
+P2：仅新增 MessageRenderState、MessageStyleTokens.legacy、MessageLayoutSpec；旧 configure 组装 state，视觉不变。
+P3：抽取 mode/palette/font/type mapping/text measurement 等纯函数；debug 下新旧双算并比较。
+P4：按 System → Text → Voice → Payment → Card → Media 逐组引入 renderer；一次只做一组。
+P5：引入 typed MessageAction，先保留旧 hit-test compatibility bridge，再逐个迁移控制器。
+P6：按 ListAdapter → selection/quote/playback store → composer 的顺序拆 ChatWindowViewController。
+P7：全量验证后清理 legacy、收紧访问控制、更新文档。
+
+【每次修改后的强制验证】
+1. 运行 Debug 和 Release 构建，原样报告命令与结果。
+2. 运行已有及新增测试；失败时先定位，不能删除或弱化断言来通过。
+3. 检查 30 个 ChatMessageType 的 registry 覆盖。
+4. 检查 incoming/outgoing、单聊/群聊头像名字组合、选择、播放、AI streaming、blur、3D、delivery。
+5. 检查快速复用无错图、错事件、残留约束/hidden/transform；无新增 Auto Layout warning。
+6. 对比固定宽度下旧/新高度；明确容差和差异原因。
+7. 若能运行模拟器，生成关键类型的 before/after 截图并对比。
+
+【输出格式】
+- 开始前：当前阶段、发现的工程事实、将修改的文件、兼容策略、验证方式。
+- 执行中：小步修改，每一步说明为何安全。
+- 完成后：实际改动、未改内容、构建/测试/截图结果、已知风险、明确回滚点、下一阶段建议。
+- 若缺少 Xcode 工程或测试 target：明确写“未能编译验证”，不得声称完成组件化；仅提交可审阅的最小改动或测试设计。
+
+现在先检查工作区与本文档，然后只执行 {{PHASE}}。</pre>
+    </section>
+
+    <section>
+      <h2>10. 最终验收标准</h2>
+      <ol>
+        <li><code>ChatWindowViewController</code> 不再负责具体消息排版、命中测试和气泡展示状态。</li>
+        <li><code>ChatMessageBubbleView</code> 成为薄容器/facade，不再含全部 30 类实现。</li>
+        <li>新增消息类型只需：模型映射 + 注册 renderer + 测试，不修改巨型 switch 链。</li>
+        <li>样式、字体、边距通过 token 注入；measure 与 render 使用同一 Layout Spec。</li>
+        <li>强类型事件从组件传给 coordinator，View 不执行导航、持久化和业务副作用。</li>
+        <li>UIKit 继承类的初始化、复用、布局、高亮、delegate 和手势行为有自动化或明确回归证据。</li>
+        <li>旧 SQLite/JSON 数据兼容，30 类消息可正常展示、交互、滚动和复用。</li>
+      </ol>
+      <div class="callout success"><strong>建议第一步：</strong>先补回宿主 Xcode 工程/测试入口并完成 P0、P1。没有可重复构建与行为基线，任何大规模“成功拆分”都不可验证。</div>
+    </section>
+  </main>
+</div>
+<footer>基于当前源码静态分析生成。本文件不依赖外部资源，可直接在浏览器打开或打印为 PDF。</footer>
+</body>
+</html>

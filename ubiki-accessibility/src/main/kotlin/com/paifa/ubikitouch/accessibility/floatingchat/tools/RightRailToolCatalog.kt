@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.PhoneIphone
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.VideoLibrary
@@ -25,14 +26,18 @@ internal data class RightRailToolCatalogItem(
     val label: String,
     val icon: ImageVector,
     val action: FloatingChatToolAction? = null,
-    val opensCouponWallet: Boolean = false
+    val opensCouponWallet: Boolean = false,
+    val opensBackgroundRemoval: Boolean = false,
+    val opensFriendManagement: Boolean = false,
+    val opensContactRelations: Boolean = false,
+    val isBubbleAppearanceToggle: Boolean = false
 )
 
 internal val rightRailToolCatalog = listOf(
     item("群信息", Icons.Filled.Contacts), item("眨眼测试", Icons.Filled.Visibility, FloatingChatToolAction.Blink),
     item("语音助手", Icons.Filled.Mic, FloatingChatToolAction.AiVoice), item("遥感套索", Icons.Filled.LocationOn),
-    item("智能抠图", Icons.Filled.Image), item("UI组件", Icons.Filled.AutoAwesome), item("OpenAI", Icons.Filled.SmartToy),
-    item("侧边特效", Icons.Filled.AutoAwesome), item("账号设置", Icons.Filled.AccountBox), item("好友管理", Icons.Filled.Contacts, FloatingChatToolAction.Contacts),
+    item("智能抠图", Icons.Filled.Image, opensBackgroundRemoval = true), item("UI组件", Icons.Filled.AutoAwesome), item("OpenAPI", Icons.Filled.SmartToy, FloatingChatToolAction.Command),
+    item("侧边特效", Icons.Filled.AutoAwesome), item("账号设备", Icons.Filled.PhoneIphone, FloatingChatToolAction.Device), item("好友管理", Icons.Filled.Contacts, FloatingChatToolAction.Contacts),
     item("同步群聊", Icons.Filled.Contacts), item("侧边特效", Icons.Filled.AutoAwesome), item("3D气泡", Icons.Filled.BubbleChart),
     item("AI自动回复", Icons.Filled.SmartToy, FloatingChatToolAction.Assistant), item("朋友圈", Icons.Filled.Collections, FloatingChatToolAction.Moments),
     item("素材库", Icons.Filled.Collections, FloatingChatToolAction.MomentMaterials), item("微信小程序", Icons.Filled.Article),
@@ -47,11 +52,27 @@ internal val rightRailToolCatalog = listOf(
     item("接龙消息", Icons.Filled.Article), item("文件/文档", Icons.Filled.Folder, FloatingChatToolAction.Files), item("语音消息", Icons.Filled.Mic, FloatingChatToolAction.Voice),
     item("语音通话", Icons.Filled.Call), item("视频通话", Icons.Filled.VideoLibrary), item("红包", Icons.Filled.AccountBox, FloatingChatToolAction.RedPacket),
     item("转账", Icons.Filled.AccountBox, FloatingChatToolAction.Transfer), item("AA收款", Icons.Filled.AccountBox), item("微信卡券", Icons.Filled.CardGiftcard, opensCouponWallet = true)
-)
+).mapIndexed { index, item ->
+    when (index) {
+        9 -> item.copy(opensFriendManagement = true)
+        19 -> item.copy(opensContactRelations = true)
+        18 -> item.copy(action = FloatingChatToolAction.Notes)
+        else -> item
+    }
+}
 
 private fun item(
     label: String,
     icon: ImageVector,
     action: FloatingChatToolAction? = null,
-    opensCouponWallet: Boolean = false
-) = RightRailToolCatalogItem(label = label, icon = icon, action = action, opensCouponWallet = opensCouponWallet)
+    opensCouponWallet: Boolean = false,
+    opensBackgroundRemoval: Boolean = false,
+    isBubbleAppearanceToggle: Boolean = icon == Icons.Filled.BubbleChart
+) = RightRailToolCatalogItem(
+    label = label,
+    icon = icon,
+    action = action,
+    opensCouponWallet = opensCouponWallet,
+    opensBackgroundRemoval = opensBackgroundRemoval,
+    isBubbleAppearanceToggle = isBubbleAppearanceToggle
+)

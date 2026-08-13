@@ -13,21 +13,6 @@ import org.junit.Test
 
 class ChatNavigationStateTest {
     @Test(timeout = 60_000)
-    fun `unread render diagnostics reports route and rendered message types`() {
-        val summary = homeUnreadRenderDiagnostics(
-            route = ChatNavigationRoute.SingleAccountUnread,
-            homeOverviewVisible = true,
-            messages = listOf(
-                FloatingChatMessage("text", FloatingChatMessageType.Text, "hello", false, "friend", "10:00"),
-                FloatingChatMessage("link", FloatingChatMessageType.WebLink, "link", false, "friend", "10:01"),
-                FloatingChatMessage("article", FloatingChatMessageType.Article, "article", false, "friend", "10:02")
-            )
-        )
-
-        assertEquals("route=SingleAccountUnread overview=true messages=3 types=Article:1,Text:1,WebLink:1", summary)
-    }
-
-    @Test(timeout = 60_000)
     fun `conversation back opens all accounts unread`() {
         val state = ChatNavigationState(
             route = ChatNavigationRoute.Conversation,

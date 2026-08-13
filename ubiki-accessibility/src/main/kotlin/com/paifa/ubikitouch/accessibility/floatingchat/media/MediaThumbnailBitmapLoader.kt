@@ -40,7 +40,7 @@ internal fun rememberAsyncImageThumbnailBitmap(message: FloatingChatMessage): Bi
 }
 
 @Composable
-internal fun rememberAsyncImageThumbnailBitmap(
+fun rememberAsyncImageThumbnailBitmap(
     context: Context,
     uriText: String?,
     maxSizePx: Int = REAL_MEDIA_DECODE_MAX_SIZE_PX,

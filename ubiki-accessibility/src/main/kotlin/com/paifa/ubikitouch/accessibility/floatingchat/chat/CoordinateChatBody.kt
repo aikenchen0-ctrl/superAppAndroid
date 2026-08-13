@@ -36,7 +36,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalDensity
-import android.util.Log
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -51,6 +50,8 @@ import com.paifa.ubikitouch.accessibility.floatingchat.message.messageListInitia
 import com.paifa.ubikitouch.accessibility.floatingchat.message.messageListViewportKey
 import com.paifa.ubikitouch.accessibility.floatingchat.message.shouldRetargetMessageList
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.RightCoordinateRail
+import com.paifa.ubikitouch.accessibility.floatingchat.message.BubbleAppearance
+import com.paifa.ubikitouch.accessibility.floatingchat.message.bubbleAppearanceButtonLabel
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.rightRailWidthDp
 import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.core.model.FloatingChatContact
@@ -145,6 +146,8 @@ internal fun CoordinateChatBody(
     onThreadSelected: (ChatThreadSelection) -> Unit,
     onHomeUnreadSelected: (HomeUnreadThreadSummary) -> Unit,
     onToolAction: (FloatingChatToolAction) -> Unit,
+    bubbleAppearance: BubbleAppearance = BubbleAppearance.TwoD,
+    onBubbleAppearanceToggle: () -> Unit = {},
     onGroupAvatarLongClick: (FloatingChatContact) -> Unit,
     onContactAvatarLongClick: (FloatingChatContact) -> Unit,
     onAccountAvatarClick: (FloatingChatContact) -> Unit,
@@ -228,16 +231,6 @@ internal fun CoordinateChatBody(
         } else {
             threadMessages
         }
-    }
-    LaunchedEffect(navigationState.route, homeOverviewVisible, visibleMessages) {
-        Log.i(
-            "UbikiChatData",
-            "stage=rendered_messages " + homeUnreadRenderDiagnostics(
-                route = navigationState.route,
-                homeOverviewVisible = homeOverviewVisible,
-                messages = visibleMessages
-            )
-        )
     }
     val homeOverviewConnectorGroupIds = remember(
         homeOverviewVisible,
@@ -433,6 +426,7 @@ internal fun CoordinateChatBody(
                     }
                 },
                 onBlankAreaTap = onBlankAreaTap,
+                bubbleAppearance = bubbleAppearance,
                 modifier = Modifier
                     .align(Alignment.Center)
                     .fillMaxSize()
@@ -483,6 +477,8 @@ internal fun CoordinateChatBody(
             },
             connectorState = connectorState,
             onToolAction = onToolAction,
+            bubbleAppearanceLabel = bubbleAppearanceButtonLabel(bubbleAppearance),
+            onBubbleAppearanceToggle = onBubbleAppearanceToggle,
             onAccountAvatarClick = onAccountAvatarClick,
             onAccountAvatarLongClick = onAccountAvatarLongClick,
             modifier = Modifier

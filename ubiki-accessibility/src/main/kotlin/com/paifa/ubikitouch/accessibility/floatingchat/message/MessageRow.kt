@@ -26,8 +26,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -84,7 +88,8 @@ internal fun MessageRow(
     onBubbleBoundsChanged: (Rect) -> Unit,
     onGroupMemberAvatarBoundsChanged: (Rect) -> Unit,
     onGroupMemberAvatarRemoved: () -> Unit,
-    detailedBubble: Boolean = usesDetailedMessageBubble(homeOverviewVisible, selectedThread)
+    detailedBubble: Boolean = usesDetailedMessageBubble(homeOverviewVisible, selectedThread),
+    bubbleAppearance: BubbleAppearance = BubbleAppearance.TwoD
 ) {
     val groupMemberContact = remember(
         message,
@@ -166,6 +171,7 @@ internal fun MessageRow(
             homeOverviewAccountColor = homeOverviewAccountColor,
             senderNickname = senderNickname,
             showSenderNickname = showSenderNickname,
+            bubbleAppearance = bubbleAppearance,
             modifier = if (groupMemberContact != null && placement == MessageHorizontalPlacement.Start) {
                 Modifier.weight(1f, fill = false)
             } else {
@@ -202,6 +208,7 @@ internal fun MessageBlock(
     homeOverviewAccountColor: Long? = null,
     senderNickname: String,
     showSenderNickname: Boolean,
+    bubbleAppearance: BubbleAppearance = BubbleAppearance.TwoD,
     modifier: Modifier = Modifier
 ) {
     val bubbleClickSource = remember { MutableInteractionSource() }
@@ -231,6 +238,8 @@ internal fun MessageBlock(
     }
     val bubbleColor = messageBubbleColor(message, claimed)
     val bubbleBorderColor = messageBubbleBorderColor(message, claimed)
+    val usesThreeDimensionalBubble = messageUsesThreeDimensionalBubble(message, bubbleAppearance)
+    val threeDimensionalAccent = messageThreeDimensionalAccent(message)
     val aiDraftDashedBubble = aiDraftMessageUsesGreenDashedBubble(message)
     val usesDemoBubble = messageTypeUsesImModuleBubble(message.type) && !isSystem
     Column(
@@ -247,11 +256,29 @@ internal fun MessageBlock(
                     Box(
                         modifier = Modifier
                             .shadow(
-                                elevation = if (usesDemoBubble) 1.dp else 2.dp,
+                                elevation = if (usesThreeDimensionalBubble) 3.dp else if (usesDemoBubble) 1.dp else 2.dp,
                                 shape = bubbleShape,
                                 ambientColor = OverlayTokens.glassShadow,
-                                spotColor = OverlayTokens.glassShadow
+                                spotColor = if (usesThreeDimensionalBubble) {
+                                    threeDimensionalAccent.copy(alpha = 0.52f)
+                                } else {
+                                    OverlayTokens.glassShadow
+                                }
                             )
+                            .drawBehind {
+                                if (usesThreeDimensionalBubble) {
+                                    val radius = 10.dp.toPx()
+                                    drawRoundRect(
+                                        color = threeDimensionalAccent.copy(alpha = 0.28f),
+                                        topLeft = Offset(
+                                            x = if (message.fromMe) -1.2.dp.toPx() else 1.2.dp.toPx(),
+                                            y = 1.4.dp.toPx()
+                                        ),
+                                        size = size,
+                                        cornerRadius = CornerRadius(radius, radius)
+                                    )
+                                }
+                            }
                             .clip(bubbleShape)
                             .background(
                                 if (usesDemoBubble) {
@@ -263,6 +290,23 @@ internal fun MessageBlock(
                                     bubbleColor
                                 }
                             )
+                            .drawBehind {
+                                if (usesThreeDimensionalBubble) {
+                                    val radius = 10.dp.toPx()
+                                    drawRoundRect(
+                                        brush = Brush.linearGradient(
+                                            colors = listOf(
+                                                Color.White.copy(alpha = 0.16f),
+                                                Color.White.copy(alpha = 0.05f),
+                                                Color.Transparent
+                                            ),
+                                            start = Offset(size.width * 0.08f, 0f),
+                                            end = Offset(size.width * 0.92f, size.height)
+                                        ),
+                                        cornerRadius = CornerRadius(radius, radius)
+                                    )
+                                }
+                            }
                             .then(
                                 if (aiDraftDashedBubble) {
                                     Modifier.aiDraftDashedBorder(bubbleShape)

@@ -164,13 +164,14 @@ private fun rightRailNormalizeAccountWeight(weight: Float): Float {
 
 private const val RightRailWidthDp = 58
 private const val RailScreenEdgeInsetPx = 12
-private const val RailAvatarSizeDp = 46
-private const val RailToolButtonWidthDp = RailAvatarSizeDp
-private const val RailToolButtonHeightDp = RailAvatarSizeDp
+// Match iso-float's account rail: 50pt account cells and 50x44pt tool cells.
+private const val RailAvatarSizeDp = 50
+private const val RailToolButtonWidthDp = 50
+private const val RailToolButtonHeightDp = 44
 private const val RightRailItemGapDp = 6
 private const val RightRailExpansionSlackDp = 10
 private const val RightRailMinimumVisibleToolCount = 3
-private const val RightRailDefaultAccountWeight = 0.42f
+private const val RightRailDefaultAccountWeight = 0.48f
 private const val RightRailMinAccountWeight = 0.10f
 private const val RightRailMaxAccountWeight = 0.90f
 private const val RightRailSectionShiftFraction = 0.48f

@@ -46,7 +46,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import kotlin.math.sqrt
 
-private const val DefaultAvatarSizeDp = 46
+private const val DefaultAvatarSizeDp = 50
 
 @Composable
 internal fun DraftBadge() {
@@ -135,7 +135,7 @@ internal fun CompactAvatar(
     onRemoved: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(9.dp)
     val avatarColor = Color(contact.avatarColor)
     val border = when {
         highlightColor != null -> highlightColor

@@ -65,6 +65,29 @@ internal class ScrmApiConfig(
         }
     }
 
+    fun openApiEndpoint(
+        path: String,
+        query: Map<String, String?> = emptyMap()
+    ): String {
+        require(path.startsWith("/openapi/v1/") || path.startsWith("/openapi/docs/")) {
+            "OpenAPI 路径无效"
+        }
+        val encodedQuery = query.entries
+            .asSequence()
+            .filter { it.value != null }
+            .joinToString("&") { (name, value) ->
+                "${percentEncode(name)}=${percentEncode(requireNotNull(value))}"
+            }
+        return buildString {
+            append(baseUrl.removeSuffix(OpenApiBasePath))
+            append(path)
+            if (encodedQuery.isNotEmpty()) {
+                append('?')
+                append(encodedQuery)
+            }
+        }
+    }
+
     override fun toString(): String {
         return "ScrmApiConfig(baseUrl=$baseUrl, apiKey=${apiKey ?: RedactedSecret}, " +
             "connectTimeoutMillis=$connectTimeoutMillis, readTimeoutMillis=$readTimeoutMillis)"

@@ -2,6 +2,10 @@ package com.paifa.ubikitouch.accessibility.floatingchat.tools
 
 import com.paifa.ubikitouch.accessibility.FloatingChatBlinkVoiceBridge
 import com.paifa.ubikitouch.accessibility.FloatingChatMediaPickerBridge
+import com.paifa.ubikitouch.accessibility.FloatingChatOpenApiBridge
+import com.paifa.ubikitouch.accessibility.FloatingChatFinderPublishBridge
+import com.paifa.ubikitouch.accessibility.FloatingChatFavoriteLibraryBridge
+import com.paifa.ubikitouch.accessibility.FloatingChatMaterialLibraryBridge
 import com.paifa.ubikitouch.accessibility.FloatingChatMediaTarget
 import com.paifa.ubikitouch.accessibility.floatingchat.account.FloatingChatAccountProfile
 import com.paifa.ubikitouch.accessibility.floatingchat.account.accountProfileCardMessage
@@ -90,6 +94,22 @@ internal class ToolMessageActions(
             }
             ToolActionDispatch.OpenAssistantPanel -> onAssistantPanelOpened()
             ToolActionDispatch.OpenAiVoicePanel -> onAiVoicePanelOpened()
+            ToolActionDispatch.OpenApiWorkbench -> {
+                onBottomPanelModeChanged(BottomPanelMode.None)
+                FloatingChatOpenApiBridge.open()
+            }
+            ToolActionDispatch.OpenFinderPublish -> {
+                onBottomPanelModeChanged(BottomPanelMode.None)
+                FloatingChatFinderPublishBridge.open()
+            }
+            ToolActionDispatch.OpenMaterialLibrary -> {
+                onBottomPanelModeChanged(BottomPanelMode.None)
+                FloatingChatMaterialLibraryBridge.open()
+            }
+            ToolActionDispatch.OpenFavoriteLibrary -> {
+                onBottomPanelModeChanged(BottomPanelMode.None)
+                FloatingChatFavoriteLibraryBridge.open()
+            }
             is ToolActionDispatch.OpenBottomPanel -> onBottomPanelModeChanged(dispatch.mode)
             ToolActionDispatch.AddSimulatedMessage -> addToolMessage(action)
             ToolActionDispatch.None -> Unit

@@ -15,9 +15,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
@@ -48,17 +45,26 @@ internal fun QuickPhrasePanel(
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(9.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                TextLabel("快捷语", 17.sp, color = OverlayTokens.panelPrimaryText, maxLines = 1)
-                TextLabel("点击发送，长内容可直接编辑", 10.sp, color = OverlayTokens.panelSecondaryText, maxLines = 1)
-            }
-            IconButton(onClick = { onEvent(QuickPhraseUiEvent.AddRequested) }, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Filled.Add, contentDescription = "新增快捷语", tint = OverlayTokens.toolIcon)
-            }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            TextLabel(
+                if (state.isDeleting) "删除快捷语" else "快捷语管理",
+                17.sp,
+                color = OverlayTokens.panelPrimaryText,
+                maxLines = 1
+            )
+            TextLabel(
+                if (state.isDeleting) {
+                    if (state.phrases.isEmpty()) "暂无快捷语" else "选择要删除的快捷语"
+                } else {
+                    "选择快捷语填入输入框，或新增、删除快捷语"
+                },
+                10.sp,
+                color = OverlayTokens.panelSecondaryText,
+                maxLines = 1
+            )
         }
 
-        if (state.editingIndex != null) {
+        if (state.isAdding) {
             Surface(
                 shape = RoundedCornerShape(8.dp),
                 color = OverlayTokens.quickPhraseRow,
@@ -68,16 +74,11 @@ internal fun QuickPhrasePanel(
                     modifier = Modifier.padding(10.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    TextLabel(
-                        if (state.editingIndex == state.phrases.size) "新增快捷语" else "编辑快捷语",
-                        12.sp,
-                        color = OverlayTokens.panelPrimaryText,
-                        maxLines = 1
-                    )
+                    TextLabel("新增快捷语", 12.sp, color = OverlayTokens.panelPrimaryText, maxLines = 1)
                     PanelTextInput(
                         value = state.draft,
                         onValueChange = { value -> onEvent(QuickPhraseUiEvent.DraftChanged(value.take(120))) },
-                        placeholder = "输入常用回复",
+                        placeholder = "输入快捷语",
                         modifier = Modifier.fillMaxWidth()
                     )
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -85,7 +86,7 @@ internal fun QuickPhrasePanel(
                             Icon(Icons.Filled.Check, contentDescription = "保存快捷语", tint = OverlayTokens.toolIconActive)
                         }
                         IconButton(onClick = { onEvent(QuickPhraseUiEvent.CancelRequested) }, modifier = Modifier.size(34.dp)) {
-                            Icon(Icons.Filled.Close, contentDescription = "取消编辑", tint = OverlayTokens.panelIcon)
+                            Icon(Icons.Filled.Close, contentDescription = "取消新增", tint = OverlayTokens.panelIcon)
                         }
                     }
                 }
@@ -93,45 +94,64 @@ internal fun QuickPhrasePanel(
         }
 
         if (state.phrases.isEmpty()) {
-            TextLabel("还没有快捷语，点击右上角添加", 12.sp, color = OverlayTokens.panelSecondaryText, modifier = Modifier.padding(vertical = 24.dp), maxLines = 1)
+            Spacer(modifier = Modifier.size(12.dp))
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(7.dp)) {
                 itemsIndexed(state.phrases, key = { index, phrase -> "$index-$phrase" }) { index, phrase ->
                     QuickPhraseRow(
                         phrase = phrase,
-                        onSend = { onEvent(QuickPhraseUiEvent.SendRequested(index)) },
-                        onEdit = { onEvent(QuickPhraseUiEvent.EditRequested(index)) },
-                        onDelete = { onEvent(QuickPhraseUiEvent.DeleteRequested(index)) }
+                        destructive = state.isDeleting,
+                        onClick = {
+                            onEvent(
+                                if (state.isDeleting) QuickPhraseUiEvent.DeleteRequested(index)
+                                else QuickPhraseUiEvent.SendRequested(index)
+                            )
+                        }
                     )
                 }
             }
         }
+
+        if (!state.isDeleting) {
+            QuickPhraseAction("新增快捷语") { onEvent(QuickPhraseUiEvent.AddRequested) }
+            QuickPhraseAction("删除快捷语", destructive = state.phrases.isNotEmpty()) {
+                onEvent(QuickPhraseUiEvent.DeleteManagerRequested)
+            }
+        } else {
+            QuickPhraseAction("返回快捷语管理") { onEvent(QuickPhraseUiEvent.BackToManagerRequested) }
+        }
+        QuickPhraseAction("取消") { onEvent(QuickPhraseUiEvent.CancelRequested) }
     }
 }
 
 @Composable
-private fun QuickPhraseRow(phrase: String, onSend: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun QuickPhraseRow(phrase: String, destructive: Boolean, onClick: () -> Unit) {
     Surface(
-        onClick = onSend,
+        onClick = onClick,
         shape = RoundedCornerShape(8.dp),
         color = Color(0xFFF8FAFB),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Row(
-            modifier = Modifier.padding(start = 11.dp, top = 8.dp, bottom = 8.dp, end = 5.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TextLabel(phrase, 12.sp, color = OverlayTokens.panelPrimaryText, modifier = Modifier.weight(1f), maxLines = 3)
-            IconButton(onClick = onSend, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "发送快捷语", tint = OverlayTokens.toolIconActive)
-            }
-            IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Filled.Edit, contentDescription = "编辑快捷语", tint = OverlayTokens.panelIcon)
-            }
-            IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Filled.Delete, contentDescription = "删除快捷语", tint = Color(0xFFB65353))
-            }
-        }
+        TextLabel(
+            phrase,
+            12.sp,
+            color = if (destructive) Color(0xFFB65353) else OverlayTokens.panelPrimaryText,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 11.dp),
+            maxLines = 3
+        )
+    }
+}
+
+@Composable
+private fun QuickPhraseAction(label: String, destructive: Boolean = false, onClick: () -> Unit) {
+    Surface(onClick = onClick, shape = RoundedCornerShape(8.dp), color = Color(0xFFF8FAFB), modifier = Modifier.fillMaxWidth()) {
+        TextLabel(
+            label,
+            13.sp,
+            color = if (destructive) Color(0xFFB65353) else OverlayTokens.toolIconActive,
+            modifier = Modifier.padding(vertical = 11.dp),
+            maxLines = 1
+        )
     }
 }
 
@@ -146,17 +166,16 @@ internal fun QuickPhrasePanel(
     var state by remember(phrases) { mutableStateOf(QuickPhraseUiState(phrases = phrases)) }
     QuickPhrasePanel(state, { event ->
         state = when (event) {
-            QuickPhraseUiEvent.AddRequested -> state.copy(editingIndex = state.phrases.size, draft = "")
-            is QuickPhraseUiEvent.EditRequested -> state.copy(editingIndex = event.index, draft = state.phrases.getOrNull(event.index).orEmpty())
+            QuickPhraseUiEvent.AddRequested -> state.copy(isAdding = true, isDeleting = false, draft = "")
+            QuickPhraseUiEvent.DeleteManagerRequested -> state.copy(isAdding = false, isDeleting = true, draft = "")
+            QuickPhraseUiEvent.BackToManagerRequested -> state.copy(isAdding = false, isDeleting = false, draft = "")
             is QuickPhraseUiEvent.DraftChanged -> state.copy(draft = event.value)
             QuickPhraseUiEvent.SaveRequested -> {
-                state.editingIndex?.let { index ->
-                    if (index == state.phrases.size) onAddPhrase(state.draft) else onUpdatePhrase(index, state.draft)
-                }
-                state.copy(editingIndex = null, draft = "")
+                if (state.isAdding) onAddPhrase(state.draft)
+                state.copy(isAdding = false, draft = "")
             }
-            QuickPhraseUiEvent.CancelRequested -> state.copy(editingIndex = null, draft = "")
-            is QuickPhraseUiEvent.DeleteRequested -> { onDeletePhrase(event.index); state.copy(editingIndex = null, draft = "") }
+            QuickPhraseUiEvent.CancelRequested -> state.copy(isAdding = false, isDeleting = false, draft = "")
+            is QuickPhraseUiEvent.DeleteRequested -> { onDeletePhrase(event.index); state.copy(isAdding = false, draft = "") }
             is QuickPhraseUiEvent.SendRequested -> { state.phrases.getOrNull(event.index)?.let(onSendPhrase); state }
         }
     })

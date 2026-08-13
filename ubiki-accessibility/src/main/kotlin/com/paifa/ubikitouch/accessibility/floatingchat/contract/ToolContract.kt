@@ -54,11 +54,17 @@ sealed interface AiUiEvent {
     data object CloseRequested : AiUiEvent
 }
 
-data class QuickPhraseUiState(val phrases: List<String> = emptyList(), val editingIndex: Int? = null, val draft: String = "")
+data class QuickPhraseUiState(
+    val phrases: List<String> = emptyList(),
+    val isAdding: Boolean = false,
+    val isDeleting: Boolean = false,
+    val draft: String = ""
+)
 
 sealed interface QuickPhraseUiEvent {
     data object AddRequested : QuickPhraseUiEvent
-    data class EditRequested(val index: Int) : QuickPhraseUiEvent
+    data object DeleteManagerRequested : QuickPhraseUiEvent
+    data object BackToManagerRequested : QuickPhraseUiEvent
     data class DraftChanged(val value: String) : QuickPhraseUiEvent
     data object SaveRequested : QuickPhraseUiEvent
     data object CancelRequested : QuickPhraseUiEvent

@@ -1,0 +1,26 @@
+import Foundation
+import os.signpost
+
+enum PerformanceSignpost {
+    private static let log = OSLog(
+        subsystem: Bundle.main.bundleIdentifier ?? "local.ios-float",
+        category: .pointsOfInterest
+    )
+
+    @inline(__always)
+    static func begin(_ name: StaticString) -> OSSignpostID {
+        let id = OSSignpostID(log: log)
+        os_signpost(.begin, log: log, name: name, signpostID: id)
+        return id
+    }
+
+    @inline(__always)
+    static func end(_ name: StaticString, id: OSSignpostID) {
+        os_signpost(.end, log: log, name: name, signpostID: id)
+    }
+
+    @inline(__always)
+    static func event(_ name: StaticString) {
+        os_signpost(.event, log: log, name: name)
+    }
+}

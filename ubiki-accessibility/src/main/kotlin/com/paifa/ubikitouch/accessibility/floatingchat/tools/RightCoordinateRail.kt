@@ -68,6 +68,9 @@ import com.paifa.ubikitouch.accessibility.floatingchat.components.CompactInterac
 import com.paifa.ubikitouch.accessibility.floatingchat.components.TextLabel
 import com.paifa.ubikitouch.accessibility.floatingchat.account.FloatingChatAccountProfile
 import com.paifa.ubikitouch.accessibility.FloatingChatCouponWalletBridge
+import com.paifa.ubikitouch.accessibility.FloatingChatBackgroundRemovalBridge
+import com.paifa.ubikitouch.accessibility.FloatingChatFriendManagementBridge
+import com.paifa.ubikitouch.accessibility.FloatingChatContactRelationsBridge
 import com.paifa.ubikitouch.accessibility.floatingchat.account.toContact
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ConnectorCoordinateState
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.RailPinnedAvatarEdge
@@ -90,6 +93,8 @@ internal fun RightCoordinateRail(
     actions: List<FloatingChatToolAction>,
     connectorState: ConnectorCoordinateState,
     onToolAction: (FloatingChatToolAction) -> Unit,
+    bubbleAppearanceLabel: String = "3D气泡",
+    onBubbleAppearanceToggle: () -> Unit = {},
     onAccountAvatarClick: (FloatingChatContact) -> Unit,
     onAccountAvatarLongClick: (FloatingChatContact) -> Unit,
     modifier: Modifier = Modifier
@@ -411,9 +416,18 @@ internal fun RightCoordinateRail(
                     CatalogToolButton(
                         item = item,
                         selected = selectedCatalogToolIndex == index,
+                        bubbleAppearanceLabel = bubbleAppearanceLabel,
                         onClick = {
                             selectedCatalogToolIndex = index
-                            if (item.opensCouponWallet) {
+                            if (item.isBubbleAppearanceToggle) {
+                                onBubbleAppearanceToggle()
+                            } else if (item.opensFriendManagement) {
+                                FloatingChatFriendManagementBridge.open()
+                            } else if (item.opensContactRelations) {
+                                FloatingChatContactRelationsBridge.open()
+                            } else if (item.opensBackgroundRemoval) {
+                                FloatingChatBackgroundRemovalBridge.open()
+                            } else if (item.opensCouponWallet) {
                                 FloatingChatCouponWalletBridge.open()
                             } else {
                                 item.action?.let(onToolAction)
@@ -430,6 +444,7 @@ internal fun RightCoordinateRail(
 private fun CatalogToolButton(
     item: RightRailToolCatalogItem,
     selected: Boolean,
+    bubbleAppearanceLabel: String,
     onClick: () -> Unit
 ) {
     val shape = RoundedCornerShape(8.dp)
@@ -456,7 +471,7 @@ private fun CatalogToolButton(
                     modifier = Modifier.size(18.dp)
                 )
                 TextLabel(
-                    text = item.label,
+                    text = if (item.isBubbleAppearanceToggle) bubbleAppearanceLabel else item.label,
                     size = 8.sp,
                     weight = FontWeight.Bold,
                     color = if (selected) OverlayTokens.toolIconActive else OverlayTokens.toolIcon,
@@ -550,7 +565,7 @@ private fun RightRailDivider() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(16.dp),
+            .height(12.dp),
         contentAlignment = Alignment.Center
     ) {
         TextLabel(

@@ -100,6 +100,13 @@ internal data class FinderPostTemplateResponse(
     val message: String? = null
 )
 
+/** A successful template response must supply the exact payload submitted to the publish endpoint. */
+internal fun validatedFinderPostRequest(response: FinderPostTemplateResponse): FinderPostRequest {
+    require(response.success) { response.message ?: "视频号模板校验未通过" }
+    return response.postRequest ?: response.payload
+        ?: throw IllegalArgumentException("发布模板未返回可提交的发布载荷")
+}
+
 @Serializable
 internal data class FinderUserPageRequest(
     val deviceUuid: String,

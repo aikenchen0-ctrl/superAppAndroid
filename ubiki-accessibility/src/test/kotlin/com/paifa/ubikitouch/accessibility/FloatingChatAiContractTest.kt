@@ -9,12 +9,45 @@ import com.paifa.ubikitouch.core.model.FloatingChatMessagePresentation
 import com.paifa.ubikitouch.core.model.FloatingChatSendState
 import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 import com.paifa.ubikitouch.core.model.FloatingChatPrototype
+import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AutoReplyMessageTracker
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FloatingChatAiContractTest {
+    @Test
+    fun autoReplyTrackerOnlyEmitsNewEligibleIncomingMessagesOnce() {
+        val tracker = AutoReplyMessageTracker()
+        val history = baseMessage("history", "A", "already there")
+        val incoming = baseMessage("incoming", "B", "new message")
+
+        tracker.markHandled(listOf(history))
+
+        assertFalse(tracker.shouldGenerate(enabled = true, configured = true, message = history))
+        assertTrue(tracker.shouldGenerate(enabled = true, configured = true, message = incoming))
+        assertFalse(tracker.shouldGenerate(enabled = true, configured = true, message = incoming))
+    }
+
+    @Test
+    fun autoReplyTrackerRejectsDisabledUnconfiguredAndNonIncomingMessages() {
+        val tracker = AutoReplyMessageTracker()
+        val incoming = baseMessage("incoming", "B", "new message")
+        val outgoing = incoming.copy(id = "outgoing", fromMe = true)
+        val system = incoming.copy(
+            id = "system",
+            kind = FloatingChatMessageKind.System,
+            presentation = FloatingChatMessagePresentation.System
+        )
+        val draft = incoming.copy(id = "draft", kind = FloatingChatMessageKind.AiDraft)
+
+        assertFalse(tracker.shouldGenerate(enabled = false, configured = true, message = incoming))
+        assertFalse(tracker.shouldGenerate(enabled = true, configured = false, message = incoming))
+        assertFalse(tracker.shouldGenerate(enabled = true, configured = true, message = outgoing))
+        assertFalse(tracker.shouldGenerate(enabled = true, configured = true, message = system))
+        assertFalse(tracker.shouldGenerate(enabled = true, configured = true, message = draft))
+    }
+
     @Test
     fun defaultAiConfigUsesBundledOpenAiCompatibleProvider() {
         val config = defaultFloatingChatAiConfig()

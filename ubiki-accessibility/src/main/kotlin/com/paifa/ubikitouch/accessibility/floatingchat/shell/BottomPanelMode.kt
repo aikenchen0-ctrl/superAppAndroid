@@ -4,6 +4,8 @@ internal enum class BottomPanelMode {
     None,
     Home,
     Contacts,
+    AccountDevice,
+    CustomerProfile,
     Assistant,
     AiVoice,
     Voice,
@@ -31,6 +33,8 @@ internal fun BottomPanelMode.isCenteredToolFeaturePanel(): Boolean {
     return this == BottomPanelMode.Assistant ||
         this == BottomPanelMode.AiVoice ||
         this == BottomPanelMode.Contacts ||
+        this == BottomPanelMode.AccountDevice ||
+        this == BottomPanelMode.CustomerProfile ||
         this == BottomPanelMode.QuickPhrase ||
         this == BottomPanelMode.Card ||
         this == BottomPanelMode.Moments ||

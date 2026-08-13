@@ -98,6 +98,22 @@ internal class FloatingChatOverlayController(
     private val preferences = UbikiPreferences(context)
     private var state: FloatingChatOverlayState = FloatingChatOverlayState.Collapsed
     private var conversation = FloatingChatPrototype.sampleConversation()
+    fun friendManagementSnapshot(): FloatingChatFriendManagementSnapshot =
+        FloatingChatFriendManagementSnapshot(
+            accounts = conversation.accountContacts,
+            selectedAccountId = selectedAccountId,
+            contacts = conversation.contacts
+                .asSequence()
+                .filter { contact -> contact.isFriend }
+                .filter { contact -> selectedAccountId.isBlank() || contact.id.startsWith("${selectedAccountId}__") }
+                .distinctBy { contact -> contact.id }
+                .toList(),
+            groups = conversation.groupContacts
+        )
+
+    fun refreshFriendManagementSnapshot() {
+        refreshScrmConversationFromApi()
+    }
     private val messageStore = FloatingChatMessageStore(context.applicationContext)
     private val scrmOperationStore = ScrmOperationStore(context.applicationContext)
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -835,6 +851,7 @@ internal class FloatingChatOverlayController(
                         )
                     ) {
                         applyScrmConversation(nextConversation)
+                        FloatingChatFriendManagementBridge.updateSnapshot(friendManagementSnapshot())
                         scheduleScrmConversationBackgroundPrefetch()
                     } else {
                         // The response can still populate the per-account cache, but it must

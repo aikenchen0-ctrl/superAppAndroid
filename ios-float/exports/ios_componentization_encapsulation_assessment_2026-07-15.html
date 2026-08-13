@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>iOS 项目组件化封装度评估</title>
+  <style>
+    :root {
+      --bg: #f5f7f8;
+      --panel: #ffffff;
+      --ink: #162126;
+      --muted: #647078;
+      --line: #dce4e7;
+      --good: #1f8a54;
+      --mid: #b56b12;
+      --bad: #c74336;
+      --blue: #3867d6;
+      --soft-good: #e8f6ee;
+      --soft-mid: #fff3df;
+      --soft-bad: #fdebe8;
+      --soft-blue: #e9efff;
+      --shadow: 0 12px 30px rgba(22, 33, 38, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.58;
+    }
+    .wrap { max-width: 1220px; margin: 0 auto; padding: 28px 18px 56px; }
+    header {
+      background: linear-gradient(135deg, #102f3a, #2f6370);
+      color: #fff;
+      border-radius: 14px;
+      padding: 28px;
+      box-shadow: var(--shadow);
+    }
+    h1 { margin: 0 0 10px; font-size: 28px; letter-spacing: 0; }
+    h2 { margin: 30px 0 12px; font-size: 20px; }
+    h3 { margin: 18px 0 8px; font-size: 16px; }
+    p { margin: 8px 0; }
+    .sub { color: rgba(255,255,255,0.84); max-width: 920px; margin: 0; }
+    .meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .pill.good { color: var(--good); background: var(--soft-good); }
+    .pill.mid { color: var(--mid); background: var(--soft-mid); }
+    .pill.bad { color: var(--bad); background: var(--soft-bad); }
+    .pill.blue { color: var(--blue); background: var(--soft-blue); }
+    .pill.neutral { color: #31505a; background: #e9f0f2; }
+    .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+    .stat {
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .stat strong { display: block; font-size: 22px; line-height: 1.1; }
+    .stat span { color: rgba(255,255,255,0.78); font-size: 12px; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px;
+      box-shadow: var(--shadow);
+      margin-top: 14px;
+    }
+    .notice {
+      border-left: 4px solid var(--mid);
+      background: #fff8ec;
+      padding: 12px 14px;
+      border-radius: 8px;
+      color: #6c430c;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+    th, td {
+      text-align: left;
+      vertical-align: top;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+      font-size: 14px;
+    }
+    th { background: #edf2f4; font-size: 13px; color: #425059; }
+    tr:last-child td { border-bottom: 0; }
+    .score {
+      display: inline-block;
+      min-width: 70px;
+      text-align: center;
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .score.good { color: var(--good); background: var(--soft-good); }
+    .score.mid { color: var(--mid); background: var(--soft-mid); }
+    .score.bad { color: var(--bad); background: var(--soft-bad); }
+    .bar {
+      width: 100%;
+      height: 10px;
+      border-radius: 999px;
+      background: #e8eef1;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .fill { height: 100%; border-radius: 999px; background: var(--mid); }
+    .fill.good { background: var(--good); }
+    .fill.bad { background: var(--bad); }
+    code {
+      background: #edf2f4;
+      padding: 2px 5px;
+      border-radius: 5px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+    }
+    .small { color: var(--muted); font-size: 12px; }
+    ul { margin: 8px 0 0 18px; padding: 0; }
+    @media (max-width: 860px) {
+      .grid { grid-template-columns: 1fr; }
+      header { padding: 22px; }
+      h1 { font-size: 24px; }
+      th, td { font-size: 13px; padding: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>iOS 项目组件化封装度评估</h1>
+      <p class="sub">按“统一 UI Schema + iOS 原生组件封装 + AutoLayout/事件回调 + Framework/SPM 发布”的 iOS 组件库标准，对当前 <code>ios-float</code> 项目做动态更新评估。结论基于 2026-08-02 当前工作区源码、Xcode 工程和模拟器测试结果；2026-07-17 的 29 项测试和真机安装结果保留为历史基线。</p>
+      <div class="meta">
+        <span class="pill neutral">更新日期：2026-08-02</span>
+        <span class="pill neutral">评估范围：ios-float 当前源码</span>
+        <span class="pill good">历史基线：29/29 测试通过，真机安装成功</span>
+        <span class="pill neutral">口径：组件库封装成熟度</span>
+      </div>
+      <div class="grid">
+        <div class="stat"><strong>68/100</strong><span>iOS 综合封装度</span></div>
+        <div class="stat"><strong>78/100</strong><span>UIKit 组件封装度</span></div>
+        <div class="stat"><strong>14</strong><span>模块与职责边界</span></div>
+        <div class="stat"><strong>36.6%</strong><span>代码仍集中在 Chat 功能族</span></div>
+      </div>
+    </header>
+
+    <section class="card">
+      <h2>总评</h2>
+      <p class="notice">当前项目仍处于“工程内组件化中后期”：根 <code>ChatWindowViewController.swift</code> 当前 2,939 行，Collection、DragDrop、Input、Layout、SystemPicker、Audio、未读时间线和 OpenAPI 同步均已迁到独立扩展文件；但 <code>Features/Chat</code> 合计仍有 28,856 行，说明目前主要完成的是职责分文件，还不是独立模块发布。消息渲染已有契约、Registry、6 类 Renderer、legacy fallback 和独立子视图，下一步重点是降低大型扩展的共享状态耦合并建立产品边界。</p>
+      <div class="meta">
+        <span class="pill good">阶段判断：工程内组件化中后期</span>
+        <span class="pill blue">消息渲染：契约 + Registry + Renderer</span>
+        <span class="pill bad">发布封装度：低</span>
+        <span class="pill blue">已有基础：协议 + Registry + Renderer + 测试</span>
+      </div>
+    </section>
+
+    <section>
+      <h2>量化证据</h2>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 24%;">指标</th>
+            <th style="width: 16%;">当前值</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Swift 文件数</td>
+            <td>95</td>
+            <td>包含根目录、<code>Features/*</code>、<code>Modules/*</code>、OpenAPI 服务和 <code>BlinkVoiceVisual/*</code>。</td>
+          </tr>
+          <tr>
+            <td>总代码量</td>
+            <td>约 78,948 行</td>
+            <td>主要代码仍在 app 内部，未拆为多个独立产品 target。</td>
+          </tr>
+          <tr>
+            <td>主控制器代码量</td>
+            <td><code>ChatWindowViewController.swift</code> 2,939 行；<code>Features/Chat</code> 28,856 行，占 36.6%</td>
+            <td>根控制器已显著缩小，Collection DataSource/Prefetch、DragDrop、Input、Layout、SystemPicker、Audio、未读时间线与 OpenAPI 同步均已分文件；这些扩展仍共享同一控制器状态，属于文件级拆分而非完整模块解耦。</td>
+          </tr>
+          <tr>
+            <td><code>Modules/*</code> 代码量</td>
+            <td>24 个 Swift 文件，约 1,843 行</td>
+            <td>除 Interaction、FloatingIM、MessageRender、AIInput、Data、Business 与 AppKitRegistry 外，MessageRender 已包含契约、Registry、6 类 Renderer 和 8 个独立 View；具体业务页面仍主要位于 Features。</td>
+          </tr>
+          <tr>
+            <td>协议数量</td>
+            <td>7 个核心协议</td>
+            <td>6 个 Kit Providing 协议之外，新增 <code>MessageRendering</code> 组件契约；消息渲染调用方可经 Registry 获取稳定 Renderer。</td>
+          </tr>
+          <tr>
+            <td>UI Schema</td>
+            <td>局部存在</td>
+            <td><code>MessageRenderModel</code>、<code>MessageRenderState</code>、<code>MessageLayoutSpec</code>、<code>MessageStyleTokens</code>、<code>MessageInteractionEvent</code> 已形成消息域契约；全局按钮、列表、表单和跨业务事件 payload 仍未统一。</td>
+          </tr>
+          <tr>
+            <td>iOS 打包形态</td>
+            <td>app target + test target + LiveActivity extension</td>
+            <td>Xcode 工程未发现当前组件的独立 Framework target；没有当前项目自己的 <code>Package.swift</code>、podspec 或 Podfile。</td>
+          </tr>
+          <tr>
+            <td>外部组件依赖</td>
+            <td>本地 Swift Package：<code>BlinkVoiceKit</code></td>
+            <td>工程依赖了外部本地包，但当前项目自身的 UI/业务组件尚未包化发布。</td>
+          </tr>
+          <tr>
+            <td>测试</td>
+            <td>135 个模拟器测试用例：128 通过、7 失败</td>
+            <td>app/test target 在 iPhone 16 Simulator 无签名构建成功并执行；当前新增 OpenAPI 契约测试 18 个（客户档案、标签权限、社交管理、支付）全部通过。最近一次全量基线为 135 个用例中 128 个通过、7 个失败，集中在支付高度、群消息帐号身份/连接点、增量插入和头像/未回消息展示；2026-07-17 的 29/29 与真机安装仍是历史基线。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>按 iOS 组件化标准逐项评分</h2>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 22%;">评估项</th>
+            <th style="width: 12%;">评分</th>
+            <th>当前状态</th>
+            <th>主要缺口</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>统一 iOS UI Schema：Props / Events / 业务无关接口</td>
+            <td><span class="score good">70/100</span><div class="bar"><div class="fill good" style="width:70%"></div></div></td>
+            <td>消息域已有 Render Model/State/Layout、Style Tokens、Interaction Event、<code>MessageRendering</code> 协议和 Registry，契约已能支撑分组 Renderer。</td>
+            <td>仍缺全局 <code>ButtonProps</code>、<code>ListProps</code>、<code>FormProps</code>、跨业务事件 payload 和项目级设计 token。</td>
+          </tr>
+          <tr>
+            <td>iOS 工程内分层规则</td>
+            <td><span class="score mid">68/100</span><div class="bar"><div class="fill" style="width:68%"></div></div></td>
+            <td>已有 <code>AppKitRegistry</code>、6 个 Providing 协议、Features/Services/Modules 分层，并已落地 Router、Store、Coordinator、页面工厂和多个聊天职责扩展；根控制器降至 2,939 行。</td>
+            <td>现有协调对象仍较薄，Collection、DragDrop、Input、Layout 等大型扩展仍直接共享控制器状态，需要继续迁入可独立测试的对象。</td>
+          </tr>
+          <tr>
+            <td>iOS 自定义 UIView / UIViewController 封装</td>
+            <td><span class="score good">78/100</span><div class="bar"><div class="fill good" style="width:78%"></div></div></td>
+            <td>MessageRender 已迁出红包、支付、联系人、链接、小程序、文件和媒体覆盖层等 8 个独立 View；但 <code>ChatCells.swift</code> 当前为 6,238 行。好友管理页已改为可折叠操作表单、全高列表与下拉刷新，好友主页还接入客户档案和联系人设置入口。</td>
+            <td><code>ChatMessageBubbleView</code> 与通用 Cell 外壳仍较重，部分文本、富媒体配置逻辑尚未完全由 Renderer 自治。</td>
+          </tr>
+          <tr>
+            <td>AutoLayout 适配</td>
+            <td><span class="score good">78/100</span><div class="bar"><div class="fill good" style="width:78%"></div></div></td>
+            <td>大量使用 <code>translatesAutoresizingMaskIntoConstraints = false</code> 和 <code>NSLayoutConstraint.activate</code>；消息高度也通过渲染 Kit 做了估算/拟合。</td>
+            <td>部分 UI 仍在主控制器和大型 Cell 文件内手写布局，缺统一布局 token、尺寸 token、响应式规则和截图回归。</td>
+          </tr>
+          <tr>
+            <td>自定义属性、Delegate / Closure 回调</td>
+            <td><span class="score mid">58/100</span><div class="bar"><div class="fill" style="width:58%"></div></div></td>
+            <td>消息域新增 <code>MessageInteractionEvent</code>，工具点击经强类型 Action Router 分发；各页面仍混用闭包、UIKit delegate、通知和局部回调。</td>
+            <td>拖拽、支付、预览、朋友圈、群聊等事件尚未统一成跨模块稳定事件模型。</td>
+          </tr>
+          <tr>
+            <td>封装为独立 Module</td>
+            <td><span class="score mid">58/100</span><div class="bar"><div class="fill" style="width:58%"></div></div></td>
+            <td>6 个模块目录已包含协议、adapter 和 Registry 入口，Modules 共 24 个 Swift 文件、约 1,843 行，MessageRender 已形成实际组件实现层。</td>
+            <td>仍编译在 app target，尚未建立独立产品边界和 public API。</td>
+          </tr>
+          <tr>
+            <td>SPM / CocoaPods / Framework 发布</td>
+            <td><span class="score bad">10/100</span><div class="bar"><div class="fill bad" style="width:10%"></div></div></td>
+            <td>工程依赖了一个外部本地 Swift Package <code>BlinkVoiceKit</code>，并有 Live Activity extension target。</td>
+            <td>当前项目自身没有 <code>Package.swift</code>、podspec、Framework target、版本号、公开 API、示例工程或二进制产物。</td>
+          </tr>
+          <tr>
+            <td>测试与可替换性</td>
+            <td><span class="score good">80/100</span><div class="bar"><div class="fill good" style="width:80%"></div></div></td>
+            <td>2026-08-02 模拟器全量基线为 135 个用例，128 个通过、7 个失败；新增 OpenAPI 契约测试当前共 18/18 通过，并覆盖客户档案、标签权限、社交管理和支付请求契约。</td>
+            <td>仍缺像素级快照测试、独立 package contract tests、失败回归修复和公开 API 兼容测试。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>模块现状拆解</h2>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 20%;">模块</th>
+            <th style="width: 14%;">封装度</th>
+            <th>已有内容</th>
+            <th>要达到 iOS 组件库标准还需补什么</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Interaction</td>
+            <td><span class="score mid">25%</span></td>
+            <td><code>InteractionKitProviding</code> 可安装全局交互，当前接入安全区总结浮层。</td>
+            <td>需要统一手势事件模型、触发上下文、ActionRegistry、iOS 系统能力 adapter、调试面板。</td>
+          </tr>
+          <tr>
+            <td>FloatingIM</td>
+            <td><span class="score mid">32%</span></td>
+            <td>有会话快照、当前会话、选中帐号、可见会话、会话归属 resolver，并通过 <code>FloatingIMKitProviding</code> 暴露入口。</td>
+            <td>需要把左栏/右栏/连接线/拖拽转发 UI、头像加载视图和状态机继续迁出主控制器/ChatCells。</td>
+          </tr>
+          <tr>
+            <td>MessageRender</td>
+            <td><span class="score good">82%</span></td>
+            <td>具备 Render Model/State/Layout、Style Tokens、Interaction Event、<code>MessageRendering</code>、完整 Registry、6 类组件化 Renderer、legacy fallback 和 8 个独立子视图；30 种消息类型均有注册映射。</td>
+            <td>让专用 Renderer 完全接管内部视图配置与事件链，进一步缩小 legacy bubble 依赖，并迁入独立 render package。</td>
+          </tr>
+          <tr>
+            <td>AIInput</td>
+            <td><span class="score mid">25%</span></td>
+            <td>有重写、润色、续写协议和本地 adapter。</td>
+            <td>需要统一输入框组件、模型请求 adapter、编辑事件、任意输入框接入和测试。</td>
+          </tr>
+          <tr>
+            <td>Data</td>
+            <td><span class="score mid">38%</span></td>
+            <td>有 <code>ChatDataLayerProviding</code> 封装消息读写、IM cache 和 KV；SQLite 相关实现已独立在 <code>ChatSQLiteStore.swift</code>。</td>
+            <td>需要 Repository 分层、DTO/Entity 映射、迁移、mock store、分页/增量同步。</td>
+          </tr>
+          <tr>
+            <td>Business</td>
+            <td><span class="score mid">20%</span></td>
+            <td>有业务页面 descriptor：朋友圈、素材库、客户档案、视频号、支付、卡包、质量报告。</td>
+            <td>需要真实路由器、页面工厂、依赖注入、各业务页面迁移出主控制器。</td>
+          </tr>
+          <tr>
+            <td>BlinkVoiceVisual</td>
+            <td><span class="score good">60%</span></td>
+            <td>文件较独立，有 public 类型、选项、结果、事件、捕获入口；类似一个小 SDK。</td>
+            <td>需要独立 Package/target、文档、权限说明、demo、二进制或源码发布流程。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>当前最大封装问题</h2>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 24%;">问题</th>
+            <th>影响</th>
+            <th>建议处理</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>主控制器仍偏重</td>
+            <td>组件复用、测试、多人协作、替换底层实现都很困难。</td>
+            <td>上述 6 个边界及 Gesture、TextField、Image/PHPicker、DocumentPicker、QuickLook、Audio、Collection、DragDrop 和 FlowLayout 代理均已完成文件级迁移；OpenAPI 社交请求已集中到可测试的服务契约层。下一步把大型扩展的共享状态继续迁入可独立测试的 Coordinator。</td>
+          </tr>
+          <tr>
+            <td><code>ChatCells.swift</code> 仍偏重</td>
+            <td>红包、支付、媒体覆盖层、联系人、链接、小程序和文件视图已迁出，但当前文件为 6,238 行；通用气泡、消息能力增长与 Cell 配置仍集中。</td>
+            <td>继续拆气泡壳层、文本/语音布局与复用状态管理，并让 Registry 返回的 Renderer 成为唯一配置入口。</td>
+          </tr>
+          <tr>
+            <td>Schema 主要覆盖消息域</td>
+            <td>无法形成稳定 iOS UI 契约，调用方只能直接依赖具体 UIKit 实现。</td>
+            <td>定义 <code>ComponentProps</code>、<code>ComponentEvent</code>、<code>ComponentState</code>、<code>DesignToken</code>、<code>ActionPayload</code>。</td>
+          </tr>
+          <tr>
+            <td>UIKit 类型外泄到业务层</td>
+            <td>业务逻辑和 UIKit 实现耦合，后续复用到其他 iOS App 或独立 Framework 困难。</td>
+            <td>业务层只依赖 UI/业务协议；UIKit 只在组件实现内部出现。</td>
+          </tr>
+          <tr>
+            <td>没有独立发布产物</td>
+            <td>其他 App 无法以稳定版本依赖，只能复制代码或引用整个 app。</td>
+            <td>先做 Swift Package 源码包，再视需求提供 XCFramework/CocoaPods。</td>
+          </tr>
+          <tr>
+            <td>事件回调 payload 不统一</td>
+            <td>闭包虽多，但每个页面/控件各自定义，难以标准化测试。</td>
+            <td>统一事件枚举和 payload：<code>tap</code>、<code>longPress</code>、<code>drag</code>、<code>submit</code>、<code>select</code>、<code>requestAccess</code>。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>推荐目标结构</h2>
+      <p>如果要达到 iOS 组件库标准，建议按下面的顺序推进。</p>
+      <ul>
+        <li><strong>第 1 步：定义 iOS 组件契约。</strong> 建 <code>UIComponentSchema</code>、<code>DesignToken</code>、<code>ComponentEvent</code>、<code>ActionPayload</code>，先覆盖按钮、列表项、消息气泡、输入框、弹窗、工具栏。</li>
+        <li><strong>第 2 步：把 iOS UI 组件迁入独立 Swift Package。</strong> 先拆 <code>MessageRenderKit</code>、<code>FloatingIMKit</code>、<code>AIInputKit</code>，每个 package 有 public API、demo、tests。</li>
+        <li><strong>第 3 步：主 app 只做编排（进行中）。</strong> Router/Store/Coordinator 和三个页面工厂已完成首轮接入；继续让 <code>ChatWindowViewController</code> 只保留导航、视图装配和状态订阅。</li>
+        <li><strong>第 4 步：建立发布和验收。</strong> iOS 输出 SPM/Framework；每个组件有契约测试、截图测试、版本兼容说明。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>超大单文件拆分实施计划与当前进度</h2>
+      <p class="notice"><strong>当前进度：</strong><code>ChatWindowViewController.swift</code> 已从约 51,091 行降到 2,939 行；Collection、Prefetch、DragDrop、FlowLayout、Input、SystemPicker、Audio、未读时间线和 OpenAPI 同步均已有独立扩展文件，批次 9 已完成文件级迁移。与此同时 <code>ChatCells.swift</code> 当前为 6,238 行，较 7 月 17 日报告的 4,395 行回升，说明消息能力增长又把配置职责带回大型 Cell 文件。下一阶段重点已从“继续搬文件”转为拆共享状态、收紧模块 API、让 Renderer 接管配置并建立独立 package 边界。</p>
+
+      <h3>执行原则：先降低文件体积，再调整架构</h3>
+      <ul>
+        <li><strong>一次只做一批：</strong>每批只移动一个完整类型，或一组明确的协议 <code>extension</code>；完成构建和测试后再开始下一批。</li>
+        <li><strong>第一阶段禁止重写：</strong>不改方法内容、调用顺序、线程、通知名、存储 key、接口参数、文案、颜色、布局常量和资源名。</li>
+        <li><strong>禁止顺手优化：</strong>不同时做命名调整、格式化全文件、async/await 改造、依赖注入、UI 重做或 API 替换。</li>
+        <li><strong>保持提交可回退：</strong>一批对应一个独立提交；若该批不能单独编译通过，则不进入下一批。</li>
+        <li><strong>先处理低耦合代码：</strong>优先移动文件末尾的独立 View、Cell、Model 和独立页面；最后才拆 <code>ChatWindowViewController</code> 主体状态与业务流程。</li>
+      </ul>
+
+      <h3>开始前建立功能基线</h3>
+      <table>
+        <thead>
+          <tr><th style="width: 24%;">基线项</th><th>执行要求</th><th style="width: 24%;">通过标准</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>构建基线</td><td>记录当前可用 scheme、模拟器型号、Debug 配置和完整构建命令。</td><td>拆分前项目可干净构建。</td></tr>
+          <tr><td>测试基线</td><td>运行现有单元测试和 <code>ModuleBoundaryTests</code>，保存通过数量与失败项。</td><td>拆分后不得新增失败。</td></tr>
+          <tr><td>关键流程基线</td><td>记录启动、会话加载、文字/图片/文件发送、预览、搜索、朋友圈、支付入口、OpenAPI 工作台等冒烟路径。</td><td>每批至少验证受影响路径。</td></tr>
+          <tr><td>工程文件基线</td><td>确认 Xcode 是否自动同步目录；若不是，新增 Swift 文件时必须加入正确 app target。</td><td>新文件出现在 Compile Sources 中且无重复编译。</td></tr>
+          <tr><td>行为冻结</td><td>拆分期间不合入同一文件的大功能开发；确需并行时先暂停拆分并重新建立基线。</td><td>移动前后可做可靠 diff。</td></tr>
+        </tbody>
+      </table>
+
+      <h3>建议目录与批次</h3>
+      <table>
+        <thead>
+          <tr><th style="width: 10%;">批次</th><th style="width: 22%;">目标目录</th><th>移动内容</th><th style="width: 25%;">本批验收重点</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>0</td>
+            <td><code>Shared/Extensions</code><br><code>Shared/Utilities</code></td>
+            <td>文件内独立的 <code>UIView</code>、<code>UIImage</code>、<code>String</code>、<code>Data</code> 等 extension，以及不依赖控制器状态的工具类型。先检查是否与项目现有 extension 重名。</td>
+            <td>全量构建；确认没有符号冲突、访问级别变化和同名方法歧义。</td>
+          </tr>
+          <tr>
+            <td>1</td>
+            <td><code>Features/MediaPreview</code></td>
+            <td><code>InlineFilePreviewViewController</code>、分页/全屏/网格媒体预览页面、预览 item、拖拽 payload、背景移除相关类型。</td>
+            <td>图片、视频、文件预览；分页、关闭、拖拽、旋转和快速预览正常。</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td><code>Features/AIInput</code><br><code>Features/Drafts</code></td>
+            <td><code>AIInputFloatingAssistant</code>、草稿编辑器、预测操作表、分段选择页面及其 Cell。</td>
+            <td>输入、草稿保存恢复、AI 建议、选择和提交回调保持一致。</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td><code>Features/Moments</code></td>
+            <td>朋友圈 Model、Feed、Cell、评论控件、图片/视频加载器、发布器、服务端镜像页面及相关 OpenAPI 类型。</td>
+            <td>列表加载、分页、点赞评论、媒体预览、发布和同步正常。</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td><code>Features/Search</code><br><code>Features/Favorites</code><br><code>Features/Wallet</code></td>
+            <td>全局搜索、隐藏用户、访问申请、收藏、音乐、卡包/优惠券相关 Model、View、Cell 和 Controller。</td>
+            <td>搜索分类与结果跳转、收藏详情、音乐播放、卡包列表和详情正常。</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td><code>Features/Location</code><br><code>Features/Contacts</code><br><code>Features/Groups</code></td>
+            <td>定位选择、实时位置、@选择、转发目标、群信息/邀请、账号、联系人名片、好友主页相关类型。</td>
+            <td>定位权限与地图回调、人员选择、群操作、登录和联系人跳转正常。</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td><code>Features/Calls</code><br><code>Features/Payments</code></td>
+            <td>语音/视频通话、音量监控、合并转发、接龙、红包、转账、群收款及其页面和控件。</td>
+            <td>通话状态、权限、计时器释放；金额校验、成员选择和支付状态正常。</td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td><code>Services/OpenAPI</code><br><code>Features/OpenAPIWorkbench</code></td>
+            <td><code>OpenApiHTTPClient</code>、配置、运行时、同步器、请求编辑器及业务工作台页面。先机械搬移，暂不重构网络层。</td>
+            <td>环境切换、鉴权、请求参数、错误展示、同步和所有工作台入口正常。</td>
+          </tr>
+          <tr>
+            <td>8</td>
+            <td><code>Features/OperationLab</code><br><code>Features/BlinkVoice</code></td>
+            <td>操作实验室图表/滑杆/拖放控件、BlinkVoice 测试页、手势触发器及配置页面。</td>
+            <td>图表刷新、控件事件、拖放、语音与手势触发正常。</td>
+          </tr>
+          <tr>
+            <td>9</td>
+            <td><code>Features/Chat/ChatWindow+Delegates</code></td>
+            <td><strong>文件级完成，模块级进行中。</strong> <code>ChatWindow+AudioDelegate</code>、<code>ChatWindow+InputDelegates</code>、<code>ChatWindow+SystemPickerDelegates</code>、Collection DataSource/Prefetch、DragDrop、UIDropInteraction 和 FlowLayout 均已迁入独立扩展文件。</td>
+            <td>当前模拟器执行 135 个用例，128 个通过、7 个失败；剩余工作是把扩展直接共享的控制器状态迁入可独立测试对象，并修复群消息、增量插入和头像相关失败。</td>
+          </tr>
+          <tr>
+            <td>10</td>
+            <td><code>Features/Chat</code></td>
+            <td><strong>首轮已完成。</strong> 已提取 <code>ConversationStateStore</code>、<code>MessageFlowCoordinator</code>、<code>ToolActionRouter</code>，并增加媒体预览、朋友圈和支付页面工厂。后续继续迁移实际流程状态与依赖，而非只做薄包装。</td>
+            <td>当前版 app/test target 已在模拟器完成编译链接和测试执行；最终目标仍是主控制器只保留生命周期、视图装配、状态订阅和导航编排。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>每个批次的固定执行模板（给 GPT-5.6 low）</h3>
+      <ol>
+        <li>读取本批涉及的完整类型，从声明第一行读到最后一个右花括号；同时搜索该类型在全项目的所有引用。</li>
+        <li>列出它依赖的类型、全局变量、<code>private/fileprivate</code> 符号、资源、通知、UserDefaults key 和回调；此时不要修改代码。</li>
+        <li>只创建本批目标文件，并将完整声明原样移动过去；不要复制后保留旧声明，不要一次移动半个类型。</li>
+        <li>仅处理编译所必需的 <code>import</code>、target membership 和访问级别。访问级别必须采用最小放宽，并记录每一处原因。</li>
+        <li>先编译；若失败，逐条修复当前批次引入的错误。禁止通过删除功能、注释代码、使用空实现或强制解包来消除错误。</li>
+        <li>运行现有测试，再执行本批表格中的冒烟流程；对失败项记录“拆分前结果、拆分后结果、错误信息、修复内容”。</li>
+        <li>检查 diff：业务方法体应只是从旧文件移动到新文件。若出现逻辑改写，撤销该逻辑改写后重新验证。</li>
+        <li>输出本批报告：移动的符号、新文件、访问级别变化、构建命令、测试结果、未验证风险。确认通过后才提交并进入下一批。</li>
+      </ol>
+
+      <h3>访问级别与依赖处理规则</h3>
+      <ul>
+        <li>Swift 的 <code>private</code> 只在声明作用域/同文件扩展内可见。跨文件报错时，先判断代码是否应继续留在同一职责文件，再考虑改为 <code>fileprivate</code> 或默认 internal。</li>
+        <li>不要为了让新文件编译，把大量主控制器属性统一改成 internal。若独立页面只需要少量数据，后续第二阶段通过初始化参数或协议传入。</li>
+        <li>第一阶段允许暂时保留同模块 internal 依赖，以保障零行为变化；访问收紧和依赖注入放到第 10 批之后单独进行。</li>
+        <li>类型移动后若需要多个 framework import，按实际使用添加；不要删除看似未使用但涉及条件编译的 import，除非构建验证确认。</li>
+        <li>新增文件名应与主类型一致；多个强相关的小 Model 可放在 <code>FeatureModels.swift</code>，但不得建立新的数万行聚合文件。</li>
+      </ul>
+
+      <h3>停止与回滚条件</h3>
+      <p>出现以下任一情况时立即停止当前批次：无法确认原有行为、需要改动接口协议才能编译、连续出现大量跨文件私有依赖、构建失败原因不属于当前批次、测试基线本身已变化。此时回退<strong>当前批次</strong>，保留之前已经独立验证通过的批次，并先补充依赖清单或测试，不允许带着失败继续拆下一批。</p>
+
+      <p class="small"><strong>完成定义：</strong>不是“文件数量变多”，而是每个批次可独立构建、现有测试无新增失败、受影响功能冒烟通过、diff 中无非必要逻辑变化。当前机械拆分与首轮 coordinator/store/router 提取均已开始落地；后续架构拆分仍需保持一次一个边界、一次一组回归。</p>
+    </section>
+
+    <section class="card">
+      <h2>结论</h2>
+      <p>当前可以定义为“工程内组件化中后期，文件级职责拆分已大幅推进，消息渲染已形成契约、Registry、Renderer 和独立子视图，但聊天扩展仍共享大型状态面，尚未形成可独立发布的 iOS 组件库”。综合封装度暂维持 <strong>68%</strong>，UIKit 组件封装度约 <strong>78%</strong>，MessageRender 模块约 <strong>82%</strong>；不因根控制器行数下降而机械上调成熟度。下一阶段重点是拆解大型 Collection/DragDrop/Input 扩展、缩小 <code>ChatCells.swift</code>、统一事件契约，并建立 Swift Package/Framework 产品边界。</p>
+      <p class="small">2026-08-02 静态统计：95 个 Swift 文件、约 78,948 行；根控制器 2,939 行，<code>Features/Chat</code> 28,856 行（36.6%），Modules 24 个文件约 1,843 行。iPhone 16 Simulator 执行 135 个测试用例，128 个通过、7 个失败；2026-07-17 的 29/29 单元测试与真机安装仅作为历史验证。评分仍为工程成熟度评估，不代表接口后端或全部人工交互场景均已人工验收。</p>
+    </section>
+  </div>
+</body>
+</html>

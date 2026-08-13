@@ -22,6 +22,7 @@ data class FloatingChatContact(
     val avatarColor: Long,
     val selected: Boolean = false,
     val online: Boolean = true,
+    val isFriend: Boolean = true,
     val avatarUrl: String? = null,
     val groupMemberAvatarUrls: List<String> = emptyList(),
     val groupMemberContacts: List<FloatingChatContact> = emptyList(),

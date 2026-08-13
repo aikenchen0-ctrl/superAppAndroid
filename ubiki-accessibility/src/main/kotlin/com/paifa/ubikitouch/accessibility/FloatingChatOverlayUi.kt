@@ -584,6 +584,7 @@ internal fun FloatingChatOverlay(
     val keyboardController = LocalSoftwareKeyboardController.current
     val coroutineScope = rememberCoroutineScope()
     var liveConversation by remember { mutableStateOf(conversation) }
+    var bubbleAppearance by remember { mutableStateOf(BubbleAppearance.TwoD) }
     var inputText by remember { mutableStateOf("") }
     var inputFocused by remember { mutableStateOf(false) }
     var bottomPanelMode by remember { mutableStateOf(BottomPanelMode.None) }
@@ -1243,7 +1244,7 @@ internal fun FloatingChatOverlay(
         context = context,
         quickPhrases = { quickPhrases },
         onQuickPhrasesChanged = { phrases -> quickPhrases = phrases },
-        onSendText = { text -> inputMessageActions.sendTextToCurrentThread(text) },
+        onApplyToInput = { text -> inputText = text },
         onBottomPanelModeChanged = { mode -> bottomPanelMode = mode }
     )
     val messageForwardingActions = MessageForwardingActions(
@@ -1468,6 +1469,8 @@ internal fun FloatingChatOverlay(
             onThreadSelected = { thread -> chatNavigationActions.openChatThread(thread) },
             onHomeUnreadSelected = { summary -> chatNavigationActions.openHomeUnread(summary) },
             onToolAction = { action -> toolMessageActions.sendToolMessage(action) },
+            bubbleAppearance = bubbleAppearance,
+            onBubbleAppearanceToggle = { bubbleAppearance = bubbleAppearance.toggle() },
             onGroupAvatarLongClick = { group ->
                 contactEditorTarget = ContactEditorTarget.Group(group)
             },
@@ -1902,7 +1905,7 @@ internal fun FloatingChatOverlay(
                     aiConfig = nextConfig
                     saveFloatingChatAiConfig(context, nextConfig)
                     aiConfigStatus = if (nextConfig.isConfigured) {
-                        "AI 配置已保存"
+                        if (nextConfig.autoReplyEnabled) "AI自动回复已开启" else "AI自动回复已关闭"
                     } else {
                         "请填写 API 地址、API Key 和模型"
                     }

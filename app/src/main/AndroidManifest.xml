@@ -33,6 +33,30 @@
         android:theme="@style/Theme.UbikiTouch">
 
         <activity android:name=".SideFunctionsActivity" android:exported="false" />
+        <activity
+            android:name=".OpenApiWorkbenchActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity="com.paifa.ubikitouch.floatingchat"
+            android:theme="@style/Theme.UbikiTouch" />
+        <activity
+            android:name="com.paifa.ubikitouch.accessibility.FinderPublishActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity="com.paifa.ubikitouch.floatingchat"
+            android:theme="@style/Theme.UbikiTouch" />
+        <activity
+            android:name="com.paifa.ubikitouch.accessibility.FavoriteLibraryActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity="com.paifa.ubikitouch.floatingchat"
+            android:theme="@style/Theme.UbikiTouch" />
+        <activity
+            android:name=".MaterialLibraryActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity="com.paifa.ubikitouch.floatingchat"
+            android:theme="@style/Theme.UbikiTouch" />
         <activity android:name=".AccessibilityKeepAliveGuideActivity" android:exported="false" />
         <activity android:name=".PauseSettingsActivity" android:exported="false" />
         <activity android:name=".BlockedAppsActivity" android:exported="false" />
@@ -45,6 +69,24 @@
         <activity android:name=".RedPacketActivity" android:excludeFromRecents="true" android:exported="false" android:taskAffinity="com.paifa.ubikitouch.floatingchat" android:theme="@style/Theme.UbikiTouch" />
         <activity
             android:name=".CouponWalletActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity="com.paifa.ubikitouch.floatingchat"
+            android:theme="@style/Theme.UbikiTouch" />
+        <activity
+            android:name=".BackgroundRemovalActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity="com.paifa.ubikitouch.floatingchat"
+            android:theme="@style/Theme.UbikiTouch" />
+        <activity
+            android:name=".FriendManagementActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity="com.paifa.ubikitouch.floatingchat"
+            android:theme="@style/Theme.UbikiTouch" />
+        <activity
+            android:name=".ContactRelationsActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:taskAffinity="com.paifa.ubikitouch.floatingchat"

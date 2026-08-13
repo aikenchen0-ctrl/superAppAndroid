@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
 import com.paifa.ubikitouch.accessibility.floatingchat.message.MessageRow
+import com.paifa.ubikitouch.accessibility.floatingchat.message.BubbleAppearance
 import com.paifa.ubikitouch.accessibility.floatingchat.components.AvatarRole
 import com.paifa.ubikitouch.accessibility.floatingchat.components.CompactAvatar
 import com.paifa.ubikitouch.accessibility.floatingchat.message.messageListBottomClearanceDp
@@ -65,6 +66,7 @@ internal fun MessageCoordinatePane(
     onToggleMessageSelection: (FloatingChatMessage) -> Unit,
     onMessageClick: (FloatingChatMessage) -> Unit,
     onBlankAreaTap: () -> Unit,
+    bubbleAppearance: BubbleAppearance = BubbleAppearance.TwoD,
     modifier: Modifier = Modifier
 ) {
     val messageIndexes = remember(messages) {
@@ -112,7 +114,8 @@ internal fun MessageCoordinatePane(
                         claimedPaymentMessageIds = claimedPaymentMessageIds,
                         onToggleMessageSelection = onToggleMessageSelection,
                         onMessageClick = onMessageClick,
-                        connectorState = connectorState
+                        connectorState = connectorState,
+                        bubbleAppearance = bubbleAppearance
                     )
                 }
             } else {
@@ -148,7 +151,8 @@ internal fun MessageCoordinatePane(
                     },
                     onGroupMemberAvatarRemoved = {
                         connectorState.removeGroupMemberAvatar(message.id)
-                    }
+                    },
+                    bubbleAppearance = bubbleAppearance
                     )
                 }
             }
@@ -176,6 +180,7 @@ private fun HomeOverviewMessageGroupRow(
     onToggleMessageSelection: (FloatingChatMessage) -> Unit,
     onMessageClick: (FloatingChatMessage) -> Unit,
     connectorState: ConnectorCoordinateState
+    ,bubbleAppearance: BubbleAppearance
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         group.messages.forEachIndexed { offset, message ->
@@ -202,7 +207,8 @@ private fun HomeOverviewMessageGroupRow(
                     onClick = { onMessageClick(message) },
                     onBubbleBoundsChanged = { bounds -> connectorState.updateMessageBubble(message.id, bounds) },
                     onGroupMemberAvatarBoundsChanged = {},
-                    onGroupMemberAvatarRemoved = {}
+                    onGroupMemberAvatarRemoved = {},
+                    bubbleAppearance = bubbleAppearance
                 )
             }
         }

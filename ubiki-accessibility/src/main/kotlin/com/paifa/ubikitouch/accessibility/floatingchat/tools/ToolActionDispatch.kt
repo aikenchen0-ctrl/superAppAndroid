@@ -10,6 +10,10 @@ internal sealed interface ToolActionDispatch {
     data object PickDocument : ToolActionDispatch
     data object OpenAssistantPanel : ToolActionDispatch
     data object OpenAiVoicePanel : ToolActionDispatch
+    data object OpenApiWorkbench : ToolActionDispatch
+    data object OpenFinderPublish : ToolActionDispatch
+    data object OpenMaterialLibrary : ToolActionDispatch
+    data object OpenFavoriteLibrary : ToolActionDispatch
     data class OpenBottomPanel(val mode: BottomPanelMode) : ToolActionDispatch
     data object AddSimulatedMessage : ToolActionDispatch
     data object None : ToolActionDispatch
@@ -22,17 +26,20 @@ internal fun toolActionDispatchFor(action: FloatingChatToolAction): ToolActionDi
         FloatingChatToolAction.Camera -> ToolActionDispatch.CaptureCameraMedia
         FloatingChatToolAction.QuickPhrase -> ToolActionDispatch.OpenBottomPanel(BottomPanelMode.QuickPhrase)
         FloatingChatToolAction.Moments -> ToolActionDispatch.OpenBottomPanel(BottomPanelMode.Moments)
-        FloatingChatToolAction.Finder -> ToolActionDispatch.OpenBottomPanel(BottomPanelMode.Finder)
-        FloatingChatToolAction.MomentMaterials -> ToolActionDispatch.OpenBottomPanel(BottomPanelMode.MomentMaterials)
+        FloatingChatToolAction.Finder -> ToolActionDispatch.OpenFinderPublish
+        FloatingChatToolAction.MomentMaterials -> ToolActionDispatch.OpenMaterialLibrary
         FloatingChatToolAction.RedPacket -> ToolActionDispatch.OpenBottomPanel(BottomPanelMode.RedPacket)
         FloatingChatToolAction.Transfer -> ToolActionDispatch.OpenBottomPanel(BottomPanelMode.Transfer)
         FloatingChatToolAction.Location -> ToolActionDispatch.OpenBottomPanel(BottomPanelMode.Location)
-        FloatingChatToolAction.Favorite -> ToolActionDispatch.OpenBottomPanel(BottomPanelMode.Favorite)
+        FloatingChatToolAction.Favorite -> ToolActionDispatch.OpenFavoriteLibrary
         FloatingChatToolAction.Card -> ToolActionDispatch.OpenBottomPanel(BottomPanelMode.Card)
         FloatingChatToolAction.Files -> ToolActionDispatch.PickDocument
         FloatingChatToolAction.Assistant -> ToolActionDispatch.OpenAssistantPanel
         FloatingChatToolAction.AiVoice -> ToolActionDispatch.OpenAiVoicePanel
         FloatingChatToolAction.Contacts -> ToolActionDispatch.OpenBottomPanel(BottomPanelMode.Contacts)
+        FloatingChatToolAction.Device -> ToolActionDispatch.OpenBottomPanel(BottomPanelMode.AccountDevice)
+        FloatingChatToolAction.Notes -> ToolActionDispatch.OpenBottomPanel(BottomPanelMode.CustomerProfile)
+        FloatingChatToolAction.Command -> ToolActionDispatch.OpenApiWorkbench
         in simulatedMessageToolActions() -> ToolActionDispatch.AddSimulatedMessage
         else -> ToolActionDispatch.None
     }

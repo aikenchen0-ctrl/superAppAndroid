@@ -415,6 +415,38 @@ class UbikiAccessibilityService : AccessibilityService() {
         }
     }
 
+    fun requestFloatingChatOpenApiWorkbench() {
+        val intent = Intent()
+            .setClassName(packageName, "com.paifa.ubikitouch.app.OpenApiWorkbenchActivity")
+            .addFloatingChatBridgeFlags()
+        runCatching { startActivity(intent) }
+            .onFailure { Log.e(TAG, "failed to start OpenAPI workbench", it) }
+    }
+
+    fun requestFloatingChatFinderPublish() {
+        val intent = Intent()
+            .setClassName(packageName, "com.paifa.ubikitouch.accessibility.FinderPublishActivity")
+            .addFloatingChatBridgeFlags()
+        runCatching { startActivity(intent) }
+            .onFailure { Log.e(TAG, "failed to start Finder publish", it) }
+    }
+
+    fun requestFloatingChatFavoriteLibrary() {
+        val intent = Intent()
+            .setClassName(packageName, "com.paifa.ubikitouch.accessibility.FavoriteLibraryActivity")
+            .addFloatingChatBridgeFlags()
+        runCatching { startActivity(intent) }
+            .onFailure { Log.e(TAG, "failed to start favorite library", it) }
+    }
+
+    fun requestFloatingChatMaterialLibrary() {
+        val intent = Intent()
+            .setClassName(packageName, "com.paifa.ubikitouch.app.MaterialLibraryActivity")
+            .addFloatingChatBridgeFlags()
+        runCatching { startActivity(intent) }
+            .onFailure { Log.e(TAG, "failed to start material library", it) }
+    }
+
     fun requestFloatingChatMediaCapture() {
         hideFloatingChatForExternalActivity("camera")
         val intent = Intent()
@@ -498,6 +530,53 @@ class UbikiAccessibilityService : AccessibilityService() {
             Log.e(TAG, "failed to start coupon wallet", it)
             onFloatingChatCouponWalletClosed()
         }
+    }
+
+    fun requestFloatingChatBackgroundRemoval() {
+        hideFloatingChatForExternalActivity("background removal")
+        val intent = Intent()
+            .setClassName(packageName, "com.paifa.ubikitouch.app.BackgroundRemovalActivity")
+            .addFloatingChatBridgeFlags()
+        runCatching {
+            startActivity(intent)
+        }.onFailure {
+            Log.e(TAG, "failed to start background removal", it)
+            onFloatingChatBackgroundRemovalClosed()
+        }
+    }
+
+    fun requestFloatingChatFriendManagement() {
+        if (::floatingChatOverlayController.isInitialized) {
+            FloatingChatFriendManagementBridge.updateSnapshot(floatingChatOverlayController.friendManagementSnapshot())
+        }
+        hideFloatingChatForExternalActivity("friend management")
+        val intent = Intent()
+            .setClassName(packageName, "com.paifa.ubikitouch.app.FriendManagementActivity")
+            .addFloatingChatBridgeFlags()
+        runCatching { startActivity(intent) }.onFailure {
+            Log.e(TAG, "failed to start friend management", it)
+            onFloatingChatFriendManagementClosed()
+        }
+    }
+
+    fun requestFloatingChatContactRelations() {
+        if (::floatingChatOverlayController.isInitialized) {
+            val friendSnapshot = floatingChatOverlayController.friendManagementSnapshot()
+            FloatingChatContactRelationsBridge.updateShell(
+                accounts = friendSnapshot.accounts,
+                selectedAccountId = friendSnapshot.selectedAccountId,
+                groups = friendSnapshot.groups
+            )
+        }
+        hideFloatingChatForExternalActivity("contact relations")
+        val intent = Intent()
+            .setClassName(packageName, "com.paifa.ubikitouch.app.ContactRelationsActivity")
+            .addFloatingChatBridgeFlags()
+        runCatching { startActivity(intent) }.onFailure {
+            Log.e(TAG, "failed to start contact relations", it)
+            onFloatingChatContactRelationsClosed()
+        }
+        FloatingChatContactRelationsBridge.refresh()
     }
 
     fun requestFloatingChatTransfer() {
@@ -614,6 +693,28 @@ class UbikiAccessibilityService : AccessibilityService() {
 
     fun onFloatingChatCouponWalletClosed() {
         onFloatingChatMediaPickerClosed()
+    }
+
+    fun onFloatingChatBackgroundRemovalClosed() {
+        onFloatingChatMediaPickerClosed()
+    }
+
+    fun onFloatingChatFriendManagementClosed() {
+        onFloatingChatMediaPickerClosed()
+    }
+
+    fun onFloatingChatContactRelationsClosed() {
+        onFloatingChatMediaPickerClosed()
+    }
+
+    fun refreshFloatingChatFriendManagement() {
+        if (!::floatingChatOverlayController.isInitialized) return
+        floatingChatOverlayController.refreshFriendManagementSnapshot()
+        FloatingChatFriendManagementBridge.updateSnapshot(floatingChatOverlayController.friendManagementSnapshot())
+    }
+
+    fun pullFloatingChatFriendRequests() {
+        refreshFloatingChatFriendManagement()
     }
 
     fun onFloatingChatTransferClosed() {

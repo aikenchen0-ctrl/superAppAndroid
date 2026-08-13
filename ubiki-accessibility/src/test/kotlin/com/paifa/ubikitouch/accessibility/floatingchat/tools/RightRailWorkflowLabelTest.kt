@@ -6,6 +6,16 @@ import org.junit.Test
 
 class RightRailWorkflowLabelTest {
     @Test
+    fun deviceToolOpensTheAccountDevicePanel() {
+        assertEquals(
+            ToolActionDispatch.OpenBottomPanel(
+                com.paifa.ubikitouch.accessibility.floatingchat.shell.BottomPanelMode.AccountDevice
+            ),
+            toolActionDispatchFor(FloatingChatToolAction.Device)
+        )
+    }
+
+    @Test
     fun standardRailContainsFinderEntry() {
         val actions = rightRailScrollableToolActions(emptyList())
 

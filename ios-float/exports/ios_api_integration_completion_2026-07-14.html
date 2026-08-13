@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>iOS 接口接入完成度对照</title>
+  <style>
+    :root {
+      --bg: #f5f7f8;
+      --panel: #ffffff;
+      --ink: #162126;
+      --muted: #647078;
+      --line: #dce4e7;
+      --done: #1f8a54;
+      --partial: #b56b12;
+      --missing: #c74336;
+      --mock: #3867d6;
+      --soft-done: #e8f6ee;
+      --soft-partial: #fff3df;
+      --soft-missing: #fdebe8;
+      --soft-mock: #e9efff;
+      --shadow: 0 12px 30px rgba(22, 33, 38, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.58;
+    }
+    .wrap { max-width: 1240px; margin: 0 auto; padding: 28px 18px 56px; }
+    header {
+      background: linear-gradient(135deg, #12313b, #2f626b);
+      color: #fff;
+      border-radius: 14px;
+      padding: 28px;
+      box-shadow: var(--shadow);
+    }
+    h1 { margin: 0 0 10px; font-size: 28px; letter-spacing: 0; }
+    h2 { margin: 30px 0 12px; font-size: 20px; }
+    p { margin: 8px 0; }
+    .sub { color: rgba(255,255,255,0.84); max-width: 920px; margin: 0; }
+    .meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      border-radius: 999px; padding: 5px 10px;
+      font-size: 12px; font-weight: 800; white-space: nowrap;
+    }
+    .pill.done { color: var(--done); background: var(--soft-done); }
+    .pill.partial { color: var(--partial); background: var(--soft-partial); }
+    .pill.missing { color: var(--missing); background: var(--soft-missing); }
+    .pill.mock { color: var(--mock); background: var(--soft-mock); }
+    .pill.neutral { color: #31505a; background: #e9f0f2; }
+    .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+    .stat {
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .stat strong { display: block; font-size: 22px; line-height: 1.1; }
+    .stat span { color: rgba(255,255,255,0.78); font-size: 12px; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px;
+      box-shadow: var(--shadow);
+      margin-top: 14px;
+    }
+    .notice {
+      border-left: 4px solid var(--partial);
+      background: #fff8ec;
+      padding: 12px 14px;
+      border-radius: 8px;
+      color: #6c430c;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+    th, td {
+      text-align: left;
+      vertical-align: top;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+      font-size: 14px;
+    }
+    th { background: #edf2f4; font-size: 13px; color: #425059; }
+    tr:last-child td { border-bottom: 0; }
+    .status {
+      display: inline-block;
+      min-width: 92px;
+      text-align: center;
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .status.done { color: var(--done); background: var(--soft-done); }
+    .status.partial { color: var(--partial); background: var(--soft-partial); }
+    .status.missing { color: var(--missing); background: var(--soft-missing); }
+    .status.mock { color: var(--mock); background: var(--soft-mock); }
+    code {
+      background: #edf2f4;
+      padding: 2px 5px;
+      border-radius: 5px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+    }
+    .small { color: var(--muted); font-size: 12px; }
+    .paths { color: #31505a; }
+    ul { margin: 8px 0 0 18px; padding: 0; }
+    @media (max-width: 860px) {
+      .grid { grid-template-columns: 1fr; }
+      header { padding: 22px; }
+      h1 { font-size: 24px; }
+      th, td { font-size: 13px; padding: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>iOS 接口接入完成度对照</h1>
+      <p class="sub">基于 2026-08-02 当前工作区源码、Xcode 工程与 2026-07-30 版本差异，并结合 2026-07-24 真实 OpenAPI、连接 iPhone 与设备 SQLite 复核结果。覆盖帐号/联系人/群聊同步、聊天收发、消息持久化、媒体字段、朋友圈/素材库、客户档案和业务接口 Workbench。</p>
+      <div class="meta">
+        <span class="pill neutral">生成日期：2026-07-14；代码复核更新：2026-08-02</span>
+        <span class="pill neutral">默认 Base URL：http://112.74.164.233:42718</span>
+        <span class="pill neutral">鉴权：X-API-Key + Authorization Bearer</span>
+        <span class="pill neutral">任务确认：/openapi/v1/tasks/{taskId}</span>
+      </div>
+      <div class="grid">
+        <div class="stat"><strong>120+</strong><span>源码中出现的 OpenAPI 路径字符串</span></div>
+        <div class="stat"><strong>12</strong><span>已进入主流程的请求域</span></div>
+        <div class="stat"><strong>4</strong><span>部分接入/待真实验收</span></div>
+        <div class="stat"><strong>7</strong><span>未接接口或主流程缺失</span></div>
+      </div>
+    </header>
+
+    <section class="card">
+      <h2>接口层结论</h2>
+      <p class="notice">已形成统一真实网络层，聊天接收侧也已接入 bootstrap、history 和 changes 增量接口，不再是“只能发送”。客户档案、联系人标签和朋友圈权限已进入好友主页的真实请求链路。当前最关键缺口仍是接收图片/表情消息没有媒体 URL，也没有按 messageId 下载媒体的后端接口；群/好友管理服务还没有完全替换页面内的散落请求。</p>
+      <div class="meta">
+        <span class="pill done">✅ 已接：主流程或业务页直接发真实请求</span>
+        <span class="pill partial">◐ 部分接：接口可调，但主页面未完全绑定</span>
+        <span class="pill mock">◇ 联调页/模拟：有字段展示或 Workbench，不算完整接入</span>
+        <span class="pill missing">□ 未接：未发现接口调用或代码明确未启用</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>2026-08-02 已完成记录与当前进展</h2>
+      <p class="notice">本轮在 2026-07-30 聊天接收闭环的基础上，补齐了好友主页的客户档案、联系人标签/朋友圈权限真实请求链路，并把社交管理契约加入 Xcode test target。页面接入已完成，但真实修改仍需后端频控、账号权限和真机验收。</p>
+      <ul>
+        <li><strong>客户档案进入好友主页：</strong><code>OpenAPICustomerProfileViewController</code> 已使用真实 contactId 调用 <code>GET/PUT /contacts/{id}/customer-profile</code>，保存后重新 GET 回读并逐字段比对；3 个服务契约测试在模拟器通过。</li>
+        <li><strong>标签与朋友圈权限进入好友主页：</strong>新增 <code>OpenApiContactLabelsPermissionsViewController</code>，支持账号标签读取/创建、联系人标签保存、三项朋友圈权限保存、任务终态校验和保存后回读；3 个服务契约测试通过。真实环境创建标签仍受后端频控影响。</li>
+        <li><strong>好友/群管理形成可测试契约：</strong>新增 <code>OpenAPISocialManagementService.swift</code>，封装群名称、群公告、资料刷新、邀请/移出成员、退群，以及好友查找、添加和好友申请处理；10 个契约测试通过。群信息页的“刷新群资料和成员”和好友管理页“拉取好友申请”已切到统一服务，其他页面请求仍待迁移。</li>
+        <li><strong>群成员真实绑定：</strong>当前安装版真机调用 <code>GET /openapi/v1/chatrooms/52516752001@chatroom/members</code> 返回 2 名成员；修复多层列表响应解析和稳定 wxid 绑定后，手机最新 SQLite 中测试群 7 条历史消息已绑定真实成员 <code>ღﾟChanོyelo</code> 及头像，<code>conversation_members</code> 已写入关系。成员同步现在只在当前打开的群聊按需触发，失败原因写入诊断字段，不在启动阶段全量请求所有群。</li>
+        <li><strong>社交接口统一入口：</strong>好友、群聊、群成员和好友申请的读取分页统一由 <code>OpenApiSocialManagementService</code> 生成账号作用域查询；群名称、公告、邀请、移出、退出和群内加好友统一由该服务校验参数并确认任务终态，页面不再重复拼装请求体。副作用入口仍保留用户确认，未在联调中执行。</li>
+        <li><strong>群成员名称字段修正：</strong><code>memberWxid</code> 仅用于内部关联和 WXID 明细；群消息名称按“群备注 → 联系人 <code>friendNo</code>（微信号）→ 昵称”选取，联系人同时支持 wxid 与微信号匹配，任何回退路径均不展示 <code>wxid_...</code>。</li>
+        <li><strong>支付接口接入：</strong><code>OpenApiPaymentService</code> 已接红包状态、红包明细、领取红包和领取转账；红包打开页按真实 <code>msgSvrId</code> 回填状态，转账只有领取任务终态成功后才更新为已收款。支付契约测试 2/2 通过，未执行真实领取。</li>
+        <li><strong>当前验证：</strong>app/test target 无签名模拟器构建成功；最近一次全量基线为 135 个测试用例、128 个通过、7 个失败；当前新增 OpenAPI 契约测试共 18 个（客户档案 3、标签权限 3、社交管理 10、支付 2）全部通过。剩余回归失败集中在支付高度、群消息身份和增量列表等历史问题。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>接口域接入状态</h2>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 19%;">接口域</th>
+            <th style="width: 11%;">状态</th>
+            <th>已接路径/代码表现</th>
+            <th>未接/风险</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>环境配置、登录与 Key</td>
+            <td><span class="status done">✅ 已接</span></td>
+            <td class="paths"><code>/api/auth/login</code>、<code>/api/openapi-keys</code>、<code>/openapi/v1/quick-start</code>。支持保存 Base URL、JWT、X-API-Key，登录后创建 OpenAPI Key。</td>
+            <td>凭证存储依赖本机 Keychain；需要真实账号权限和环境稳定性验收。</td>
+          </tr>
+          <tr>
+            <td>设备/能力/帐号</td>
+            <td><span class="status done">✅ 已接</span></td>
+            <td class="paths"><code>/openapi/v1/capabilities</code>、<code>/openapi/v1/devices</code>、<code>/openapi/v1/wechat-accounts</code>。启动同步会拉真实微信帐号并映射到右侧帐号栏。</td>
+            <td>离线/失败时回退本地状态，需补增量更新策略。</td>
+          </tr>
+          <tr>
+            <td>联系人、群聊、好友申请同步</td>
+            <td><span class="status done">✅ 已接</span></td>
+            <td class="paths"><code>/openapi/v1/contacts</code>、<code>/contacts/{id}/detail</code>、<code>/chatrooms</code>、<code>/chatrooms/{id}/members</code>、<code>/friend-requests</code>、<code>/tasks/recent</code>。<code>OpenApiIMSynchronizer</code> 会生成帐号/好友/群聊快照。</td>
+            <td>联系人、群聊和关系表已落 SQLite；非好友群成员昵称依赖按需调用成员接口，启动时不得全量刷新以免阻塞 UI。</td>
+          </tr>
+          <tr>
+            <td>收消息/历史消息/增量同步</td>
+            <td><span class="status done">✅ 已接</span></td>
+            <td class="paths"><code>/openapi/v1/chat/bootstrap</code>、<code>/openapi/v1/chat/history</code>、<code>/openapi/v1/messages/changes</code>。启动导入、会话历史分页和定时增量均已进入主聊天流程，消息与会话写入 SQLite。</td>
+            <td>需继续做游标边界、重复消息、撤回/删除和大数据量性能回归测试。</td>
+          </tr>
+          <tr>
+            <td>接收图片/表情/媒体下载</td>
+            <td><span class="status missing">□ 后端缺口</span></td>
+            <td>客户端已识别图片/表情类型，并解析 <code>mediaUrl</code>、<code>downloadUrl</code>、<code>fileUrl</code>、<code>imageUrl</code> 及正文 CDN URL。</td>
+            <td>真实历史数据中的 42 条图片只有 <code>[图片]</code>，附件 URL 数为 0；未发现 <code>/messages/{id}/media</code> 或下载接口，因此只能显示占位符。</td>
+          </tr>
+          <tr>
+            <td>主聊天发送：文本/图片/视频/语音/文件</td>
+            <td><span class="status done">✅ 已接</span></td>
+            <td class="paths"><code>/messages/text</code>、<code>/messages/image</code>、<code>/messages/video</code>、<code>/messages/voice</code>、<code>/messages/file</code>；发送后等待 <code>/tasks/{taskId}</code> 终态，状态写入 SQLite。</td>
+            <td>只有选中真实 OpenAPI 帐号和会话时才会尝试真实发送；否则保留本地发送。</td>
+          </tr>
+          <tr>
+            <td>消息卡片：网页/公众号/小程序</td>
+            <td><span class="status done">✅ 已接</span></td>
+            <td class="paths"><code>/messages/link-card</code>、<code>/messages/official-article-card</code>、<code>/messages/weapp-card</code>、<code>/messages/card-templates</code>。小程序卡片会阻止 demo appId/url，要求真实 payload。</td>
+            <td>依赖后端返回真实卡片模板；缺真实字段时不会发送。</td>
+          </tr>
+          <tr>
+            <td>消息联调扩展：表情、引用、收藏/笔记、批量发送</td>
+            <td><span class="status partial">◐ 部分接</span></td>
+            <td class="paths">业务 Workbench 可调用 <code>/messages/emoji</code>、<code>/messages/quote</code>、<code>/messages/note-card</code>、<code>/messages/batch</code>、<code>/messages/batch-by-filter</code>。</td>
+            <td>这些路径主要在接口联调页，不是主聊天发送链路的完整 UI。</td>
+          </tr>
+          <tr>
+            <td>媒体上传</td>
+            <td><span class="status done">✅ 已接</span></td>
+            <td class="paths"><code>/openapi/v1/media</code>、<code>/openapi/v1/media/voice</code>、<code>/openapi/v1/media/voice/environment</code>。支持 multipart 字段名候选和 raw file 兜底。</td>
+            <td>语音可播放格式、安全态和后端字段名仍需真机/后端联调。</td>
+          </tr>
+          <tr>
+            <td>好友管理与标签/权限</td>
+            <td><span class="status done">✅ 页面已接入，待真机验收</span></td>
+            <td class="paths"><code>/friends/find</code>、<code>/friends</code>、<code>/friends/by-phone</code>、<code>/friends/from-phonebook</code>、<code>/friends/in-chatroom</code>、<code>/friends/name-card</code>、<code>/friends/verify</code>、<code>/friend-requests/pull</code>、<code>/friend-requests/handle</code>、<code>/contact-labels</code>、<code>/contacts/labels*</code>、<code>/friends/permissions*</code>。好友主页已进入标签/朋友圈权限页面，支持真实读取、保存和回读。</td>
+            <td>新增标签/权限页面的真实修改仍需账号权限和后端频控验收；群/好友统一服务尚未替换所有 Workbench/ViewController 内的重复请求。</td>
+          </tr>
+          <tr>
+            <td>群聊管理</td>
+            <td><span class="status partial">◐ 部分接</span></td>
+            <td class="paths"><code>/chatrooms/sync</code>、<code>/chatrooms</code>、<code>/chatrooms/{id}/members</code>、<code>/chatrooms/refresh</code>、<code>/chatrooms/by-filter</code>、<code>/chatrooms/members/invite*</code>、<code>/chatrooms/members/kick*</code>、<code>/chatrooms/rename</code>、<code>/chatrooms/notice</code>、<code>/chatrooms/qrcode</code>、<code>/chatrooms/join-by-qr</code>、<code>/chatrooms/invites/*</code>。</td>
+            <td>主群信息页和聊天页已接真实成员读取、历史消息绑定和踢人请求；群信息页刷新群资料已使用统一服务，其他群操作主要在业务接口 Workbench，统一服务层仍需继续迁移。</td>
+          </tr>
+          <tr>
+            <td>朋友圈动态</td>
+            <td><span class="status done">✅ 已接</span></td>
+            <td class="paths"><code>/moments/sync</code>、<code>/moments/messages/sync</code>、<code>/moments/detail</code>、<code>/moments/like</code>、<code>/moments/comments</code>、<code>/moments/comments/delete</code>、<code>/moments</code>。朋友圈页会尝试同步、发布、点赞、评论并解析任务结果。</td>
+            <td>后端任务回写不稳定时会显示同步摘要或空状态。</td>
+          </tr>
+          <tr>
+            <td>朋友圈素材库与批量计划</td>
+            <td><span class="status done">✅ 已接</span></td>
+            <td class="paths"><code>/moments/materials</code>、<code>/moments/materials/{id}</code>、<code>/detail</code>、<code>/copy</code>、<code>/archive</code>、<code>/moments/template</code>、<code>/moments/batch/render-preview</code>、<code>/moments/batch/plans</code>、<code>/pause</code>、<code>/resume</code>、<code>/cancel</code>。</td>
+            <td>素材创建/编辑依赖后端 Schema；tenantId 当前传空字符串。</td>
+          </tr>
+          <tr>
+            <td>视频号</td>
+            <td><span class="status partial">◐ 部分接</span></td>
+            <td class="paths">业务 Workbench 可调 <code>/finder/posts/template</code>、<code>/finder/posts</code>、<code>/finder/mentions</code>、<code>/finder/user-page</code>、<code>/finder/comments/list</code>。</td>
+            <td><code>OpenApiFinderPublishViewController</code> 仍用模拟响应展示发布字段；主视频号详情页不是完整真实流。</td>
+          </tr>
+          <tr>
+            <td>支付/红包/转账</td>
+            <td><span class="status done">✅ 代码已接，待真机验收</span></td>
+            <td class="paths">主聊天红包/转账入口已接 <code>/red-packets/status-by-message</code>、<code>/red-packets/detail-by-message</code>、<code>/lucky-money/take-by-message</code>、<code>/transfers/take-by-message</code>；Workbench 仍可调钱包余额、发送红包和发送转账。</td>
+            <td>必须使用真实消息 <code>msgSvrId</code>；未完成真实领取验收，AA 仍是本地流程，Workbench 状态页仍保留 Mock envelope。</td>
+          </tr>
+          <tr>
+            <td>客户档案</td>
+            <td><span class="status done">✅ 代码已完成，待真机验收</span></td>
+            <td class="paths">主业务页已接 <code>GET/PUT /contacts/{id}/customer-profile</code>；保存后重新 GET 回读。Workbench 仍可调草稿和联系人详情接口。</td>
+            <td><code>OpenApiCustomerProfileViewController</code> 已使用真实后端 contactId；模拟器服务测试覆盖 GET 参数、404 后 contactId 解析、嵌套响应字段映射和 PUT 请求体（3/3 通过）。仍未发送真实 PUT；快捷区发消息、电话、跟进尚未绑定业务操作。</td>
+          </tr>
+          <tr>
+            <td>全局搜索/知识库搜索</td>
+            <td><span class="status missing">□ 未接</span></td>
+            <td>全局搜索为本地索引，安全区搜索为控件文本 + Vision OCR。</td>
+            <td>未发现服务端搜索、知识库检索或向量检索 API 调用。</td>
+          </tr>
+          <tr>
+            <td>AI：Codex/Claude/OpenAI 格式</td>
+            <td><span class="status done">✅ 已接</span></td>
+            <td class="paths">Codex/Claude 配置页、AI 输入浮标、Codex 会话、语音助手均可通过配置的 OpenAI 格式 <code>/chat/completions</code> 请求流式或非流式结果。</td>
+            <td>默认 API Key 为空；真实能力依赖用户配置。</td>
+          </tr>
+          <tr>
+            <td>AI 任务执行器 / AIfx 编排</td>
+            <td><span class="status missing">□ 未接</span></td>
+            <td>有本地意图计划、日历写入和 AI 草稿，但未发现 AIfx 模板编排服务或任务执行器接口。</td>
+            <td>需要模板、节点、执行、状态、重试、审批接口。</td>
+          </tr>
+          <tr>
+            <td>商城</td>
+            <td><span class="status missing">□ 未接</span></td>
+            <td>未发现商品、订单、购物车、交易接口。</td>
+            <td>需要商城领域 API 和页面一起补。</td>
+          </tr>
+          <tr>
+            <td>AI 浏览器 / Web 后台任务</td>
+            <td><span class="status missing">□ 未接</span></td>
+            <td>未发现浏览器任务、网页抓取、后台执行接口。</td>
+            <td>需要网页会话、快照、任务队列和执行状态 API。</td>
+          </tr>
+          <tr>
+            <td>AI 云盘 / 文件整理系统</td>
+            <td><span class="status missing">□ 未接</span></td>
+            <td>只有消息文件上传/预览/素材附件，未发现云盘文件库接口。</td>
+            <td>需要文件索引、目录、标签、权限、分享链接和整理任务接口。</td>
+          </tr>
+          <tr>
+            <td>PIP / 灵动岛后端</td>
+            <td><span class="status missing">□ 未接</span></td>
+            <td>灵动岛状态来自本地 App 状态；未发现 PIP 服务端接口。</td>
+            <td>如果需要跨设备/后台状态同步，需要新增状态服务。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>主流程 vs 联调页</h2>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 24%;">已进入主流程的接口</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>帐号/联系人/群同步</td>
+            <td>启动后通过 <code>OpenApiIMSynchronizer.loadSnapshot()</code> 拉真实帐号、联系人、群聊、好友申请和最近任务，应用到左/右栏。</td>
+          </tr>
+          <tr>
+            <td>聊天发送</td>
+            <td>选中真实帐号和真实会话后，本地发送会并行尝试 OpenAPI 真实发送，任务终态写入 <code>openapi_delivery_status</code>。</td>
+          </tr>
+          <tr>
+            <td>聊天接收与历史</td>
+            <td>启动 bootstrap、打开会话加载 history、后台轮询 changes；真机数据已验证会话自动补建，孤立消息数为 0。</td>
+          </tr>
+          <tr>
+            <td>好友主页资料与联系人设置</td>
+            <td>好友主页已进入客户档案、标签与朋友圈权限页面；读取、保存、任务终态校验和保存后回读均走真实 OpenAPI。当前代码已接入，真实修改仍待账号权限、频控和真机验收。</td>
+          </tr>
+          <tr>
+            <td>朋友圈</td>
+            <td>朋友圈页和素材库页已直接调用真实 OpenAPI，同步、发布、点赞、评论、素材 CRUD、批量计划均有请求。</td>
+          </tr>
+          <tr>
+            <td>群成员同步/踢人</td>
+            <td>群信息页可拉真实群成员，踢人会尝试 <code>/chatrooms/members/kick</code>。</td>
+          </tr>
+          <tr>
+            <td>AI 模型请求</td>
+            <td>Codex/Claude/语音助手/AI 输入框通过配置的模型接口请求，非 OpenAPI 业务接口。</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="small">仅在 Workbench 可调的接口不等同于主流程完成，例如支付、视频号、群创建/邀请/公告等；客户档案和联系人设置已移入好友主页，但仍保留 Workbench 入口用于联调。</p>
+    </section>
+
+    <section class="card">
+      <h2>优先补齐</h2>
+      <ul>
+        <li><strong>P0：</strong>后端为 history/changes 的媒体消息返回可访问的 <code>downloadUrl</code>，或新增 <code>GET /openapi/v1/messages/{messageId}/media</code>；这是当前图片和动态表情只能显示占位符的直接原因。</li>
+        <li><strong>P0：</strong>为 bootstrap/history/changes 建立固定 Schema 和真实数据契约测试，覆盖图片、表情、语音、视频、文件、卡片、撤回、删除、群发送者字段。</li>
+        <li><strong>P0：</strong>在真机上验收好友/群列表读取和当前群成员刷新；社交管理入口已完成统一服务迁移，邀请、踢人、退群和加好友只做契约校验，不主动触发真实副作用。</li>
+        <li><strong>P0：</strong>修复当前模拟器回归中的 7 个失败用例，覆盖支付消息高度、群消息帐号身份/连接点、增量插入和头像/未回消息展示。</li>
+        <li><strong>P0：</strong>继续做聊天启动性能回归：当前已改为只对当前打开群聊按需请求成员并缓存，仍需验证大历史会话、重复进入和接口失败重试。</li>
+        <li><strong>P1：</strong>完成客户档案、标签/权限真实环境验收；继续把支付、视频号从 Workbench/模拟页面迁入主业务页。</li>
+        <li><strong>P1：</strong>补服务端搜索、知识库、AI 浏览器、AIfx、商城接口域，并完善错误码映射和自动化联调用例。</li>
+      </ul>
+      <p class="small">复核依据：2026-07-24 真实 X-API-Key 校验成功；2026-08-02 当前源码真机构建、安装并启动到连接的 iPhone 14 Pro；最新手机 SQLite 显示测试群成员接口成功返回 2 名成员，7 条历史消息已绑定真实昵称/头像，未发送消息、未拨号、未执行加好友或群管理副作用。最近一次全量模拟器基线为 135 个测试用例中 128 个通过、7 个失败；当前新增 OpenAPI 契约测试 18/18 通过。媒体附件缺失、标签频控、支付真实领取和任务终态仍需真机/后端验收。</p>
+    </section>
+  </div>
+</body>
+</html>

@@ -52,6 +52,8 @@ private fun toolActionBottomPanelMode(action: FloatingChatToolAction): BottomPan
         FloatingChatToolAction.Location -> BottomPanelMode.Location
         FloatingChatToolAction.Favorite -> BottomPanelMode.Favorite
         FloatingChatToolAction.Card -> BottomPanelMode.Card
+        FloatingChatToolAction.Device -> BottomPanelMode.AccountDevice
+        FloatingChatToolAction.Notes -> BottomPanelMode.CustomerProfile
         else -> BottomPanelMode.None
     }
 }

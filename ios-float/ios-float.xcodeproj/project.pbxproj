@@ -1,0 +1,1004 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000000000000000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* AppDelegate.swift */; };
+		A10000000000000000000002 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* SceneDelegate.swift */; };
+		A10000000000000000000003 /* ChatWindowViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* ChatWindowViewController.swift */; };
+		A10000000000000000000040 /* Data+LittleEndian.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000040 /* Data+LittleEndian.swift */; };
+		A10000000000000000000041 /* MediaPreviewFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000041 /* MediaPreviewFeature.swift */; };
+		A10000000000000000000042 /* AIInputFloatingAssistant.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000042 /* AIInputFloatingAssistant.swift */; };
+		A10000000000000000000043 /* DraftPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000043 /* DraftPresentation.swift */; };
+		A10000000000000000000044 /* MomentsFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000044 /* MomentsFeature.swift */; };
+		A10000000000000000000045 /* SearchFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000045 /* SearchFeature.swift */; };
+		A10000000000000000000046 /* FavoritesFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000046 /* FavoritesFeature.swift */; };
+		A10000000000000000000047 /* WalletFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000047 /* WalletFeature.swift */; };
+		A10000000000000000000048 /* LocationFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000048 /* LocationFeature.swift */; };
+		A10000000000000000000049 /* ContactsFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000049 /* ContactsFeature.swift */; };
+		A10000000000000000000050 /* GroupsFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000050 /* GroupsFeature.swift */; };
+		A10000000000000000000051 /* CallsFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000051 /* CallsFeature.swift */; };
+		A10000000000000000000052 /* PaymentsFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000052 /* PaymentsFeature.swift */; };
+		A10000000000000000000053 /* RelayEditorViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000053 /* RelayEditorViewController.swift */; };
+		A10000000000000000000054 /* MergedForwardDetailViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000054 /* MergedForwardDetailViewController.swift */; };
+		A10000000000000000000055 /* OpenAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000055 /* OpenAPIClient.swift */; };
+		A10000000000000000000056 /* OpenAPIContexts.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000056 /* OpenAPIContexts.swift */; };
+		A10000000000000000000057 /* OpenAPIIMSynchronizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000057 /* OpenAPIIMSynchronizer.swift */; };
+		D7C100000000000000000001 /* OpenAPIChatSynchronizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7C200000000000000000001 /* OpenAPIChatSynchronizer.swift */; };
+		D7C100000000000000000002 /* ChatWindow+OpenApiMessageSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7C200000000000000000002 /* ChatWindow+OpenApiMessageSync.swift */; };
+		D7C300000000000000000001 /* OpenAPISocialManagementService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7C300000000000000000002 /* OpenAPISocialManagementService.swift */; };
+		D7C300000000000000000003 /* OpenAPISocialManagementServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7C300000000000000000004 /* OpenAPISocialManagementServiceTests.swift */; };
+		A10000000000000000000058 /* OpenAPIWorkbenchCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000058 /* OpenAPIWorkbenchCore.swift */; };
+		A10000000000000000000059 /* OpenAPIFriendManagementViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000059 /* OpenAPIFriendManagementViewController.swift */; };
+		A10000000000000000000060 /* OpenAPIBusinessWorkbenchViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000060 /* OpenAPIBusinessWorkbenchViewController.swift */; };
+		A10000000000000000000061 /* OpenAPIFinderPublishViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000061 /* OpenAPIFinderPublishViewController.swift */; };
+		A10000000000000000000062 /* ContactRelationsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000062 /* ContactRelationsViewController.swift */; };
+		A10000000000000000000063 /* OpenAPICustomerProfileViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000063 /* OpenAPICustomerProfileViewController.swift */; };
+		D7C400000000000000000001 /* OpenApiContactLabelsPermissionsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7C400000000000000000002 /* OpenApiContactLabelsPermissionsViewController.swift */; };
+		A10000000000000000000064 /* OpenAPIMomentWorkbench.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000064 /* OpenAPIMomentWorkbench.swift */; };
+		A10000000000000000000065 /* OperationLabFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000065 /* OperationLabFeature.swift */; };
+		A10000000000000000000066 /* BlinkVoiceFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000066 /* BlinkVoiceFeature.swift */; };
+		A10000000000000000000067 /* ChatWindow+AudioDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000067 /* ChatWindow+AudioDelegate.swift */; };
+		A10000000000000000000068 /* MessageComponentContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000068 /* MessageComponentContracts.swift */; };
+		A10000000000000000000069 /* MessageRendererRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000069 /* MessageRendererRegistry.swift */; };
+		A10000000000000000000070 /* SystemMessageRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000070 /* SystemMessageRenderer.swift */; };
+		A10000000000000000000071 /* TextMessageRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000071 /* TextMessageRenderer.swift */; };
+		A10000000000000000000072 /* MediaMessageRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000072 /* MediaMessageRenderer.swift */; };
+		A10000000000000000000073 /* VoiceCallMessageRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000073 /* VoiceCallMessageRenderer.swift */; };
+		A10000000000000000000074 /* CardMessageRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000074 /* CardMessageRenderer.swift */; };
+		A10000000000000000000075 /* PaymentMessageRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000075 /* PaymentMessageRenderer.swift */; };
+		A10000000000000000000076 /* RedPacketEnvelopeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000076 /* RedPacketEnvelopeView.swift */; };
+		A10000000000000000000077 /* PaymentCardContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000077 /* PaymentCardContentView.swift */; };
+		A10000000000000000000078 /* MediaPrivacyOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000078 /* MediaPrivacyOverlayView.swift */; };
+		A10000000000000000000079 /* DocumentCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000079 /* DocumentCardView.swift */; };
+		A10000000000000000000080 /* ChannelsMediaOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000080 /* ChannelsMediaOverlayView.swift */; };
+		A10000000000000000000081 /* ContactCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000081 /* ContactCardView.swift */; };
+		A10000000000000000000082 /* SidebarAvatarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000082 /* SidebarAvatarView.swift */; };
+		A10000000000000000000083 /* MiniProgramShareCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000083 /* MiniProgramShareCardView.swift */; };
+		A10000000000000000000084 /* LinkShareCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000084 /* LinkShareCardView.swift */; };
+		A10000000000000000000085 /* ChatWindowSupportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000085 /* ChatWindowSupportModels.swift */; };
+		A10000000000000000000086 /* ToolActionRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000086 /* ToolActionRouter.swift */; };
+		A10000000000000000000087 /* ConversationStateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000087 /* ConversationStateStore.swift */; };
+		A10000000000000000000088 /* MessageFlowCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000088 /* MessageFlowCoordinator.swift */; };
+		A10000000000000000000089 /* MediaPreviewKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000089 /* MediaPreviewKit.swift */; };
+		A10000000000000000000090 /* MomentsKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000090 /* MomentsKit.swift */; };
+		A10000000000000000000091 /* PaymentKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000091 /* PaymentKit.swift */; };
+		A10000000000000000000092 /* ChatWindow+SystemPickerDelegates.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000092 /* ChatWindow+SystemPickerDelegates.swift */; };
+		A10000000000000000000093 /* ChatWindow+InputDelegates.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000093 /* ChatWindow+InputDelegates.swift */; };
+		A10000000000000000000094 /* ChatWindow+CollectionDataSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000094 /* ChatWindow+CollectionDataSource.swift */; };
+		A10000000000000000000095 /* ChatWindow+DragDropDelegates.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000095 /* ChatWindow+DragDropDelegates.swift */; };
+		A10000000000000000000096 /* ChatWindow+CollectionLayoutDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000096 /* ChatWindow+CollectionLayoutDelegate.swift */; };
+		A10000000000000000000097 /* UnreadTimelineLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000097 /* UnreadTimelineLayout.swift */; };
+		A10000000000000000000004 /* ChatModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* ChatModels.swift */; };
+		A10000000000000000000005 /* ChatCells.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* ChatCells.swift */; };
+		A10000000000000000000006 /* ChatDataFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* ChatDataFactory.swift */; };
+		A10000000000000000000007 /* FloatingChromeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* FloatingChromeView.swift */; };
+		A10000000000000000000008 /* ConnectionOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* ConnectionOverlayView.swift */; };
+		A10000000000000000000009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* Assets.xcassets */; };
+		A10000000000000000000010 /* ios_floatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* ios_floatTests.swift */; };
+		A10000000000000000000013 /* ChatSQLiteStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* ChatSQLiteStore.swift */; };
+		A10000000000000000000014 /* FloatingChatActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000014 /* FloatingChatActivityAttributes.swift */; };
+		A10000000000000000000015 /* FloatingChatActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015 /* FloatingChatActivityManager.swift */; };
+		A10000000000000000000016 /* FloatingChatLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000016 /* FloatingChatLiveActivityWidget.swift */; };
+		A10000000000000000000017 /* FloatingChatActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000014 /* FloatingChatActivityAttributes.swift */; };
+		A10000000000000000000018 /* ios-floatLiveActivity.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = A20000000000000000000017 /* ios-floatLiveActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A10000000000000000000020 /* BlinkCaptureOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000020 /* BlinkCaptureOptions.swift */; };
+		A10000000000000000000021 /* BlinkCaptureResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000021 /* BlinkCaptureResult.swift */; };
+		A10000000000000000000022 /* BlinkCaptureViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000022 /* BlinkCaptureViewController.swift */; };
+		A10000000000000000000023 /* BlinkEventClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000023 /* BlinkEventClassifier.swift */; };
+		A10000000000000000000024 /* BlinkEventType.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000024 /* BlinkEventType.swift */; };
+		A10000000000000000000025 /* BlinkVoiceCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000025 /* BlinkVoiceCapture.swift */; };
+		A10000000000000000000026 /* VisionBlinkDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000026 /* VisionBlinkDetector.swift */; };
+		A10000000000000000000027 /* AppKits.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000027 /* AppKits.swift */; };
+		A10000000000000000000028 /* SafeAreaSummaryOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000028 /* SafeAreaSummaryOverlay.swift */; };
+		A10000000000000000000029 /* AppQualityBaseline.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000029 /* AppQualityBaseline.swift */; };
+		C0D300000000000000000001 /* PerformanceSignposts.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D300000000000000000002 /* PerformanceSignposts.swift */; };
+		A10000000000000000000030 /* AIVoiceAssistantOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000030 /* AIVoiceAssistantOverlay.swift */; };
+		A10000000000000000000031 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* Assets.xcassets */; };
+		A10000000000000000000032 /* AppKitRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000031 /* AppKitRegistry.swift */; };
+		A10000000000000000000033 /* InteractionKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000032 /* InteractionKit.swift */; };
+		A10000000000000000000034 /* FloatingIMKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000033 /* FloatingIMKit.swift */; };
+		A10000000000000000000035 /* MessageRenderKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000034 /* MessageRenderKit.swift */; };
+		A10000000000000000000036 /* AIInputKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000035 /* AIInputKit.swift */; };
+		A10000000000000000000037 /* ChatDataLayerKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000036 /* ChatDataLayerKit.swift */; };
+		A10000000000000000000038 /* BusinessPageKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000037 /* BusinessPageKit.swift */; };
+		A10000000000000000000039 /* ModuleBoundaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000038 /* ModuleBoundaryTests.swift */; };
+		F17E00000000000000000001 /* PerformanceDataFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = F17E00000000000000000003 /* PerformanceDataFixtures.swift */; };
+		F17E00000000000000000002 /* PerformanceBaselineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F17E00000000000000000004 /* PerformanceBaselineTests.swift */; };
+		C0D310000000000000000001 /* RendererReuseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D310000000000000000002 /* RendererReuseTests.swift */; };
+		B10000000000000000000001 /* BlinkVoiceKit in Frameworks */ = {isa = PBXBuildFile; productRef = B30000000000000000000001 /* BlinkVoiceKit */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A80000000000000000000002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A00000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A50000000000000000000001;
+			remoteInfo = "ios-float";
+		};
+		A80000000000000000000004 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A00000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A50000000000000000000003;
+			remoteInfo = "ios-floatLiveActivity";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A30000000000000000000004 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				A10000000000000000000018 /* ios-floatLiveActivity.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		A20000000000000000000001 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		A20000000000000000000002 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
+		A20000000000000000000003 /* ChatWindowViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatWindowViewController.swift; sourceTree = "<group>"; };
+		A20000000000000000000040 /* Data+LittleEndian.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Extensions/Data+LittleEndian.swift"; sourceTree = "<group>"; };
+		A20000000000000000000041 /* MediaPreviewFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/MediaPreview/MediaPreviewFeature.swift; sourceTree = "<group>"; };
+		A20000000000000000000042 /* AIInputFloatingAssistant.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AIInput/AIInputFloatingAssistant.swift; sourceTree = "<group>"; };
+		A20000000000000000000043 /* DraftPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Drafts/DraftPresentation.swift; sourceTree = "<group>"; };
+		A20000000000000000000044 /* MomentsFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Moments/MomentsFeature.swift; sourceTree = "<group>"; };
+		A20000000000000000000045 /* SearchFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Search/SearchFeature.swift; sourceTree = "<group>"; };
+		A20000000000000000000046 /* FavoritesFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Favorites/FavoritesFeature.swift; sourceTree = "<group>"; };
+		A20000000000000000000047 /* WalletFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Wallet/WalletFeature.swift; sourceTree = "<group>"; };
+		A20000000000000000000048 /* LocationFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Location/LocationFeature.swift; sourceTree = "<group>"; };
+		A20000000000000000000049 /* ContactsFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Contacts/ContactsFeature.swift; sourceTree = "<group>"; };
+		A20000000000000000000050 /* GroupsFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Groups/GroupsFeature.swift; sourceTree = "<group>"; };
+		A20000000000000000000051 /* CallsFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Calls/CallsFeature.swift; sourceTree = "<group>"; };
+		A20000000000000000000052 /* PaymentsFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Payments/PaymentsFeature.swift; sourceTree = "<group>"; };
+		A20000000000000000000053 /* RelayEditorViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Calls/RelayEditorViewController.swift; sourceTree = "<group>"; };
+		A20000000000000000000054 /* MergedForwardDetailViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Calls/MergedForwardDetailViewController.swift; sourceTree = "<group>"; };
+		A20000000000000000000055 /* OpenAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/OpenAPI/OpenAPIClient.swift; sourceTree = "<group>"; };
+		A20000000000000000000056 /* OpenAPIContexts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/OpenAPI/OpenAPIContexts.swift; sourceTree = "<group>"; };
+		A20000000000000000000057 /* OpenAPIIMSynchronizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/OpenAPI/OpenAPIIMSynchronizer.swift; sourceTree = "<group>"; };
+		D7C200000000000000000001 /* OpenAPIChatSynchronizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/OpenAPI/OpenAPIChatSynchronizer.swift; sourceTree = "<group>"; };
+		D7C200000000000000000002 /* ChatWindow+OpenApiMessageSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/Chat/ChatWindow+OpenApiMessageSync.swift"; sourceTree = "<group>"; };
+		D7C300000000000000000002 /* OpenAPISocialManagementService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/OpenAPI/OpenAPISocialManagementService.swift; sourceTree = "<group>"; };
+		D7C300000000000000000004 /* OpenAPISocialManagementServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAPISocialManagementServiceTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000058 /* OpenAPIWorkbenchCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/OpenAPIWorkbench/OpenAPIWorkbenchCore.swift; sourceTree = "<group>"; };
+		A20000000000000000000059 /* OpenAPIFriendManagementViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/OpenAPIWorkbench/OpenAPIFriendManagementViewController.swift; sourceTree = "<group>"; };
+		A20000000000000000000060 /* OpenAPIBusinessWorkbenchViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/OpenAPIWorkbench/OpenAPIBusinessWorkbenchViewController.swift; sourceTree = "<group>"; };
+		A20000000000000000000061 /* OpenAPIFinderPublishViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/OpenAPIWorkbench/OpenAPIFinderPublishViewController.swift; sourceTree = "<group>"; };
+		A20000000000000000000062 /* ContactRelationsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/OpenAPIWorkbench/ContactRelationsViewController.swift; sourceTree = "<group>"; };
+		A20000000000000000000063 /* OpenAPICustomerProfileViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/OpenAPIWorkbench/OpenAPICustomerProfileViewController.swift; sourceTree = "<group>"; };
+		D7C400000000000000000002 /* OpenApiContactLabelsPermissionsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/OpenAPIWorkbench/OpenApiContactLabelsPermissionsViewController.swift; sourceTree = "<group>"; };
+		A20000000000000000000064 /* OpenAPIMomentWorkbench.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/OpenAPIWorkbench/OpenAPIMomentWorkbench.swift; sourceTree = "<group>"; };
+		A20000000000000000000065 /* OperationLabFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/OperationLab/OperationLabFeature.swift; sourceTree = "<group>"; };
+		A20000000000000000000066 /* BlinkVoiceFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/BlinkVoice/BlinkVoiceFeature.swift; sourceTree = "<group>"; };
+		A20000000000000000000067 /* ChatWindow+AudioDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/Chat/ChatWindow+AudioDelegate.swift"; sourceTree = "<group>"; };
+		A20000000000000000000068 /* MessageComponentContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Modules/MessageRender/MessageComponentContracts.swift; sourceTree = "<group>"; };
+		A20000000000000000000069 /* MessageRendererRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Modules/MessageRender/MessageRendererRegistry.swift; sourceTree = "<group>"; };
+		A20000000000000000000070 /* SystemMessageRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Modules/MessageRender/Renderers/SystemMessageRenderer.swift; sourceTree = "<group>"; };
+		A20000000000000000000071 /* TextMessageRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Modules/MessageRender/Renderers/TextMessageRenderer.swift; sourceTree = "<group>"; };
+		A20000000000000000000072 /* MediaMessageRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Modules/MessageRender/Renderers/MediaMessageRenderer.swift; sourceTree = "<group>"; };
+		A20000000000000000000073 /* VoiceCallMessageRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Modules/MessageRender/Renderers/VoiceCallMessageRenderer.swift; sourceTree = "<group>"; };
+		A20000000000000000000074 /* CardMessageRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Modules/MessageRender/Renderers/CardMessageRenderer.swift; sourceTree = "<group>"; };
+		A20000000000000000000075 /* PaymentMessageRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Modules/MessageRender/Renderers/PaymentMessageRenderer.swift; sourceTree = "<group>"; };
+		A20000000000000000000076 /* RedPacketEnvelopeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Modules/MessageRender/Views/RedPacketEnvelopeView.swift; sourceTree = "<group>"; };
+		A20000000000000000000077 /* PaymentCardContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Modules/MessageRender/Views/PaymentCardContentView.swift; sourceTree = "<group>"; };
+		A20000000000000000000078 /* MediaPrivacyOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Modules/MessageRender/Views/MediaPrivacyOverlayView.swift; sourceTree = "<group>"; };
+		A20000000000000000000079 /* DocumentCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Modules/MessageRender/Views/DocumentCardView.swift; sourceTree = "<group>"; };
+		A20000000000000000000080 /* ChannelsMediaOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Modules/MessageRender/Views/ChannelsMediaOverlayView.swift; sourceTree = "<group>"; };
+		A20000000000000000000081 /* ContactCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Modules/MessageRender/Views/ContactCardView.swift; sourceTree = "<group>"; };
+		A20000000000000000000082 /* SidebarAvatarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Modules/FloatingIM/SidebarAvatarView.swift; sourceTree = "<group>"; };
+		A20000000000000000000083 /* MiniProgramShareCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Modules/MessageRender/Views/MiniProgramShareCardView.swift; sourceTree = "<group>"; };
+		A20000000000000000000084 /* LinkShareCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Modules/MessageRender/Views/LinkShareCardView.swift; sourceTree = "<group>"; };
+		A20000000000000000000085 /* ChatWindowSupportModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Chat/ChatWindowSupportModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000086 /* ToolActionRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Chat/ToolActionRouter.swift; sourceTree = "<group>"; };
+		A20000000000000000000087 /* ConversationStateStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Chat/ConversationStateStore.swift; sourceTree = "<group>"; };
+		A20000000000000000000088 /* MessageFlowCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Chat/MessageFlowCoordinator.swift; sourceTree = "<group>"; };
+		A20000000000000000000089 /* MediaPreviewKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/MediaPreview/MediaPreviewKit.swift; sourceTree = "<group>"; };
+		A20000000000000000000090 /* MomentsKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Moments/MomentsKit.swift; sourceTree = "<group>"; };
+		A20000000000000000000091 /* PaymentKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Payments/PaymentKit.swift; sourceTree = "<group>"; };
+		A20000000000000000000092 /* ChatWindow+SystemPickerDelegates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/Chat/ChatWindow+SystemPickerDelegates.swift"; sourceTree = "<group>"; };
+		A20000000000000000000093 /* ChatWindow+InputDelegates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/Chat/ChatWindow+InputDelegates.swift"; sourceTree = "<group>"; };
+		A20000000000000000000094 /* ChatWindow+CollectionDataSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/Chat/ChatWindow+CollectionDataSource.swift"; sourceTree = "<group>"; };
+		A20000000000000000000095 /* ChatWindow+DragDropDelegates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/Chat/ChatWindow+DragDropDelegates.swift"; sourceTree = "<group>"; };
+		A20000000000000000000096 /* ChatWindow+CollectionLayoutDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/Chat/ChatWindow+CollectionLayoutDelegate.swift"; sourceTree = "<group>"; };
+		A20000000000000000000097 /* UnreadTimelineLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Chat/UnreadTimelineLayout.swift; sourceTree = "<group>"; };
+		A20000000000000000000004 /* ChatModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000005 /* ChatCells.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatCells.swift; sourceTree = "<group>"; };
+		A20000000000000000000006 /* ChatDataFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatDataFactory.swift; sourceTree = "<group>"; };
+		A20000000000000000000007 /* FloatingChromeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingChromeView.swift; sourceTree = "<group>"; };
+		A20000000000000000000008 /* ConnectionOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionOverlayView.swift; sourceTree = "<group>"; };
+		A20000000000000000000009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A20000000000000000000010 /* ios_floatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ios_floatTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000011 /* ios-float.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "ios-float.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000012 /* ios-floatTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "ios-floatTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000013 /* ChatSQLiteStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSQLiteStore.swift; sourceTree = "<group>"; };
+		A20000000000000000000014 /* FloatingChatActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingChatActivityAttributes.swift; sourceTree = "<group>"; };
+		A20000000000000000000015 /* FloatingChatActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingChatActivityManager.swift; sourceTree = "<group>"; };
+		A20000000000000000000016 /* FloatingChatLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingChatLiveActivityWidget.swift; sourceTree = "<group>"; };
+		A20000000000000000000017 /* ios-floatLiveActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "ios-floatLiveActivity.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000018 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A20000000000000000000019 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A20000000000000000000020 /* BlinkCaptureOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlinkVoiceVisual/BlinkCaptureOptions.swift; sourceTree = "<group>"; };
+		A20000000000000000000021 /* BlinkCaptureResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlinkVoiceVisual/BlinkCaptureResult.swift; sourceTree = "<group>"; };
+		A20000000000000000000022 /* BlinkCaptureViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlinkVoiceVisual/BlinkCaptureViewController.swift; sourceTree = "<group>"; };
+		A20000000000000000000023 /* BlinkEventClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlinkVoiceVisual/BlinkEventClassifier.swift; sourceTree = "<group>"; };
+		A20000000000000000000024 /* BlinkEventType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlinkVoiceVisual/BlinkEventType.swift; sourceTree = "<group>"; };
+		A20000000000000000000025 /* BlinkVoiceCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlinkVoiceVisual/BlinkVoiceCapture.swift; sourceTree = "<group>"; };
+		A20000000000000000000026 /* VisionBlinkDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlinkVoiceVisual/VisionBlinkDetector.swift; sourceTree = "<group>"; };
+		A20000000000000000000027 /* AppKits.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKits.swift; sourceTree = "<group>"; };
+		A20000000000000000000028 /* SafeAreaSummaryOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafeAreaSummaryOverlay.swift; sourceTree = "<group>"; };
+		A20000000000000000000029 /* AppQualityBaseline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppQualityBaseline.swift; sourceTree = "<group>"; };
+		C0D300000000000000000002 /* PerformanceSignposts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceSignposts.swift; sourceTree = "<group>"; };
+		A20000000000000000000030 /* AIVoiceAssistantOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIVoiceAssistantOverlay.swift; sourceTree = "<group>"; };
+		A20000000000000000000031 /* AppKitRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Modules/AppKitRegistry.swift; sourceTree = "<group>"; };
+		A20000000000000000000032 /* InteractionKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Modules/Interaction/InteractionKit.swift; sourceTree = "<group>"; };
+		A20000000000000000000033 /* FloatingIMKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Modules/FloatingIM/FloatingIMKit.swift; sourceTree = "<group>"; };
+		A20000000000000000000034 /* MessageRenderKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Modules/MessageRender/MessageRenderKit.swift; sourceTree = "<group>"; };
+		A20000000000000000000035 /* AIInputKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Modules/AIInput/AIInputKit.swift; sourceTree = "<group>"; };
+		A20000000000000000000036 /* ChatDataLayerKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Modules/Data/ChatDataLayerKit.swift; sourceTree = "<group>"; };
+		A20000000000000000000037 /* BusinessPageKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Modules/Business/BusinessPageKit.swift; sourceTree = "<group>"; };
+		A20000000000000000000038 /* ModuleBoundaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleBoundaryTests.swift; sourceTree = "<group>"; };
+		F17E00000000000000000003 /* PerformanceDataFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ios-float/PerformanceTests/PerformanceDataFixtures.swift"; sourceTree = SOURCE_ROOT; };
+		F17E00000000000000000004 /* PerformanceBaselineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ios-float/PerformanceTests/PerformanceBaselineTests.swift"; sourceTree = SOURCE_ROOT; };
+		C0D310000000000000000002 /* RendererReuseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ios-float/PerformanceTests/RendererReuseTests.swift"; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A30000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B10000000000000000000001 /* BlinkVoiceKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A30000000000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A30000000000000000000003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A40000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				A40000000000000000000002 /* ios-float */,
+				A40000000000000000000005 /* ios-floatLiveActivity */,
+				A40000000000000000000003 /* ios-floatTests */,
+				A40000000000000000000004 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A40000000000000000000002 /* ios-float */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000001 /* AppDelegate.swift */,
+				A20000000000000000000002 /* SceneDelegate.swift */,
+				A20000000000000000000003 /* ChatWindowViewController.swift */,
+				A20000000000000000000040 /* Data+LittleEndian.swift */,
+				A20000000000000000000041 /* MediaPreviewFeature.swift */,
+				A20000000000000000000042 /* AIInputFloatingAssistant.swift */,
+				A20000000000000000000043 /* DraftPresentation.swift */,
+				A20000000000000000000044 /* MomentsFeature.swift */,
+				A20000000000000000000045 /* SearchFeature.swift */,
+				A20000000000000000000046 /* FavoritesFeature.swift */,
+				A20000000000000000000047 /* WalletFeature.swift */,
+				A20000000000000000000048 /* LocationFeature.swift */,
+				A20000000000000000000049 /* ContactsFeature.swift */,
+				A20000000000000000000050 /* GroupsFeature.swift */,
+				A20000000000000000000051 /* CallsFeature.swift */,
+				A20000000000000000000052 /* PaymentsFeature.swift */,
+				A20000000000000000000053 /* RelayEditorViewController.swift */,
+				A20000000000000000000054 /* MergedForwardDetailViewController.swift */,
+				A20000000000000000000055 /* OpenAPIClient.swift */,
+				A20000000000000000000056 /* OpenAPIContexts.swift */,
+				A20000000000000000000057 /* OpenAPIIMSynchronizer.swift */,
+				D7C200000000000000000001 /* OpenAPIChatSynchronizer.swift */,
+				D7C200000000000000000002 /* ChatWindow+OpenApiMessageSync.swift */,
+				D7C300000000000000000002 /* OpenAPISocialManagementService.swift */,
+				A20000000000000000000058 /* OpenAPIWorkbenchCore.swift */,
+				A20000000000000000000059 /* OpenAPIFriendManagementViewController.swift */,
+				A20000000000000000000060 /* OpenAPIBusinessWorkbenchViewController.swift */,
+				A20000000000000000000061 /* OpenAPIFinderPublishViewController.swift */,
+				A20000000000000000000062 /* ContactRelationsViewController.swift */,
+				A20000000000000000000063 /* OpenAPICustomerProfileViewController.swift */,
+				D7C400000000000000000002 /* OpenApiContactLabelsPermissionsViewController.swift */,
+				A20000000000000000000064 /* OpenAPIMomentWorkbench.swift */,
+				A20000000000000000000065 /* OperationLabFeature.swift */,
+				A20000000000000000000066 /* BlinkVoiceFeature.swift */,
+				A20000000000000000000067 /* ChatWindow+AudioDelegate.swift */,
+				A20000000000000000000085 /* ChatWindowSupportModels.swift */,
+				A20000000000000000000086 /* ToolActionRouter.swift */,
+				A20000000000000000000087 /* ConversationStateStore.swift */,
+				A20000000000000000000088 /* MessageFlowCoordinator.swift */,
+				A20000000000000000000089 /* MediaPreviewKit.swift */,
+				A20000000000000000000090 /* MomentsKit.swift */,
+				A20000000000000000000091 /* PaymentKit.swift */,
+				A20000000000000000000092 /* ChatWindow+SystemPickerDelegates.swift */,
+				A20000000000000000000093 /* ChatWindow+InputDelegates.swift */,
+				A20000000000000000000094 /* ChatWindow+CollectionDataSource.swift */,
+				A20000000000000000000095 /* ChatWindow+DragDropDelegates.swift */,
+				A20000000000000000000096 /* ChatWindow+CollectionLayoutDelegate.swift */,
+				A20000000000000000000097 /* UnreadTimelineLayout.swift */,
+				A20000000000000000000068 /* MessageComponentContracts.swift */,
+				A20000000000000000000069 /* MessageRendererRegistry.swift */,
+				A20000000000000000000070 /* SystemMessageRenderer.swift */,
+				A20000000000000000000071 /* TextMessageRenderer.swift */,
+				A20000000000000000000072 /* MediaMessageRenderer.swift */,
+				A20000000000000000000073 /* VoiceCallMessageRenderer.swift */,
+				A20000000000000000000074 /* CardMessageRenderer.swift */,
+				A20000000000000000000075 /* PaymentMessageRenderer.swift */,
+				A20000000000000000000076 /* RedPacketEnvelopeView.swift */,
+				A20000000000000000000077 /* PaymentCardContentView.swift */,
+				A20000000000000000000078 /* MediaPrivacyOverlayView.swift */,
+				A20000000000000000000079 /* DocumentCardView.swift */,
+				A20000000000000000000080 /* ChannelsMediaOverlayView.swift */,
+				A20000000000000000000081 /* ContactCardView.swift */,
+				A20000000000000000000082 /* SidebarAvatarView.swift */,
+				A20000000000000000000083 /* MiniProgramShareCardView.swift */,
+				A20000000000000000000084 /* LinkShareCardView.swift */,
+				A20000000000000000000004 /* ChatModels.swift */,
+				A20000000000000000000005 /* ChatCells.swift */,
+				A20000000000000000000006 /* ChatDataFactory.swift */,
+				A20000000000000000000027 /* AppKits.swift */,
+				A20000000000000000000031 /* AppKitRegistry.swift */,
+				A20000000000000000000032 /* InteractionKit.swift */,
+				A20000000000000000000033 /* FloatingIMKit.swift */,
+				A20000000000000000000034 /* MessageRenderKit.swift */,
+				A20000000000000000000035 /* AIInputKit.swift */,
+				A20000000000000000000036 /* ChatDataLayerKit.swift */,
+				A20000000000000000000037 /* BusinessPageKit.swift */,
+				A20000000000000000000028 /* SafeAreaSummaryOverlay.swift */,
+				A20000000000000000000029 /* AppQualityBaseline.swift */,
+				C0D300000000000000000002 /* PerformanceSignposts.swift */,
+				A20000000000000000000030 /* AIVoiceAssistantOverlay.swift */,
+				A20000000000000000000007 /* FloatingChromeView.swift */,
+				A20000000000000000000008 /* ConnectionOverlayView.swift */,
+				A20000000000000000000013 /* ChatSQLiteStore.swift */,
+				A20000000000000000000014 /* FloatingChatActivityAttributes.swift */,
+				A20000000000000000000015 /* FloatingChatActivityManager.swift */,
+				A20000000000000000000020 /* BlinkCaptureOptions.swift */,
+				A20000000000000000000021 /* BlinkCaptureResult.swift */,
+				A20000000000000000000022 /* BlinkCaptureViewController.swift */,
+				A20000000000000000000023 /* BlinkEventClassifier.swift */,
+				A20000000000000000000024 /* BlinkEventType.swift */,
+				A20000000000000000000025 /* BlinkVoiceCapture.swift */,
+				A20000000000000000000026 /* VisionBlinkDetector.swift */,
+				A20000000000000000000009 /* Assets.xcassets */,
+				A20000000000000000000019 /* Info.plist */,
+			);
+			path = "ios-float";
+			sourceTree = "<group>";
+		};
+		A40000000000000000000003 /* ios-floatTests */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000010 /* ios_floatTests.swift */,
+				A20000000000000000000038 /* ModuleBoundaryTests.swift */,
+				D7C300000000000000000004 /* OpenAPISocialManagementServiceTests.swift */,
+				F17E00000000000000000003 /* PerformanceDataFixtures.swift */,
+				F17E00000000000000000004 /* PerformanceBaselineTests.swift */,
+				C0D310000000000000000002 /* RendererReuseTests.swift */,
+			);
+			path = "ios-floatTests";
+			sourceTree = "<group>";
+		};
+		A40000000000000000000004 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000011 /* ios-float.app */,
+				A20000000000000000000012 /* ios-floatTests.xctest */,
+				A20000000000000000000017 /* ios-floatLiveActivity.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000005 /* ios-floatLiveActivity */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000016 /* FloatingChatLiveActivityWidget.swift */,
+				A20000000000000000000018 /* Info.plist */,
+			);
+			path = "ios-floatLiveActivity";
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A50000000000000000000001 /* ios-float */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A90000000000000000000002 /* Build configuration list for PBXNativeTarget "ios-float" */;
+			buildPhases = (
+				A60000000000000000000001 /* Sources */,
+				A30000000000000000000001 /* Frameworks */,
+				A70000000000000000000001 /* Resources */,
+				A30000000000000000000004 /* Embed App Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A80000000000000000000003 /* PBXTargetDependency */,
+			);
+			name = "ios-float";
+			packageProductDependencies = (
+				B30000000000000000000001 /* BlinkVoiceKit */,
+			);
+			productName = "ios-float";
+			productReference = A20000000000000000000011 /* ios-float.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A50000000000000000000002 /* ios-floatTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A90000000000000000000003 /* Build configuration list for PBXNativeTarget "ios-floatTests" */;
+			buildPhases = (
+				A60000000000000000000002 /* Sources */,
+				A30000000000000000000002 /* Frameworks */,
+				A70000000000000000000002 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A80000000000000000000001 /* PBXTargetDependency */,
+			);
+			name = "ios-floatTests";
+			productName = "ios-floatTests";
+			productReference = A20000000000000000000012 /* ios-floatTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		A50000000000000000000003 /* ios-floatLiveActivity */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A90000000000000000000012 /* Build configuration list for PBXNativeTarget "ios-floatLiveActivity" */;
+			buildPhases = (
+				A60000000000000000000003 /* Sources */,
+				A30000000000000000000003 /* Frameworks */,
+				A70000000000000000000003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "ios-floatLiveActivity";
+			productName = "ios-floatLiveActivity";
+			productReference = A20000000000000000000017 /* ios-floatLiveActivity.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A00000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					A50000000000000000000001 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					A50000000000000000000002 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = A50000000000000000000001;
+					};
+					A50000000000000000000003 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = A90000000000000000000001 /* Build configuration list for PBXProject "ios-float" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = zh-Hans;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				zh-Hans,
+				en,
+				Base,
+			);
+			mainGroup = A40000000000000000000001;
+			packageReferences = (
+				B20000000000000000000001 /* XCLocalSwiftPackageReference "../../../../../../../../../../../Desktop/悬浮聊天/ios-float/BlinkVoiceKit_iOS_Integration/BlinkVoiceKit" */,
+			);
+			productRefGroup = A40000000000000000000004 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A50000000000000000000001 /* ios-float */,
+				A50000000000000000000003 /* ios-floatLiveActivity */,
+				A50000000000000000000002 /* ios-floatTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A70000000000000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000009 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A70000000000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A70000000000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000031 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A60000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000001 /* AppDelegate.swift in Sources */,
+				A10000000000000000000002 /* SceneDelegate.swift in Sources */,
+				A10000000000000000000003 /* ChatWindowViewController.swift in Sources */,
+				A10000000000000000000040 /* Data+LittleEndian.swift in Sources */,
+				A10000000000000000000041 /* MediaPreviewFeature.swift in Sources */,
+				A10000000000000000000042 /* AIInputFloatingAssistant.swift in Sources */,
+				A10000000000000000000043 /* DraftPresentation.swift in Sources */,
+				A10000000000000000000044 /* MomentsFeature.swift in Sources */,
+				A10000000000000000000045 /* SearchFeature.swift in Sources */,
+				A10000000000000000000046 /* FavoritesFeature.swift in Sources */,
+				A10000000000000000000047 /* WalletFeature.swift in Sources */,
+				A10000000000000000000048 /* LocationFeature.swift in Sources */,
+				A10000000000000000000049 /* ContactsFeature.swift in Sources */,
+				A10000000000000000000050 /* GroupsFeature.swift in Sources */,
+				A10000000000000000000051 /* CallsFeature.swift in Sources */,
+				A10000000000000000000052 /* PaymentsFeature.swift in Sources */,
+				A10000000000000000000053 /* RelayEditorViewController.swift in Sources */,
+				A10000000000000000000054 /* MergedForwardDetailViewController.swift in Sources */,
+				A10000000000000000000055 /* OpenAPIClient.swift in Sources */,
+				A10000000000000000000056 /* OpenAPIContexts.swift in Sources */,
+				A10000000000000000000057 /* OpenAPIIMSynchronizer.swift in Sources */,
+				D7C100000000000000000001 /* OpenAPIChatSynchronizer.swift in Sources */,
+				D7C100000000000000000002 /* ChatWindow+OpenApiMessageSync.swift in Sources */,
+				D7C300000000000000000001 /* OpenAPISocialManagementService.swift in Sources */,
+				A10000000000000000000058 /* OpenAPIWorkbenchCore.swift in Sources */,
+				A10000000000000000000059 /* OpenAPIFriendManagementViewController.swift in Sources */,
+				A10000000000000000000060 /* OpenAPIBusinessWorkbenchViewController.swift in Sources */,
+				A10000000000000000000061 /* OpenAPIFinderPublishViewController.swift in Sources */,
+				A10000000000000000000062 /* ContactRelationsViewController.swift in Sources */,
+				A10000000000000000000063 /* OpenAPICustomerProfileViewController.swift in Sources */,
+				D7C400000000000000000001 /* OpenApiContactLabelsPermissionsViewController.swift in Sources */,
+				A10000000000000000000064 /* OpenAPIMomentWorkbench.swift in Sources */,
+				A10000000000000000000065 /* OperationLabFeature.swift in Sources */,
+				A10000000000000000000066 /* BlinkVoiceFeature.swift in Sources */,
+				A10000000000000000000067 /* ChatWindow+AudioDelegate.swift in Sources */,
+				A10000000000000000000085 /* ChatWindowSupportModels.swift in Sources */,
+				A10000000000000000000086 /* ToolActionRouter.swift in Sources */,
+				A10000000000000000000087 /* ConversationStateStore.swift in Sources */,
+				A10000000000000000000088 /* MessageFlowCoordinator.swift in Sources */,
+				A10000000000000000000089 /* MediaPreviewKit.swift in Sources */,
+				A10000000000000000000090 /* MomentsKit.swift in Sources */,
+				A10000000000000000000091 /* PaymentKit.swift in Sources */,
+				A10000000000000000000092 /* ChatWindow+SystemPickerDelegates.swift in Sources */,
+				A10000000000000000000093 /* ChatWindow+InputDelegates.swift in Sources */,
+				A10000000000000000000094 /* ChatWindow+CollectionDataSource.swift in Sources */,
+				A10000000000000000000095 /* ChatWindow+DragDropDelegates.swift in Sources */,
+				A10000000000000000000096 /* ChatWindow+CollectionLayoutDelegate.swift in Sources */,
+				A10000000000000000000097 /* UnreadTimelineLayout.swift in Sources */,
+				A10000000000000000000068 /* MessageComponentContracts.swift in Sources */,
+				A10000000000000000000069 /* MessageRendererRegistry.swift in Sources */,
+				A10000000000000000000070 /* SystemMessageRenderer.swift in Sources */,
+				A10000000000000000000071 /* TextMessageRenderer.swift in Sources */,
+				A10000000000000000000072 /* MediaMessageRenderer.swift in Sources */,
+				A10000000000000000000073 /* VoiceCallMessageRenderer.swift in Sources */,
+				A10000000000000000000074 /* CardMessageRenderer.swift in Sources */,
+				A10000000000000000000075 /* PaymentMessageRenderer.swift in Sources */,
+				A10000000000000000000076 /* RedPacketEnvelopeView.swift in Sources */,
+				A10000000000000000000077 /* PaymentCardContentView.swift in Sources */,
+				A10000000000000000000078 /* MediaPrivacyOverlayView.swift in Sources */,
+				A10000000000000000000079 /* DocumentCardView.swift in Sources */,
+				A10000000000000000000080 /* ChannelsMediaOverlayView.swift in Sources */,
+				A10000000000000000000081 /* ContactCardView.swift in Sources */,
+				A10000000000000000000082 /* SidebarAvatarView.swift in Sources */,
+				A10000000000000000000083 /* MiniProgramShareCardView.swift in Sources */,
+				A10000000000000000000084 /* LinkShareCardView.swift in Sources */,
+				A10000000000000000000004 /* ChatModels.swift in Sources */,
+				A10000000000000000000005 /* ChatCells.swift in Sources */,
+				A10000000000000000000006 /* ChatDataFactory.swift in Sources */,
+				A10000000000000000000007 /* FloatingChromeView.swift in Sources */,
+				A10000000000000000000008 /* ConnectionOverlayView.swift in Sources */,
+				A10000000000000000000013 /* ChatSQLiteStore.swift in Sources */,
+				A10000000000000000000014 /* FloatingChatActivityAttributes.swift in Sources */,
+				A10000000000000000000015 /* FloatingChatActivityManager.swift in Sources */,
+				A10000000000000000000020 /* BlinkCaptureOptions.swift in Sources */,
+				A10000000000000000000021 /* BlinkCaptureResult.swift in Sources */,
+				A10000000000000000000022 /* BlinkCaptureViewController.swift in Sources */,
+				A10000000000000000000023 /* BlinkEventClassifier.swift in Sources */,
+				A10000000000000000000024 /* BlinkEventType.swift in Sources */,
+				A10000000000000000000025 /* BlinkVoiceCapture.swift in Sources */,
+				A10000000000000000000027 /* AppKits.swift in Sources */,
+				C0D300000000000000000001 /* PerformanceSignposts.swift in Sources */,
+				A10000000000000000000032 /* AppKitRegistry.swift in Sources */,
+				A10000000000000000000033 /* InteractionKit.swift in Sources */,
+				A10000000000000000000034 /* FloatingIMKit.swift in Sources */,
+				A10000000000000000000035 /* MessageRenderKit.swift in Sources */,
+				A10000000000000000000036 /* AIInputKit.swift in Sources */,
+				A10000000000000000000037 /* ChatDataLayerKit.swift in Sources */,
+				A10000000000000000000038 /* BusinessPageKit.swift in Sources */,
+				A10000000000000000000028 /* SafeAreaSummaryOverlay.swift in Sources */,
+				A10000000000000000000029 /* AppQualityBaseline.swift in Sources */,
+				A10000000000000000000030 /* AIVoiceAssistantOverlay.swift in Sources */,
+				A10000000000000000000026 /* VisionBlinkDetector.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A60000000000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000010 /* ios_floatTests.swift in Sources */,
+				A10000000000000000000039 /* ModuleBoundaryTests.swift in Sources */,
+				D7C300000000000000000003 /* OpenAPISocialManagementServiceTests.swift in Sources */,
+				F17E00000000000000000001 /* PerformanceDataFixtures.swift in Sources */,
+				F17E00000000000000000002 /* PerformanceBaselineTests.swift in Sources */,
+				C0D310000000000000000001 /* RendererReuseTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A60000000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000017 /* FloatingChatActivityAttributes.swift in Sources */,
+				A10000000000000000000016 /* FloatingChatLiveActivityWidget.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A80000000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A50000000000000000000001 /* ios-float */;
+			targetProxy = A80000000000000000000002 /* PBXContainerItemProxy */;
+		};
+		A80000000000000000000003 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A50000000000000000000003 /* ios-floatLiveActivity */;
+			targetProxy = A80000000000000000000004 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		A90000000000000000000004 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		A90000000000000000000005 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		A90000000000000000000006 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 64FU73PM8Z;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "ios-float/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "local.ios-float";
+				PRODUCT_MODULE_NAME = ios_float;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A90000000000000000000007 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 64FU73PM8Z;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "ios-float/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "local.ios-float";
+				PRODUCT_MODULE_NAME = ios_float;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		A90000000000000000000008 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 64FU73PM8Z;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "local.ios-floatTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ios-float.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ios-float";
+			};
+			name = Debug;
+		};
+		A90000000000000000000009 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 64FU73PM8Z;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "local.ios-floatTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ios-float.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ios-float";
+			};
+			name = Release;
+		};
+		A90000000000000000000010 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 64FU73PM8Z;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "ios-floatLiveActivity/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "local.ios-float.liveactivity";
+				PRODUCT_MODULE_NAME = ios_floatLiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A90000000000000000000011 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 64FU73PM8Z;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "ios-floatLiveActivity/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "local.ios-float.liveactivity";
+				PRODUCT_MODULE_NAME = ios_floatLiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A90000000000000000000001 /* Build configuration list for PBXProject "ios-float" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A90000000000000000000004 /* Debug */,
+				A90000000000000000000005 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A90000000000000000000002 /* Build configuration list for PBXNativeTarget "ios-float" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A90000000000000000000006 /* Debug */,
+				A90000000000000000000007 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A90000000000000000000003 /* Build configuration list for PBXNativeTarget "ios-floatTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A90000000000000000000008 /* Debug */,
+				A90000000000000000000009 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A90000000000000000000012 /* Build configuration list for PBXNativeTarget "ios-floatLiveActivity" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A90000000000000000000010 /* Debug */,
+				A90000000000000000000011 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		B20000000000000000000001 /* XCLocalSwiftPackageReference "../../../../../../../../../../../Desktop/悬浮聊天/ios-float/BlinkVoiceKit_iOS_Integration/BlinkVoiceKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../../../../../../../../../../../Desktop/悬浮聊天/ios-float/BlinkVoiceKit_iOS_Integration/BlinkVoiceKit";
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B30000000000000000000001 /* BlinkVoiceKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B20000000000000000000001 /* XCLocalSwiftPackageReference "../../../../../../../../../../../Desktop/悬浮聊天/ios-float/BlinkVoiceKit_iOS_Integration/BlinkVoiceKit" */;
+			productName = BlinkVoiceKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = A00000000000000000000001 /* Project object */;
+}

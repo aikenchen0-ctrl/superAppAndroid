@@ -23,6 +23,7 @@ private const val AiPrefsModel = "model"
 private const val AiPrefsSystemPrompt = "system_prompt"
 private const val AiPrefsTemperature = "temperature"
 private const val AiPrefsMaxTokens = "max_tokens"
+private const val AiPrefsAutoReplyEnabled = "auto_reply_enabled"
 private const val DefaultAiBaseUrl = "https://cc2.cx/v1"
 private const val DefaultAiApiKey = ""
 private const val DefaultAiModel = "gpt-5.6-luna"
@@ -33,6 +34,7 @@ private const val DefaultAiReadTimeoutMs = 45_000
 private const val DefaultAiMaxPromptMessages = 10
 
 internal data class FloatingChatAiConfig(
+    val autoReplyEnabled: Boolean = false,
     val baseUrl: String = "",
     val apiKey: String = "",
     val model: String = "",
@@ -100,6 +102,7 @@ internal fun floatingChatAiModelOrDefault(stored: String?): String {
 internal fun loadFloatingChatAiConfig(context: Context): FloatingChatAiConfig {
     val prefs = context.getSharedPreferences(AiPrefsName, Context.MODE_PRIVATE)
     return FloatingChatAiConfig(
+        autoReplyEnabled = prefs.getBoolean(AiPrefsAutoReplyEnabled, false),
         baseUrl = floatingChatAiBaseUrlOrDefault(prefs.getString(AiPrefsBaseUrl, null)),
         apiKey = floatingChatAiApiKeyOrDefault(prefs.getString(AiPrefsApiKey, null)),
         model = floatingChatAiModelOrDefault(prefs.getString(AiPrefsModel, null)),
@@ -449,6 +452,7 @@ private fun SharedPreferences.Editor.putFloatingChatAiConfig(
     config: FloatingChatAiConfig
 ): SharedPreferences.Editor {
     return putString(AiPrefsBaseUrl, config.baseUrl)
+        .putBoolean(AiPrefsAutoReplyEnabled, config.autoReplyEnabled)
         .putString(AiPrefsApiKey, config.apiKey)
         .putString(AiPrefsModel, config.model)
         .putString(AiPrefsSystemPrompt, config.systemPrompt)

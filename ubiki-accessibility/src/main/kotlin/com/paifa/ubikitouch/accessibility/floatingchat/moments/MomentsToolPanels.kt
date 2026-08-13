@@ -348,6 +348,7 @@ internal fun MomentsTimelinePanel(
             )
             Spacer(modifier = Modifier.height(4.dp))
         }
+
         BasicTextField(
             value = draft,
             onValueChange = { draft = it },
@@ -1284,6 +1285,8 @@ internal fun MomentMaterialsPanel(
     var nameDraft by remember { mutableStateOf("") }
     var categoryDraft by remember { mutableStateOf("") }
     var contentDraft by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf<String?>(null) }
     var createMaterialConfirmed by remember { mutableStateOf(false) }
     var materialOperationDraft by remember { mutableStateOf<MomentMaterialOperationPreviewDraft?>(null) }
     var materialOperationConfirmation by remember { mutableStateOf("") }
@@ -1466,6 +1469,22 @@ internal fun MomentMaterialsPanel(
         }
     }
 
+    fun executeMaterialOperation() {
+        val draft = materialOperationDraft ?: return
+        val material = state.materials.firstOrNull { it.id.toString() == draft.materialId }
+            ?: run {
+                state = state.copy(error = "素材已不在当前列表中，请刷新后重试")
+                return
+            }
+        when (draft.action) {
+            MomentMaterialOperation.Copy -> copyMaterial(material)
+            MomentMaterialOperation.Archive -> archiveMaterial(material)
+        }
+        materialOperationDraft = null
+        materialOperationConfirmation = ""
+        materialOperationConfirmed = false
+    }
+
     fun copyDetailText() {
         val content = scrmReadableText(state.selectedDetail?.template?.content)
             ?.takeIf { it.isNotBlank() }
@@ -1479,6 +1498,15 @@ internal fun MomentMaterialsPanel(
 
     LaunchedEffect(route) {
         loadMaterials()
+    }
+
+    val categories = state.materials.mapNotNull { material ->
+        scrmReadableText(material.category)?.trim()?.takeIf { it.isNotEmpty() }
+    }.distinct().sorted()
+    val visibleMaterials = state.materials.filter { material ->
+        val matchesCategory = selectedCategory == null || material.category == selectedCategory
+        val searchText = listOfNotNull(material.displayName, scrmReadableText(material.category), scrmReadableText(material.statusName)).joinToString(" ")
+        matchesCategory && searchText.contains(searchQuery.trim(), ignoreCase = true)
     }
 
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1518,6 +1546,21 @@ internal fun MomentMaterialsPanel(
             )
         }
 
+        PanelTextInput(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            placeholder = "搜索素材名称、分类或状态",
+            modifier = Modifier.fillMaxWidth()
+        )
+        if (categories.isNotEmpty()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                ScrmPanelButton(label = "全部", accent = selectedCategory == null, enabled = !state.loading, onClick = { selectedCategory = null })
+                categories.take(3).forEach { category ->
+                    ScrmPanelButton(label = category, accent = selectedCategory == category, enabled = !state.loading, onClick = { selectedCategory = category })
+                }
+            }
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1555,12 +1598,10 @@ internal fun MomentMaterialsPanel(
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 ScrmPanelButton(
-                    label = "生成预览",
+                    label = "创建素材",
                     enabled = !state.loading && createPreview.canGeneratePreview && createMaterialConfirmed,
                     accent = true,
-                    onClick = {
-                        state = state.copy(status = "创建素材：仅生成 UI 预览，未创建", error = null)
-                    }
+                    onClick = ::createMaterial
                 )
             }
         }
@@ -1582,9 +1623,11 @@ internal fun MomentMaterialsPanel(
                     Text("我已确认素材和影响范围", color = OverlayTokens.panelSecondaryText, fontSize = 10.sp)
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    Button(enabled = preview.canGeneratePreview && materialOperationConfirmed, onClick = {
-                        state = state.copy(status = "${preview.actionLabel}：仅生成 UI 预览，未执行", error = null)
-                    }, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp)) { Text("生成预览", fontSize = 10.sp) }
+                    Button(
+                        enabled = preview.canGeneratePreview && materialOperationConfirmed && !state.loading,
+                        onClick = ::executeMaterialOperation,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp)
+                    ) { Text(preview.actionLabel, fontSize = 10.sp) }
                 }
             }
         }
@@ -1596,10 +1639,10 @@ internal fun MomentMaterialsPanel(
                     .heightIn(min = 180.dp, max = 305.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                if (state.materials.isEmpty()) {
+                if (visibleMaterials.isEmpty()) {
                     item {
                         TextLabel(
-                            text = if (state.loading) "正在加载..." else "暂无朋友圈素材",
+                            text = if (state.loading) "正在加载..." else if (state.materials.isEmpty()) "暂无朋友圈素材" else "没有匹配的素材",
                             size = 10.sp,
                             color = OverlayTokens.panelSecondaryText,
                             modifier = Modifier.padding(vertical = 12.dp),
@@ -1608,7 +1651,7 @@ internal fun MomentMaterialsPanel(
                     }
                 }
                 itemsIndexed(
-                    items = state.materials,
+                    items = visibleMaterials,
                     key = { _, item -> item.id }
                 ) { _, material ->
                     MomentMaterialRow(

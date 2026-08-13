@@ -9,16 +9,16 @@ class RightRailExpansionTest {
     fun defaultRailModeUsesBalancedAccountAndToolSections() {
         val weights = rightRailWeightsForAccountWeight(defaultRightRailAccountWeight())
 
-        assertEquals(0.42f, weights.accountWeight)
-        assertEquals(0.58f, weights.toolWeight)
+        assertEquals(0.48f, weights.accountWeight)
+        assertEquals(0.52f, weights.toolWeight)
     }
 
     @Test
     fun accountAreaDragExpandsAccountSection() {
         assertEquals(0.25f, rightRailSectionShiftFraction())
-        assertEquals(0.67f, rightRailAccountWeightForAccountAreaDrag())
+        assertEquals(0.70f, rightRailAccountWeightForAccountAreaDrag())
         assertEquals(
-            RightRailWeights(accountWeight = 0.67f, toolWeight = 0.33f),
+            RightRailWeights(accountWeight = 0.70f, toolWeight = 0.30f),
             rightRailWeightsForAccountWeight(rightRailAccountWeightForAccountAreaDrag())
         )
     }
@@ -43,9 +43,9 @@ class RightRailExpansionTest {
 
     @Test
     fun shortContentStopsExpansionBeforeEmptyFixedSlot() {
-        assertEquals(90, rightRailListContentHeightDp(itemCount = 2, itemHeightDp = 42))
-        assertEquals(0.42f, rightRailMaxAccountWeightForContentDp(accountCount = 2, toolCount = 8, railHeightDp = 800))
-        assertEquals(0.42f, rightRailMinAccountWeightForContentDp(toolCount = 2, railHeightDp = 800))
+        assertEquals(106, rightRailListContentHeightDp(itemCount = 2, itemHeightDp = 50))
+        assertEquals(0.48f, rightRailMaxAccountWeightForContentDp(accountCount = 2, toolCount = 8, railHeightDp = 800))
+        assertEquals(0.48f, rightRailMinAccountWeightForContentDp(toolCount = 2, railHeightDp = 800))
         assertEquals(true, rightRailStopsExpansionAtContentHeightWhenItemsAreShort())
     }
 }

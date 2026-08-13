@@ -14,6 +14,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -49,11 +50,21 @@ internal fun AiConfigPanel(
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("AI 配置")
+        Text("AI自动回复")
+        Text("后续收到的新消息会生成回复草稿，需由用户确认发送。")
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("启用自动回复")
+            Switch(
+                checked = candidate.autoReplyEnabled,
+                onCheckedChange = { candidate = candidate.copy(autoReplyEnabled = it) },
+                enabled = !busy
+            )
+        }
+        Text("回复机器人：Codex（OpenAI 格式）")
         OutlinedTextField(
             value = candidate.baseUrl,
             onValueChange = { candidate = candidate.copy(baseUrl = it) },
-            label = { Text("API 地址") },
+            label = { Text("访问地址，例如 https://cc2.cx/v1") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             enabled = !busy
@@ -70,7 +81,7 @@ internal fun AiConfigPanel(
         OutlinedTextField(
             value = candidate.model,
             onValueChange = { candidate = candidate.copy(model = it) },
-            label = { Text("模型") },
+            label = { Text("模型，例如 gpt-5.5") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             enabled = !busy
@@ -78,7 +89,7 @@ internal fun AiConfigPanel(
         OutlinedTextField(
             value = candidate.systemPrompt,
             onValueChange = { candidate = candidate.copy(systemPrompt = it) },
-            label = { Text("系统提示词") },
+            label = { Text("自动回复提示词") },
             modifier = Modifier.fillMaxWidth(),
             minLines = 2,
             maxLines = 4,
@@ -110,6 +121,7 @@ internal fun AiConfigPanel(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
         }
+        Text(if (candidate.autoReplyEnabled) "状态：保存后开启，等待新消息。" else "状态：未开启。")
         status?.takeIf(String::isNotBlank)?.let { Text(it) }
         HorizontalDivider()
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -118,13 +130,13 @@ internal fun AiConfigPanel(
                 enabled = !busy,
                 modifier = Modifier.weight(1f)
             ) {
-                if (testing) CircularProgressIndicator() else Text("测试")
+                if (testing) CircularProgressIndicator() else Text("测试连接")
             }
             Button(
                 onClick = { onSave(candidate) },
                 enabled = !busy,
                 modifier = Modifier.weight(1f)
-            ) { Text("保存") }
+            ) { Text("保存配置") }
             OutlinedButton(
                 onClick = onClose,
                 enabled = !busy,

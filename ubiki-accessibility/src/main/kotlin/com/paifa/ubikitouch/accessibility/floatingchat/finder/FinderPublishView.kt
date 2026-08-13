@@ -91,8 +91,7 @@ internal fun FinderPublishView(
                             withContext(Dispatchers.IO) {
                                 val request = buildTemplateRequest()
                                 val response = api.buildPostTemplate(request)
-                                require(response.success) { response.message ?: "发布模板未通过校验" }
-                                response.postRequest ?: response.payload ?: request.toPostRequest()
+                                validatedFinderPostRequest(response)
                             }
                         }.onSuccess { post ->
                             validatedPost = post

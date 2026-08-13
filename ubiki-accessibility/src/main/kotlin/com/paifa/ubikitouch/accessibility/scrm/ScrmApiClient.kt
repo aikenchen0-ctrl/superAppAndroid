@@ -19,6 +19,15 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
+internal interface ScrmOpenApiRawApi {
+    fun requestRaw(
+        method: String,
+        path: String,
+        query: Map<String, String?> = emptyMap(),
+        body: String? = null
+    ): JsonElement
+}
+
 internal sealed class ScrmException(message: String) : Exception(message)
 
 internal class ScrmConfigurationException(message: String) : ScrmException(message)
@@ -238,7 +247,30 @@ internal class ScrmApiClient(
     ScrmContactApi,
     ScrmContactManagementApi,
     ScrmChatRoomApi,
+    ScrmOpenApiRawApi,
     ScrmChatRoomManagementApi {
+    override fun requestRaw(
+        method: String,
+        path: String,
+        query: Map<String, String?>,
+        body: String?
+    ): JsonElement {
+        require(method in setOf("GET", "POST", "PUT", "DELETE")) { "不支持的 OpenAPI 方法: $method" }
+        require(path.startsWith("/openapi/v1/") || path.startsWith("/openapi/docs/")) {
+            "OpenAPI 路径必须以 /openapi/v1/ 或 /openapi/docs/ 开头"
+        }
+        val relativePath = path.removePrefix("/openapi/v1/")
+        return executeRequest(
+            method = method,
+            path = relativePath,
+            query = query,
+            headers = authenticatedJsonHeaders(hasBody = body != null),
+            body = body,
+            bodyBytes = null,
+            safeRoute = path,
+            urlOverride = config.openApiEndpoint(path, query)
+        )
+    }
     override fun getMe(): ScrmMe = get("me")
 
     override fun getDevices(): List<ScrmDevice> = get("devices")
@@ -1555,13 +1587,14 @@ internal class ScrmApiClient(
         headers: Map<String, String>,
         body: String?,
         bodyBytes: ByteArray?,
-        safeRoute: String
+        safeRoute: String,
+        urlOverride: String? = null
     ): T {
         val apiKey = config.apiKey
             ?: throw ScrmConfigurationException("尚未配置 SCRM API Key")
         val request = ScrmHttpRequest(
             method = method,
-            url = config.endpoint(path, query),
+            url = urlOverride ?: config.endpoint(path, query),
             headers = headers,
             body = body,
             bodyBytes = bodyBytes,

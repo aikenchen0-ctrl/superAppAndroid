@@ -103,6 +103,22 @@ class FinderContractsTest {
     }
 
     @Test
+    fun templateValidationUsesTheExactServerReturnedPublishPayload() {
+        val serverPost = FinderPostRequest(
+            deviceUuid = "server-device",
+            weChatId = "wxid-server",
+            content = "服务端已校验正文",
+            medias = listOf("https://cdn.example.net/finder/validated.mp4"),
+            mediaType = FinderMediaType.Video.code
+        )
+
+        assertEquals(
+            serverPost,
+            validatedFinderPostRequest(FinderPostTemplateResponse(success = true, postRequest = serverPost))
+        )
+    }
+
+    @Test
     fun navigationSearchRequiresBoundedKeywordAndHomeDropsKeyword() {
         val home = FinderNavigationRequest(
             deviceUuid = "device-1",

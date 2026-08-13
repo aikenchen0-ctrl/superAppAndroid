@@ -8,3 +8,12 @@
 28	1998	8080323142364920	CMakeFiles/libadbcore.so.dir/starter.cpp.o	217a541d7e884b94
 1472	2015	8080323142258066	C:/WorkSpace/UbikiTouch/adbcore/build/intermediates/cxx/Debug/2w465x6h/obj/x86/libadb.so	cd1a6e3e6f1722b0
 2002	2366	8080323146091674	C:/WorkSpace/UbikiTouch/adbcore/build/intermediates/cxx/Debug/2w465x6h/obj/x86/libadbcore.so	229cc25ff71d295a
+1	16	0	clean	989bb87d1af582c3
+59	398	8083109841098842	CMakeFiles/libadbcore.so.dir/cgroup.cpp.o	6883fae129fed4a0
+95	415	8083109841037609	CMakeFiles/libadbcore.so.dir/android.cpp.o	ae17b5fad3e13873
+9	433	8083109841622847	CMakeFiles/libadbcore.so.dir/misc.cpp.o	6e14df2abaa07adc
+71	457	8083109841514355	CMakeFiles/libadbcore.so.dir/selinux.cpp.o	75815669a1d800d5
+108	1103	8083109848323863	CMakeFiles/adb.dir/adb_pairing.cpp.o	8dc2b3155e292d52
+80	1443	8083109851547236	CMakeFiles/libadbcore.so.dir/starter.cpp.o	217a541d7e884b94
+1103	1747	8083109852114479	C:/WorkSpace/UbikiTouch/adbcore/build/intermediates/cxx/Debug/2w465x6h/obj/x86/libadb.so	cd1a6e3e6f1722b0
+1444	2080	8083109858061574	C:/WorkSpace/UbikiTouch/adbcore/build/intermediates/cxx/Debug/2w465x6h/obj/x86/libadbcore.so	229cc25ff71d295a

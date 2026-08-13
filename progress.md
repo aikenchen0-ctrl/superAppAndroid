@@ -363,3 +363,5 @@
 - 按 TDD 新增数组字段回归测试，先 RED 后 GREEN；修复 `scrmFloatingJsonUrlValue`，仅对 `JsonPrimitive` 读取 URL，并递归遍历 `JsonObject`/`JsonArray`。
 - `ScrmFloatingChatBridgeTest` 全类通过。
 - 2026-08-13 继续诊断“十年账号未回列表末尾出现公众号卡片”：当前源码的未回筛选严格要求 `Text + Bubble + 非本人`，卡片类型不应进入该视图。新增 `stage=rendered_messages`，记录实际 route、总览状态和渲染消息类型计数，用于区分未回组装异常、导航误入普通会话或设备 APK 版本不一致；诊断摘要单测通过。
+- 2026-08-13 用户要求输出完整业务字段以便逐条对照消息渲染规则：新增 `raw_message`、`mapped_message`、`account_list_item`、`contact_list_item`、`rendered_message_details`、`rendered_message` 日志，输出昵称、微信 ID、原始 `messageType/content`、映射类型、presentation、文本、详情与资源地址；认证凭据仍不输出。日志调用使用 `runCatching` 包装，避免 Android JVM 单测因 `Log.i` 未 mock 而失败；bridge 与导航定向测试通过。
+- 2026-08-13 修正明细日志刷屏：后台 SCRM 刷新/预取会遍历全部账号与历史消息，故移除 bridge 中的全量 `raw_message/mapped_message/列表` 输出；仅保留 `CoordinateChatBody` 在悬浮聊天实际打开并组合渲染时的 `rendered_message_details/rendered_message` 明细日志。相关 bridge 与导航测试通过。

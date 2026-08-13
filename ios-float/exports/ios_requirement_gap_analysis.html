@@ -1,0 +1,936 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>iOS 应用需求完成度与缺口对照</title>
+  <style>
+    :root {
+      --bg: #f4f6f7;
+      --panel: #ffffff;
+      --ink: #162126;
+      --muted: #647078;
+      --line: #dce3e6;
+      --done: #1f8a54;
+      --partial: #b56b12;
+      --missing: #c74336;
+      --planned: #3867d6;
+      --soft-done: #e7f5ee;
+      --soft-partial: #fff3df;
+      --soft-missing: #fdebe8;
+      --soft-planned: #e9efff;
+      --shadow: 0 12px 30px rgba(22, 33, 38, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.58;
+    }
+
+    .wrap {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px 18px 56px;
+    }
+
+    header {
+      background: linear-gradient(135deg, #102f3a, #2e6270);
+      color: #fff;
+      border-radius: 14px;
+      padding: 28px;
+      box-shadow: var(--shadow);
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: 28px;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 30px 0 12px;
+      font-size: 20px;
+    }
+
+    h3 {
+      margin: 18px 0 8px;
+      font-size: 16px;
+    }
+
+    p { margin: 8px 0; }
+
+    .sub {
+      color: rgba(255, 255, 255, 0.82);
+      max-width: 880px;
+      margin: 0;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .pill.done { color: var(--done); background: var(--soft-done); }
+    .pill.partial { color: var(--partial); background: var(--soft-partial); }
+    .pill.missing { color: var(--missing); background: var(--soft-missing); }
+    .pill.planned { color: var(--planned); background: var(--soft-planned); }
+    .pill.neutral { color: #31505a; background: #e9f0f2; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .stat {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 22px;
+      line-height: 1.1;
+    }
+
+    .stat span {
+      color: rgba(255, 255, 255, 0.78);
+      font-size: 12px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px;
+      box-shadow: var(--shadow);
+      margin-top: 14px;
+    }
+
+    .notice {
+      border-left: 4px solid var(--partial);
+      background: #fff8ec;
+      padding: 12px 14px;
+      border-radius: 8px;
+      color: #6c430c;
+    }
+
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 10px 0 16px;
+    }
+
+    button.filter {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button.filter.active {
+      background: #193b46;
+      color: #fff;
+      border-color: #193b46;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+
+    th, td {
+      text-align: left;
+      vertical-align: top;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+      font-size: 14px;
+    }
+
+    th {
+      background: #edf2f4;
+      font-size: 13px;
+      color: #425059;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+
+    .status {
+      display: inline-block;
+      min-width: 68px;
+      text-align: center;
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .status.done { color: var(--done); background: var(--soft-done); }
+    .status.partial { color: var(--partial); background: var(--soft-partial); }
+    .status.missing { color: var(--missing); background: var(--soft-missing); }
+    .status.planned { color: var(--planned); background: var(--soft-planned); }
+
+    .priority {
+      font-weight: 800;
+      color: #203940;
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    ul {
+      margin: 8px 0 0 18px;
+      padding: 0;
+    }
+
+    code {
+      background: #edf2f4;
+      padding: 2px 5px;
+      border-radius: 5px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .checklist {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .check {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #fff;
+    }
+
+    .check b { display: block; margin-bottom: 4px; }
+
+    @media (max-width: 820px) {
+      .grid, .two-col, .checklist { grid-template-columns: 1fr; }
+      header { padding: 22px; }
+      h1 { font-size: 24px; }
+      th, td { font-size: 13px; padding: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <h1>iOS 应用需求完成度与缺口对照</h1>
+      <p class="sub">基于 Google 文档《aispect 传感大模型》的可导出文本、当前 iOS 项目功能和代码结构梳理。用于后续判断哪些已经做成可演示功能，哪些仍是本地模拟、半成品或未开始。</p>
+      <div class="meta">
+        <span class="pill neutral">生成日期：2026-07-10</span>
+        <span class="pill done">同步状态：已按 2026-07-10 当前源码更新</span>
+        <span class="pill neutral">项目：只发 / local.ios-float</span>
+        <span class="pill neutral">代码范围：ios-float/*.swift</span>
+        <span class="pill neutral">验证：Debug 编译通过，本轮未安装真机</span>
+        <span class="pill partial">Google 文档：可通过 export?format=txt 读取正文</span>
+      </div>
+      <div class="grid">
+        <div class="stat"><strong>30</strong><span>已建模消息类型</span></div>
+        <div class="stat"><strong>6</strong><span>已落地物理 Kit 目录</span></div>
+        <div class="stat"><strong>9</strong><span>SQLite 本地表</span></div>
+        <div class="stat"><strong>14</strong><span>当前单元测试用例</span></div>
+      </div>
+    </header>
+
+    <section class="card">
+      <h2>1. 外部需求文档读取结论</h2>
+      <p>可以看到大致需求描述。Google Docs 页面本身需要 JS/权限渲染，但导出文本链接可以读取正文。文档核心关键词如下：</p>
+      <div class="checklist">
+        <div class="check"><b>产品框架</b><span class="small">IM 悬浮页、双侧悬浮中台、视频页、商城页、浏览器、知识库页、AIfx 模板编排、自身帐号、朋友圈、搜索、通讯录关系、AI 特殊状态。</span></div>
+        <div class="check"><b>消息气泡</b><span class="small">AI 友好消息格式，位置、名片、小程序、链接、文件预览、文本混排、图片缩略图、引用、权限申请。</span></div>
+        <div class="check"><b>交互体系</b><span class="small">轻触/重触区分、闭眼触发、边缘拉动、拖拽、摇杆/套索/旋钮、倾斜二维码、任意页面 AI 唤醒。</span></div>
+        <div class="check"><b>模块化方向</b><span class="small">aispect、灵动岛、PIP、悬浮 IM、聚合 IM 数据模型、多维视频、AI 文本框、todo、知识库、AI 浏览器、AI 云盘。</span></div>
+      </div>
+      <p class="notice">本次同步：已新增 6 个物理模块目录和模块注册表；消息气泡改为真实 Auto Layout 拟合高度；左侧会话去重和绑定改为 UUID；直接会话帐号归属增加稳定解析器；新增“智能扣图”工具，默认关闭，开启后对新拍摄/新选择图片使用设备端 Vision 生成透明 PNG。当前仍以本地模拟和 UIKit 原型为主，尚未接入真实后端数据。</p>
+      <h3>当前验收口径</h3>
+      <ul>
+        <li><b>已完成原型</b>：真机可打开、主要交互可跑通、UI 可展示，数据可为本地模拟。</li>
+        <li><b>已完成业务原型</b>：除 UI 外，已接入当前 App 状态或 SQLite/内存状态，能随主流程变化更新。</li>
+        <li><b>部分完成</b>：有页面或关键交互，但缺真实服务、统一数据模型、稳定 SDK、跨页面复用或异常处理。</li>
+        <li><b>缺失</b>：没有可进入的页面或只有零散入口，无法按需求形成闭环。</li>
+        <li><b>生产级验收</b>：必须包含真实 API/权限/分页/错误处理/持久化/真机稳定性/自动化或手工验收用例。</li>
+      </ul>
+      <p class="small">本轮“已完成”以源码、Debug 编译和现有本地状态闭环为依据；涉及相机、相册、Vision、眨眼、灵动岛、后台行为的项仍需单独真机验收。</p>
+    </section>
+
+    <section>
+      <h2>2. 当前已经比较明确完成的功能</h2>
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>模块</th>
+              <th>状态</th>
+              <th>当前实现</th>
+              <th>证据/位置</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr data-status="done">
+              <td>IM 悬浮主页 / 会话页</td>
+              <td><span class="status done">已完成原型</span></td>
+              <td>左侧联系人/群聊、右侧帐号和工具栏、中间消息流、主页与具体会话切换、消息连接线、右侧帐号筛选联系人。会话绑定已改为 UUID，同名联系人/群不会合并或串线。</td>
+              <td><code>ChatWindowViewController</code>、<code>ChatDemoState</code>、<code>FloatingIMConversationResolver</code></td>
+            </tr>
+            <tr data-status="done">
+              <td>消息类型体系</td>
+              <td><span class="status done">已覆盖较全</span></td>
+              <td>文本、Emoji、GIF、图片、拍摄照片、语音、视频、文件、位置、实时位置、名片、群邀请、网页、公众号、小程序、视频号、直播、音乐、收藏、合并转发、红包、转账、AA、卡券、语音/视频通话、引用、接龙、群公告、系统提示。</td>
+              <td><code>ChatMessageType</code> 共 30 类</td>
+            </tr>
+            <tr data-status="done">
+              <td>右侧工具栏</td>
+              <td><span class="status done">已完成原型</span></td>
+              <td>快捷语、拍照、图片、视频、视频号、位置、名片、群邀请、网页链接、文章、音乐、收藏、多选、文件、语音/视频通话、红包、转账、AA、卡券、智能扣图等工具，并支持长按调整顺序。</td>
+              <td><code>makeRightToolItems</code>、<code>handleTool</code></td>
+            </tr>
+            <tr data-status="done">
+              <td>自定义工具页</td>
+              <td><span class="status done">已完成多页原型</span></td>
+              <td>申请审核、朋友圈、AI 自动回复、隐藏用户、侧边特效、携带名字、视频号发布、客户档案、通讯录、素材库、微信小程序、眨眼测试、语音助手、摇杆套索、智能扣图、UI 组件、OpenAPI 等；支付状态页保留为 OpenAPI 模拟页，不再作为常驻工具。</td>
+              <td><code>SidebarItem.CustomTool</code></td>
+            </tr>
+            <tr data-status="done">
+              <td>灵动岛 / Live Activity</td>
+              <td><span class="status done">已完成业务原型</span></td>
+              <td>折叠到灵动岛后显示只发应用图标、当前会话、未读、IM 状态、AI 任务、通话/媒体状态、最近消息和输入草稿，并在消息、AI 草稿、语音播放等状态变化时同步刷新。</td>
+              <td><code>FloatingChatActivityAttributes</code>、<code>FloatingChatLiveActivityWidget</code>、<code>FloatingChatActivityManager</code></td>
+            </tr>
+            <tr data-status="done">
+              <td>媒体选择与预览</td>
+              <td><span class="status done">已完成原型</span></td>
+              <td>相机、相册、视频选择、文档选择、QuickLook 文件预览、图片/视频全屏预览、视频页长按 2x 临时加速、底部播放控制；图片预览保留“扣除背景”单次操作。</td>
+              <td><code>UIImagePickerController</code>、<code>PHPicker</code>、<code>QLPreviewController</code></td>
+            </tr>
+            <tr data-status="done">
+              <td>智能扣图 / 背景移除</td>
+              <td><span class="status done">已完成本地原型</span></td>
+              <td>右侧“智能扣图”工具页默认关闭，状态写入 SQLite <code>app_state</code>。开启后，之后从相册选择或相机拍摄的图片会在发送前调用 iOS 17 <code>VNGenerateForegroundInstanceMaskRequest</code> 生成透明 PNG；识别失败或保存失败会自动保留原图。视频和已有聊天媒体不受影响。</td>
+              <td><code>BackgroundRemovalConfigurationViewController</code>、<code>BackgroundRemovalProcessor</code>、<code>enqueueSelectedImages</code></td>
+            </tr>
+            <tr data-status="done">
+              <td>朋友圈</td>
+              <td><span class="status done">已完成本地模拟</span></td>
+              <td>朋友圈列表、发布入口、图片九宫格、评论点赞、图片预览、素材库页面。</td>
+              <td><code>MomentsViewController</code>、<code>OpenApiMomentMaterialsViewController</code></td>
+            </tr>
+            <tr data-status="done">
+              <td>支付类消息</td>
+              <td><span class="status done">已完成模拟</span></td>
+              <td>红包、转账、AA 收款、群收款详情、支付方式选择、密码确认、领取状态、红包领完/转账已领取效果。</td>
+              <td><code>RedPacketOpenViewController</code>、<code>WeChatPaymentConfirmationViewController</code></td>
+            </tr>
+            <tr data-status="done">
+              <td>音视频通话页面</td>
+              <td><span class="status done">已完成演示</span></td>
+              <td>语音通话、视频通话、结束通话、摄像头切换、说话波形动画。</td>
+              <td><code>VoiceCallViewController</code>、<code>VideoCallViewController</code></td>
+            </tr>
+            <tr data-status="done">
+              <td>AI 输入框浮标</td>
+              <td><span class="status done">已实现基础能力</span></td>
+              <td>仅在主页消息聊天输入框聚焦后浮出 AI 重写、润色、续写，避免全局搜索、表单、配置页误触；使用 OpenAI 格式流式接口写回输入框。</td>
+              <td><code>AIInputFloatingAssistant</code></td>
+            </tr>
+            <tr data-status="done">
+              <td>Codex/Claude 配置</td>
+              <td><span class="status done">已完成配置页</span></td>
+              <td>Codex 与 Claude 配置入口、访问地址、API Key、模型选择；Codex 聊天页可流式输出。</td>
+              <td><code>presentAIConfigurationEditor</code>、<code>CodexAssistantViewController</code></td>
+            </tr>
+            <tr data-status="done">
+              <td>SQLite 本地持久化</td>
+              <td><span class="status done">已建基础库</span></td>
+              <td>消息、附件索引、消息附件关联、app_state、帐号缓存、联系人缓存、会话、成员、消息状态。主聊天页的消息读取、保存和 IM 缓存已通过数据层 facade 调用。</td>
+              <td><code>ChatSQLiteStore</code>、<code>ChatDataLayerProviding</code>，9 张表</td>
+            </tr>
+            <tr data-status="done">
+              <td>UI 操作组件页</td>
+              <td><span class="status done">已完成演示</span></td>
+              <td>表单、图表、选择器、双向范围滑块、刻度尺、拖放区、圆形进度条，并将圆形进度接入若干页面加载。</td>
+              <td><code>UIOperationLabViewController</code></td>
+            </tr>
+            <tr data-status="done">
+              <td>任意页面顶部安全区总结/识搜</td>
+              <td><span class="status done">已完成增强面板</span></td>
+              <td>全局滚动手势监听，顶部安全区浮层显示“滑到此总结/识搜”；总结/识搜已合并为页面洞察面板，包含重点、操作项、页内搜索、复制摘要、页面快照和性能报告入口。</td>
+              <td><code>SafeAreaSummaryOverlayCoordinator</code></td>
+            </tr>
+            <tr data-status="done">
+              <td>全局搜索页</td>
+              <td><span class="status done">已完成本地原型</span></td>
+              <td>支持联系人、群聊、消息、文件、朋友圈、视频号、知识库等分类搜索，分类栏“全部”固定，其余横向滚动；结果可进入详情或定位到消息。</td>
+              <td><code>GlobalSearchViewController</code>、<code>GlobalSearchDetailViewController</code></td>
+            </tr>
+            <tr data-status="done">
+              <td>AI 语音助手悬浮组件</td>
+              <td><span class="status done">已完成 App 内原型</span></td>
+              <td>右侧工具栏打开/隐藏悬浮语音助手，支持录音、模拟识别、Codex 请求、本地兜底回复、中文语音播报和悬浮拖动。</td>
+              <td><code>AIVoiceAssistantOverlayCoordinator</code></td>
+            </tr>
+            <tr data-status="done">
+              <td>可访问性与性能基准</td>
+              <td><span class="status done">已完成基础报告</span></td>
+              <td>采集冷启动、滚动 FPS、内存、滚动事件；补齐基础 VoiceOver 标签、动态字体、Reduce Motion 适配，并提供报告页。</td>
+              <td><code>AppQualityBaseline</code>、<code>AppQualityReportViewController</code></td>
+            </tr>
+            <tr data-status="done">
+              <td>OpenAPI 环境与模块边界</td>
+              <td><span class="status done">物理拆分已开始</span></td>
+              <td>OpenAPI 环境页、模拟 Client、支付/视频号/客户/素材接口字段展示；已创建 <code>Interaction</code>、<code>FloatingIM</code>、<code>MessageRender</code>、<code>AIInput</code>、<code>Data</code>、<code>Business</code> 六个物理目录、注册表、适配器和模块测试。消息持久化和高度计算已走 facade。</td>
+              <td><code>Modules/*</code>、<code>AppKitRegistry</code>、<code>OpenApiRuntime</code></td>
+            </tr>
+            <tr data-status="done">
+              <td>消息布局稳定性</td>
+              <td><span class="status done">本轮已增强</span></td>
+              <td>列表高度不再只依赖手写估算；气泡会按当前 Auto Layout 分支进行拟合，覆盖文本、富文本、文件、卡片、红包、引用、群名、时间等内容变化。</td>
+              <td><code>ChatMessageBubbleView.fittedHeight</code>、<code>MessageRenderKitProviding</code>、模拟器测试</td>
+            </tr>
+            <tr data-status="done">
+              <td>通讯录关系页</td>
+              <td><span class="status done">已完成本地模拟</span></td>
+              <td>支持搜索、全部/组织/标签/共同关系/客户分段，基于本地联系人、消息、名片计算模拟关系。</td>
+              <td><code>ContactRelationsViewController</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>3. 部分完成但还不完整的功能</h2>
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>需求</th>
+              <th>状态</th>
+              <th>当前情况</th>
+              <th>还缺什么</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr data-status="partial">
+              <td>一切皆悬浮、万物可拖拽事件体系</td>
+              <td><span class="status partial">部分完成</span></td>
+              <td>已有右侧/左侧边缘水滴拉动、工具栏拖拽排序、消息长按拖拽转发/删除、媒体拖拽，以及消息区域内的浮动摇杆光标和套索框选。</td>
+              <td>缺统一底层事件路由、可配置事件绑定、跨页面/跨 App 复用、重触阈值和旋钮式参数调节。</td>
+            </tr>
+            <tr data-status="partial">
+              <td>重触 / major radius</td>
+              <td><span class="status partial">概念未落底层</span></td>
+              <td>当前多使用长按、拖拽、边缘手势替代。</td>
+              <td>缺基于触摸半径/力度的轻触重触判定、冲突管理、状态调度器、统一手势调试面板。</td>
+            </tr>
+            <tr data-status="partial">
+              <td>眨眼交互</td>
+              <td><span class="status partial">App 内动作已接入</span></td>
+              <td>已有 BlinkVoiceVisual 相关文件和眨眼测试页；双指按住进入眼部控制，单眨眼/双眨眼可触发打开抖音或 Codex，长闭眼可对聊天输入框内容改写或生成 AI 草稿。</td>
+              <td>SDK 返回事件在真机上仍需稳定性验收，缺误触统计、权限策略、ARKit/绿点控制说明、动作配置页和自动化测试。</td>
+            </tr>
+            <tr data-status="partial">
+              <td>AI 自动回复和意图识别</td>
+              <td><span class="status partial">部分完成</span></td>
+              <td>已有自动回复配置、模拟收到消息测试、AI 预测草稿、草稿动作面板；草稿可展示意图、目的、计划，并支持执行/重试/撤销日历计划的本地流程。</td>
+              <td>缺真实意图识别模型、真实任务执行器、服务端状态同步、失败重试队列和多人审批机制。</td>
+            </tr>
+            <tr data-status="partial">
+              <td>AI 友好消息气泡</td>
+              <td><span class="status partial">渲染稳定性已增强</span></td>
+              <td>消息气泡已支持富文本、链接、@、AI 金字、文件/图片/卡片/引用等多模板；本轮已接入真实 Auto Layout 高度拟合和当前 seed 消息高度回归测试。</td>
+              <td>仍缺正式 DSL/Schema 版本、AI 可解析的稳定字段、服务端字段映射、权限审计；不少业务状态仍写在 <code>body/detail</code> 字符串内。</td>
+            </tr>
+            <tr data-status="partial">
+              <td>文件权限与访问申请</td>
+              <td><span class="status partial">逻辑变更后需重整</span></td>
+              <td>图片、视频、GIF 已改为直接发送和预览；链接访问限制有本地申请流程，文件可本地预览。</td>
+              <td>缺统一资源权限模型：公开、粉丝、好友、收件者；缺真实审核队列、分享链接、过期策略。</td>
+            </tr>
+            <tr data-status="partial">
+              <td>通讯录与维度关系</td>
+              <td><span class="status partial">关系页与基础归属已做</span></td>
+              <td>左侧联系人/群聊可按右侧帐号筛选，群成员可配置；同名对象按 UUID 隔离；直接会话按显式接收帐号、发送帐号或稳定 UUID 回退归属。</td>
+              <td>缺持久化 <code>account_contacts</code>/<code>group_members</code> 关系、真实组织架构接口、多度关系图谱、跨账号关系计算和服务端搜索。</td>
+            </tr>
+            <tr data-status="partial">
+              <td>视频号</td>
+              <td><span class="status partial">展示/发布链路原型</span></td>
+              <td>视频号消息卡、详情页、评论弹窗、自动播放、转发选择、作者主页、推荐/关注切换、下一条、发布页、上传进度和审核状态模拟。</td>
+              <td>缺真实视频流、真实上传、真实审核回调、推荐流接口和后台任务续传。</td>
+            </tr>
+            <tr data-status="partial">
+              <td>OpenAPI 对接</td>
+              <td><span class="status partial">环境页和模拟 Client 已做</span></td>
+              <td>支付状态、视频号发布、客户档案、素材库等页面按接口字段模拟展示；新增 OpenAPI 环境页、运行时配置和统一响应包络模拟。</td>
+              <td>缺真实网络请求、鉴权刷新、错误码联调、分页、缓存更新、Schema 校验和正式接口环境。</td>
+            </tr>
+            <tr data-status="partial">
+              <td>可复用模块化</td>
+              <td><span class="status partial">物理拆分已落地，迁移中</span></td>
+              <td>
+                已创建 <code>Modules/Interaction</code>、<code>Modules/FloatingIM</code>、<code>Modules/MessageRender</code>、<code>Modules/AIInput</code>、<code>Modules/Data</code>、<code>Modules/Business</code>；每个目录已有协议、默认 adapter 和 demo 入口，模块边界测试已加入 test target。消息读写、消息高度和直接会话归属已实际接入对应 Kit。
+              </td>
+              <td>
+                仍未完成业务迁移：<code>ChatWindowViewController</code> 约 3.5 万行，消息发送、右侧工具、AI、支付、预览、朋友圈等大量实现还在主控制器。生产验收标准：主控制器只编排；每个 Kit 有可注入 Repository、独立 UI/逻辑测试和最小 demo；稳定后再评估 Swift Package 或独立 target。
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>4. 目前明确缺失或基本未开始的功能</h2>
+      <div class="card">
+        <div class="filters">
+          <button class="filter active" data-filter="all">全部</button>
+          <button class="filter" data-filter="P0">P0</button>
+          <button class="filter" data-filter="P1">P1</button>
+          <button class="filter" data-filter="P2">P2</button>
+          <button class="filter" data-filter="P3">P3</button>
+        </div>
+        <table id="missingTable">
+          <thead>
+            <tr>
+              <th>优先级</th>
+              <th>缺失功能</th>
+              <th>需求描述</th>
+              <th>建议验收标准</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr data-priority="P0" data-status="partial">
+              <td class="priority">P0</td>
+              <td>统一数据模型与真实后端适配层</td>
+              <td>已具备 9 张 SQLite 表、<code>ChatDataLayerProviding</code> 和消息读写 facade；但联系人/群成员/支付/权限/AI 任务仍分散在内存和消息字符串中。</td>
+              <td>先完成本地 Repository、结构化领域模型和迁移；接接口时再补 API Client、DTO、错误处理、分页、增量同步与 mock/真实切换。</td>
+            </tr>
+            <tr data-priority="P0" data-status="partial">
+              <td class="priority">P0</td>
+              <td>主聊天控制器职责迁移</td>
+              <td><code>ChatWindowViewController</code> 当前约 35,329 行，同时承载消息发送、预览、支付、AI、工具栏、朋友圈入口、手势和页面跳转。</td>
+              <td>先拆 MessageFlow、ConversationCoordinator、ToolActionRouter、MediaPreview、Payment、AI Draft；主控制器只保留页面组合、状态订阅和导航。</td>
+            </tr>
+            <tr data-priority="P0" data-status="partial">
+              <td class="priority">P0</td>
+              <td>会话成员与帐号归属持久化</td>
+              <td>同名会话隔离和直接会话稳定归属已完成；群成员、好友关系和直接会话归属仍主要从模拟消息、内存配置或 UUID 回退推断。</td>
+              <td>建立 <code>account_contacts</code>、<code>group_members</code>、<code>conversation_owners</code>，所有左栏过滤、转发、支付和群工具都读取同一关系 Repository。</td>
+            </tr>
+            <tr data-priority="P0" data-status="missing">
+              <td class="priority">P0</td>
+              <td>aispect 底层交互事件引擎</td>
+              <td>文档要求轻触/重触、长按进度、拖拽、闭眼、边缘拉动等动作可绑定任意事件。</td>
+              <td>提供统一 GestureEvent、Context、ActionRegistry；能在不同页面注册动作并解决手势冲突。</td>
+            </tr>
+            <tr data-priority="P0" data-status="missing">
+              <td class="priority">P0</td>
+              <td>真实重触识别</td>
+              <td>需要通过 major radius 或可用触摸信号区分轻触/重触。</td>
+              <td>有阈值配置、实时调试浮层、误触保护、轻触/重触测试用例；不同设备可校准。</td>
+            </tr>
+            <tr data-priority="P0" data-status="partial">
+              <td class="priority">P0</td>
+              <td>真实 AI 任务执行闭环</td>
+              <td>已具备 AI 预测草稿、意图/目的/计划展示，以及本地执行/重试/撤销日历计划流程。</td>
+              <td>下一步验收：接入真实意图模型、任务执行器、任务状态表、失败重试和服务端同步。</td>
+            </tr>
+            <tr data-priority="P0" data-status="partial">
+              <td class="priority">P0</td>
+              <td>消息 Schema / AI 友好气泡 DSL</td>
+              <td>已有 <code>MessageBubbleSchema</code>、富文本元素、链接规则和访问策略字段，消息气泡视觉模板也覆盖较多类型。</td>
+              <td>下一步验收：形成正式 JSON Schema/版本号、AI 输出校验、服务端字段映射、截图可访问链接规范、权限审计和跨端兼容测试。</td>
+            </tr>
+            <tr data-priority="P1" data-status="missing">
+              <td class="priority">P1</td>
+              <td>知识库页</td>
+              <td>文档列出知识库模块，但当前没有完整知识库页面和数据模型。</td>
+              <td>支持文件/消息/网页收藏入库、分类、检索、摘要、问答、引用来源。</td>
+            </tr>
+            <tr data-priority="P1" data-status="missing">
+              <td class="priority">P1</td>
+              <td>AI 浏览器 / Web 后台执行任务</td>
+              <td>文档要求 AI 浏览器 web 可后台执行任务。</td>
+              <td>有浏览器页、地址栏、网页快照、AI 读取页面、后台任务队列、任务状态展示。</td>
+            </tr>
+            <tr data-priority="P1" data-status="missing">
+              <td class="priority">P1</td>
+              <td>商城页</td>
+              <td>需求列表包含商城页，当前没有商城信息架构和交易流程。</td>
+              <td>商品列表、详情、购物车、订单、支付模拟、客服会话关联。</td>
+            </tr>
+            <tr data-priority="P1" data-status="done">
+              <td class="priority">P1</td>
+              <td>全局搜索页</td>
+              <td>已完成本地全局搜索页，覆盖联系人、群、消息、文件、朋友圈、视频号、知识库等分类，并支持结果详情和消息定位。</td>
+              <td>下一步验收：接入真实服务端搜索、分页、搜索高亮、最近搜索、跨帐号权限过滤和离线索引增量更新。</td>
+            </tr>
+            <tr data-priority="P1" data-status="missing">
+              <td class="priority">P1</td>
+              <td>AIfx 模板编排页</td>
+              <td>文档列出 AIfx 模板编排页，目前没有可视化流程编排。</td>
+              <td>可编排 AI 指令、输入、输出、触发器、动作节点，保存模板并在工具栏调用。</td>
+            </tr>
+            <tr data-priority="P1" data-status="missing">
+              <td class="priority">P1</td>
+              <td>AI 云盘 / AI 文件整理系统</td>
+              <td>当前只做了本地文件消息和 QuickLook 预览。</td>
+              <td>有文件库、去重索引、目录/标签、AI 归档、权限申请、分享链接。</td>
+            </tr>
+            <tr data-priority="P1" data-status="partial">
+              <td class="priority">P1</td>
+              <td>通讯录维度关系页</td>
+              <td>已新增通讯录关系页，支持搜索、组织、标签、共同关系和客户分段，本地模拟共同关系。</td>
+              <td>下一步验收：接真实通讯录/组织/标签接口，补关系图谱、多度关系链和账号归属。</td>
+            </tr>
+            <tr data-priority="P1" data-status="done">
+              <td class="priority">P1</td>
+              <td>AI 语音助手悬浮组件</td>
+              <td>已新增 App 内悬浮语音助手，右侧工具栏打开/隐藏，支持录音、模拟识别、Codex 请求、本地兜底和中文语音播报。</td>
+              <td>下一步验收：接真实 ASR，明确 iOS 后台/跨 App 悬浮限制下的 Live Activity 或 PIP 方案。</td>
+            </tr>
+            <tr data-priority="P1" data-status="partial">
+              <td class="priority">P1</td>
+              <td>摇杆选择 / 旋钮选择 / 套索选择</td>
+              <td>右侧“摇杆套索”工具已能打开可拖动浮层：摇杆移动消息光标且不带动页面滚动，点“选择”可选中当前消息，点“套索”可框选多条消息。</td>
+              <td>缺旋钮式参数选择、重触触发、图片/视频页复用、跨页面选择结果协议和误触/性能验收。</td>
+            </tr>
+            <tr data-priority="P1" data-status="done">
+              <td class="priority">P1</td>
+              <td>可选智能扣图</td>
+              <td>已实现设备端 Vision 前景实例遮罩。默认关闭；在右侧工具启用后，新拍摄或新选择图片会先生成透明 PNG，再进入原有发送预览；手动媒体预览入口继续保留。</td>
+              <td>下一步验收：iOS 17+ 真机对人物/商品/多人图片的成功率、耗时、内存峰值和失败回退；如需兼容 iOS 16，再接入 Core ML 模型。</td>
+            </tr>
+            <tr data-priority="P2" data-status="done">
+              <td class="priority">P2</td>
+              <td>灵动岛模块完整化</td>
+              <td>已形成 Live Activity 业务原型：显示当前 app 图标、IM 状态、AI 任务、通话/媒体状态、最近消息和草稿，并在主应用消息/AI/语音状态变更时同步刷新。</td>
+              <td>下一步验收：真机动态岛尺寸适配截图、后台生命周期测试、用户关闭 Live Activity 后的恢复策略、异常状态兜底和通知权限提示。</td>
+            </tr>
+            <tr data-priority="P2" data-status="missing">
+              <td class="priority">P2</td>
+              <td>PIP 悬浮窗模块</td>
+              <td>文档列出 PIP 基于画中画悬浮窗。</td>
+              <td>视频/AI/IM 可进入 PIP，支持状态恢复和系统限制处理。</td>
+            </tr>
+            <tr data-priority="P2" data-status="missing">
+              <td class="priority">P2</td>
+              <td>多维视频模型</td>
+              <td>文档要求底部区域下拉弹出视频、截屏猜需求。</td>
+              <td>视频页支持截图识别、AI 猜需求、标签/时间轴/动作按钮、视频与 IM 关联。</td>
+            </tr>
+            <tr data-priority="P2" data-status="done">
+              <td class="priority">P2</td>
+              <td>任意页面顶部安全区总结提示</td>
+              <td>已新增全局滚动监听和顶部安全区浮层，支持“滑到此总结/识搜”；弹窗已升级为页面洞察面板，包含重点、操作、识搜、复制摘要、快照和质量报告。</td>
+              <td>下一步验收：接入真实 OCR/总结服务、支持长页面分段采样、搜索结果点击定位、摘要发送到 AI 和隐私脱敏策略。</td>
+            </tr>
+            <tr data-priority="P2" data-status="missing">
+              <td class="priority">P2</td>
+              <td>屏幕级空白处滑动动作</td>
+              <td>轻点下滑长按、重触下滑停顿、右下角重按等全屏动作未完整做。</td>
+              <td>动作识别器覆盖全局，带调试开关，避免和系统手势冲突。</td>
+            </tr>
+            <tr data-priority="P2" data-status="missing">
+              <td class="priority">P2</td>
+              <td>真实权限/安全体系</td>
+              <td>图片/视频改为直接观看后，链接权限仍是本地模拟。</td>
+              <td>服务端权限、申请/审批/撤销、过期链接、审计日志、截图水印/脱敏策略。</td>
+            </tr>
+            <tr data-priority="P3" data-status="missing">
+              <td class="priority">P3</td>
+              <td>商城支付真实状态</td>
+              <td>当前支付状态页只是模拟接口出参。</td>
+              <td>接入真实任务状态接口，轮询、失败重试、回调更新消息状态。</td>
+            </tr>
+            <tr data-priority="P3" data-status="missing">
+              <td class="priority">P3</td>
+              <td>国际化完整覆盖</td>
+              <td>我的帐号有中英切换，其他页面多数仍是中文静态文本。</td>
+              <td>抽取文案、语言包、动态刷新、缺失 key 检测。</td>
+            </tr>
+            <tr data-priority="P3" data-status="done">
+              <td class="priority">P3</td>
+              <td>可访问性与性能基准</td>
+              <td>已新增质量基线：冷启动、滚动 FPS、内存、滚动事件采样，基础 VoiceOver/动态字体/Reduce Motion 适配和报告页。</td>
+              <td>下一步验收：补真实低端机测试、自动化性能阈值、页面级 FPS 埋点和持续报告。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>5. SQLite 数据模型缺口</h2>
+      <div class="card">
+        <p>当前 SQLite 已有 <code>messages</code>、<code>attachments</code>、<code>message_attachments</code>、<code>app_state</code>、<code>accounts_cache</code>、<code>contacts_cache</code>、<code>conversations</code>、<code>conversation_members</code>、<code>message_status</code>。这对本地 IM 原型足够，但不够支撑文档中的完整产品。</p>
+        <table>
+          <thead>
+            <tr>
+              <th>建议新增表/模型</th>
+              <th>原因</th>
+              <th>关键字段</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>account_contacts / conversation_owners</td>
+              <td>右侧帐号筛选左侧好友和直接会话归属目前已有稳定解析，但还不是可编辑、可同步、可查询的持久化关系。</td>
+              <td>account_id, contact_id, conversation_id, ownership_source, created_at, updated_at</td>
+            </tr>
+            <tr>
+              <td>group_members（关系增强）</td>
+              <td>已有 <code>conversation_members</code> 基础表，但群成员展示、移除成员、多个帐号在群中的成员资格仍有内存/消息推断路径。</td>
+              <td>group_id, member_id, member_role, group_nickname, joined_at, removed_at, visible_flags</td>
+            </tr>
+            <tr>
+              <td>relation_edges</td>
+              <td>通讯录关系页已有本地计算原型，但仍需要持久化多度关系、共同好友、组织关系。</td>
+              <td>source_id, target_id, relation_type, weight, tags, created_at</td>
+            </tr>
+            <tr>
+              <td>moments_posts / comments / reactions</td>
+              <td>朋友圈目前是本地数组，不可持久化完整动态。</td>
+              <td>post_id, owner_id, media_json, comment_id, parent_id, reaction_type</td>
+            </tr>
+            <tr>
+              <td>resource_permissions / access_requests</td>
+              <td>链接、文件、截图可访问权限需要真实状态。</td>
+              <td>resource_id, scope, requester_id, status, approved_by, expires_at</td>
+            </tr>
+            <tr>
+              <td>media_derivatives / media_processing_jobs</td>
+              <td>智能扣图开关目前已存入 <code>app_state</code>，透明 PNG 作为本地附件发送；但没有记录原图与衍生图关系、处理版本、耗时和失败原因。</td>
+              <td>source_attachment_id, derivative_attachment_id, processor, processor_version, status, failure_reason, created_at</td>
+            </tr>
+            <tr>
+              <td>ai_intents / ai_plans / ai_tasks</td>
+              <td>AI 草稿已有意图/计划本地流程；需要持久化真实计划、执行和日历写入状态。</td>
+              <td>intent, confidence, plan_json, task_status, result_json</td>
+            </tr>
+            <tr>
+              <td>gesture_events / action_bindings</td>
+              <td>支撑“一切皆悬浮，万物可拖拽”的可配置动作体系。</td>
+              <td>gesture_type, target_type, context_rule, action_id, enabled</td>
+            </tr>
+            <tr>
+              <td>knowledge_items / embeddings_index</td>
+              <td>支撑知识库、AI 问答、文件整理。</td>
+              <td>source_type, source_id, title, content_ref, summary, vector_ref</td>
+            </tr>
+            <tr>
+              <td>browser_sessions / web_tasks</td>
+              <td>支撑 AI 浏览器和后台执行任务。</td>
+              <td>url, snapshot_ref, task_prompt, task_state, run_log</td>
+            </tr>
+            <tr>
+              <td>payment_records</td>
+              <td>红包/转账/AA 目前写在消息 detail 中，不利于查询。</td>
+              <td>message_id, payer_id, receiver_id, amount, status, paid_at</td>
+            </tr>
+            <tr>
+              <td>message_reactions / message_edits</td>
+              <td>补充现代 IM 所需的表情回应、编辑、撤回轨迹。</td>
+              <td>message_id, user_id, reaction, edit_body, recalled_at</td>
+            </tr>
+            <tr>
+              <td>live_activity_states</td>
+              <td>灵动岛已完成 Live Activity 原型，但状态来自内存组装，缺可恢复状态。</td>
+              <td>activity_id, conversation_id, im_status, ai_status, call_status, media_status, draft, updated_at</td>
+            </tr>
+            <tr>
+              <td>global_search_index</td>
+              <td>全局搜索页已完成本地原型，后续需要离线索引和增量更新。</td>
+              <td>entity_type, entity_id, account_id, searchable_text, tags, updated_at</td>
+            </tr>
+            <tr>
+              <td>moment_materials / finder_posts</td>
+              <td>素材库和视频号发布目前是 OpenAPI 字段模拟，缺本地草稿与发布状态持久化。</td>
+              <td>draft_id, media_refs, publish_status, audit_status, openapi_task_id, error_message</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>6. 可复用模块化拆分验收表</h2>
+      <div class="card">
+        <p class="notice">物理目录、注册表、默认 adapter、demo 入口和模块测试已经建立。当前验收重点从“建目录”转为“把具体业务迁出主控制器，并让每个 Kit 能独立替换、测试和演示”。</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Kit</th>
+              <th>当前状态</th>
+              <th>建议落地目录/边界</th>
+              <th>验收标准</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Aispect 交互 SDK</td>
+              <td><code>Modules/Interaction</code> 已存在，含交互协议、默认 adapter 和快照拖拽 demo；眨眼、边缘拉出、灵动岛、顶部洞察的大部分具体实现仍在页面控制器或 coordinator。</td>
+              <td><code>Modules/Interaction</code>：Blink、EdgeGesture、DragDrop、LiveActivity、SafeAreaInsight。</td>
+              <td>所有跨页面手势统一走事件模型；有误触阈值配置、调试页、启停开关；业务页面只订阅动作，不直接写手势细节。</td>
+            </tr>
+            <tr>
+              <td>悬浮 IM Kit</td>
+              <td><code>Modules/FloatingIM</code> 已存在，含会话快照、闭包 adapter 和直接会话帐号归属解析器；左栏、右栏、连接线和 composer 还未整体迁出。</td>
+              <td><code>Modules/FloatingIM</code>：ConversationList、AccountRail、ToolRail、ConnectionOverlay、Composer。</td>
+              <td>外部只传入会话模型和动作回调；联系人筛选、群聊显示、连接线更新、拖拽转发可独立测试。</td>
+            </tr>
+            <tr>
+              <td>消息渲染 Kit</td>
+              <td><code>Modules/MessageRender</code> 已存在，渲染 facade 已用于主消息列表高度计算；气泡本体仍在 <code>ChatCells.swift</code>，并仍有业务字符串解析。</td>
+              <td><code>Modules/MessageRender</code>：BubbleSchema、BubbleView、MediaPreview、PaymentBubble、CardBubble。</td>
+              <td>以 <code>MessageBubbleSchema</code> 作为输入，渲染层不解析业务字符串；每类消息有高度计算、点击动作和快照验收。</td>
+            </tr>
+            <tr>
+              <td>AI 输入框 Kit</td>
+              <td><code>Modules/AIInput</code> 已存在，包含动作枚举、协议、默认本地 adapter 和 demo；实际流式客户端、浮标和草稿状态机仍集中在主控制器。</td>
+              <td><code>Modules/AIInput</code>：FloatingActions、DraftPrediction、ProviderConfig、StreamingClient、IntentPlan。</td>
+              <td>只暴露 rewrite/polish/continue/predictReply 等协议；不同页面可按白名单启用；流式失败、取消、重试有统一状态。</td>
+            </tr>
+            <tr>
+              <td>数据层</td>
+              <td><code>Modules/Data</code> 已存在；消息加载、消息保存、IM 缓存已从主聊天页经 <code>ChatDataLayerProviding</code> 调用，但其他业务仍直接或间接依赖内存状态。</td>
+              <td><code>Modules/Data</code>：SQLiteStore、Repository、DTO、OpenAPIClient、CacheSync。</td>
+              <td>页面不直接访问 SQLite；消息、账号、群、附件、权限、支付、AI 任务均通过 Repository；可在 mock 和真实 API 间切换。</td>
+            </tr>
+            <tr>
+              <td>业务页面模块</td>
+              <td><code>Modules/Business</code> 已存在业务页面描述和 adapter；朋友圈、素材库、客户档案、视频号发布等 ViewController 仍定义在大型页面文件中。</td>
+              <td><code>Modules/Business</code>：Moments、Materials、CustomerProfile、FinderPublish、OpenAPI、Relations。</td>
+              <td>每个业务页有独立 ViewModel/数据入口；页面可单独启动 demo；不会依赖 <code>ChatWindowViewController</code> 的私有状态。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>7. 建议下一阶段实施顺序</h2>
+      <div class="card two-col">
+        <div>
+          <h3>阶段 A：把原型变成可维护应用</h3>
+          <ul>
+            <li>先把 <code>ChatWindowViewController</code> 迁出 MessageFlow、ConversationCoordinator、ToolActionRouter、MediaPreview、Payment 和 AI Draft 六块职责。</li>
+            <li>继续落地 <code>Modules/MessageRender</code>：把 <code>ChatMessageBubbleView</code>、各类卡片和点击动作迁入，保留当前真实高度拟合和回归测试。</li>
+            <li>建立 Repository/DataSource 层，把当前 SQLite 9 表、内存状态和后续 API 切换统一起来。</li>
+            <li>持久化好友、群成员、会话归属；不再用消息字符串或列表顺序推断右侧帐号关系。</li>
+            <li>整理消息 Schema，逐步替换 <code>body/detail</code> 中的支付、权限、AI、群成员等业务字段。</li>
+            <li>为智能扣图等媒体处理补衍生文件元数据、处理任务状态和 iOS 17+ 真机性能回归，保证失败时可稳定回退原图。</li>
+            <li>补消息截图测试、群/帐号切换测试、媒体/支付操作测试和真机长会话滚动性能测试。</li>
+          </ul>
+        </div>
+        <div>
+          <h3>阶段 B：补齐需求文档核心差异</h3>
+          <ul>
+            <li>先做 aispect 交互事件引擎和重触识别调试页，收敛眨眼、长按、拖拽、边缘拉出之间的冲突。</li>
+            <li>做知识库、AI 浏览器、商城页三个核心缺失页面；全局搜索页和通讯录关系页已完成本地原型，下一步接接口。</li>
+            <li>把 AI 意图识别从本地模拟升级为真实模型和任务执行状态闭环。</li>
+            <li>将权限申请从本地提示升级为资源权限模型。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>8. 当前完成/未完成快速核对</h2>
+      <div class="card">
+        <p class="notice">本轮同步新增：6 个物理 Kit 目录、模块注册表和模块测试；主消息持久化/高度计算已走 facade；消息行高改为真实 Auto Layout 拟合；会话按 UUID 绑定，同名对象隔离，直接会话帐号归属稳定解析；智能扣图已改为右侧工具可选开关，默认仍按原图发送。后续主攻业务迁移和结构化数据模型。</p>
+        <table>
+          <thead>
+            <tr>
+              <th>需求文档条目</th>
+              <th>当前判断</th>
+              <th>备注</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>IM 悬浮页</td><td><span class="status done">已完成原型</span></td><td>未读主页、单聊、群聊均已有。</td></tr>
+            <tr><td>双侧悬浮中台</td><td><span class="status done">已完成原型</span></td><td>左右栏、意图按钮、拖动排序已做。</td></tr>
+            <tr><td>视频页</td><td><span class="status partial">部分完成</span></td><td>播放器与视频号页有；多维视频模型未完成。</td></tr>
+            <tr><td>商城页</td><td><span class="status missing">缺失</span></td><td>没有商城页面。</td></tr>
+            <tr><td>浏览器</td><td><span class="status missing">缺失</span></td><td>只有链接跳转/预览，没有内置 AI 浏览器。</td></tr>
+            <tr><td>知识库页</td><td><span class="status missing">缺失</span></td><td>收藏不等同于知识库。</td></tr>
+            <tr><td>AIfx 模板编排页</td><td><span class="status missing">缺失</span></td><td>没有流程编排器。</td></tr>
+            <tr><td>自身帐号页</td><td><span class="status done">已完成原型</span></td><td>我的帐号、添加/移除/登录/配置。</td></tr>
+            <tr><td>朋友圈动态页</td><td><span class="status done">已完成模拟</span></td><td>发布、评论、点赞、图片预览。</td></tr>
+            <tr><td>搜索页</td><td><span class="status done">已完成本地原型</span></td><td>全局搜索页覆盖联系人、群聊、消息、文件、朋友圈、视频号、知识库；真实服务端搜索和分页未接。</td></tr>
+            <tr><td>通讯录与维度关系</td><td><span class="status partial">部分完成</span></td><td>通讯录关系页、组织/标签/共同关系/客户分段已有；真实图谱接口缺。</td></tr>
+            <tr><td>IM 特殊状态 AI</td><td><span class="status partial">部分完成</span></td><td>Codex/Claude、AI 气泡、预测草稿、意图/计划/日历本地流程有；完整服务端状态机缺。</td></tr>
+            <tr><td>AI 语音助手悬浮组件</td><td><span class="status done">已完成 App 内原型</span></td><td>右侧工具打开/隐藏，录音、模拟识别、AI 回答、本地兜底、中文播报已做；跨 App 后台悬浮受 iOS 限制。</td></tr>
+            <tr><td>摇杆/拖拽选取悬浮组件</td><td><span class="status partial">部分完成</span></td><td>消息拖拽、摇杆光标与套索框选已做；旋钮参数调节、重触触发和跨页复用仍缺。</td></tr>
+            <tr><td>AI 友好消息气泡格式</td><td><span class="status partial">部分完成</span></td><td>视觉、交互和真实高度拟合已完成；正式版本化 Schema 与服务端字段仍缺。</td></tr>
+            <tr><td>UI 操作组件</td><td><span class="status done">已完成演示</span></td><td>表单、图表、选择器、滑块、刻度尺、拖放、圆形进度已做。</td></tr>
+            <tr><td>顶部安全区总结/识搜</td><td><span class="status done">已完成增强面板</span></td><td>全局滚动监听、顶部浮层、页面洞察面板、重点/操作/识搜、复制摘要、快照、质量报告入口已做。</td></tr>
+            <tr><td>灵动岛 Live Activity</td><td><span class="status done">已完成业务原型</span></td><td>显示 app 图标、IM 状态、AI 任务、通话/媒体状态、最近消息和草稿，并和主应用状态同步。</td></tr>
+            <tr><td>可访问性与性能基准</td><td><span class="status done">已完成基础版</span></td><td>VoiceOver/动态字体/Reduce Motion 基线、冷启动/FPS/内存/滚动报告已做。</td></tr>
+            <tr><td>OpenAPI 环境与模块边界</td><td><span class="status partial">物理拆分已完成</span></td><td>六个 Modules 目录、注册表、adapter、demo 和测试已落地；大量业务仍待从主控制器迁出。</td></tr>
+            <tr><td>可选智能扣图（默认关闭）</td><td><span class="status done">已完成本地原型</span></td><td>右侧“智能扣图”打开后，新增相册/相机图片走 iOS 17 Vision 前景实例遮罩并生成透明 PNG；关闭时保持原图发送，失败自动回退。</td></tr>
+            <tr><td>3D 出框气泡效果</td><td><span class="status done">已完成本地效果</span></td><td>默认保持 2D；右侧工具栏“3D气泡”可即时开关，文字、卡片、图片/视频、红包/转账均有前景高光、底部深度层和阴影，开关状态保存到 SQLite。</td></tr>
+            <tr><td>倾斜二维码</td><td><span class="status partial">部分完成</span></td><td>前后倾斜触发二维码页已有；误触策略仍可优化。</td></tr>
+            <tr><td>闭眼触发 AI</td><td><span class="status partial">App 内部分完成</span></td><td>双指眼控、单眨眼/双眨眼、长闭眼改写输入或生成草稿已接入；SDK 稳定性、误触统计和动作配置仍需验收。</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const buttons = document.querySelectorAll("button.filter");
+    const rows = document.querySelectorAll("#missingTable tbody tr");
+    buttons.forEach(button => {
+      button.addEventListener("click", () => {
+        buttons.forEach(item => item.classList.remove("active"));
+        button.classList.add("active");
+        const filter = button.dataset.filter;
+        rows.forEach(row => {
+          row.style.display = filter === "all" || row.dataset.priority === filter ? "" : "none";
+        });
+      });
+    });
+  </script>
+</body>
+</html>

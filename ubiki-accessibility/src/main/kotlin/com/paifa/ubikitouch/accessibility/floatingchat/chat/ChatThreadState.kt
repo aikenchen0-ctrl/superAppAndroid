@@ -557,19 +557,6 @@ internal data class HomeOverviewMessageGroup(
     val key: String = messages.firstOrNull()?.id ?: "home-overview-empty"
 }
 
-internal fun homeUnreadRenderDiagnostics(
-    route: ChatNavigationRoute,
-    homeOverviewVisible: Boolean,
-    messages: List<FloatingChatMessage>
-): String {
-    val types = messages.groupingBy { message -> message.type.name }
-        .eachCount()
-        .toSortedMap()
-        .entries
-        .joinToString(separator = ",") { (type, count) -> "$type:$count" }
-    return "route=${route.name} overview=$homeOverviewVisible messages=${messages.size} types=$types"
-}
-
 internal fun homeOverviewMessageGroups(
     messages: List<FloatingChatMessage>,
     accountIdsByMessageId: Map<String, String> = emptyMap()

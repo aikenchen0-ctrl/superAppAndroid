@@ -2126,7 +2126,7 @@ class FloatingChatMessageUiContractTest {
         assertEquals(44, bottomInputIconButtonSizeDp())
         assertEquals(24, bottomInputIconSizeDp())
         assertEquals(46, leftRailAvatarSizeDp())
-        assertEquals(46, rightRailAvatarSizeDp())
+        assertEquals(50, rightRailAvatarSizeDp())
         assertEquals(1, bottomInputMinLines())
         assertEquals(4, bottomInputMaxLines())
         assertEquals(
@@ -2972,17 +2972,17 @@ class FloatingChatMessageUiContractTest {
                 fallbackStepPx = 48f
             )
         )
-        assertEquals(0.42f, defaultRightRailAccountWeight())
+        assertEquals(0.48f, defaultRightRailAccountWeight())
         assertEquals(0.24f, minRightRailAccountWeight())
         assertEquals(0.70f, maxRightRailAccountWeight())
         assertEquals(0.25f, rightRailSectionShiftFraction())
-        assertEquals(0.67f, rightRailAccountWeightForAccountAreaDrag())
+        assertEquals(0.70f, rightRailAccountWeightForAccountAreaDrag())
         assertEquals(0.24f, rightRailAccountWeightForToolAreaDrag())
         assertEquals(58, rightRailWidthDp())
         assertEquals(12, rightRailAvatarScreenEdgeInsetPx())
         assertEquals(12, rightRailToolIconScreenEdgeInsetPx())
-        assertEquals(42, rightRailToolButtonWidthDp())
-        assertEquals(42, rightRailToolButtonHeightDp())
+        assertEquals(50, rightRailToolButtonWidthDp())
+        assertEquals(44, rightRailToolButtonHeightDp())
         assertEquals(
             listOf(
                 FloatingChatToolAction.Gallery,
