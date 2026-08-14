@@ -45,11 +45,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.paifa.ubikitouch.core.model.FloatingChatContact
@@ -168,34 +170,23 @@ private enum class LeftSidebarTab(val label: String) {
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
-private fun LeftSidebarFullScreen(onBack: () -> Unit) {
+internal fun LeftSidebarFullScreen(onBack: () -> Unit) {
     val snapshot by FloatingChatLeftSidebarBridge.snapshot.collectAsState()
     val displayMode by FloatingChatLeftSidebarBridge.displayMode.collectAsState()
     val scope = rememberCoroutineScope()
     val pager = rememberPagerState { LeftSidebarTab.entries.size }
 
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
-        Spacer(Modifier.height(leftSidebarStatusBarHeightDp().dp))
-        TopAppBar(
-            title = {
-                Text(
-                    "左侧全部",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Normal
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            },
+    Column(Modifier.fillMaxSize().background(Color.Transparent)) {
+        // UI：左侧全部入口复用 UI组件 的全屏 toolbar；状态区不再使用独立空白占位。
+        // 测试流程：从右侧左侧全部入口打开，切换分页后点击左上返回，确认向顶部退出。
+        FloatingWorkspaceTopAppBar(
+            title = "左侧全部",
+            onBack = onBack,
             actions = {
                 IconButton(onClick = FloatingChatLeftSidebarBridge::open) {
                     Icon(Icons.Filled.Refresh, contentDescription = "刷新当前数据")
                 }
-            },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+            }
         )
         PrimaryTabRow(selectedTabIndex = pager.currentPage) {
             LeftSidebarTab.entries.forEachIndexed { index, tab ->

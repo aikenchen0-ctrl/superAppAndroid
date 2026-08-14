@@ -1,6 +1,7 @@
 package com.paifa.ubikitouch.accessibility
 
 import android.view.WindowManager
+import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -27,5 +28,16 @@ class AiAutoReplyOverlayPresentationTest {
         assertEquals(0f, aiAutoReplyEntryTranslationY(0))
         assertEquals(-1_000f, aiAutoReplyExitTranslationY(1_000))
         assertEquals(0f, aiAutoReplyExitTranslationY(0))
+    }
+
+    @Test
+    fun aiAutoReplyScreenIsReusableWhileTheOverlayControllerKeepsUsingIt() {
+        val source = File(
+            System.getProperty("user.dir"),
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/AiAutoReplyOverlayController.kt"
+        ).readText()
+
+        assertTrue(source.contains("internal fun AiAutoReplyFullScreen("))
+        assertTrue(source.contains("setContent { AiAutoReplyFullScreen(context = context, onBack = ::dismiss) }"))
     }
 }

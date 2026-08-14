@@ -23,7 +23,6 @@ import androidx.camera.view.PreviewView
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -37,14 +36,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
@@ -55,8 +51,8 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -83,6 +79,9 @@ import com.paifa.ubikitouch.accessibility.UbikiAccessibilityService
 import com.paifa.ubikitouch.accessibility.blinkVoiceCaptureAutoFinishOnEvent
 import com.paifa.ubikitouch.accessibility.blinkVoiceRealtimeStatusLabel
 import com.paifa.ubikitouch.accessibility.blinkVoiceStatusLogEntry
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceMotion
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopBarDefaults
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlinx.coroutines.launch
@@ -102,11 +101,11 @@ internal fun blinkVoiceFullscreenOverlayWindowPresentation() = BlinkVoiceFullscr
     focusable = true
 )
 
-internal fun blinkVoiceFullscreenStatusBarHeightDp(): Int = 30
+internal fun blinkVoiceFullscreenStatusBarHeightDp(): Int = FloatingWorkspaceTopBarDefaults.StatusBarTopPaddingDp
 
-internal fun blinkVoiceFullscreenEntryTranslationY(heightPx: Int): Float = heightPx.coerceAtLeast(0).toFloat()
+internal fun blinkVoiceFullscreenEntryTranslationY(heightPx: Int): Float = FloatingWorkspaceMotion.enterTranslationY(heightPx)
 
-internal fun blinkVoiceFullscreenExitTranslationY(heightPx: Int): Float = -heightPx.coerceAtLeast(0).toFloat()
+internal fun blinkVoiceFullscreenExitTranslationY(heightPx: Int): Float = FloatingWorkspaceMotion.exitTranslationY(heightPx)
 
 /** App-module host for the right-rail test. Call [show] after the system camera permission is granted. */
 object FloatingChatBlinkVoiceOverlayHost {
@@ -201,7 +200,7 @@ internal class BlinkVoiceFullscreenOverlayController(
             setViewTreeSavedStateRegistryOwner(composeOwner)
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnLifecycleDestroyed(composeOwner.lifecycle))
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
-            translationY = blinkVoiceFullscreenEntryTranslationY(context.resources.displayMetrics.heightPixels)
+            translationY = FloatingWorkspaceMotion.enterTranslationY(context.resources.displayMetrics.heightPixels)
             alpha = 0f
             setContent { BlinkVoiceFullscreenScreen(controller = this@BlinkVoiceFullscreenOverlayController) }
         }
@@ -231,7 +230,7 @@ internal class BlinkVoiceFullscreenOverlayController(
         val current = view ?: return
         current.animate().cancel()
         val height = current.height.takeIf { it > 0 } ?: context.resources.displayMetrics.heightPixels
-        current.animate().translationY(blinkVoiceFullscreenExitTranslationY(height)).alpha(0f)
+        current.animate().translationY(FloatingWorkspaceMotion.exitTranslationY(height)).alpha(0f)
             .setDuration(HIDE_DURATION_MILLIS)
             .setInterpolator(AccelerateInterpolator(1.5f))
             .withEndAction { if (view === current) dismissImmediately() }
@@ -387,14 +386,10 @@ private enum class BlinkVoiceTab(val label: String) { Recognition("识别"), Rec
 private fun BlinkVoiceFullscreenScreen(controller: BlinkVoiceFullscreenOverlayController) {
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState { BlinkVoiceTab.entries.size }
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
-        Spacer(Modifier.height(blinkVoiceFullscreenStatusBarHeightDp().dp))
-        Box(Modifier.fillMaxWidth().height(56.dp)) {
-            IconButton(onClick = controller::dismiss, modifier = Modifier.align(Alignment.CenterStart)) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-            }
-            Text("眨眼测试", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Normal, modifier = Modifier.align(Alignment.Center))
-        }
+    Column(Modifier.fillMaxSize().background(Color.Transparent)) {
+        // UI：复用 UI组件 的 M3 工具栏，30dp 状态区由工具栏 padding 承载，避免独立空白区域跳变。
+        // 测试流程：点击右侧眨眼测试，确认页面自下向上进入；点击左上返回，确认页面向顶部退出。
+        FloatingWorkspaceTopAppBar(title = "眨眼测试", onBack = controller::dismiss)
         PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
             BlinkVoiceTab.entries.forEachIndexed { index, tab ->
                 Tab(selected = pagerState.currentPage == index, onClick = { scope.launch { pagerState.animateScrollToPage(index) } }, text = { Text(tab.label, fontWeight = FontWeight.Normal) })

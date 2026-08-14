@@ -1,27 +1,18 @@
-# 执行进度
+# 执行记录
 
 ## 2026-08-14
-- 状态：进行中
-- 已完成：读取工作区状态，定位 iOS 群邀请实现、Android 浮窗入口、SCRM 接口文档。
-- 当前：提取 iOS 行为和 API 字段，核对 Android 已有能力与并发改动。
-- 发现：Android `ScrmApiClient` 已有 `getGroupInvitations`、`pullChatRoomInvitations`、`agreeChatRoomInvite`、`approveChatRoomInvite` 方法；右侧入口仍指向底部面板。
 
-## 验证结果
-| 检查 | 结果 |
-|---|---|
-| 初始状态检查 | 工作区已有并行未提交修改，已保留 |
-| 批量源码提取 | PowerShell 组合语法失败，已改用拆分读取 |
-| 群邀请契约测试 | 通过 |
-| :ubiki-accessibility:compileDebugKotlin | 通过 |
-| Group invitation tab and animation verification | Passed: TabRow, HorizontalPager, LazyColumn, 30dp status spacer, translationY enter/exit |
+- 已将聊天根的全屏工作区进出场收敛为 `FloatingWorkspaceMotion`，底部抽屉保持原有行为。
+- 已将 AI 自动回复、通讯录关系、左侧全部和好友管理迁回同一个 `BottomPanelMode` 聊天根；对应页面使用透明 M3 工具栏。
+- 定向入口契约测试和 `:ubiki-accessibility:compileDebugKotlin` 已通过；编译仅报告既有的 Android API 弃用警告。
+- 后续：迁移收藏库、视频号发布、素材库，并单独处理群信息仍在资料编辑宿主外层的根动画问题。
 
-## 2026-08-14 网页链接
-- 已新增右侧“网页链接”独立 WebLink action 和全屏 Material 3 工作区。
-- 已接入 `POST /openapi/v1/messages/link-card`，仅以 SCRM 任务返回更新发送状态。
-- 验证通过：`WebLinkFullScreenContractTest`、`ScrmApiClientTest`、`:ubiki-accessibility:compileDebugKotlin`。
-
-## 2026-08-14 悬浮聊天全屏动画
-- 已在 `FloatingChatOverlayController` 共享根视图加入实体 `ComposeView.translationY` 入场和退出属性动画。
-- 主界面展开按钮、无障碍 `ExpandFloatingChat`、未读总览和具体账户会话均复用该 controller 根视图。
-- 收起会先完成向下退出动画，再恢复折叠窗口；完全关闭会先退出再移除窗口。
-- 验证通过：`FloatingChatOverlayAnimationContractTest`、`FloatingChatOverlayMountStateTest`、`FloatingChatOverlayControllerContractTest`、`:ubiki-accessibility:compileDebugKotlin`。
+- 已读取任务、调试、测试驱动和界面规范。
+- 已确认本轮范围与统一工作区视觉契约。
+- 下一步：检查实际代码与契约测试，定位尚未统一的入口或局部动画。
+- 已验证旧工具栏测试按旧 UI 契约失败，确认不是 Gradle 并发错误。
+- 已以测试先行方式接入未回消息根 View 的 `FloatingWorkspaceMotion`，待重新运行定向测试和编译。
+- 已修复首次 Expanded 状态的入场动画计算时序。
+- 已让全部未回消息和单账号未回消息使用透明根，普通会话保留磨砂背景。
+- 已把 30dp 顶部空间改为 M3 `TopAppBar.windowInsets`。
+- 定向契约测试、模块 Kotlin 编译和 `app:compileDebugKotlin` 均通过；全量单测重试后仍有 25 个非本范围失败。

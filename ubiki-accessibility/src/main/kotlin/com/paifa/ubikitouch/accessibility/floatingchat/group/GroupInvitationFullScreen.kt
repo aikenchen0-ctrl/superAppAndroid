@@ -31,16 +31,14 @@ import androidx.compose.material3.TabRow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import com.paifa.ubikitouch.accessibility.scrm.ScrmAccountMutationRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmAgreeChatRoomInviteRequest
@@ -53,8 +51,7 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmSettingsManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,8 +68,6 @@ internal fun GroupInvitationFullScreen(
     var status by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     val pagerState = rememberPagerState(pageCount = { GroupInvitationTab.entries.size })
-    var pageHeightPx by remember { mutableFloatStateOf(0f) }
-    val pageTranslationY = remember { Animatable(0f) }
 
     fun load(tab: GroupInvitationTab) {
         if (route == null) {
@@ -168,39 +163,16 @@ internal fun GroupInvitationFullScreen(
     LaunchedEffect(route, pagerState.currentPage) {
         load(GroupInvitationTab.entries[pagerState.currentPage])
     }
-    LaunchedEffect(pageHeightPx) {
-        if (pageHeightPx > 0f) {
-            pageTranslationY.snapTo(pageHeightPx)
-            pageTranslationY.animateTo(0f, animationSpec = tween(durationMillis = 240))
-        }
-    }
-    fun closeWithExitAnimation() {
-        scope.launch {
-            pageTranslationY.animateTo(pageHeightPx, animationSpec = tween(durationMillis = 200))
-            onBack()
-        }
-    }
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .onSizeChanged { pageHeightPx = it.height.toFloat() }
-            .graphicsLayer { translationY = pageTranslationY.value }
-            .background(MaterialTheme.colorScheme.surface)
+            .background(Color.Transparent)
     ) {
-        Spacer(Modifier.height(30.dp))
-        androidx.compose.material3.TopAppBar(
-            title = {
-                Text(
-                    text = "群邀请卡",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.titleLarge
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = ::closeWithExitAnimation) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            },
+        // UI：群邀请卡与 UI组件共享全屏工具栏，避免独立状态栏空白区域造成布局跳变。
+        // 测试流程：打开群邀请卡后确认从底部进入，点击左上返回后确认向顶部退出。
+        FloatingWorkspaceTopAppBar(
+            title = "群邀请卡",
+            onBack = onBack,
             actions = {
                 IconButton(onClick = ::pull, enabled = !loading && route != null) {
                     Icon(Icons.Filled.Refresh, contentDescription = "刷新")

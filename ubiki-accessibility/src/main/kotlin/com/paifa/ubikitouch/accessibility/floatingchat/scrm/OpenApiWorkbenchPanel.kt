@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSettingsManager
@@ -170,16 +171,17 @@ internal fun OpenApiWorkbenchPanel(manager: ScrmSettingsManager, onClose: () -> 
         OpenApiRequestEditor(editor!!, manager, onClose = { editor = null }) { rows -> result = rows; editor = null }
         return
     }
-    Column(Modifier.fillMaxSize().background(Color(0xFFF2F3F5))) {
-        Row(
-            Modifier.fillMaxWidth().statusBarsPadding().height(52.dp),
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = Color(0xFF007AFF)) }
-            Text("业务接口", modifier = Modifier.weight(1f), fontSize = 17.sp, color = Color(0xFF17191C))
-            TextButton(onClick = { refresh++ }) { Text("刷新", color = Color(0xFF007AFF), fontSize = 16.sp) }
-            TextButton(onClick = { showEnvironment = true }) { Text("环境", color = Color(0xFF007AFF), fontSize = 16.sp) }
-        }
+    Column(Modifier.fillMaxSize().background(Color.Transparent)) {
+        // UI：OpenAPI 复用 UI组件 的 M3 toolbar，30dp 状态区由共享组件内嵌。
+        // 测试流程：打开 OpenAPI，刷新或查看环境后点击左上返回，确认页面向顶部退出。
+        FloatingWorkspaceTopAppBar(
+            title = "业务接口",
+            onBack = onClose,
+            actions = {
+                TextButton(onClick = { refresh++ }) { Text("刷新") }
+                TextButton(onClick = { showEnvironment = true }) { Text("环境") }
+            }
+        )
         LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             openApiSections.forEach { section -> item(section.title) { OpenApiGroupedSection(section) { editor = it } } }
             if (result.isNotEmpty()) item("响应") { OpenApiResponseSection(result) }
@@ -225,15 +227,17 @@ internal fun OpenApiWorkbenchPanel(manager: ScrmSettingsManager, onClose: () -> 
 @Composable private fun OpenApiRequestEditor(action: OpenApiAction, manager: ScrmSettingsManager, onClose: () -> Unit, onRun: (List<Pair<String, String>>) -> Unit) {
     var path by remember { mutableStateOf(action.path) }; var query by remember { mutableStateOf("") }; var body by remember { mutableStateOf("{}") }; var confirm by remember { mutableStateOf(false) }; var error by remember { mutableStateOf<String?>(null) }; val scope = rememberCoroutineScope()
     LaunchedEffect(action.path) { runCatching { withContext(Dispatchers.IO) { manager.loadSelectedSessionOrBootstrap() } }.onSuccess { session -> query = "deviceUuid=${session.deviceUuid}&weChatId=${session.weChatId}"; body = "{\n  \"deviceUuid\": \"${session.deviceUuid}\",\n  \"weChatId\": \"${session.weChatId}\"\n}" }.onFailure { error = it.message } }
-    Column(Modifier.fillMaxSize().background(Color(0xFFF2F3F5))) {
-        Row(Modifier.fillMaxWidth().statusBarsPadding().height(52.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = Color(0xFF007AFF)) }
-            Text(action.title, modifier = Modifier.weight(1f), fontSize = 17.sp, color = Color(0xFF17191C))
-            TextButton(onClick = {
-                error = validateOpenApiRequest(path, query, body)
-                if (error == null) { if (action.risky) confirm = true else runOpenApi(action, path, query, body, manager, scope, onRun) }
-            }) { Text("调用", color = Color(0xFF007AFF), fontSize = 16.sp) }
-        }
+    Column(Modifier.fillMaxSize().background(Color.Transparent)) {
+        FloatingWorkspaceTopAppBar(
+            title = action.title,
+            onBack = onClose,
+            actions = {
+                TextButton(onClick = {
+                    error = validateOpenApiRequest(path, query, body)
+                    if (error == null) { if (action.risky) confirm = true else runOpenApi(action, path, query, body, manager, scope, onRun) }
+                }) { Text("调用") }
+            }
+        )
         LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             item { Text("${action.method}\n${action.subtitle}", fontSize = 13.sp, color = Color(0xFF6E6E73)) }
             item { OpenApiEditorCard("接口", "可以把 path 中的 demo ID 改成真实 wxid、群 ID 或素材 ID。") { OutlinedTextField(path, { path = it }, Modifier.fillMaxWidth(), label = { Text("/openapi/v1/...") }) } }

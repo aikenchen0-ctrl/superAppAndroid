@@ -99,6 +99,7 @@ internal fun RightCoordinateRail(
     onOfficialArticleClick: () -> Unit = {},
     onMusicShareClick: () -> Unit = {},
     onSplitBillClick: () -> Unit = {},
+    onGroupInfoClick: () -> Unit = {},
     bubbleAppearanceLabel: String = "3D气泡",
     onBubbleAppearanceToggle: () -> Unit = {},
     onAccountAvatarClick: (FloatingChatContact) -> Unit,
@@ -394,6 +395,8 @@ internal fun RightCoordinateRail(
                                 onMusicShareClick()
                             } else if (item.opensSplitBill) {
                                 onSplitBillClick()
+                            } else if (item.opensGroupInfo) {
+                                onGroupInfoClick()
                             } else if (item.opensBackgroundRemoval) {
                                 FloatingChatBackgroundRemovalBridge.open()
                             } else {

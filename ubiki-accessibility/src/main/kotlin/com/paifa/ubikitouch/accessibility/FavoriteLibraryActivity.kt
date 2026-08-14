@@ -29,7 +29,6 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Image
@@ -42,7 +41,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -64,6 +62,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.FavoriteCollectionItem
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.LegacyFavoriteAccountId
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.loadFavoriteCollectionItems
@@ -95,7 +94,6 @@ private enum class FavoriteCategory(val title: String) {
     Recent("最近使用"), Media("图片与视频"), File("文件"), Link("链接"), Text("文本"), Chat("聊天记录")
 }
 
-private val FavoriteBackground = Color(0xFFEDEDED)
 private val FavoritePrimary = Color(0xFF1D1D1F)
 private val FavoriteSecondary = Color(0xFF8A8A8F)
 private val FavoriteBlue = Color(0xFF2E476F)
@@ -113,53 +111,52 @@ internal fun FavoriteLibraryScreen(context: android.content.Context, onBack: () 
     var query by remember { mutableStateOf("") }
     val pagerState = rememberPagerState { FavoriteCategory.entries.size }
     val pagerScope = rememberCoroutineScope()
-    Box(Modifier.fillMaxSize().background(FavoriteBackground)) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .navigationBarsPadding()
-        ) {
-            Spacer(Modifier.height(favoriteLibraryStatusBarHeightDp().dp))
-            FavoriteTopBar(title = "收藏", onBack = onBack)
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp).height(52.dp),
-                placeholder = { Text("搜索", color = FavoriteSecondary, fontSize = 17.sp) },
-                leadingIcon = { Icon(Icons.Filled.Search, null, tint = FavoriteSecondary) },
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color(0xFFFCFCFC),
-                    unfocusedContainerColor = Color(0xFFFCFCFC),
-                    focusedBorderColor = Color.Transparent,
-                    unfocusedBorderColor = Color.Transparent,
-                    cursorColor = FavoriteBlue
-                ),
-                shape = RoundedCornerShape(12.dp)
-            )
-            PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
-                FavoriteCategory.entries.forEachIndexed { index, category ->
-                    Tab(
-                        selected = pagerState.currentPage == index,
-                        onClick = { pagerScope.launch { pagerState.animateScrollToPage(index) } },
-                        text = { Text(category.title, maxLines = 1) }
-                    )
-                }
-            }
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize()
-            ) { page ->
-                FavoriteLibraryPage(
-                    items = savedItems,
-                    category = FavoriteCategory.entries[page],
-                    query = query,
-                    accountName = snapshot?.accountName.orEmpty(),
-                    onItemSelected = { item ->
-                        if (FloatingChatFavoriteLibraryBridge.send(item)) onBack()
-                    }
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Transparent)
+            .navigationBarsPadding()
+    ) {
+        // 状态区由共享 AppBar 内嵌承载，避免独立 30dp 占位造成切换跳变。
+        FloatingWorkspaceTopAppBar(title = "收藏", onBack = onBack)
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp).height(52.dp),
+            placeholder = { Text("搜索", color = FavoriteSecondary, fontSize = 17.sp) },
+            leadingIcon = { Icon(Icons.Filled.Search, null, tint = FavoriteSecondary) },
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = Color(0xFFFCFCFC),
+                unfocusedContainerColor = Color(0xFFFCFCFC),
+                focusedBorderColor = Color.Transparent,
+                unfocusedBorderColor = Color.Transparent,
+                cursorColor = FavoriteBlue
+            ),
+            shape = RoundedCornerShape(12.dp)
+        )
+        PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
+            FavoriteCategory.entries.forEachIndexed { index, category ->
+                Tab(
+                    selected = pagerState.currentPage == index,
+                    onClick = { pagerScope.launch { pagerState.animateScrollToPage(index) } },
+                    text = { Text(category.title, maxLines = 1) }
                 )
             }
+        }
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize()
+        ) { page ->
+            FavoriteLibraryPage(
+                items = savedItems,
+                category = FavoriteCategory.entries[page],
+                query = query,
+                accountName = snapshot?.accountName.orEmpty(),
+                onItemSelected = { item ->
+                    if (FloatingChatFavoriteLibraryBridge.send(item)) onBack()
+                }
+            )
         }
     }
 }
@@ -194,22 +191,6 @@ private fun FavoriteLibraryPage(
                 onClick = { onItemSelected(item) }
             )
         }
-    }
-}
-
-@Composable
-private fun FavoriteTopBar(title: String, onBack: () -> Unit) {
-    Box(Modifier.fillMaxWidth().height(52.dp)) {
-        IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = FavoritePrimary)
-        }
-        Text(
-            title,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Normal,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.align(Alignment.Center)
-        )
     }
 }
 

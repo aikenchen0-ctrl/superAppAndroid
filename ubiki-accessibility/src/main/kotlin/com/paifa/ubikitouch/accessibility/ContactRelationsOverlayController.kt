@@ -59,6 +59,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ComposeView
@@ -68,6 +69,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.paifa.ubikitouch.accessibility.floatingchat.media.rememberAsyncImageThumbnailBitmap
@@ -193,7 +195,7 @@ private enum class ContactRelationsTab(
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
-private fun ContactRelationsFullScreen(onBack: () -> Unit) {
+internal fun ContactRelationsFullScreen(onBack: () -> Unit) {
     val snapshot by FloatingChatContactRelationsBridge.snapshot.collectAsState()
     val scope = rememberCoroutineScope()
     val pager = rememberPagerState { ContactRelationsTab.entries.size }
@@ -207,28 +209,17 @@ private fun ContactRelationsFullScreen(onBack: () -> Unit) {
         }
     }
 
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
-        Spacer(Modifier.height(contactRelationsStatusBarHeightDp().dp))
-        TopAppBar(
-            title = {
-                Text(
-                    "通讯录",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Normal
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            },
+    Column(Modifier.fillMaxSize().background(Color.Transparent)) {
+        // UI：通讯录关系页复用 UI组件 工具栏，避免独立状态栏 Spacer 造成视觉断层。
+        // 测试流程：从右侧联系人入口打开，刷新数据后点击左上返回，确认向顶部退出。
+        FloatingWorkspaceTopAppBar(
+            title = "通讯录",
+            onBack = onBack,
             actions = {
                 IconButton(onClick = FloatingChatContactRelationsBridge::refresh) {
                     Icon(Icons.Filled.Refresh, contentDescription = "刷新")
                 }
-            },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+            }
         )
         OutlinedTextField(
             value = query,

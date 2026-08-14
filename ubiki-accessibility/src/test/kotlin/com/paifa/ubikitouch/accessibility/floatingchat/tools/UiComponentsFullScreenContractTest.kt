@@ -48,7 +48,7 @@ class UiComponentsFullScreenContractTest {
             "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/UiComponentsFullScreen.kt"
         ).readText()
 
-        assertTrue(source.contains("modifier = Modifier.padding(top = UiComponentsStatusBarHeightDp.dp)"))
+        assertTrue(source.contains("FloatingWorkspaceTopAppBar(title = \"UI组件\", onBack = onBack)"))
         assertFalse(source.contains("Spacer(Modifier.height(UiComponentsStatusBarHeightDp.dp))"))
     }
 }

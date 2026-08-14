@@ -56,10 +56,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.lifecycle.setViewTreeLifecycleOwner
@@ -194,7 +196,7 @@ private class AiAutoReplyGateway(private val client: FloatingChatAiClient = Floa
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
-private fun AiAutoReplyFullScreen(context: Context, onBack: () -> Unit) {
+internal fun AiAutoReplyFullScreen(context: Context, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val gateway = remember { AiAutoReplyGateway() }
     val pager = rememberPagerState { AiAutoReplyTab.entries.size }
@@ -272,24 +274,10 @@ private fun AiAutoReplyFullScreen(context: Context, onBack: () -> Unit) {
         }
     }
 
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
-        Spacer(Modifier.height(aiAutoReplyStatusBarHeightDp().dp))
-        TopAppBar(
-            title = {
-                Text(
-                    text = "AI自动回复",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Normal
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
-        )
+    Column(Modifier.fillMaxSize().background(Color.Transparent)) {
+        // UI：AI自动回复复用 UI组件 的 toolbar，状态区由共享组件内嵌处理。
+        // 测试流程：从右侧打开 AI自动回复，确认自下向上进入并通过左上返回向顶部退出。
+        FloatingWorkspaceTopAppBar(title = "AI自动回复", onBack = onBack)
         PrimaryTabRow(selectedTabIndex = pager.currentPage) {
             AiAutoReplyTab.entries.forEachIndexed { index, tab ->
                 Tab(

@@ -1,28 +1,11 @@
-# 群邀请卡发现
+# 悬浮聊天统一工作区发现
 
-## 用户要求
-- 将右侧功能“群邀请卡”按 iOS 行为和接口实现到 Android。
-- 承载形式为全屏悬浮窗：顶部 30dp 状态区，工具栏左侧返回按钮，不使用底部取消对话框。
-- 所有 Android UI 使用 Material 3 风格。
-- 处理 `BadTokenException` 等窗口附加和移除异常。
-
-## 已定位资料
-- iOS 群邀请创建器：`ios-float/ios-float/ChatWindowViewController.swift`。
-- iOS 群邀请审批/接收与 OpenAPI 选取器：`ios-float/ios-float/Features/Groups/GroupsFeature.swift`、`Features/Chat/ChatWindow+CollectionDataSource.swift`、`Features/Chat/ChatWindow+AudioDelegate.swift`。
-- 接口文档：`接口文档.md`、`接口文档.json`。
-- Android SCRM 客户端与模型：`ubiki-accessibility/.../scrm/ScrmApiClient.kt`、`ScrmModels.kt`。
-
-## 已知接口
-- `GET /openapi/v1/group-invitations`
-- `POST /openapi/v1/chatrooms/invites/pull`
-- `POST /openapi/v1/chatrooms/invites/agree`
-- `POST /openapi/v1/chatrooms/invites/approve`
-
-## 并发边界
-Android 浮窗、右侧工具、SCRM 客户端已有未提交修改，必须在读取最新内容后做最小增量编辑。
-
-## 实现结果
-- 群邀请右侧工具在既有浮窗根视图内显示为全屏 Material 3 页面。
-- 页面使用 30dp 状态区、返回图标和刷新图标，不使用 Activity、Dialog 或底部取消按钮。
-- 实际调用 get、pull、agree、approve 四个既有 SCRM 接口。
-- 复用 TYPE_ACCESSIBILITY_OVERLAY 控制器，避免额外窗口附着导致 BadToken 风险。
+- “UI组件”基线为 `FloatingChatOverlayUi` 的根级 `AnimatedVisibility` 与 `FloatingBottomPanel` 透明容器，页面使用 `FloatingWorkspaceTopAppBar`。
+- 当前用户指定范围为：未回消息、全部未回消息、工具栏搜索、工具栏扫码。
+- 预期视觉契约：工具栏自身 `paddingTop = 30.dp`，无独立状态栏 `Spacer`；透明背景；左返回按钮；进入由下向上、关闭由上向下，且只由根实体做一次动画。
+- 现有协作者摘要称这四类页面已部分改为共享工具栏，仍须以当前工作区代码和定向测试验证。
+- 旧 `ToolbarWorkspaceContractTest` 仍要求独立 `Spacer(Modifier.height(30.dp))` 和页面级 `translationY`，与新规范冲突；测试已更新为共享 toolbar、透明根和根级运动断言。
+- `FloatingChatOverlayController.showState` 原先在 `updateOverlayState(nextState)` 后计算 `state != Expanded`，导致首次挂载 Expanded 时入场动画条件为假；现在在发布状态前保存 `previousState` 并计算条件。
+- 未回消息路由默认继承磨砂背景，默认配置约 67% alpha；`AllAccountsUnread` 与 `SingleAccountUnread` 现在明确禁用该根背景，普通会话仍保留用户配置。
+- 共享 `FloatingWorkspaceTopAppBar` 现在通过 Material 3 `windowInsets = WindowInsets(top = 30.dp)` 承载顶部空间，不再把 30dp 放在外层 padding。
+- 定向测试和 app Kotlin 编译通过；模块全量测试等待重试后仍有 25 个与本轮无关的既有契约失败。

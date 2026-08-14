@@ -14,12 +14,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.paifa.ubikitouch.accessibility.AppLocationOption
 import com.paifa.ubikitouch.accessibility.AppMomentMedia
 import com.paifa.ubikitouch.accessibility.AppMomentPost
+import com.paifa.ubikitouch.accessibility.AiAutoReplyFullScreen
+import com.paifa.ubikitouch.accessibility.ContactRelationsFullScreen
 import com.paifa.ubikitouch.accessibility.FloatingChatAiConfig
+import com.paifa.ubikitouch.accessibility.FriendManagementFullscreenScreen
+import com.paifa.ubikitouch.accessibility.LeftSidebarFullScreen
 import com.paifa.ubikitouch.accessibility.floatingchat.account.GroupInvitePickerPanel
 import com.paifa.ubikitouch.accessibility.floatingchat.account.FloatingChatAccountProfile
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AiVoiceCapabilityConfigEvent
@@ -29,6 +34,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AiVoicePanel
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AiVoiceState
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.aiVoiceUsesFullscreenWorkspace
 import com.paifa.ubikitouch.accessibility.floatingchat.contacts.ScrmContactsPanel
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceMotion
 import com.paifa.ubikitouch.accessibility.floatingchat.finder.FinderApi
 import com.paifa.ubikitouch.accessibility.floatingchat.finder.FinderSession
 import com.paifa.ubikitouch.accessibility.floatingchat.finder.FinderWorkspaceView
@@ -45,6 +51,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.scrm.CustomerProfilePanel
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSettingsManager
 import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.AiConfigPanel
+import com.paifa.ubikitouch.accessibility.floatingchat.tools.BackgroundRemovalWorkspace
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.CompactNoticePanel
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.EmojiPanel
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.FavoriteCollectionItem
@@ -59,6 +66,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.tools.TransferFullScreen
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.QuickPhrasePanel
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.RealVoiceInputPanel
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.UiComponentsFullScreen
+import com.paifa.ubikitouch.accessibility.floatingchat.scrm.OpenApiWorkbenchActivityContent
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.MiniProgramFullScreen
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.ReviewRequestsFullScreen
 import com.paifa.ubikitouch.core.model.FloatingChatContact
@@ -88,10 +96,10 @@ internal fun aiAssistantExitOffsetDirection(): Int = -1
 internal fun uiComponentsUsesFullscreenWorkspace(): Boolean = true
 
 /** 测试流程：打开右侧 UI组件，确认全屏实体从底部进入。 */
-internal fun uiComponentsEnterOffsetDirection(): Int = 1
+internal fun uiComponentsEnterOffsetDirection(): Int = FloatingWorkspaceMotion.EnterOffsetDirection
 
 /** 测试流程：点击左上返回，确认全屏实体向顶部退出。 */
-internal fun uiComponentsExitOffsetDirection(): Int = -1
+internal fun uiComponentsExitOffsetDirection(): Int = FloatingWorkspaceMotion.ExitOffsetDirection
 
 /** 微信小程序复用当前悬浮根视图，避免新增窗口附着时发生 BadTokenException。 */
 internal fun miniProgramUsesFullscreenWorkspace(): Boolean = true
@@ -154,7 +162,7 @@ internal fun transferUsesFullscreenWorkspace(): Boolean = true
 internal fun transferEnterOffsetDirection(): Int = 1
 
 /** 测试流程：点击返回，确认工作区实体向下退出完成后关闭。 */
-internal fun transferExitOffsetDirection(): Int = 1
+internal fun transferExitOffsetDirection(): Int = FloatingWorkspaceMotion.ExitOffsetDirection
 
 @Composable
 internal fun FloatingBottomPanel(
@@ -241,6 +249,12 @@ internal fun FloatingBottomPanel(
         BottomPanelMode.Assistant -> aiAssistantUsesFullscreenWorkspace()
         BottomPanelMode.AiVoice -> aiVoiceUsesFullscreenWorkspace()
         BottomPanelMode.UiComponents -> uiComponentsUsesFullscreenWorkspace()
+        BottomPanelMode.AiAutoReply,
+        BottomPanelMode.ContactRelations,
+        BottomPanelMode.LeftSidebar,
+        BottomPanelMode.FriendManagement,
+        BottomPanelMode.OpenApiWorkbench,
+        BottomPanelMode.BackgroundRemoval -> true
         BottomPanelMode.MiniProgram -> miniProgramUsesFullscreenWorkspace()
         BottomPanelMode.ReviewRequests -> reviewRequestsUsesFullscreenWorkspace()
         BottomPanelMode.Favorite -> favoriteShareUsesFullscreenWorkspace()
@@ -334,7 +348,11 @@ internal fun FloatingBottomPanel(
                 }
             ),
         shape = if (isFullscreenWorkspace) RoundedCornerShape(0.dp) else shape,
-        color = if (isFullscreenWorkspace || isBottomDrawer) OverlayTokens.bottomComposerSurface else OverlayTokens.panel,
+        color = if (isFullscreenWorkspace) Color.Transparent else if (isBottomDrawer) {
+            OverlayTokens.bottomComposerSurface
+        } else {
+            OverlayTokens.panel
+        },
         border = if (isFullscreenWorkspace) null else BorderStroke(1.dp, OverlayTokens.panelBorder)
     ) {
         val panelContent: @Composable () -> Unit = {
@@ -520,6 +538,18 @@ internal fun FloatingBottomPanel(
                     onCapabilityConfigEvent = onAiVoiceCapabilityConfigEvent
                 )
                 BottomPanelMode.UiComponents -> UiComponentsFullScreen(onBack = onClose)
+                BottomPanelMode.AiAutoReply -> AiAutoReplyFullScreen(
+                    context = context,
+                    onBack = onClose
+                )
+                BottomPanelMode.ContactRelations -> ContactRelationsFullScreen(onBack = onClose)
+                BottomPanelMode.LeftSidebar -> LeftSidebarFullScreen(onBack = onClose)
+                BottomPanelMode.FriendManagement -> FriendManagementFullscreenScreen(onBack = onClose)
+                BottomPanelMode.OpenApiWorkbench -> OpenApiWorkbenchActivityContent(
+                    context = context.applicationContext,
+                    onClose = onClose
+                )
+                BottomPanelMode.BackgroundRemoval -> BackgroundRemovalWorkspace(onBack = onClose)
                 BottomPanelMode.MiniProgram -> MiniProgramFullScreen(
                     route = scrmMessageRoute,
                     conversationId = scrmMessageConversationId,

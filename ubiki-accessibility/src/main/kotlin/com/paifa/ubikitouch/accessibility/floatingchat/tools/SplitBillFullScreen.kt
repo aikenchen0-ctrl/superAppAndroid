@@ -1,6 +1,8 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.tools
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -9,10 +11,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,14 +22,12 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -37,7 +35,6 @@ import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,13 +45,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceMotion
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
 
@@ -77,10 +78,10 @@ internal fun splitBillMemberIsCurrentAccount(
 }
 
 /** 测试流程：从群聊右侧点击“AA收款”，确认页面实体从底部向上进入。 */
-internal fun splitBillEnterOffsetDirection(): Int = 1
+internal fun splitBillEnterOffsetDirection(): Int = FloatingWorkspaceMotion.EnterOffsetDirection
 
-/** 测试流程：点击左上角返回，确认页面实体向下退出后再关闭。 */
-internal fun splitBillExitOffsetDirection(): Int = 1
+/** 测试流程：点击左上角返回，确认页面实体沿 FloatActivity 统一方向向顶部退出后再关闭。 */
+internal fun splitBillExitOffsetDirection(): Int = FloatingWorkspaceMotion.ExitOffsetDirection
 
 /**
  * AA 收款全屏工作区。页面复用现有悬浮根视图，不创建 Dialog、Activity 或额外 Window，避免 BadTokenException。
@@ -102,6 +103,7 @@ internal fun SplitBillFullScreen(
     val pagerState = rememberPagerState(pageCount = { 2 })
     var pageHeightPx by remember { mutableFloatStateOf(0f) }
     val pageTranslationY = remember { Animatable(0f) }
+    val pageAlpha = remember { Animatable(0f) }
     var entered by remember { mutableStateOf(false) }
     var exiting by remember { mutableStateOf(false) }
     var amount by remember { mutableStateOf("") }
@@ -113,7 +115,27 @@ internal fun SplitBillFullScreen(
     LaunchedEffect(pageHeightPx) {
         if (pageHeightPx > 0f && !entered) {
             pageTranslationY.snapTo(pageHeightPx * splitBillEnterOffsetDirection())
-            pageTranslationY.animateTo(0f, tween(SplitBillAnimationDurationMillis))
+            pageAlpha.snapTo(0f)
+            coroutineScope {
+                launch {
+                    pageTranslationY.animateTo(
+                        0f,
+                        tween(
+                            durationMillis = SplitBillAnimationDurationMillis,
+                            easing = LinearOutSlowInEasing
+                        )
+                    )
+                }
+                launch {
+                    pageAlpha.animateTo(
+                        1f,
+                        tween(
+                            durationMillis = SplitBillAnimationDurationMillis,
+                            easing = LinearOutSlowInEasing
+                        )
+                    )
+                }
+            }
             entered = true
         }
     }
@@ -122,11 +144,27 @@ internal fun SplitBillFullScreen(
         if (exiting) return
         exiting = true
         scope.launch {
-            if (pageHeightPx > 0f) {
-                pageTranslationY.animateTo(
-                    pageHeightPx * splitBillExitOffsetDirection(),
-                    tween(SplitBillAnimationDurationMillis)
-                )
+            coroutineScope {
+                if (pageHeightPx > 0f) {
+                    launch {
+                        pageTranslationY.animateTo(
+                            pageHeightPx * splitBillExitOffsetDirection(),
+                            tween(
+                                durationMillis = SplitBillAnimationDurationMillis,
+                                easing = FastOutLinearInEasing
+                            )
+                        )
+                    }
+                }
+                launch {
+                    pageAlpha.animateTo(
+                        0f,
+                        tween(
+                            durationMillis = SplitBillAnimationDurationMillis,
+                            easing = FastOutLinearInEasing
+                        )
+                    )
+                }
             }
             onBack()
         }
@@ -155,26 +193,21 @@ internal fun SplitBillFullScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
+            .background(Color.Transparent)
             .onSizeChanged { pageHeightPx = it.height.toFloat() }
-            .graphicsLayer { translationY = pageTranslationY.value }
-    ) {
-        Spacer(Modifier.height(30.dp))
-        TopAppBar(
-            title = {
-                Text(
-                    text = "AA收款",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Normal
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = ::closeWithExitAnimation) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
+            .graphicsLayer {
+                translationY = pageTranslationY.value
+                this.alpha = pageAlpha.value
             }
+    ) {
+        FloatingWorkspaceTopAppBar(
+            title = "AA收款",
+            onBack = ::closeWithExitAnimation
         )
-        PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
+        PrimaryTabRow(
+            selectedTabIndex = pagerState.currentPage,
+            containerColor = Color.Transparent
+        ) {
             listOf("发起收款", "当前会话").forEachIndexed { index, title ->
                 Tab(
                     selected = pagerState.currentPage == index,

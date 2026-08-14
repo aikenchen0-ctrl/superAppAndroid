@@ -1,7 +1,5 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.group
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -43,34 +41,27 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoMemberUiState
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoUiEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoUiState
 import kotlinx.coroutines.launch
 
-private const val GroupInfoAnimationDurationMillis = 260
-
 /**
  * iOS 群信息的 Android 全屏悬浮实现。
  *
  * 测试流程：从群聊右侧工具进入，检查 30dp 顶部安全区、三个分页及返回动画；依次刷新群资料、
- * 编辑资料、邀请成员和切换群设置，确认 SCRM 返回状态显示在页面顶部。
+ * 编辑资料、邀请成员和切换群设置，确认 SCRM 返回状态显示在页面顶部。进出场由聊天根的
+ * `AnimatedVisibility` 统一执行，禁止页面自行创建第二段位移动画。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,47 +72,17 @@ internal fun GroupInfoScreen(
 ) {
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { GroupInfoFullScreenTab.entries.size })
-    var pageHeightPx by remember { mutableFloatStateOf(0f) }
-    var entered by remember { mutableStateOf(false) }
-    val translationY = remember { Animatable(0f) }
-
-    LaunchedEffect(pageHeightPx) {
-        if (pageHeightPx > 0f && !entered) {
-            translationY.snapTo(pageHeightPx)
-            translationY.animateTo(0f, tween(GroupInfoAnimationDurationMillis))
-            entered = true
-        }
-    }
-
-    fun closeFullScreenView() {
-        scope.launch {
-            translationY.animateTo(pageHeightPx, tween(GroupInfoAnimationDurationMillis))
-            onEvent(GroupInfoUiEvent.BackRequested)
-        }
-    }
 
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
-            .onSizeChanged { pageHeightPx = it.height.toFloat() }
-            .graphicsLayer { this.translationY = translationY.value }
+            .background(Color.Transparent)
     ) {
-        // Accessibility overlay does not automatically consume system-bar insets.
-        Spacer(Modifier.height(30.dp))
-        TopAppBar(
-            title = {
-                Text(
-                    text = "群信息",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Normal
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = ::closeFullScreenView) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            },
+        // UI：右侧群信息复用 UI组件 的全屏工具栏；状态区由 toolbar 内嵌 padding 承载。
+        // 测试流程：点击群信息后确认自下向上进入，点击左上返回后确认页面向顶部退出。
+        FloatingWorkspaceTopAppBar(
+            title = "群信息",
+            onBack = { onEvent(GroupInfoUiEvent.BackRequested) },
             actions = {
                 IconButton(
                     onClick = { onEvent(GroupInfoUiEvent.RefreshRequested) },
@@ -129,10 +90,7 @@ internal fun GroupInfoScreen(
                 ) {
                     Icon(Icons.Filled.Refresh, contentDescription = "刷新群资料")
                 }
-            },
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
+            }
         )
         TabRow(selectedTabIndex = pagerState.currentPage) {
             GroupInfoFullScreenTab.entries.forEachIndexed { index, tab ->

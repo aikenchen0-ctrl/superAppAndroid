@@ -1,21 +1,16 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.tools
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PersonAddAlt1
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
@@ -28,22 +23,19 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import kotlinx.coroutines.launch
 
 internal enum class ToolbarWorkspaceMode {
@@ -51,8 +43,6 @@ internal enum class ToolbarWorkspaceMode {
     Scan,
     AddFriend
 }
-
-private const val ToolbarWorkspaceAnimationDurationMillis = 260
 
 /**
  * 顶部搜索、扫一扫和添加好友的全屏悬浮工作区。
@@ -71,52 +61,21 @@ internal fun ToolbarWorkspaceFullScreen(
     onOpenAddFriend: () -> Unit,
     onSubmitFriend: suspend (account: String, message: String) -> String
 ) {
-    val scope = rememberCoroutineScope()
-    var pageHeightPx by remember { mutableFloatStateOf(0f) }
-    var entered by remember { mutableStateOf(false) }
-    val translationY = remember { Animatable(0f) }
-
-    LaunchedEffect(pageHeightPx) {
-        if (pageHeightPx > 0f && !entered) {
-            translationY.snapTo(pageHeightPx)
-            translationY.animateTo(0f, tween(ToolbarWorkspaceAnimationDurationMillis))
-            entered = true
-        }
-    }
-    fun close(afterExit: () -> Unit = onBack) {
-        scope.launch {
-            if (pageHeightPx > 0f) {
-                translationY.animateTo(pageHeightPx, tween(ToolbarWorkspaceAnimationDurationMillis))
-            }
-            afterExit()
-        }
-    }
+    // 页面只负责内容，进出场由 UI组件 同一聊天根的 AnimatedVisibility 执行。
+    fun close(afterExit: () -> Unit = onBack) = afterExit()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
-            .onSizeChanged { pageHeightPx = it.height.toFloat() }
-            .graphicsLayer { this.translationY = translationY.value }
+            .background(Color.Transparent)
     ) {
-        Spacer(Modifier.height(30.dp))
-        TopAppBar(
-            title = {
-                Text(
-                    text = when (mode) {
-                        ToolbarWorkspaceMode.Search -> "搜索聊天记录"
-                        ToolbarWorkspaceMode.Scan -> "扫一扫"
-                        ToolbarWorkspaceMode.AddFriend -> "添加好友"
-                    },
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Normal
-                )
+        FloatingWorkspaceTopAppBar(
+            title = when (mode) {
+                ToolbarWorkspaceMode.Search -> "搜索聊天记录"
+                ToolbarWorkspaceMode.Scan -> "扫一扫"
+                ToolbarWorkspaceMode.AddFriend -> "添加好友"
             },
-            navigationIcon = {
-                androidx.compose.material3.IconButton(onClick = ::close) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            }
+            onBack = onBack
         )
         when (mode) {
             ToolbarWorkspaceMode.Search -> ToolbarMessageSearchContent(messages)

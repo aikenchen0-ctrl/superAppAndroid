@@ -35,6 +35,7 @@ import com.paifa.ubikitouch.core.sidefunction.sideFunctionGroupShiftY
 import com.paifa.ubikitouch.core.sidefunction.sideFunctionLayout
 import com.paifa.ubikitouch.core.model.sanitizeEdgeInsetDp
 import com.paifa.ubikitouch.core.overlay.ScreenInteractiveState
+import com.paifa.ubikitouch.accessibility.floatingchat.shell.BottomPanelMode
 import com.paifa.ubikitouch.overlay.EdgeOutlineView
 import com.paifa.ubikitouch.overlay.EdgeOverlayView
 import com.paifa.ubikitouch.overlay.edgeOutlinePlacement
@@ -448,11 +449,13 @@ class UbikiAccessibilityService : AccessibilityService() {
     }
 
     fun requestFloatingChatOpenApiWorkbench() {
-        val intent = Intent()
-            .setClassName(packageName, "com.paifa.ubikitouch.app.OpenApiWorkbenchActivity")
-            .addFloatingChatBridgeFlags()
-        runCatching { startActivity(intent) }
-            .onFailure { Log.e(TAG, "failed to start OpenAPI workbench", it) }
+        if (!::floatingChatOverlayController.isInitialized) {
+            Log.w(TAG, "skip OpenAPI workbench before floating chat initialization")
+            return
+        }
+        // UI：OpenAPI 必须由 UI组件 同一聊天根承载，不启动 Activity 或新增 Window。
+        // 测试流程：点击右侧 OpenAPI，确认当前悬浮聊天连续过渡到透明全屏工作区。
+        floatingChatOverlayController.openWorkspace(BottomPanelMode.OpenApiWorkbench)
     }
 
     fun requestFloatingChatFinderPublish() {
@@ -465,11 +468,11 @@ class UbikiAccessibilityService : AccessibilityService() {
 
     /** 右侧 AI 自动回复入口使用独立全屏悬浮页，避免复用聊天内部的底部面板。 */
     fun requestFloatingChatAiAutoReply() {
-        if (!::aiAutoReplyOverlayController.isInitialized) {
+        if (!::floatingChatOverlayController.isInitialized) {
             Log.w(TAG, "skip AI auto reply before overlay initialization")
             return
         }
-        aiAutoReplyOverlayController.show()
+        floatingChatOverlayController.openWorkspace(BottomPanelMode.AiAutoReply)
     }
 
     fun requestFloatingChatFavoriteLibrary() {
@@ -587,55 +590,46 @@ class UbikiAccessibilityService : AccessibilityService() {
     }
 
     fun requestFloatingChatBackgroundRemoval() {
-        hideFloatingChatForExternalActivity("background removal")
-        val intent = Intent()
-            .setClassName(packageName, "com.paifa.ubikitouch.app.BackgroundRemovalActivity")
-            .addFloatingChatBridgeFlags()
-        runCatching {
-            startActivity(intent)
-        }.onFailure {
-            Log.e(TAG, "failed to start background removal", it)
-            onFloatingChatBackgroundRemovalClosed()
+        if (!::floatingChatOverlayController.isInitialized) {
+            Log.w(TAG, "skip background removal before floating chat initialization")
+            return
         }
+        // UI：智能抠图由聊天根的透明工作区显示，避免 Activity 白帧与第二个 Window 的 token 风险。
+        // 测试流程：点击右侧智能抠图，确认聊天界面未闪白或消失，页面从底部平滑进入。
+        floatingChatOverlayController.openWorkspace(BottomPanelMode.BackgroundRemoval)
     }
 
     fun requestFloatingChatFriendManagement() {
-        if (::floatingChatOverlayController.isInitialized) {
-            FloatingChatFriendManagementBridge.updateSnapshot(floatingChatOverlayController.friendManagementSnapshot())
-        }
-        if (!::friendManagementOverlayController.isInitialized) {
+        if (!::floatingChatOverlayController.isInitialized) {
             Log.w(TAG, "skip friend management before overlay initialization")
             return
         }
-        friendManagementOverlayController.show()
+        FloatingChatFriendManagementBridge.updateSnapshot(floatingChatOverlayController.friendManagementSnapshot())
+        floatingChatOverlayController.openWorkspace(BottomPanelMode.FriendManagement)
     }
 
     fun requestFloatingChatContactRelations() {
-        if (::floatingChatOverlayController.isInitialized) {
-            val friendSnapshot = floatingChatOverlayController.friendManagementSnapshot()
-            FloatingChatContactRelationsBridge.updateShell(
-                accounts = friendSnapshot.accounts,
-                selectedAccountId = friendSnapshot.selectedAccountId,
-                groups = friendSnapshot.groups
-            )
-        }
-        if (!::contactRelationsOverlayController.isInitialized) {
+        if (!::floatingChatOverlayController.isInitialized) {
             Log.w(TAG, "skip contact relations before overlay initialization")
             return
         }
-        contactRelationsOverlayController.show()
+        val friendSnapshot = floatingChatOverlayController.friendManagementSnapshot()
+        FloatingChatContactRelationsBridge.updateShell(
+            accounts = friendSnapshot.accounts,
+            selectedAccountId = friendSnapshot.selectedAccountId,
+            groups = friendSnapshot.groups
+        )
+        floatingChatOverlayController.openWorkspace(BottomPanelMode.ContactRelations)
     }
 
     /** 打开左侧全部前先从当前 SCRM 会话同步快照，模式由 Bridge 的持久化状态提供。 */
     fun requestFloatingChatLeftSidebar() {
-        if (::floatingChatOverlayController.isInitialized) {
-            FloatingChatLeftSidebarBridge.updateSnapshot(floatingChatOverlayController.leftSidebarSnapshot())
-        }
-        if (!::leftSidebarOverlayController.isInitialized) {
+        if (!::floatingChatOverlayController.isInitialized) {
             Log.w(TAG, "skip left sidebar before overlay initialization")
             return
         }
-        leftSidebarOverlayController.show()
+        FloatingChatLeftSidebarBridge.updateSnapshot(floatingChatOverlayController.leftSidebarSnapshot())
+        floatingChatOverlayController.openWorkspace(BottomPanelMode.LeftSidebar)
     }
 
     fun requestFloatingChatTransfer() {

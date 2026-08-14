@@ -1,6 +1,7 @@
 package com.paifa.ubikitouch.accessibility
 
 import android.view.WindowManager
+import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -21,5 +22,16 @@ class FriendManagementOverlayPresentationTest {
     fun overlayUsesVerticalPropertyAnimationEndpoints() {
         assertEquals(1_000f, friendManagementEntryTranslationY(1_000))
         assertEquals(-1_000f, friendManagementExitTranslationY(1_000))
+    }
+
+    @Test
+    fun friendManagementScreenIsReusableWhileTheOverlayControllerKeepsUsingIt() {
+        val source = File(
+            System.getProperty("user.dir"),
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/FriendManagementOverlayController.kt"
+        ).readText()
+
+        assertTrue(source.contains("internal fun FriendManagementFullscreenScreen("))
+        assertTrue(source.contains("setContent { FriendManagementFullscreenScreen(onBack = ::dismiss) }"))
     }
 }

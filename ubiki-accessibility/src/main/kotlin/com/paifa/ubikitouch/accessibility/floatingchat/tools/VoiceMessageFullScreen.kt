@@ -66,7 +66,7 @@ internal enum class VoiceMessageFullScreenTab(val label: String) {
 
 internal fun voiceMessageEnterOffsetDirection(): Int = 1
 
-internal fun voiceMessageExitOffsetDirection(): Int = 1
+internal fun voiceMessageExitOffsetDirection(): Int = -1
 
 /**
  * 对应 iOS ChatWindow 的语音消息录制与播放工作区，使用 Android M3 全屏 View。

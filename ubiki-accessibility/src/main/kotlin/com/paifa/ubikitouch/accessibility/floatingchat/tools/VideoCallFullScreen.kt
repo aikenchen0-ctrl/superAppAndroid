@@ -61,6 +61,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -71,6 +72,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 
 internal const val VideoCallStatusBarHeightDp = 30
 private const val VideoCallAnimationDurationMillis = 260
@@ -128,7 +130,7 @@ internal fun VideoCallFullScreen(
         exiting = true
         cameraOn = false
         scope.launch {
-            pageTranslationY.animateTo(pageHeightPx, tween(VideoCallAnimationDurationMillis))
+            pageTranslationY.animateTo(-pageHeightPx, tween(VideoCallAnimationDurationMillis))
             if (recordCall) onEndCall(elapsedSeconds)
             onBack()
         }
@@ -137,25 +139,13 @@ internal fun VideoCallFullScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
+            .background(Color.Transparent)
             .onSizeChanged { pageHeightPx = it.height.toFloat() }
             .graphicsLayer { translationY = pageTranslationY.value }
     ) {
-        Spacer(Modifier.height(VideoCallStatusBarHeightDp.dp))
-        TopAppBar(
-            title = {
-                Text(
-                    text = if (isGroup) "群视频通话" else "视频通话",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Normal
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = { closeWithExitAnimation(recordCall = false) }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            }
+        FloatingWorkspaceTopAppBar(
+            title = if (isGroup) "群视频通话" else "视频通话",
+            onBack = { closeWithExitAnimation(recordCall = false) }
         )
         PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
             VideoCallTab.entries.forEachIndexed { index, tab ->

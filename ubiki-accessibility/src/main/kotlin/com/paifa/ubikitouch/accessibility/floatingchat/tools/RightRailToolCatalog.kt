@@ -34,11 +34,12 @@ internal data class RightRailToolCatalogItem(
     val opensOfficialArticle: Boolean = false,
     val opensMusic: Boolean = false,
     val opensSplitBill: Boolean = false,
+    val opensGroupInfo: Boolean = false,
     val isBubbleAppearanceToggle: Boolean = false
 )
 
 internal val rightRailToolCatalog = listOf(
-    item("群信息", Icons.Filled.Contacts), item("眨眼测试", Icons.Filled.Visibility, FloatingChatToolAction.Blink),
+    item("群信息", Icons.Filled.Contacts, opensGroupInfo = true), item("眨眼测试", Icons.Filled.Visibility, FloatingChatToolAction.Blink),
     item("语音助手", Icons.Filled.Mic, FloatingChatToolAction.AiVoice), item("遥感套索", Icons.Filled.LocationOn),
     item("智能抠图", Icons.Filled.Image, opensBackgroundRemoval = true), item("UI组件", Icons.Filled.AutoAwesome), item("OpenAPI", Icons.Filled.SmartToy, FloatingChatToolAction.Command),
     item("侧边特效", Icons.Filled.AutoAwesome, FloatingChatToolAction.SideEffect), item("账号设备", Icons.Filled.PhoneIphone, FloatingChatToolAction.Device), item("好友管理", Icons.Filled.Contacts, FloatingChatToolAction.Contacts),
@@ -90,6 +91,7 @@ private fun item(
     opensOfficialArticle: Boolean = false,
     opensMusic: Boolean = false,
     opensSplitBill: Boolean = false,
+    opensGroupInfo: Boolean = false,
     isBubbleAppearanceToggle: Boolean = icon == Icons.Filled.BubbleChart
 ) = RightRailToolCatalogItem(
     label = label,
@@ -100,5 +102,6 @@ private fun item(
     opensOfficialArticle = opensOfficialArticle,
     opensMusic = opensMusic,
     opensSplitBill = opensSplitBill,
+    opensGroupInfo = opensGroupInfo,
     isBubbleAppearanceToggle = isBubbleAppearanceToggle
 )

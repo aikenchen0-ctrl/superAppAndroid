@@ -7,11 +7,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SplitBillFullScreenContractTest {
-    /** 测试流程：核对页面进入和关闭均使用向下为正方向的实体位移动画。 */
+    /** 测试流程：核对页面从底部进入、向顶部退出，与右侧 FloatActivity 悬浮承载器一致。 */
     @Test
     fun splitBillUsesRequestedSlideDirections() {
         assertEquals(1, splitBillEnterOffsetDirection())
-        assertEquals(1, splitBillExitOffsetDirection())
+        assertEquals(-1, splitBillExitOffsetDirection())
     }
 
     /** 测试流程：点击右侧“AA收款”，确认进入既有悬浮根内的全屏工作区。 */
@@ -33,22 +33,30 @@ class SplitBillFullScreenContractTest {
         assertFalse(bottomPanel.contains("SplitBillPanel("))
     }
 
-    /** 测试流程：检查 M3 分页、高效列表、30dp 状态区与实体位移动画。 */
+    /** 测试流程：检查 M3 分页、高效列表、工具栏顶部安全区与实体位移动画。 */
     @Test
     fun splitBillWorkspaceUsesRequiredMaterial3BuildingBlocks() {
         val workspace = source("floatingchat/tools/SplitBillFullScreen.kt")
+        val presentation = source("floatingchat/components/FloatingWorkspacePresentation.kt")
 
         assertTrue("AA收款全屏工作区源码必须存在", workspace.isFile)
         val text = workspace.readText()
+        val presentationText = presentation.readText()
         assertTrue(text.contains("PrimaryTabRow"))
         assertTrue(text.contains("HorizontalPager"))
         assertTrue(text.contains("LazyColumn"))
-        assertTrue(text.contains("TopAppBar"))
-        assertTrue(text.contains("height(30.dp)"))
+        assertTrue(text.contains("FloatingWorkspaceTopAppBar("))
+        assertTrue(presentationText.contains("StatusBarTopPaddingDp: Int = 30"))
+        assertTrue(presentationText.contains(".padding(top = FloatingWorkspaceTopBarDefaults.StatusBarTopPaddingDp.dp)"))
+        assertFalse(text.contains("Spacer(Modifier.height(30.dp))"))
+        assertTrue(text.contains(".background(Color.Transparent)"))
+        assertTrue(text.contains("containerColor = Color.Transparent"))
         assertTrue(text.contains("MaterialTheme.colorScheme.primary"))
         assertTrue(text.contains("FontWeight.Normal"))
         assertTrue(text.contains("Animatable"))
         assertTrue(text.contains("translationY"))
+        assertTrue(text.contains("pageAlpha.animateTo"))
+        assertTrue(text.contains("this.alpha = pageAlpha.value"))
         assertFalse(text.contains("Dialog("))
         assertFalse(text.contains("WindowManager"))
     }

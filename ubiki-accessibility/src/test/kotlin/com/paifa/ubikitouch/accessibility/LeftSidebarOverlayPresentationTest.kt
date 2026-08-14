@@ -1,7 +1,9 @@
 package com.paifa.ubikitouch.accessibility
 
 import android.view.WindowManager
+import java.io.File
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -35,5 +37,17 @@ class LeftSidebarOverlayPresentationTest {
         assertEquals("friends", LeftSidebarDisplayMode.Friends.rawValue)
         assertEquals("groups", LeftSidebarDisplayMode.Groups.rawValue)
         assertEquals(LeftSidebarDisplayMode.All, LeftSidebarDisplayMode.fromRawValue("unknown"))
+    }
+
+    @Test
+    fun leftSidebarFullscreenProvidesAnInternalReusableComposableEntry() {
+        val source = File(
+            System.getProperty("user.dir"),
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/LeftSidebarOverlayController.kt"
+        ).readText()
+
+        assertTrue(source.contains("internal fun LeftSidebarFullScreen(onBack: () -> Unit)"))
+        assertFalse(source.contains("private fun LeftSidebarFullScreen(onBack: () -> Unit)"))
+        assertTrue(source.contains("setContent { LeftSidebarFullScreen(onBack = ::dismiss) }"))
     }
 }

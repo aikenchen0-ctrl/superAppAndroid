@@ -57,7 +57,7 @@ internal const val QuickPhraseStatusBarHeightDp = 30
 internal fun quickPhraseEnterOffsetDirection(): Int = 1
 
 /** 测试流程：点击左上返回，确认全屏实体按要求向下方退出。 */
-internal fun quickPhraseExitOffsetDirection(): Int = 1
+internal fun quickPhraseExitOffsetDirection(): Int = -1
 
 internal enum class QuickPhraseFullScreenTab(val label: String) {
     Recent("常用"),

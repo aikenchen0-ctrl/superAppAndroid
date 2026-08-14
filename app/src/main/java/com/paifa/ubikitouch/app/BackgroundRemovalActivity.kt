@@ -3,7 +3,6 @@ package com.paifa.ubikitouch.app
 import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,7 +20,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Security
@@ -30,7 +28,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -48,16 +45,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.paifa.ubikitouch.accessibility.FloatingChatBackgroundRemovalBridge
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 
 class BackgroundRemovalActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { BackgroundRemovalScreen(onBack = ::finish) }
-    }
-
-    override fun onDestroy() {
-        if (!isChangingConfigurations) FloatingChatBackgroundRemovalBridge.notifyClosed()
-        super.onDestroy()
+        // 兼容旧 Activity 深链：实际页面由聊天根的 BottomPanelMode 承载，禁止创建第二个 Window。
+        // 测试流程：从旧入口启动后，确认直接打开已有悬浮聊天内的智能抠图工作区。
+        FloatingChatBackgroundRemovalBridge.open()
+        finish()
     }
 }
 
@@ -74,9 +70,8 @@ private fun BackgroundRemovalScreen(onBack: () -> Unit) {
     val preferences = context.getSharedPreferences(BackgroundRemovalPreferences, Context.MODE_PRIVATE)
     var enabled by rememberSaveable { mutableStateOf(preferences.getBoolean(AutomaticRemovalKey, false)) }
 
-    Column(Modifier.fillMaxSize().background(Color(0xFFF2F7F5))) {
-        Spacer(Modifier.height(30.dp))
-        BackgroundRemovalToolbar(onBack)
+    Column(Modifier.fillMaxSize().background(Color.Transparent)) {
+        FloatingWorkspaceTopAppBar(title = "智能抠图", onBack = onBack)
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -115,16 +110,6 @@ private fun BackgroundRemovalScreen(onBack: () -> Unit) {
                 textAlign = TextAlign.Center
             )
         }
-    }
-}
-
-@Composable
-private fun BackgroundRemovalToolbar(onBack: () -> Unit) {
-    Box(Modifier.fillMaxWidth().height(56.dp).background(Color.White)) {
-        IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp)) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = RemovalPrimary)
-        }
-        Text("智能抠图", Modifier.align(Alignment.Center), color = RemovalPrimary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 

@@ -6,8 +6,6 @@ import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.accessibility.floatingchat.account.*
 import com.paifa.ubikitouch.accessibility.floatingchat.input.*
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AiVoiceCoordinator
-import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.aiVoiceEnterOffsetDirection
-import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.aiVoiceExitOffsetDirection
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AiVoiceApiConfig
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AiVoiceCallRuntime
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AndroidAiVoiceAudioEngine
@@ -61,14 +59,6 @@ import com.paifa.ubikitouch.accessibility.floatingchat.shell.FloatingChatConvers
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.FloatingChatInternalEdgeGestureDefaults
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.FloatingChatOverlayRuntimeState
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.FloatingChatPreviewChromeEffects
-import com.paifa.ubikitouch.accessibility.floatingchat.shell.aiAssistantEnterOffsetDirection
-import com.paifa.ubikitouch.accessibility.floatingchat.shell.aiAssistantExitOffsetDirection
-import com.paifa.ubikitouch.accessibility.floatingchat.shell.uiComponentsEnterOffsetDirection
-import com.paifa.ubikitouch.accessibility.floatingchat.shell.uiComponentsExitOffsetDirection
-import com.paifa.ubikitouch.accessibility.floatingchat.shell.miniProgramEnterOffsetDirection
-import com.paifa.ubikitouch.accessibility.floatingchat.shell.miniProgramExitOffsetDirection
-import com.paifa.ubikitouch.accessibility.floatingchat.shell.reviewRequestsEnterOffsetDirection
-import com.paifa.ubikitouch.accessibility.floatingchat.shell.reviewRequestsExitOffsetDirection
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.floatingChatFrostedBackdrop
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.floatingChatOverlayGestureBinding
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.isCenteredToolFeaturePanel
@@ -210,6 +200,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
@@ -310,6 +301,8 @@ import com.paifa.ubikitouch.core.model.FloatingChatVisibilityScope
 import com.paifa.ubikitouch.core.model.GestureData
 import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingChatExpandedBottomGestureBar
 import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingChatRuntimeSections
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceMotion
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingChatHeaderIcon
 import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingChatUnreadDot
 import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingChatImageActionPill
@@ -437,106 +430,56 @@ internal fun FloatingChatWorkspaceHeader(
     onScanClick: () -> Unit,
     onAddFriendClick: () -> Unit
 ) {
-    val compactOffset by animateFloatAsState(
-        targetValue = if (state.compact) -76f else 0f,
-        animationSpec = tween(durationMillis = 180),
-        label = "floating-chat-header-compact"
-    )
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height((chatStatusBarHeightDp() + chatToolbarHeightDp()).dp)
-            .background(OverlayTokens.toolbarSurface)
-            .padding(start = 8.dp, top = chatStatusBarHeightDp().dp, end = 8.dp)
-            .clipToBounds(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(
-            modifier = Modifier
-                .graphicsLayer {
-                    translationX = compactOffset.dp.toPx()
-                    alpha = if (state.compact) 0f else 1f
-                }
-                .clickable(onClick = onLeadingClick)
-                .padding(horizontal = 4.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = state.leadingLabel,
-                tint = OverlayTokens.panelPrimaryText,
-                modifier = Modifier.size(17.dp)
-            )
+    // 未回消息总览、单账号会话与普通会话均复用 UI组件 的透明 M3 工具栏。
+    // 测试流程：从全部未回消息或具体账号页面打开后确认 30dp 位于 AppBar 内，点击搜索/扫码继续进入同一根工作区。
+    FloatingWorkspaceTopAppBar(
+        title = state.title,
+        onBack = onLeadingClick,
+        actions = {
+            if (state.showUnreadDot) {
+                FloatingChatUnreadDot()
+            }
             Text(
-                text = state.leadingLabel,
-                color = OverlayTokens.panelPrimaryText,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1
-            )
-            if (state.showUnreadDot) FloatingChatUnreadDot()
-        }
-        Row(
-            modifier = Modifier
-                .weight(1f)
-                .graphicsLayer { translationX = compactOffset.dp.toPx() }
-                .padding(start = 6.dp, end = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = state.title,
-                modifier = Modifier.weight(1f),
-                color = OverlayTokens.panelPrimaryText,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(
-                    text = accountName,
+                text = accountName,
                 modifier = Modifier.width(62.dp),
-                color = OverlayTokens.panelSecondaryText,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
+                fontWeight = FontWeight.Normal,
                 textAlign = TextAlign.End,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            if (state.showEdit) {
-                FloatingChatHeaderIcon(
-                    imageVector = Icons.Filled.Edit,
-                    contentDescription = "编辑会话备注",
-                    onClick = onEditClick
-                )
+            if (state.showEdit && onEditClick != null) {
+                IconButton(onClick = onEditClick) {
+                    Icon(
+                        imageVector = Icons.Filled.Edit,
+                        contentDescription = "编辑会话备注"
+                    )
+                }
             }
-            FilledTonalIconButton(
-                onClick = onSearchClick,
-                modifier = Modifier.size(40.dp)
-            ) {
+            IconButton(onClick = onSearchClick) {
                 Icon(
                     imageVector = Icons.Filled.Search,
-                    contentDescription = "搜索聊天记录",
-                    modifier = Modifier.size(20.dp)
+                    contentDescription = "搜索聊天记录"
                 )
             }
-            FilledTonalIconButton(
-                onClick = onScanClick,
-                modifier = Modifier.size(40.dp)
-            ) {
+            IconButton(onClick = onScanClick) {
                 Icon(
                     imageVector = Icons.Filled.QrCodeScanner,
-                    contentDescription = "扫一扫与添加朋友",
-                    modifier = Modifier.size(20.dp)
+                    contentDescription = "扫一扫与添加朋友"
                 )
             }
         }
-    }
+    )
+}
+
+/**
+ * UI：未回消息总览和账号未回消息以透明工作区承载，严格复用 UI组件 的根背景语义。
+ * 测试流程：分别进入两类未回消息页，确认宿主应用仍可透过页面背景自然衔接；普通会话保留用户配置的磨砂背景。
+ */
+internal fun floatingChatRouteUsesTransparentWorkspaceRoot(route: ChatNavigationRoute): Boolean {
+    return route == ChatNavigationRoute.AllAccountsUnread ||
+        route == ChatNavigationRoute.SingleAccountUnread
 }
 
 @Composable
@@ -599,6 +542,13 @@ internal fun FloatingChatOverlay(
     var contactsOpenAddFriend by remember { mutableStateOf(false) }
     var displayedContactsOpenAddFriend by remember { mutableStateOf(false) }
     val bottomPanelVisibility = remember { MutableTransitionState(false) }
+    val workspaceRequest = runtimeState.workspaceRequest
+    LaunchedEffect(workspaceRequest?.token) {
+        workspaceRequest?.let { request ->
+            bottomPanelMode = request.mode
+            runtimeState.clearWorkspaceRequest(request.token)
+        }
+    }
     val imeInsets = WindowInsets.ime
     val imeVisible by remember(imeInsets, density) {
         derivedStateOf { imeInsets.getBottom(density) > 0 }
@@ -1452,7 +1402,8 @@ internal fun FloatingChatOverlay(
                 onBackGestureCancel = onBackGestureCancel
             )
             .floatingChatFrostedBackdrop(
-                enabled = frostedBackgroundEnabled,
+                enabled = frostedBackgroundEnabled &&
+                    !floatingChatRouteUsesTransparentWorkspaceRoot(chatNavigationState.route),
                 opacityPercent = backgroundOpacityPercent,
                 blurRadiusDp = blurRadiusDp,
                 backgroundColorRgb = backgroundColorRgb
@@ -1520,6 +1471,12 @@ internal fun FloatingChatOverlay(
                 } else {
                     bottomPanelMode = BottomPanelMode.SplitBill
                 }
+            },
+            // 复用既有 GroupInfoHost，避免新增 Dialog、Activity 或 Window 而触发 BadTokenException。
+            onGroupInfoClick = {
+                groupInfoTargetForThread(displayConversation, selectedThread)?.let { group ->
+                    contactEditorTarget = ContactEditorTarget.Group(group)
+                } ?: Toast.makeText(context, "请先进入群聊后查看群信息", Toast.LENGTH_SHORT).show()
             },
             bubbleAppearance = bubbleAppearance,
             onBubbleAppearanceToggle = { bubbleAppearance = bubbleAppearance.toggle() },
@@ -1705,14 +1662,6 @@ internal fun FloatingChatOverlay(
         panelContent = {
         if (bottomPanelVisibility.currentState || bottomPanelVisibility.targetState) {
             val displayedPanelIsBottomDrawer = displayedBottomPanelMode.isBottomComposerDrawer()
-            val displayedPanelIsAiAssistant = displayedBottomPanelMode == BottomPanelMode.Assistant
-            val displayedPanelIsAiVoice = displayedBottomPanelMode == BottomPanelMode.AiVoice
-            val displayedPanelIsUiComponents = displayedBottomPanelMode == BottomPanelMode.UiComponents
-            val displayedPanelIsMiniProgram = displayedBottomPanelMode == BottomPanelMode.MiniProgram
-            val displayedPanelIsReviewRequests = displayedBottomPanelMode == BottomPanelMode.ReviewRequests
-            val displayedPanelIsQuickPhrase = displayedBottomPanelMode == BottomPanelMode.QuickPhrase
-             val displayedPanelIsGallery = displayedBottomPanelMode == BottomPanelMode.Gallery
-             val displayedPanelIsVoice = displayedBottomPanelMode == BottomPanelMode.Voice
             AnimatedVisibility(
                 modifier = if (displayedPanelIsBottomDrawer) {
                     Modifier.align(Alignment.BottomCenter)
@@ -1720,47 +1669,12 @@ internal fun FloatingChatOverlay(
                     Modifier.fillMaxSize()
                 },
                 visibleState = bottomPanelVisibility,
+                // 所有全屏 iconButton 工作区从同一实体根节点运动，禁止按页面叠加第二套动画。
                 enter = slideInVertically(initialOffsetY = { height ->
-                     height * if (displayedPanelIsAiAssistant) {
-                        aiAssistantEnterOffsetDirection()
-                    } else if (displayedPanelIsAiVoice) {
-                        aiVoiceEnterOffsetDirection()
-                    } else if (displayedPanelIsUiComponents) {
-                        uiComponentsEnterOffsetDirection()
-                    } else if (displayedPanelIsMiniProgram) {
-                        miniProgramEnterOffsetDirection()
-                    } else if (displayedPanelIsReviewRequests) {
-                        reviewRequestsEnterOffsetDirection()
-                    } else if (displayedPanelIsQuickPhrase) {
-                        quickPhraseEnterOffsetDirection()
-                     } else if (displayedPanelIsGallery) {
-                         galleryEnterOffsetDirection()
-                     } else if (displayedPanelIsVoice) {
-                         voiceMessageEnterOffsetDirection()
-                     } else {
-                        1
-                    }
+                    height * FloatingWorkspaceMotion.EnterOffsetDirection
                 }) + fadeIn(),
                 exit = slideOutVertically(targetOffsetY = { height ->
-                    height * if (displayedPanelIsAiAssistant) {
-                        aiAssistantExitOffsetDirection()
-                    } else if (displayedPanelIsAiVoice) {
-                        aiVoiceExitOffsetDirection()
-                    } else if (displayedPanelIsUiComponents) {
-                        uiComponentsExitOffsetDirection()
-                    } else if (displayedPanelIsMiniProgram) {
-                        miniProgramExitOffsetDirection()
-                    } else if (displayedPanelIsReviewRequests) {
-                        reviewRequestsExitOffsetDirection()
-                    } else if (displayedPanelIsQuickPhrase) {
-                        quickPhraseExitOffsetDirection()
-                     } else if (displayedPanelIsGallery) {
-                         galleryExitOffsetDirection()
-                     } else if (displayedPanelIsVoice) {
-                         voiceMessageExitOffsetDirection()
-                     } else {
-                        1
-                    }
+                    height * FloatingWorkspaceMotion.ExitOffsetDirection
                 }) + fadeOut()
             ) {
             Box(

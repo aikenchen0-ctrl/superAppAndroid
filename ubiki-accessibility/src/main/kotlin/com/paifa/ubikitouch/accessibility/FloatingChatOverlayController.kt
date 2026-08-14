@@ -44,7 +44,9 @@ import com.paifa.ubikitouch.accessibility.floatingchat.chat.toPrototypeToolSelec
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.navigationStateAfterOutgoingMessage
 import com.paifa.ubikitouch.accessibility.floatingchat.moments.toAppMomentPost
 import com.paifa.ubikitouch.accessibility.floatingchat.moments.toLocalMomentPost
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceMotion
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.FloatingChatOverlayRuntimeState
+import com.paifa.ubikitouch.accessibility.floatingchat.shell.BottomPanelMode
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.floatingChatInternalEdgeGestureTouchTargetDp
 import com.paifa.ubikitouch.accessibility.scrm.ScrmAdminBootstrapResult
 import com.paifa.ubikitouch.accessibility.scrm.ScrmAuthenticationException
@@ -222,7 +224,18 @@ internal class FloatingChatOverlayController(
     }
 
     /**
-     * 收起当前全屏聊天根视图；先执行实体 View 向下退出动画，再恢复悬浮按钮尺寸。
+     * 统一从右侧 iconButton 或兼容 Activity 入口打开全屏工作区。
+     * 测试流程：先收起聊天后依次请求 OpenAPI、智能抠图，确认仍由同一个 ComposeView 从底部进入。
+     */
+    fun openWorkspace(mode: BottomPanelMode) {
+        mainHandler.post {
+            expand()
+            runtimeState.requestWorkspace(mode)
+        }
+    }
+
+    /**
+     * 收起当前全屏聊天根视图；先执行实体 View 向顶部退出动画，再恢复悬浮按钮尺寸。
      * 测试流程：在未读总览和具体账户会话分别收起，确认动画完成后窗口才变为折叠态。
      */
     fun collapse() {
@@ -520,6 +533,11 @@ internal class FloatingChatOverlayController(
             }
             return
         }
+        val previousState = state
+        val shouldAnimateEntrance = shouldAnimateFloatingChatEntrance(
+            previousState = previousState,
+            nextState = nextState
+        )
         if (
             !force &&
             nextState == FloatingChatOverlayState.Expanded &&
@@ -534,11 +552,11 @@ internal class FloatingChatOverlayController(
             dismissView()
         }
         dismissView()
-        updateOverlayState(nextState)
-        if (nextState == FloatingChatOverlayState.Collapsed) return
+        if (nextState == FloatingChatOverlayState.Collapsed) {
+            updateOverlayState(nextState)
+            return
+        }
         val owner = AccessibilityOverlayComposeOwner()
-        val shouldAnimateEntrance = nextState == FloatingChatOverlayState.Expanded &&
-            state != FloatingChatOverlayState.Expanded
         val view = ComposeView(context).apply {
             setViewTreeLifecycleOwner(owner)
             setViewTreeSavedStateRegistryOwner(owner)
@@ -548,7 +566,9 @@ internal class FloatingChatOverlayController(
                 systemUiVisibility = expandedSystemUiVisibility(previewVisible = false)
             }
             if (shouldAnimateEntrance) {
-                translationY = expandedAnimationDistance(this)
+                translationY = FloatingWorkspaceMotion.enterTranslationY(
+                    expandedAnimationHeightPx(this)
+                )
             }
             setContent {
                 when (nextState) {
@@ -1528,7 +1548,7 @@ internal class FloatingChatOverlayController(
 
     /**
      * 完全关闭聊天悬浮根视图；退出动画结束后移除无障碍窗口，避免视觉瞬移。
-     * 测试流程：从两类聊天界面返回或服务关闭，确认真实 View 向下退场且无 BadToken 异常。
+     * 测试流程：从两类聊天界面返回或服务关闭，确认真实 View 向顶部退场且无 BadToken 异常。
      */
     fun dismiss() {
         val view = composeView
@@ -1566,13 +1586,18 @@ internal class FloatingChatOverlayController(
         previewChromeVisible = false
     }
 
-    /** 展开聊天根视图时，使用真实 View 属性从屏幕底部滑入，未读总览和具体账户共用此入口。 */
+    /**
+     * UI：未回消息总览和具体账户会话复用 UI组件 的入场运动规范。
+     * 测试流程：主界面按钮和无障碍手势分别展开，确认真实 ComposeView 从底部进入。
+     */
     private fun animateExpandedEntrance(view: View) {
         if (!view.isAttachedToWindow) return
         view.post {
             if (!view.isAttachedToWindow) return@post
             if (view.translationY == 0f) {
-                view.translationY = expandedAnimationDistance(view)
+                view.translationY = FloatingWorkspaceMotion.enterTranslationY(
+                    expandedAnimationHeightPx(view)
+                )
             }
             view.animate()
                 .translationY(0f)
@@ -1582,12 +1607,15 @@ internal class FloatingChatOverlayController(
         }
     }
 
-    /** 关闭聊天根视图时，先让真实 View 向下退出，再执行窗口收起或移除。 */
+    /**
+     * UI：未回消息总览和具体账户会话复用 UI组件 的退场运动规范。
+     * 测试流程：点击顶部返回或触发收起后，确认真实 ComposeView 完成退场后才收起窗口。
+     */
     private fun animateExpandedExit(view: View, onFinished: () -> Unit): Boolean {
         if (!view.isAttachedToWindow) return false
         expandedExitAnimationRunning = true
         view.animate()
-            .translationY(expandedAnimationDistance(view))
+            .translationY(FloatingWorkspaceMotion.exitTranslationY(expandedAnimationHeightPx(view)))
             .setDuration(FloatingChatOverlayAnimationDurationMillis)
             .setInterpolator(android.view.animation.AccelerateInterpolator())
             .withEndAction {
@@ -1598,11 +1626,8 @@ internal class FloatingChatOverlayController(
         return true
     }
 
-    private fun expandedAnimationDistance(view: View): Float {
-        return maxOf(
-            view.height.toFloat(),
-            context.resources.displayMetrics.heightPixels.toFloat()
-        )
+    private fun expandedAnimationHeightPx(view: View): Int {
+        return maxOf(view.height, context.resources.displayMetrics.heightPixels)
     }
 
     private fun hideExpandedViewForCollapse(): Boolean {
@@ -1870,6 +1895,15 @@ private fun logFloatingChatMetadata(
 private enum class FloatingChatOverlayState {
     Collapsed,
     Expanded
+}
+
+/** 首次挂载全屏聊天根时，必须在发布 Expanded 状态前确定是否播放入场动画。 */
+private fun shouldAnimateFloatingChatEntrance(
+    previousState: FloatingChatOverlayState,
+    nextState: FloatingChatOverlayState
+): Boolean {
+    return previousState != FloatingChatOverlayState.Expanded &&
+        nextState == FloatingChatOverlayState.Expanded
 }
 
 private const val FloatingChatOverlayAnimationDurationMillis = 260L

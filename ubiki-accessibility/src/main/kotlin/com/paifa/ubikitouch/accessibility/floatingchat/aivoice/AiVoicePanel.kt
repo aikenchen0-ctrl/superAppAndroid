@@ -50,11 +50,13 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 
 /** Full-screen M3 voice-assistant workspace. Test: open the right-rail voice entry, then use Back to exit. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -72,27 +74,15 @@ internal fun AiVoicePanel(
     var configExpanded by remember { mutableStateOf(false) }
     Column(
         modifier = modifier
-            .fillMaxSize(),
+            .fillMaxSize()
+            .background(Color.Transparent),
         verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing)
     ) {
-        Box(modifier = Modifier.fillMaxWidth().height(30.dp))
-        TopAppBar(
-            title = {
-                Text(
-                    text = "语音助手",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Normal
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = {
-                    if (state == AiVoiceState.Menu) onClose() else onEvent(AiVoiceEvent.BackRequested)
-                }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            },
-            colors = TopAppBarDefaults.topAppBarColors()
+        // UI：右侧语音助手复用 UI组件 工具栏，状态区由 toolbar 顶部 padding 统一处理。
+        // 测试流程：点击语音助手确认自下向上进入，在菜单点击左上返回确认向顶部退出。
+        FloatingWorkspaceTopAppBar(
+            title = "语音助手",
+            onBack = { if (state == AiVoiceState.Menu) onClose() else onEvent(AiVoiceEvent.BackRequested) }
         )
         if (state is AiVoiceState.RealtimeCall) {
             RealtimeCallPanel(state, onEvent, tokens, Modifier.weight(1f).padding(tokens.panelPadding))

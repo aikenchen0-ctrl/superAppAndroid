@@ -1,8 +1,6 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.tools
 
 import android.content.Context
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,9 +33,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,14 +42,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import kotlinx.coroutines.launch
-
-private const val SideEffectAnimationDurationMillis = 260
 
 private data class SideEffectTemplate(val title: String, val subtitle: String)
 private data class SideEffectSettings(val templateIndex: Int, val fillColor: Long, val strokeColor: Long)
@@ -99,27 +92,11 @@ internal fun SideEffectFullScreen(onBack: () -> Unit) {
     var settings by remember { mutableStateOf(store.load()) }
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState { 2 }
-    var heightPx by remember { mutableFloatStateOf(0f) }
-    var entered by remember { mutableStateOf(false) }
-    val translationY = remember { Animatable(0f) }
-    LaunchedEffect(heightPx) {
-        if (heightPx > 0f && !entered) {
-            translationY.snapTo(heightPx)
-            translationY.animateTo(0f, tween(SideEffectAnimationDurationMillis))
-            entered = true
-        }
-    }
     fun update(next: SideEffectSettings) { settings = next; store.save(next) }
-    fun close() = scope.launch {
-        if (heightPx > 0f) translationY.animateTo(heightPx, tween(SideEffectAnimationDurationMillis))
-        onBack()
-    }
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).onSizeChanged { heightPx = it.height.toFloat() }.graphicsLayer { this.translationY = translationY.value }) {
-        Spacer(Modifier.height(30.dp))
-        TopAppBar(
-            title = { Text("侧边特效", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Normal) },
-            navigationIcon = { IconButton(onClick = ::close) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") } }
-        )
+    Column(Modifier.fillMaxSize().background(Color.Transparent)) {
+        // UI：右侧边缘特效复用 UI组件 工具栏和全屏工作区坐标系。
+        // 测试流程：点击边缘特效确认自下向上进入，点击左上返回确认向顶部退出。
+        FloatingWorkspaceTopAppBar(title = "侧边特效", onBack = onBack)
         PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
             listOf("特效模板", "颜色配置").forEachIndexed { index, title ->
                 Tab(selected = pagerState.currentPage == index, onClick = { scope.launch { pagerState.animateScrollToPage(index) } }, text = { Text(title, fontWeight = FontWeight.Normal) })

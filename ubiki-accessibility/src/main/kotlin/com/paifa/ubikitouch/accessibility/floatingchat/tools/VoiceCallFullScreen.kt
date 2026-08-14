@@ -53,12 +53,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 
 internal const val VoiceCallStatusBarHeightDp = 30
 private const val VoiceCallAnimationDurationMillis = 260
@@ -113,7 +115,7 @@ internal fun VoiceCallFullScreen(
         if (exiting) return
         exiting = true
         scope.launch {
-            pageTranslationY.animateTo(pageHeightPx, tween(VoiceCallAnimationDurationMillis))
+            pageTranslationY.animateTo(-pageHeightPx, tween(VoiceCallAnimationDurationMillis))
             if (recordCall) onEndCall(elapsedSeconds)
             onBack()
         }
@@ -122,25 +124,13 @@ internal fun VoiceCallFullScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
+            .background(Color.Transparent)
             .onSizeChanged { pageHeightPx = it.height.toFloat() }
             .graphicsLayer { translationY = pageTranslationY.value }
     ) {
-        Spacer(Modifier.height(VoiceCallStatusBarHeightDp.dp))
-        TopAppBar(
-            title = {
-                Text(
-                    text = if (isGroup) "群语音通话" else "语音通话",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Normal
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = { closeWithExitAnimation(recordCall = false) }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            }
+        FloatingWorkspaceTopAppBar(
+            title = if (isGroup) "群语音通话" else "语音通话",
+            onBack = { closeWithExitAnimation(recordCall = false) }
         )
         PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
             VoiceCallTab.entries.forEachIndexed { index, tab ->

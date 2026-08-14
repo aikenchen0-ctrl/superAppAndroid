@@ -16,7 +16,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CheckCircle
@@ -35,7 +34,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -44,7 +42,6 @@ import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -57,9 +54,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopBarDefaults
 import kotlinx.coroutines.launch
 
-internal const val UiComponentsStatusBarHeightDp = 30
+internal const val UiComponentsStatusBarHeightDp = FloatingWorkspaceTopBarDefaults.StatusBarTopPaddingDp
 
 internal enum class UiComponentsFullScreenTab(val label: String) {
     Operation("操作组件"),
@@ -97,22 +96,7 @@ internal fun UiComponentsFullScreen(onBack: () -> Unit) {
 
     Column(modifier = Modifier.fillMaxSize()) {
         // 将悬浮状态区内嵌到工具栏顶部 padding，避免独立空白区域造成页面跳变。
-        TopAppBar(
-            modifier = Modifier.padding(top = UiComponentsStatusBarHeightDp.dp),
-            title = {
-                Text(
-                    text = "UI组件",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Normal
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            }
-        )
+        FloatingWorkspaceTopAppBar(title = "UI组件", onBack = onBack)
         PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
             UiComponentsFullScreenTab.entries.forEachIndexed { index, tab ->
                 Tab(

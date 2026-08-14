@@ -54,7 +54,7 @@ private const val GalleryAnimationDurationMillis = 240
 internal fun galleryEnterOffsetDirection(): Int = 1
 
 /** 测试流程：点击左上返回后确认全屏页面自上向下退出。 */
-internal fun galleryExitOffsetDirection(): Int = 1
+internal fun galleryExitOffsetDirection(): Int = -1
 
 internal enum class GalleryFullScreenTab(val label: String) {
     Images("图片"),

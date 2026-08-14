@@ -45,6 +45,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -52,6 +53,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import kotlinx.coroutines.launch
 
@@ -133,18 +135,23 @@ private enum class FriendManagementTab(val label: String) { Requests("申请"), 
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
-private fun FriendManagementFullscreenScreen(onBack: () -> Unit) {
+internal fun FriendManagementFullscreenScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val pager = rememberPagerState { FriendManagementTab.entries.size }
     var refreshToken by androidx.compose.runtime.remember { mutableIntStateOf(0) }
     val snapshot = FloatingChatFriendManagementBridge.snapshot
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
-        Spacer(Modifier.height(friendManagementStatusBarHeightDp().dp))
-        Box(Modifier.fillMaxWidth().height(56.dp)) {
-            IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
-            Text("好友管理", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Normal, modifier = Modifier.align(Alignment.Center))
-            IconButton(onClick = { FloatingChatFriendManagementBridge.refresh(); refreshToken++ }, modifier = Modifier.align(Alignment.CenterEnd)) { Icon(Icons.Filled.Refresh, "刷新") }
-        }
+    Column(Modifier.fillMaxSize().background(Color.Transparent)) {
+        // UI：好友管理复用 UI组件 的透明 M3 工具栏，顶部 30dp 由工具栏 Insets 承载。
+        // 测试流程：从右侧打开好友管理，刷新后切换分页，再从左上返回确认根动画关闭。
+        FloatingWorkspaceTopAppBar(
+            title = "好友管理",
+            onBack = onBack,
+            actions = {
+                IconButton(onClick = { FloatingChatFriendManagementBridge.refresh(); refreshToken++ }) {
+                    Icon(Icons.Filled.Refresh, "刷新")
+                }
+            }
+        )
         PrimaryTabRow(selectedTabIndex = pager.currentPage) {
             FriendManagementTab.entries.forEachIndexed { index, tab -> Tab(selected = pager.currentPage == index, onClick = { scope.launch { pager.animateScrollToPage(index) } }, text = { Text(tab.label, fontWeight = FontWeight.Normal) }) }
         }

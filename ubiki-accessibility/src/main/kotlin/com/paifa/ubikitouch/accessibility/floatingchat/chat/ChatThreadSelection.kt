@@ -3,6 +3,7 @@ package com.paifa.ubikitouch.accessibility.floatingchat.chat
 import com.paifa.ubikitouch.accessibility.data.localThreadIdForSelection
 import com.paifa.ubikitouch.core.model.FloatingChatConnectionTarget
 import com.paifa.ubikitouch.core.model.FloatingChatContact
+import com.paifa.ubikitouch.core.model.FloatingChatConversation
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import com.paifa.ubikitouch.core.model.FloatingChatPrototype
 
@@ -49,6 +50,16 @@ internal fun ChatThreadSelection.toPrototypeToolSelection(): FloatingChatPrototy
 
 internal fun ChatThreadSelection.isGroupThread(): Boolean {
     return this is ChatThreadSelection.Group || this is ChatThreadSelection.GroupChat
+}
+
+/** 右侧“群信息”入口只允许打开当前选中的群聊资料。 */
+internal fun groupInfoTargetForThread(
+    conversation: FloatingChatConversation,
+    selection: ChatThreadSelection
+): FloatingChatContact? = when (selection) {
+    ChatThreadSelection.Group -> conversation.groupContacts.firstOrNull()
+    is ChatThreadSelection.GroupChat -> conversation.groupContacts.firstOrNull { it.id == selection.groupId }
+    is ChatThreadSelection.Private -> null
 }
 
 internal fun ChatThreadSelection.groupConnectorId(): String {

@@ -18,6 +18,7 @@ internal class FloatingChatOverlayRuntimeState {
     var previewVisible by mutableStateOf(false)
     var mediaActionSheetVisible by mutableStateOf(false)
     var dismissSignal by mutableStateOf(0L)
+    var workspaceRequest by mutableStateOf<FloatingChatWorkspaceRequest?>(null)
     var chatNavigationState by mutableStateOf(ChatNavigationState())
     var selectedThread: ChatThreadSelection
         get() = chatNavigationState.selectedThread
@@ -38,6 +39,21 @@ internal class FloatingChatOverlayRuntimeState {
 
     fun requestDismiss() {
         dismissSignal += 1L
+    }
+
+    /**
+     * 将外部入口切换请求交回已挂载的聊天根视图，避免通过 Activity 或第二个 Window 附加页面。
+     * 测试流程：从 OpenAPI、智能抠图等入口触发后，确认同一悬浮聊天根显示对应全屏工作区。
+     */
+    fun requestWorkspace(mode: BottomPanelMode) {
+        val nextToken = (workspaceRequest?.token ?: 0L) + 1L
+        workspaceRequest = FloatingChatWorkspaceRequest(token = nextToken, mode = mode)
+    }
+
+    fun clearWorkspaceRequest(token: Long) {
+        if (workspaceRequest?.token == token) {
+            workspaceRequest = null
+        }
     }
 
     fun deliverPickedMedia(
@@ -177,6 +193,12 @@ internal class FloatingChatOverlayRuntimeState {
         previewVisible = false
     }
 }
+
+/** 单次工作区请求使用 token，避免 Compose 重组重复打开已消费的页面。 */
+internal data class FloatingChatWorkspaceRequest(
+    val token: Long,
+    val mode: BottomPanelMode
+)
 
 internal data class FloatingChatPickedMediaEvent(
     val token: Long,

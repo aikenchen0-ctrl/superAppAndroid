@@ -57,7 +57,7 @@ internal const val TransferStatusBarHeightDp = 30
 internal fun transferEnterOffsetDirection(): Int = 1
 
 /** 测试流程：点击左上角返回，确认全屏实体向顶部下方退出后才关闭。 */
-internal fun transferExitOffsetDirection(): Int = 1
+internal fun transferExitOffsetDirection(): Int = -1
 
 internal enum class TransferFullScreenTab(val label: String) {
     Compose("转账"),
