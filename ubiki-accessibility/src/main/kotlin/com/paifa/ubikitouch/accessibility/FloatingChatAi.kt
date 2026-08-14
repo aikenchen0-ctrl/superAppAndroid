@@ -48,6 +48,19 @@ internal val FloatingChatAiConfig.isConfigured: Boolean
         apiKey.trim().isNotEmpty() &&
         model.trim().isNotEmpty()
 
+internal class FloatingChatAiHttpException(
+    val statusCode: Int,
+    detail: String
+) : IllegalStateException("AI request failed: HTTP $statusCode ${detail.take(240)}")
+
+internal fun floatingChatAiFailureMessage(statusCode: Int?, detail: String): String {
+    return when (statusCode) {
+        401 -> "AI API Key 无效或已失效，请更新后重试"
+        403 -> "当前 API Key 没有使用 AI 服务的权限"
+        else -> detail.ifBlank { "AI 服务请求失败，请检查网络和配置" }
+    }
+}
+
 internal enum class FloatingChatAiDraftAction(val label: String) {
     Edit("\u7f16\u8f91\u8349\u7a3f"),
     Regenerate("\u91cd\u65b0\u751f\u6210"),
@@ -126,6 +139,14 @@ internal fun floatingChatAiCompletionsEndpoint(config: FloatingChatAiConfig): St
         trimmed.endsWith("/chat/completions", ignoreCase = true) -> trimmed
         trimmed.endsWith("/v1", ignoreCase = true) -> "$trimmed/chat/completions"
         else -> "$trimmed/v1/chat/completions"
+    }
+}
+
+internal fun floatingChatAiModelsEndpoint(config: FloatingChatAiConfig): String {
+    val trimmed = config.baseUrl.trim().trimEnd('/')
+    return when {
+        trimmed.endsWith("/v1", ignoreCase = true) -> "$trimmed/models"
+        else -> "$trimmed/v1/models"
     }
 }
 
@@ -273,6 +294,7 @@ internal fun buildFloatingChatAiChatCompletionsBody(
         append(normalized.temperature.toString())
         append(",\"max_tokens\":")
         append(normalized.maxTokens.toString())
+        append(",\"stream\":true")
         append('}')
     }
 }
@@ -398,7 +420,7 @@ internal class FloatingChatAiClient(
             } else {
                 val errorText = connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
                     ?: ""
-                throw IllegalStateException("AI request failed: HTTP $statusCode ${errorText.take(240)}")
+                throw FloatingChatAiHttpException(statusCode, errorText)
             }
             parseFloatingChatAiDraftResponse(responseText)
         } finally {
@@ -412,6 +434,41 @@ internal class FloatingChatAiClient(
             draftPrompt = buildFloatingChatAiConfigTestPrompt()
         )
     }
+
+    fun listModels(config: FloatingChatAiConfig): List<String> {
+        require(config.isConfigured) { "AI config is incomplete." }
+
+        val connection = URL(floatingChatAiModelsEndpoint(config)).openConnection() as HttpURLConnection
+        return try {
+            connection.requestMethod = "GET"
+            connection.connectTimeout = connectTimeoutMs
+            connection.readTimeout = readTimeoutMs
+            connection.setRequestProperty("Accept", "application/json")
+            connection.setRequestProperty("Authorization", "Bearer ${config.apiKey.trim()}")
+            val statusCode = connection.responseCode
+            val responseText = if (statusCode in 200..299) {
+                connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            } else {
+                val errorText = connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+                    ?: ""
+                throw FloatingChatAiHttpException(statusCode, errorText)
+            }
+            parseFloatingChatAiModelsResponse(responseText)
+        } finally {
+            connection.disconnect()
+        }
+    }
+}
+
+internal fun parseFloatingChatAiModelsResponse(responseText: String): List<String> {
+    val ids = Regex("\\\"id\\\"\\s*:\\s*\\\"((?:\\\\.|[^\\\"\\\\])*)\\\"")
+        .findAll(responseText)
+        .map { match -> decodeJsonString(match.groupValues[1]).trim() }
+        .filter(String::isNotBlank)
+        .distinct()
+        .toList()
+    if (ids.isEmpty()) throw IllegalStateException("AI models response contains no model ids.")
+    return ids
 }
 
 internal fun parseFloatingChatAiDraftResponse(responseText: String): String {

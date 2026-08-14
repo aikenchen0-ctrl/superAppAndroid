@@ -2,8 +2,10 @@ package com.paifa.ubikitouch.accessibility.floatingchat.aivoice
 
 import com.paifa.ubikitouch.accessibility.FloatingChatAiClient
 import com.paifa.ubikitouch.accessibility.FloatingChatAiConfig
+import com.paifa.ubikitouch.accessibility.FloatingChatAiHttpException
 import com.paifa.ubikitouch.accessibility.buildFloatingChatMessageAsidePrompt
 import com.paifa.ubikitouch.accessibility.floatingChatMessageAsideConfig
+import com.paifa.ubikitouch.accessibility.floatingChatAiFailureMessage
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.visibleMessagesForThread
 import com.paifa.ubikitouch.accessibility.floatingchat.message.MessageAsideAnalysis
@@ -90,7 +92,11 @@ internal class MessageAsideAnalysisActions(
                     onStateChanged(MessageAsideAnalysisState.Ready(message, analysis))
                 }
             }.onFailure { error ->
-                val reason = error.message?.take(120) ?: "未知错误"
+                val httpError = error as? FloatingChatAiHttpException
+                val reason = floatingChatAiFailureMessage(
+                    statusCode = httpError?.statusCode,
+                    detail = httpError?.message ?: error.message.orEmpty()
+                )
                 if (requestTracker.isActive(request)) {
                     onStateChanged(MessageAsideAnalysisState.Failed(message, "AI 分析失败：$reason"))
                 }

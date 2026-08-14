@@ -2,6 +2,7 @@ package com.paifa.ubikitouch.accessibility.floatingchat.aivoice
 
 import com.paifa.ubikitouch.accessibility.FloatingChatAiClient
 import com.paifa.ubikitouch.accessibility.FloatingChatAiConfig
+import com.paifa.ubikitouch.accessibility.FloatingChatAiHttpException
 import com.paifa.ubikitouch.accessibility.FloatingChatBlinkInputAiAction
 import com.paifa.ubikitouch.accessibility.FloatingChatBlinkInputStatusPhase
 import com.paifa.ubikitouch.accessibility.buildFloatingChatAiDraftPrompt
@@ -9,6 +10,7 @@ import com.paifa.ubikitouch.accessibility.buildFloatingChatAiInputPolishPrompt
 import com.paifa.ubikitouch.accessibility.blinkVoiceInputStatusMessageFor
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.visibleMessagesForThread
+import com.paifa.ubikitouch.accessibility.floatingChatAiFailureMessage
 import com.paifa.ubikitouch.accessibility.isConfigured
 import com.paifa.ubikitouch.core.model.FloatingChatConversation
 import kotlinx.coroutines.CoroutineScope
@@ -115,7 +117,11 @@ internal class BlinkInputAiActions(
                     FloatingChatBlinkInputAiAction.None -> Unit
                 }
             }.onFailure { error ->
-                val status = "\u0041\u0049\u5904\u7406\u5931\u8d25\uff1a${error.message?.take(80) ?: "\u672a\u77e5\u9519\u8bef"}"
+                val httpError = error as? FloatingChatAiHttpException
+                val status = floatingChatAiFailureMessage(
+                    statusCode = httpError?.statusCode,
+                    detail = httpError?.message ?: error.message.orEmpty()
+                )
                 onAiConfigStatusChanged(status)
                 onShowBlinkInputStatus(
                     blinkVoiceInputStatusMessageFor(

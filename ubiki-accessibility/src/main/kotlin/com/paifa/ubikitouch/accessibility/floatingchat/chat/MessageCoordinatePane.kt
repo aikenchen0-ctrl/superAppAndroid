@@ -35,6 +35,7 @@ import androidx.compose.ui.zIndex
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
 import com.paifa.ubikitouch.accessibility.floatingchat.message.MessageRow
 import com.paifa.ubikitouch.accessibility.floatingchat.message.BubbleAppearance
+import com.paifa.ubikitouch.accessibility.floatingchat.message.outgoingMessageCarriesName
 import com.paifa.ubikitouch.accessibility.floatingchat.components.AvatarRole
 import com.paifa.ubikitouch.accessibility.floatingchat.components.CompactAvatar
 import com.paifa.ubikitouch.accessibility.floatingchat.message.messageListBottomClearanceDp
@@ -51,6 +52,7 @@ internal fun MessageCoordinatePane(
     homeOverviewAccountColors: Map<String, Long>,
     homeOverviewAccountIdsByMessageId: Map<String, String>,
     homeOverviewMessageGroups: List<HomeOverviewMessageGroup>,
+    sendNameEnabledByAccountId: Map<String, Boolean>,
     groupMemberAvatarsVisible: Boolean,
     listState: LazyListState,
     connectorState: ConnectorCoordinateState,
@@ -102,6 +104,7 @@ internal fun MessageCoordinatePane(
                         selectedThread = selectedThread,
                         contactsById = contactsById,
                         homeOverviewAccountColors = homeOverviewAccountColors,
+                        sendNameEnabledByAccountId = sendNameEnabledByAccountId,
                         groupMemberAvatarsVisible = groupMemberAvatarsVisible,
                         onPreviewMedia = onPreviewMedia,
                         onOpenMediaActions = onOpenMediaActions,
@@ -152,6 +155,7 @@ internal fun MessageCoordinatePane(
                     onGroupMemberAvatarRemoved = {
                         connectorState.removeGroupMemberAvatar(message.id)
                     },
+                    showOwnSenderName = outgoingMessageCarriesName(message, sendNameEnabledByAccountId),
                     bubbleAppearance = bubbleAppearance
                     )
                 }
@@ -167,6 +171,7 @@ private fun HomeOverviewMessageGroupRow(
     selectedThread: ChatThreadSelection,
     contactsById: Map<String, FloatingChatContact>,
     homeOverviewAccountColors: Map<String, Long>,
+    sendNameEnabledByAccountId: Map<String, Boolean>,
     groupMemberAvatarsVisible: Boolean,
     onPreviewMedia: (FloatingChatMessage) -> Unit,
     onOpenMediaActions: (FloatingChatMessage) -> Unit,
@@ -208,6 +213,7 @@ private fun HomeOverviewMessageGroupRow(
                     onBubbleBoundsChanged = { bounds -> connectorState.updateMessageBubble(message.id, bounds) },
                     onGroupMemberAvatarBoundsChanged = {},
                     onGroupMemberAvatarRemoved = {},
+                    showOwnSenderName = outgoingMessageCarriesName(message, sendNameEnabledByAccountId),
                     bubbleAppearance = bubbleAppearance
                 )
             }

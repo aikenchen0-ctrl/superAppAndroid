@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CardGiftcard
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -54,7 +55,8 @@ import kotlinx.coroutines.delay
 
 private enum class PaymentCardKind(val label: String) {
     RedPacket("红包"),
-    Transfer("转账")
+    Transfer("转账"),
+    SplitBill("群收款")
 }
 
 @Composable
@@ -64,17 +66,20 @@ internal fun PaymentCardContent(
 ) {
     val kind = paymentCardKindFor(message.resourceUrl, message.appName, message.text) ?: PaymentCardKind.RedPacket
     val isTransfer = kind == PaymentCardKind.Transfer
-    val title = if (isTransfer) {
-        paymentCardAmountTextFor(message.text)
-    } else {
-        message.detail?.ifBlank { null } ?: "恭喜发财，大吉大利"
+    val isSplitBill = kind == PaymentCardKind.SplitBill
+    val title = when {
+        isTransfer -> paymentCardAmountTextFor(message.text)
+        isSplitBill -> splitBillAmountTextFor(message.detail)
+        else -> message.detail?.ifBlank { null } ?: "恭喜发财，大吉大利"
     }
-    val subtitle = if (isTransfer) {
-        message.detail?.ifBlank { null } ?: paymentCardTransferSubtitle()
-    } else {
-        null
+    val subtitle = when {
+        isTransfer -> message.detail?.ifBlank { null } ?: paymentCardTransferSubtitle()
+        isSplitBill -> splitBillStatusTextFor(message.detail)
+        else -> null
     }
-    val footer = if (claimed) {
+    val footer = if (isSplitBill) {
+        "群收款"
+    } else if (claimed) {
         paymentCardClaimedStatusLabel(isTransfer)
     } else if (isTransfer) {
         "转账"
@@ -96,6 +101,13 @@ internal fun PaymentCardContent(
         ) {
             if (isTransfer) {
                 TransferPaymentGlyph(modifier = Modifier.size(paymentCardGlyphSizeDp().dp))
+            } else if (isSplitBill) {
+                Icon(
+                    imageVector = Icons.Filled.Groups,
+                    contentDescription = null,
+                    tint = OverlayTokens.paymentCardText,
+                    modifier = Modifier.size(paymentCardGlyphSizeDp().dp)
+                )
             } else {
                 RedPacketPaymentGlyph(
                     modifier = Modifier.size(
@@ -115,7 +127,7 @@ internal fun PaymentCardContent(
                     weight = FontWeight.Normal,
                     color = OverlayTokens.paymentCardText,
                     lineHeight = 16.sp,
-                    maxLines = if (isTransfer) 1 else 2
+                    maxLines = if (isTransfer || isSplitBill) 1 else 2
                 )
                 subtitle?.let {
                     TextLabel(
@@ -152,8 +164,11 @@ internal fun PaymentDetailOverlay(
 ) {
     val kind = paymentCardKindFor(message.resourceUrl, message.appName, message.text) ?: PaymentCardKind.RedPacket
     val isTransfer = kind == PaymentCardKind.Transfer
+    val isSplitBill = kind == PaymentCardKind.SplitBill
     val amountText = if (isTransfer) {
         transferAmountTextFor(message.text)
+    } else if (isSplitBill) {
+        splitBillAmountTextFor(message.detail)
     } else {
         redPacketAmountTextFor(message.text)
     }
@@ -163,7 +178,7 @@ internal fun PaymentDetailOverlay(
         animationSpec = tween(durationMillis = redPacketClaimAnimationDurationMs()),
         label = "redPacketClaimProgress"
     )
-    val canClaimRedPacket = !isTransfer && redPacketCanClaimInThread(
+    val canClaimRedPacket = !isTransfer && !isSplitBill && redPacketCanClaimInThread(
         fromMe = message.fromMe,
         selectedThread = selectedThread
     )
@@ -224,6 +239,13 @@ internal fun PaymentDetailOverlay(
                                     scaleY = 1f + pulse * 0.2f
                                 }
                         )
+                    } else if (isSplitBill) {
+                        Icon(
+                            imageVector = Icons.Filled.Groups,
+                            contentDescription = null,
+                            tint = OverlayTokens.paymentCardText,
+                            modifier = Modifier.size(30.dp)
+                        )
                     } else {
                         Icon(
                             imageVector = Icons.Filled.CardGiftcard,
@@ -241,7 +263,11 @@ internal fun PaymentDetailOverlay(
                     }
                 }
                 TextLabel(
-                    text = if (isTransfer) "转账" else paymentCardRedPacketFooter(),
+                    text = when {
+                        isTransfer -> "转账"
+                        isSplitBill -> "群收款"
+                        else -> paymentCardRedPacketFooter()
+                    },
                     size = 15.sp,
                     weight = FontWeight.Normal,
                     color = OverlayTokens.panelPrimaryText,
@@ -251,6 +277,8 @@ internal fun PaymentDetailOverlay(
                 TextLabel(
                     text = if (isTransfer) {
                         message.detail?.ifBlank { null } ?: paymentCardTransferSubtitle()
+                    } else if (isSplitBill) {
+                        splitBillStatusTextFor(message.detail)
                     } else {
                         message.detail?.ifBlank { null } ?: "恭喜发财，大吉大利"
                     },
@@ -268,7 +296,17 @@ internal fun PaymentDetailOverlay(
                     maxLines = 1,
                     textAlign = TextAlign.Center
                 )
-                PaymentReadbackStatus(readback)
+                if (!isSplitBill) PaymentReadbackStatus(readback)
+                if (isSplitBill) {
+                    TextLabel(
+                        text = message.detail?.ifBlank { null } ?: "暂无收款详情",
+                        size = 11.sp,
+                        color = OverlayTokens.panelSecondaryText,
+                        maxLines = 8,
+                        lineHeight = 16.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
                 if (!isTransfer && readback.detail?.entries?.isNotEmpty() == true) {
                     Column(
                         modifier = Modifier.fillMaxWidth().background(OverlayTokens.control, RoundedCornerShape(8.dp)).padding(10.dp),
@@ -381,20 +419,22 @@ internal fun PaymentDetailOverlay(
                         textAlign = TextAlign.Center
                     )
                 }
-                Button(
-                    onClick = onRefresh,
-                    enabled = readback.state != PaymentReadbackState.LOADING,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = OverlayTokens.control,
-                        contentColor = OverlayTokens.panelPrimaryText
-                    )
-                ) {
-                    TextLabel(
-                        text = if (readback.state == PaymentReadbackState.LOADING) "查询中..." else "刷新支付状态",
-                        size = 11.sp,
-                        color = OverlayTokens.panelPrimaryText,
-                        maxLines = 1
-                    )
+                if (!isSplitBill) {
+                    Button(
+                        onClick = onRefresh,
+                        enabled = readback.state != PaymentReadbackState.LOADING,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = OverlayTokens.control,
+                            contentColor = OverlayTokens.panelPrimaryText
+                        )
+                    ) {
+                        TextLabel(
+                            text = if (readback.state == PaymentReadbackState.LOADING) "查询中..." else "刷新支付状态",
+                            size = 11.sp,
+                            color = OverlayTokens.panelPrimaryText,
+                            maxLines = 1
+                        )
+                    }
                 }
             }
         }
@@ -540,6 +580,22 @@ internal fun transferRecipientCandidatesForThread(
 
 internal fun paymentCardRedPacketFooter(): String = "红包"
 
+internal fun splitBillAmountTextFor(detail: String?): String {
+    val amount = Regex("""[¥￥]\s*([0-9]+(?:\.[0-9]{1,2})?)""")
+        .find(detail.orEmpty())
+        ?.groupValues
+        ?.getOrNull(1)
+        ?: "0.00"
+    return "¥$amount"
+}
+
+internal fun splitBillStatusTextFor(detail: String?): String {
+    val progress = Regex("""已收\s*(\d+)\s*/\s*(\d+)\s*人""")
+        .find(detail.orEmpty())
+        ?: return "请参与收款"
+    return if (progress.groupValues[1] == progress.groupValues[2]) "已收齐" else "请参与收款"
+}
+
 internal fun paymentCardClaimedStatusLabel(isTransfer: Boolean): String {
     return if (isTransfer) "已收款" else "已领取"
 }
@@ -581,6 +637,7 @@ private fun paymentCardKindFor(resourceUrl: String?, appName: String?, text: Str
     return when {
         marker.contains("red-packet") || marker.contains("红包") -> PaymentCardKind.RedPacket
         marker.contains("transfer") || marker.contains("转账") -> PaymentCardKind.Transfer
+        marker.contains("split-bill") || marker.contains("aa 收款") || marker.contains("aa收款") -> PaymentCardKind.SplitBill
         else -> null
     }
 }

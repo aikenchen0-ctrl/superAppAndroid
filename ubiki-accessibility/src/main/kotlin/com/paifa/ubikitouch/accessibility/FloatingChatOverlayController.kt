@@ -111,6 +111,16 @@ internal class FloatingChatOverlayController(
             groups = conversation.groupContacts
         )
 
+    /** 左侧全部页复用当前会话的真实帐号、好友和群聊快照，不创建演示数据。 */
+    fun leftSidebarSnapshot(): FloatingChatLeftSidebarSnapshot = friendManagementSnapshot().let { snapshot ->
+        FloatingChatLeftSidebarSnapshot(
+            accounts = snapshot.accounts,
+            selectedAccountId = snapshot.selectedAccountId,
+            contacts = snapshot.contacts,
+            groups = snapshot.groups
+        )
+    }
+
     fun refreshFriendManagementSnapshot() {
         refreshScrmConversationFromApi()
     }
@@ -152,6 +162,7 @@ internal class FloatingChatOverlayController(
     }
     private var localMessageSequence = nextLocalMessageSequence(localMessages)
     private var previewChromeVisible = false
+    private var expandedExitAnimationRunning = false
     private var edgeGestureConfigRevision by mutableIntStateOf(0)
     private var voicePermissionRequestToken = 0
     private var locationPermissionRequestToken = 0
@@ -187,7 +198,16 @@ internal class FloatingChatOverlayController(
         }
     }
 
+    /**
+     * 展开未读总览或具体微信账户会话；主界面按钮与无障碍展开手势都经过此入口。
+     * 测试流程：两种入口分别触发后确认同一个全屏 ComposeView 从底部上移进入。
+     */
     fun expand() {
+        if (expandedExitAnimationRunning) {
+            composeView?.animate()?.cancel()
+            composeView?.translationY = 0f
+            expandedExitAnimationRunning = false
+        }
         if (
             shouldRestoreHiddenExpandedChatView(
                 floatingChatExpanded = state == FloatingChatOverlayState.Expanded,
@@ -201,7 +221,25 @@ internal class FloatingChatOverlayController(
         showState(FloatingChatOverlayState.Expanded)
     }
 
+    /**
+     * 收起当前全屏聊天根视图；先执行实体 View 向下退出动画，再恢复悬浮按钮尺寸。
+     * 测试流程：在未读总览和具体账户会话分别收起，确认动画完成后窗口才变为折叠态。
+     */
     fun collapse() {
+        val view = composeView
+        if (state == FloatingChatOverlayState.Expanded && view != null) {
+            if (expandedExitAnimationRunning) return
+            animateExpandedExit(view) {
+                if (composeView === view) {
+                    view.translationY = 0f
+                    if (!hideExpandedViewForCollapse()) {
+                        dismissView()
+                    }
+                    updateOverlayState(FloatingChatOverlayState.Collapsed)
+                }
+            }
+            return
+        }
         if (!hideExpandedViewForCollapse()) {
             dismissView()
         }
@@ -396,6 +434,43 @@ internal class FloatingChatOverlayController(
         showState(FloatingChatOverlayState.Expanded, force = true)
     }
 
+    fun favoriteLibrarySnapshot(): FloatingChatFavoriteLibrarySnapshot {
+        val accountName = conversation.accountContacts
+            .firstOrNull { account -> account.id == selectedAccountId }
+            ?.name
+            .orEmpty()
+        return FloatingChatFavoriteLibrarySnapshot(
+            accountId = selectedAccountId,
+            accountName = accountName
+        )
+    }
+
+    fun sendFavoriteCollectionItem(
+        item: com.paifa.ubikitouch.accessibility.floatingchat.tools.FavoriteCollectionItem
+    ): Boolean {
+        if (
+            item.accountId != selectedAccountId &&
+                item.accountId != com.paifa.ubikitouch.accessibility.floatingchat.tools.LegacyFavoriteAccountId
+        ) {
+            return false
+        }
+        localMessageSequence += 1
+        val threadId = selectedThread.toLocalThreadId()
+        val message = prepareOutgoingMessageForScrm(
+            com.paifa.ubikitouch.accessibility.floatingchat.tools.favoriteCollectionPreviewMessage(item).copy(
+                id = "favorite-send-${item.messageId}-$localMessageSequence",
+                fromMe = true,
+                senderName = favoriteLibrarySnapshot().accountName
+            ),
+            threadId
+        )
+        markCurrentUnreadSummaryReplied(threadId)
+        localMessages += message
+        persistLocalMessage(message, threadId)
+        showState(FloatingChatOverlayState.Expanded, force = true)
+        return true
+    }
+
     fun addBlinkVoiceResult(
         eventType: String,
         durationMs: Long,
@@ -453,6 +528,7 @@ internal class FloatingChatOverlayController(
         ) {
             if (restoreRetainedExpandedView()) {
                 updateOverlayState(FloatingChatOverlayState.Expanded)
+                composeView?.let(::animateExpandedEntrance)
                 return
             }
             dismissView()
@@ -461,6 +537,8 @@ internal class FloatingChatOverlayController(
         updateOverlayState(nextState)
         if (nextState == FloatingChatOverlayState.Collapsed) return
         val owner = AccessibilityOverlayComposeOwner()
+        val shouldAnimateEntrance = nextState == FloatingChatOverlayState.Expanded &&
+            state != FloatingChatOverlayState.Expanded
         val view = ComposeView(context).apply {
             setViewTreeLifecycleOwner(owner)
             setViewTreeSavedStateRegistryOwner(owner)
@@ -468,6 +546,9 @@ internal class FloatingChatOverlayController(
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
             if (mediaPreviewCoversSystemBars()) {
                 systemUiVisibility = expandedSystemUiVisibility(previewVisible = false)
+            }
+            if (shouldAnimateEntrance) {
+                translationY = expandedAnimationDistance(this)
             }
             setContent {
                 when (nextState) {
@@ -568,6 +649,10 @@ internal class FloatingChatOverlayController(
             }
         }.isSuccess
         if (!mounted) return
+
+        if (shouldAnimateEntrance) {
+            animateExpandedEntrance(view)
+        }
 
         // Publish the expanded state only after the window is attached. The service
         // rebuilds edge gesture windows from this callback, so publishing earlier
@@ -1441,7 +1526,23 @@ internal class FloatingChatOverlayController(
         }
     }
 
+    /**
+     * 完全关闭聊天悬浮根视图；退出动画结束后移除无障碍窗口，避免视觉瞬移。
+     * 测试流程：从两类聊天界面返回或服务关闭，确认真实 View 向下退场且无 BadToken 异常。
+     */
     fun dismiss() {
+        val view = composeView
+        if (state == FloatingChatOverlayState.Expanded && view != null) {
+            if (expandedExitAnimationRunning) return
+            animateExpandedExit(view) {
+                if (composeView === view) {
+                    view.translationY = 0f
+                    dismissView()
+                    updateOverlayState(FloatingChatOverlayState.Collapsed)
+                }
+            }
+            return
+        }
         dismissView()
         updateOverlayState(FloatingChatOverlayState.Collapsed)
     }
@@ -1463,6 +1564,45 @@ internal class FloatingChatOverlayController(
         composeOwner?.destroy()
         composeOwner = null
         previewChromeVisible = false
+    }
+
+    /** 展开聊天根视图时，使用真实 View 属性从屏幕底部滑入，未读总览和具体账户共用此入口。 */
+    private fun animateExpandedEntrance(view: View) {
+        if (!view.isAttachedToWindow) return
+        view.post {
+            if (!view.isAttachedToWindow) return@post
+            if (view.translationY == 0f) {
+                view.translationY = expandedAnimationDistance(view)
+            }
+            view.animate()
+                .translationY(0f)
+                .setDuration(FloatingChatOverlayAnimationDurationMillis)
+                .setInterpolator(android.view.animation.DecelerateInterpolator())
+                .start()
+        }
+    }
+
+    /** 关闭聊天根视图时，先让真实 View 向下退出，再执行窗口收起或移除。 */
+    private fun animateExpandedExit(view: View, onFinished: () -> Unit): Boolean {
+        if (!view.isAttachedToWindow) return false
+        expandedExitAnimationRunning = true
+        view.animate()
+            .translationY(expandedAnimationDistance(view))
+            .setDuration(FloatingChatOverlayAnimationDurationMillis)
+            .setInterpolator(android.view.animation.AccelerateInterpolator())
+            .withEndAction {
+                expandedExitAnimationRunning = false
+                onFinished()
+            }
+            .start()
+        return true
+    }
+
+    private fun expandedAnimationDistance(view: View): Float {
+        return maxOf(
+            view.height.toFloat(),
+            context.resources.displayMetrics.heightPixels.toFloat()
+        )
     }
 
     private fun hideExpandedViewForCollapse(): Boolean {
@@ -1731,6 +1871,8 @@ private enum class FloatingChatOverlayState {
     Collapsed,
     Expanded
 }
+
+private const val FloatingChatOverlayAnimationDurationMillis = 260L
 
 internal fun shouldRestoreHiddenExpandedChatView(
     floatingChatExpanded: Boolean,

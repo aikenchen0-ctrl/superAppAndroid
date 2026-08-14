@@ -24,6 +24,7 @@ internal fun buildScrmWeAppCardRequest(
     appId: String,
     title: String,
     pagePath: String,
+    url: String,
     thumb: String
 ): ScrmSendWeAppCardRequest = ScrmSendWeAppCardRequest(
     deviceUuid = route.deviceUuid,
@@ -32,6 +33,7 @@ internal fun buildScrmWeAppCardRequest(
     appId = appId,
     title = title,
     pagePath = pagePath,
+    url = url,
     thumb = thumb
 )
 

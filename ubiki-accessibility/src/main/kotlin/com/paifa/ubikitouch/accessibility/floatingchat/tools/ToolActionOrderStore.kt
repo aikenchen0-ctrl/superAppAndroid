@@ -11,15 +11,22 @@ internal fun referenceToolActionsFor(actions: List<FloatingChatToolAction>): Lis
     val referenceOrder = listOf(
         FloatingChatToolAction.Assistant,
         FloatingChatToolAction.AiVoice,
+        FloatingChatToolAction.UiComponents,
+        FloatingChatToolAction.MiniProgram,
+        FloatingChatToolAction.ReviewRequests,
         FloatingChatToolAction.Contacts,
         FloatingChatToolAction.Blink,
         FloatingChatToolAction.Gallery,
         FloatingChatToolAction.Camera,
+        FloatingChatToolAction.ChannelsVideo,
+        FloatingChatToolAction.WebLink,
         FloatingChatToolAction.Location,
         FloatingChatToolAction.Favorite,
         FloatingChatToolAction.RedPacket,
         FloatingChatToolAction.Transfer,
         FloatingChatToolAction.Files,
+        FloatingChatToolAction.VoiceCall,
+        FloatingChatToolAction.VideoCall,
         FloatingChatToolAction.Card,
         FloatingChatToolAction.Moments,
         FloatingChatToolAction.Finder,
@@ -43,6 +50,9 @@ private fun toolActionBottomPanelMode(action: FloatingChatToolAction): BottomPan
         FloatingChatToolAction.Contacts -> BottomPanelMode.Contacts
         FloatingChatToolAction.Assistant -> BottomPanelMode.Assistant
         FloatingChatToolAction.AiVoice -> BottomPanelMode.AiVoice
+        FloatingChatToolAction.UiComponents -> BottomPanelMode.UiComponents
+        FloatingChatToolAction.MiniProgram -> BottomPanelMode.MiniProgram
+        FloatingChatToolAction.ReviewRequests -> BottomPanelMode.ReviewRequests
         FloatingChatToolAction.QuickPhrase -> BottomPanelMode.QuickPhrase
         FloatingChatToolAction.Moments -> BottomPanelMode.Moments
         FloatingChatToolAction.Finder -> BottomPanelMode.Finder
@@ -51,9 +61,17 @@ private fun toolActionBottomPanelMode(action: FloatingChatToolAction): BottomPan
         FloatingChatToolAction.Transfer -> BottomPanelMode.Transfer
         FloatingChatToolAction.Location -> BottomPanelMode.Location
         FloatingChatToolAction.Favorite -> BottomPanelMode.Favorite
+        FloatingChatToolAction.Files -> BottomPanelMode.FileDocument
+        FloatingChatToolAction.VoiceCall -> BottomPanelMode.VoiceCall
+        FloatingChatToolAction.VideoCall -> BottomPanelMode.VideoCall
         FloatingChatToolAction.Card -> BottomPanelMode.Card
+        FloatingChatToolAction.GroupInvite -> BottomPanelMode.GroupInvite
         FloatingChatToolAction.Device -> BottomPanelMode.AccountDevice
         FloatingChatToolAction.Notes -> BottomPanelMode.CustomerProfile
+        FloatingChatToolAction.HiddenUsers -> BottomPanelMode.HiddenUsers
+        FloatingChatToolAction.Video -> BottomPanelMode.VideoShort
+        FloatingChatToolAction.ChannelsVideo -> BottomPanelMode.ChannelsVideo
+        FloatingChatToolAction.WebLink -> BottomPanelMode.WebLink
         else -> BottomPanelMode.None
     }
 }

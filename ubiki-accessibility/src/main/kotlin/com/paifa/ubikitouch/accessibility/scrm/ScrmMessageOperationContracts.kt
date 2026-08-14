@@ -105,7 +105,7 @@ internal data class ScrmSendEmojiRequest(
     }
 }
 
-/** 待“更多/小程序卡片”UI 对接；缩略图必须是测试手机可访问 URL。 */
+/** 小程序卡片接口；url、缩略图必须是测试手机可访问的真实链接。 */
 @Serializable
 internal data class ScrmSendWeAppCardRequest(
     val deviceUuid: String,
@@ -114,7 +114,7 @@ internal data class ScrmSendWeAppCardRequest(
     val appId: String,
     val title: String,
     val pagePath: String,
-    val url: String? = null,
+    val url: String,
     val thumb: String,
     val icon: String? = null,
     val source: String? = null,
@@ -130,7 +130,12 @@ internal data class ScrmSendWeAppCardRequest(
         require(appId.isNotBlank()) { "appId cannot be blank" }
         require(title.isNotBlank()) { "title cannot be blank" }
         require(pagePath.isNotBlank()) { "pagePath cannot be blank" }
+        require(url.isNotBlank()) { "url cannot be blank" }
         require(thumb.isNotBlank()) { "thumb cannot be blank" }
+        require(!appId.equals("wx_demo_appid", ignoreCase = true)) { "appId cannot be a demo value" }
+        require(!url.contains("cc2.cx", ignoreCase = true) && !url.contains("example.com", ignoreCase = true)) {
+            "url cannot be a demo value"
+        }
     }
 }
 

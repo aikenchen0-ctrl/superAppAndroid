@@ -89,6 +89,7 @@ internal fun MessageRow(
     onGroupMemberAvatarBoundsChanged: (Rect) -> Unit,
     onGroupMemberAvatarRemoved: () -> Unit,
     detailedBubble: Boolean = usesDetailedMessageBubble(homeOverviewVisible, selectedThread),
+    showOwnSenderName: Boolean = false,
     bubbleAppearance: BubbleAppearance = BubbleAppearance.TwoD
 ) {
     val groupMemberContact = remember(
@@ -110,7 +111,7 @@ internal fun MessageRow(
     val showSenderNickname = shouldShowDetailedBubbleSenderName(
         detailedBubble = detailedBubble,
         presentation = message.presentation
-    )
+    ) || (showOwnSenderName && message.fromMe && messageUsesBubbleChrome(message.presentation))
     val senderNickname = remember(message, groupMemberContact, contactsById) {
         val resolvedNickname = groupMemberContact?.name
             ?: message.threadContactId?.let { threadId -> contactsById[threadId]?.name }

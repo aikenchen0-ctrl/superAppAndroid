@@ -2,6 +2,8 @@ package com.paifa.ubikitouch.accessibility.floatingchat.aivoice
 
 import com.paifa.ubikitouch.accessibility.FloatingChatAiClient
 import com.paifa.ubikitouch.accessibility.FloatingChatAiConfig
+import com.paifa.ubikitouch.accessibility.FloatingChatAiHttpException
+import com.paifa.ubikitouch.accessibility.floatingChatAiFailureMessage
 import com.paifa.ubikitouch.accessibility.isConfigured
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,7 +30,13 @@ internal class AiConfigTestActions(
             }.onSuccess { reply ->
                 onAiConfigStatusChanged("AI 连接测试成功：${reply.take(40)}")
             }.onFailure { error ->
-                onAiConfigStatusChanged("AI 连接测试失败：${error.message?.take(80) ?: "未知错误"}")
+                val httpError = error as? FloatingChatAiHttpException
+                onAiConfigStatusChanged(
+                    floatingChatAiFailureMessage(
+                        statusCode = httpError?.statusCode,
+                        detail = httpError?.message ?: error.message.orEmpty()
+                    )
+                )
             }
             onAiConfigTestingChanged(false)
         }

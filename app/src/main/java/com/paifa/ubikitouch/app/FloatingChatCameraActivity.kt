@@ -66,14 +66,17 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FlashlightOff
 import androidx.compose.material.icons.filled.FlashlightOn
-import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -91,7 +94,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
@@ -562,6 +565,7 @@ private data class CapturedMediaMeta(
     val aspectRatio: Float?
 )
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun CameraScanOverlay(
     onClose: () -> Unit,
@@ -580,29 +584,29 @@ private fun CameraScanOverlay(
     )
 
     Box(modifier = Modifier.fillMaxSize()) {
-            Row(
+            Surface(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .height(52.dp)
-                    .background(Color(0x55000000))
-                    .padding(horizontal = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .fillMaxWidth(),
+                tonalElevation = 3.dp
             ) {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = "扫一扫",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Normal
+                        )
+                    },
+                    navigationIcon = {
                 IconButton(onClick = onClose) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "返回",
-                        tint = Color.White
                     )
                 }
-                Text(
-                    text = "扫一扫",
-                    modifier = Modifier.weight(1f),
-                    color = Color.White,
-                    textAlign = TextAlign.Center
+                    }
                 )
-                Spacer(modifier = Modifier.size(48.dp))
             }
 
             Box(
@@ -615,27 +619,21 @@ private fun CameraScanOverlay(
                 )
             }
 
-            Row(
+            Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .height(112.dp)
-                    .background(Color(0x55000000))
-                    .padding(horizontal = 42.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .fillMaxWidth(),
+                tonalElevation = 3.dp
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Filled.Image,
-                        contentDescription = "相册",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Text("相册", color = Color.White, modifier = Modifier.padding(top = 6.dp))
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    IconButton(
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    FilledTonalIconButton(
                         onClick = {
                             flashlightEnabled = !flashlightEnabled
                             onFlashlightChanged(flashlightEnabled)
@@ -648,13 +646,13 @@ private fun CameraScanOverlay(
                                 Icons.Filled.FlashlightOff
                             },
                             contentDescription = "闪光灯",
-                            tint = if (flashlightEnabled) Color(0xFF07C160) else Color.White
                         )
                     }
                     Text(
                         if (flashlightEnabled) "关闭闪光灯" else "闪光灯",
-                        color = Color.White
+                        fontWeight = FontWeight.Normal
                     )
+                    }
                 }
             }
     }

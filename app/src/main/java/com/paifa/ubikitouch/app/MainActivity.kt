@@ -607,11 +607,6 @@ private fun MainScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 DebugFloatingChatExpandButton()
-                Text(
-                    text = "悬浮聊天",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
             }
         }
         item {

@@ -6,6 +6,8 @@ import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.accessibility.floatingchat.account.*
 import com.paifa.ubikitouch.accessibility.floatingchat.input.*
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AiVoiceCoordinator
+import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.aiVoiceEnterOffsetDirection
+import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.aiVoiceExitOffsetDirection
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AiVoiceApiConfig
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AiVoiceCallRuntime
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AndroidAiVoiceAudioEngine
@@ -27,6 +29,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.MessageAsideAnaly
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.BlinkInputAiActions
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.FloatingChatBlinkInputEffects
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AiDraftGenerationActions
+import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.AutoReplyMessageTracker
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.editedAiDraftMessage
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.OkHttpAiVoiceRealtimeClient
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.DoubaoRealtimeCredentials
@@ -49,11 +52,23 @@ import com.paifa.ubikitouch.accessibility.floatingchat.finder.ScrmFinderApi
 import com.paifa.ubikitouch.accessibility.floatingchat.finder.finderUserNameForMessage
 import com.paifa.ubikitouch.accessibility.floatingchat.finder.isFinderMessage
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.BottomPanelMode
+import com.paifa.ubikitouch.accessibility.floatingchat.group.GroupInvitationFullScreen
+import com.paifa.ubikitouch.accessibility.floatingchat.scrm.AccountDeviceFullScreen
+import com.paifa.ubikitouch.accessibility.floatingchat.scrm.CustomerProfileFullScreen
+import com.paifa.ubikitouch.accessibility.floatingchat.tools.QuickPhraseFullScreen
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.FloatingBottomPanel
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.FloatingChatConversationSyncEffects
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.FloatingChatInternalEdgeGestureDefaults
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.FloatingChatOverlayRuntimeState
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.FloatingChatPreviewChromeEffects
+import com.paifa.ubikitouch.accessibility.floatingchat.shell.aiAssistantEnterOffsetDirection
+import com.paifa.ubikitouch.accessibility.floatingchat.shell.aiAssistantExitOffsetDirection
+import com.paifa.ubikitouch.accessibility.floatingchat.shell.uiComponentsEnterOffsetDirection
+import com.paifa.ubikitouch.accessibility.floatingchat.shell.uiComponentsExitOffsetDirection
+import com.paifa.ubikitouch.accessibility.floatingchat.shell.miniProgramEnterOffsetDirection
+import com.paifa.ubikitouch.accessibility.floatingchat.shell.miniProgramExitOffsetDirection
+import com.paifa.ubikitouch.accessibility.floatingchat.shell.reviewRequestsEnterOffsetDirection
+import com.paifa.ubikitouch.accessibility.floatingchat.shell.reviewRequestsExitOffsetDirection
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.floatingChatFrostedBackdrop
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.floatingChatOverlayGestureBinding
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.isCenteredToolFeaturePanel
@@ -143,8 +158,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.automirrored.filled.Forward
@@ -180,7 +193,6 @@ import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.PersonAddAlt1
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Public
@@ -322,6 +334,7 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmFloatingAccountRoute
 import com.paifa.ubikitouch.accessibility.scrm.AndroidScrmMediaContentResolver
 import com.paifa.ubikitouch.accessibility.scrm.ScrmMediaUploadRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmMessageApi
+import com.paifa.ubikitouch.accessibility.scrm.ScrmSendLinkCardMessageRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterial
 import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterialDetail
 import com.paifa.ubikitouch.accessibility.scrm.ScrmQueuedMediaPayload
@@ -342,6 +355,7 @@ import com.paifa.ubikitouch.accessibility.scrm.PaymentReadbackState
 import com.paifa.ubikitouch.accessibility.scrm.PaymentRequestFactory
 import com.paifa.ubikitouch.accessibility.scrm.PaymentTaskRunner
 import com.paifa.ubikitouch.accessibility.scrm.PaymentTaskState
+import com.paifa.ubikitouch.accessibility.scrm.WalletBalanceParser
 import com.paifa.ubikitouch.accessibility.scrm.toPaymentReadback
 import com.paifa.ubikitouch.accessibility.scrm.scrmContactsPanelRouteForSelectedAccount
 import com.paifa.ubikitouch.accessibility.scrm.resolveScrmTaskResult
@@ -423,7 +437,6 @@ internal fun FloatingChatWorkspaceHeader(
     onScanClick: () -> Unit,
     onAddFriendClick: () -> Unit
 ) {
-    var utilityMenuExpanded by remember { mutableStateOf(false) }
     val compactOffset by animateFloatAsState(
         targetValue = if (state.compact) -76f else 0f,
         animationSpec = tween(durationMillis = 180),
@@ -502,38 +515,25 @@ internal fun FloatingChatWorkspaceHeader(
                     onClick = onEditClick
                 )
             }
-            FloatingChatHeaderIcon(
-                imageVector = Icons.Filled.Search,
-                contentDescription = "搜索聊天记录",
-                onClick = onSearchClick
-            )
-            Box {
-                FloatingChatHeaderIcon(
+            FilledTonalIconButton(
+                onClick = onSearchClick,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Search,
+                    contentDescription = "搜索聊天记录",
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            FilledTonalIconButton(
+                onClick = onScanClick,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
                     imageVector = Icons.Filled.QrCodeScanner,
                     contentDescription = "扫一扫与添加朋友",
-                    onClick = { utilityMenuExpanded = true }
+                    modifier = Modifier.size(20.dp)
                 )
-                DropdownMenu(
-                    expanded = utilityMenuExpanded,
-                    onDismissRequest = { utilityMenuExpanded = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("扫一扫") },
-                        leadingIcon = { Icon(Icons.Filled.QrCodeScanner, contentDescription = null) },
-                        onClick = {
-                            utilityMenuExpanded = false
-                            onScanClick()
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("添加朋友") },
-                        leadingIcon = { Icon(Icons.Filled.PersonAddAlt1, contentDescription = null) },
-                        onClick = {
-                            utilityMenuExpanded = false
-                            onAddFriendClick()
-                        }
-                    )
-                }
             }
         }
     }
@@ -587,8 +587,15 @@ internal fun FloatingChatOverlay(
     var bubbleAppearance by remember { mutableStateOf(BubbleAppearance.TwoD) }
     var inputText by remember { mutableStateOf("") }
     var inputFocused by remember { mutableStateOf(false) }
+    var sendNameEnabledByAccountId by remember { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
     var bottomPanelMode by remember { mutableStateOf(BottomPanelMode.None) }
+    var locationIsLive by remember { mutableStateOf(false) }
     var displayedBottomPanelMode by remember { mutableStateOf(BottomPanelMode.None) }
+    var channelsLiveDraftState by remember { mutableStateOf<ChannelsLiveDraftState>(ChannelsLiveDraftState.Idle) }
+    var webLinkSubmissionState by remember { mutableStateOf<WebLinkSubmissionState>(WebLinkSubmissionState.Idle) }
+    var officialArticleSubmissionState by remember {
+        mutableStateOf<OfficialArticleSubmissionState>(OfficialArticleSubmissionState.Idle)
+    }
     var contactsOpenAddFriend by remember { mutableStateOf(false) }
     var displayedContactsOpenAddFriend by remember { mutableStateOf(false) }
     val bottomPanelVisibility = remember { MutableTransitionState(false) }
@@ -633,7 +640,11 @@ internal fun FloatingChatOverlay(
     var aiVoiceCapabilityConfigState by remember { mutableStateOf(AiVoiceCapabilityConfigState()) }
     var aiConfig by remember(context) { mutableStateOf(loadFloatingChatAiConfig(context)) }
     var aiConfigStatus by remember { mutableStateOf<String?>(null) }
+    var aiModels by remember { mutableStateOf(emptyList<String>()) }
+    var aiModelsLoading by remember { mutableStateOf(false) }
     var aiPredicting by remember { mutableStateOf(false) }
+    val autoReplyMessageTracker = remember { AutoReplyMessageTracker() }
+    var autoReplyWasEnabled by remember { mutableStateOf(false) }
     var blinkInputAiBusy by remember { mutableStateOf(false) }
     var blinkInputStatusText by remember { mutableStateOf<String?>(null) }
     var blinkInputStatusAutoDismiss by remember { mutableStateOf(false) }
@@ -678,6 +689,7 @@ internal fun FloatingChatOverlay(
     val selectedMessageIds = remember { mutableStateMapOf<String, Boolean>() }
     val selectedFavoriteItemIds = remember { mutableStateMapOf<String, Boolean>() }
     val hiddenMessageIds = remember { mutableStateMapOf<String, Boolean>() }
+    val hiddenParticipantIds = remember { mutableStateMapOf<String, Boolean>() }
     val contactProfiles = remember(initialContactProfiles) {
         mutableStateMapOf<String, LocalContactProfile>().apply {
             initialContactProfiles.forEach { profile ->
@@ -1137,28 +1149,6 @@ internal fun FloatingChatOverlay(
                         ?.let { thread -> scrmFloatingContactConversationId(thread.groupId) }
                 )
             )
-        },
-        onRedPacketRequested = {
-            val recipients = when (val thread = selectedThread) {
-                is ChatThreadSelection.Private -> displayConversation.contacts
-                    .firstOrNull { contact -> contact.id == thread.contactId }
-                    ?.let(::listOf).orEmpty()
-                else -> transferRecipientCandidatesForThread(
-                    conversation = displayConversation,
-                    selectedThread = thread,
-                    selectedAccountId = selectedAccount.id
-                ).ifEmpty {
-                    (thread as? ChatThreadSelection.GroupChat)
-                        ?.let { groupThread -> displayConversation.groupContacts.firstOrNull { it.id == groupThread.groupId } }
-                        ?.groupMemberContacts.orEmpty()
-                }
-            }
-            FloatingChatRedPacketBridge.open(
-                FloatingChatRedPacketSession(
-                    accountName = selectedAccount.name,
-                    recipientNames = recipients.map { contact -> contact.name }.filter { name -> name.isNotBlank() }.take(3)
-                )
-            )
         }
     )
     val aiDraftMessageActions = AiDraftMessageActions(
@@ -1201,6 +1191,41 @@ internal fun FloatingChatOverlay(
         onCloseAssistantPanel = { bottomPanelMode = BottomPanelMode.None },
         onShowToast = { message -> Toast.makeText(context, message, Toast.LENGTH_SHORT).show() }
     )
+    LaunchedEffect(
+        aiConfig.autoReplyEnabled,
+        aiConfig.isConfigured,
+        displayConversation,
+        selectedThread,
+        selectedAccount.id,
+        aiPredicting
+    ) {
+        if (!aiConfig.autoReplyEnabled) {
+            autoReplyMessageTracker.markHandled(displayConversation.messages)
+            autoReplyWasEnabled = false
+            return@LaunchedEffect
+        }
+        if (!autoReplyWasEnabled || !aiConfig.isConfigured) {
+            autoReplyMessageTracker.markHandled(displayConversation.messages)
+            autoReplyWasEnabled = true
+            return@LaunchedEffect
+        }
+        if (aiPredicting) return@LaunchedEffect
+
+        val incomingMessage = visibleMessagesForThread(
+            conversation = displayConversation,
+            selection = selectedThread,
+            selectedAccountId = selectedAccount.id
+        ).firstOrNull { message ->
+            autoReplyMessageTracker.shouldGenerate(
+                enabled = true,
+                configured = true,
+                message = message
+            )
+        }
+        if (incomingMessage != null) {
+            aiDraftGenerationActions.generate()
+        }
+    }
     val messageAsideAnalysisActions = MessageAsideAnalysisActions(
         coroutineScope = coroutineScope,
         aiConfig = { aiConfig },
@@ -1446,12 +1471,10 @@ internal fun FloatingChatOverlay(
                 onEditClick = headerEditableContact?.let { contact ->
                     { contactEditorTarget = ContactEditorTarget.User(contact) }
                 },
-                onSearchClick = { openChatSearchRequestKey += 1 },
-                onScanClick = { FloatingChatMediaPickerBridge.requestScan() },
-                onAddFriendClick = {
-                    contactsOpenAddFriend = true
-                    bottomPanelMode = BottomPanelMode.Contacts
-                }
+                onSearchClick = { bottomPanelMode = BottomPanelMode.ToolbarSearch },
+                onScanClick = { bottomPanelMode = BottomPanelMode.ToolbarScan },
+                // 保持测试和既有调用契约；实际入口统一收敛到扫码全屏工作区的“添加好友”项。
+                onAddFriendClick = { bottomPanelMode = BottomPanelMode.ToolbarAddFriend }
             )
         },
         mainContent = {
@@ -1464,11 +1487,40 @@ internal fun FloatingChatOverlay(
             selectedThread = selectedThread,
             homeOverviewVisible = homeOverviewVisible,
             unreadThreadIds = unreadThreadIds.filterValues { unread -> unread }.keys.toSet(),
+            hiddenParticipantIds = hiddenParticipantIds.filterValues { hidden -> hidden }.keys,
+            sendNameEnabledByAccountId = sendNameEnabledByAccountId,
             inputFocused = inputFocused,
             groupMemberAvatarsVisible = currentGroupMemberAvatarsVisible,
             onThreadSelected = { thread -> chatNavigationActions.openChatThread(thread) },
             onHomeUnreadSelected = { summary -> chatNavigationActions.openHomeUnread(summary) },
-            onToolAction = { action -> toolMessageActions.sendToolMessage(action) },
+             onToolAction = { action ->
+                 if (action == FloatingChatToolAction.Location) {
+                     locationIsLive = false
+                 }
+                 if (action == FloatingChatToolAction.Voice) {
+                     bottomPanelMode = BottomPanelMode.Voice
+                 } else {
+                     toolMessageActions.sendToolMessage(action)
+                 }
+            },
+            onLiveLocationClick = {
+                locationIsLive = true
+                bottomPanelMode = BottomPanelMode.Location
+            },
+            onOfficialArticleClick = {
+                officialArticleSubmissionState = OfficialArticleSubmissionState.Idle
+                bottomPanelMode = BottomPanelMode.Article
+            },
+            onMusicShareClick = {
+                bottomPanelMode = BottomPanelMode.Music
+            },
+            onSplitBillClick = {
+                if (selectedThread is ChatThreadSelection.Private) {
+                    Toast.makeText(context, "AA 收款只能在群聊中发起", Toast.LENGTH_SHORT).show()
+                } else {
+                    bottomPanelMode = BottomPanelMode.SplitBill
+                }
+            },
             bubbleAppearance = bubbleAppearance,
             onBubbleAppearanceToggle = { bubbleAppearance = bubbleAppearance.toggle() },
             onGroupAvatarLongClick = { group ->
@@ -1591,7 +1643,16 @@ internal fun FloatingChatOverlay(
         )
         },
         bottomContent = {
-        if (bottomInputBarVisibleForCenteredToolPanel(bottomPanelMode.isCenteredToolFeaturePanel()) &&
+        if (bottomPanelMode != BottomPanelMode.GroupInvite &&
+            bottomPanelMode != BottomPanelMode.QuickPhrase &&
+            bottomPanelMode != BottomPanelMode.ToolbarSearch &&
+            bottomPanelMode != BottomPanelMode.ToolbarScan &&
+            bottomPanelMode != BottomPanelMode.ToolbarAddFriend &&
+            bottomPanelMode != BottomPanelMode.Relay &&
+            bottomPanelMode != BottomPanelMode.SideEffect &&
+            bottomPanelMode != BottomPanelMode.CouponWallet &&
+            bottomPanelMode != BottomPanelMode.RedPacket &&
+            bottomInputBarVisibleForCenteredToolPanel(bottomPanelMode.isCenteredToolFeaturePanel()) &&
             !bottomPanelMode.isBottomComposerDrawer()
         ) {
             Column(
@@ -1644,6 +1705,14 @@ internal fun FloatingChatOverlay(
         panelContent = {
         if (bottomPanelVisibility.currentState || bottomPanelVisibility.targetState) {
             val displayedPanelIsBottomDrawer = displayedBottomPanelMode.isBottomComposerDrawer()
+            val displayedPanelIsAiAssistant = displayedBottomPanelMode == BottomPanelMode.Assistant
+            val displayedPanelIsAiVoice = displayedBottomPanelMode == BottomPanelMode.AiVoice
+            val displayedPanelIsUiComponents = displayedBottomPanelMode == BottomPanelMode.UiComponents
+            val displayedPanelIsMiniProgram = displayedBottomPanelMode == BottomPanelMode.MiniProgram
+            val displayedPanelIsReviewRequests = displayedBottomPanelMode == BottomPanelMode.ReviewRequests
+            val displayedPanelIsQuickPhrase = displayedBottomPanelMode == BottomPanelMode.QuickPhrase
+             val displayedPanelIsGallery = displayedBottomPanelMode == BottomPanelMode.Gallery
+             val displayedPanelIsVoice = displayedBottomPanelMode == BottomPanelMode.Voice
             AnimatedVisibility(
                 modifier = if (displayedPanelIsBottomDrawer) {
                     Modifier.align(Alignment.BottomCenter)
@@ -1651,8 +1720,48 @@ internal fun FloatingChatOverlay(
                     Modifier.fillMaxSize()
                 },
                 visibleState = bottomPanelVisibility,
-                enter = slideInVertically(initialOffsetY = { height -> height }) + fadeIn(),
-                exit = slideOutVertically(targetOffsetY = { height -> height }) + fadeOut()
+                enter = slideInVertically(initialOffsetY = { height ->
+                     height * if (displayedPanelIsAiAssistant) {
+                        aiAssistantEnterOffsetDirection()
+                    } else if (displayedPanelIsAiVoice) {
+                        aiVoiceEnterOffsetDirection()
+                    } else if (displayedPanelIsUiComponents) {
+                        uiComponentsEnterOffsetDirection()
+                    } else if (displayedPanelIsMiniProgram) {
+                        miniProgramEnterOffsetDirection()
+                    } else if (displayedPanelIsReviewRequests) {
+                        reviewRequestsEnterOffsetDirection()
+                    } else if (displayedPanelIsQuickPhrase) {
+                        quickPhraseEnterOffsetDirection()
+                     } else if (displayedPanelIsGallery) {
+                         galleryEnterOffsetDirection()
+                     } else if (displayedPanelIsVoice) {
+                         voiceMessageEnterOffsetDirection()
+                     } else {
+                        1
+                    }
+                }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { height ->
+                    height * if (displayedPanelIsAiAssistant) {
+                        aiAssistantExitOffsetDirection()
+                    } else if (displayedPanelIsAiVoice) {
+                        aiVoiceExitOffsetDirection()
+                    } else if (displayedPanelIsUiComponents) {
+                        uiComponentsExitOffsetDirection()
+                    } else if (displayedPanelIsMiniProgram) {
+                        miniProgramExitOffsetDirection()
+                    } else if (displayedPanelIsReviewRequests) {
+                        reviewRequestsExitOffsetDirection()
+                    } else if (displayedPanelIsQuickPhrase) {
+                        quickPhraseExitOffsetDirection()
+                     } else if (displayedPanelIsGallery) {
+                         galleryExitOffsetDirection()
+                     } else if (displayedPanelIsVoice) {
+                         voiceMessageExitOffsetDirection()
+                     } else {
+                        1
+                    }
+                }) + fadeOut()
             ) {
             Box(
                 modifier = if (displayedPanelIsBottomDrawer) Modifier else Modifier.fillMaxSize()
@@ -1670,7 +1779,520 @@ internal fun FloatingChatOverlay(
                             }
                     )
                 }
-                FloatingBottomPanel(
+                 if (displayedBottomPanelMode == BottomPanelMode.GroupInvite) {
+                    GroupInvitationFullScreen(
+                        route = scrmFloatingAccountRouteForContactId(selectedAccount.id),
+                        onBack = { bottomPanelMode = BottomPanelMode.None }
+                     )
+                 } else if (displayedBottomPanelMode == BottomPanelMode.Relay) {
+                     val threadMessages = visibleMessagesForThread(
+                         conversation = displayConversation,
+                         selection = selectedThread,
+                         selectedAccountId = selectedAccount.id
+                     )
+                     RelayFullScreen(
+                         existingRelays = threadMessages.filter { it.type == FloatingChatMessageType.Relay },
+                         onBack = { bottomPanelMode = BottomPanelMode.None },
+                         // 对接 POST /openapi/v1/chatrooms/jielong，私聊不允许提交。
+                         onSubmit = { draft ->
+                             val groupId = (selectedThread as? ChatThreadSelection.GroupChat)?.groupId
+                                 ?: throw IllegalStateException("群接龙只能在群聊中发起")
+                             val route = scrmFloatingAccountRouteForContactId(selectedAccount.id)
+                                 ?: throw IllegalStateException("当前账号没有可用的 SCRM 设备路由")
+                             val chatRoomId = scrmFloatingContactConversationId(groupId)
+                                 ?: throw IllegalStateException("当前群聊没有可用的 SCRM 群 ID")
+                             val result = withContext(Dispatchers.IO) {
+                                 val session = ScrmSettingsManager(context.applicationContext)
+                                     .loadSelectedSessionOrBootstrap()
+                                 val api = session.chatRoomApi as? com.paifa.ubikitouch.accessibility.scrm.ScrmChatRoomManagementApi
+                                     ?: throw IllegalStateException("当前 SCRM 客户端不支持群接龙接口")
+                                 api.sendJielong(
+                                     com.paifa.ubikitouch.accessibility.scrm.ScrmSendJielongRequest(
+                                         deviceUuid = route.deviceUuid,
+                                         weChatId = route.weChatId,
+                                         chatRoomId = chatRoomId,
+                                         content = draft.content,
+                                         title = draft.title.takeIf { it.isNotBlank() },
+                                         sample = draft.content,
+                                         memo = draft.memo.takeIf { it.isNotBlank() },
+                                         msgSvrId = draft.msgSvrId
+                                     )
+                                 )
+                             }
+                             if (!result.success) throw IllegalStateException(result.message ?: "群接龙提交失败")
+                             toolMessageActions.addToolMessage(FloatingChatToolAction.Relay) { base ->
+                                 base.copy(
+                                     type = FloatingChatMessageType.Relay,
+                                     text = draft.title.ifBlank { "接龙" },
+                                     detail = draft.memo.takeIf { it.isNotBlank() }?.let { "备注：$it" },
+                                     filePreviewLines = listOf(draft.content),
+                                     remoteTaskId = result.taskId,
+                                     sendState = FloatingChatSendState.Submitted
+                                 )
+                             }
+                             "群接龙任务已提交${result.taskId?.let { "，任务 #$it" }.orEmpty()}"
+                         }
+                     )
+                 } else if (displayedBottomPanelMode == BottomPanelMode.SplitBill) {
+                     val splitBillGroup = when (val thread = selectedThread) {
+                         is ChatThreadSelection.GroupChat -> displayConversation.groupContacts
+                             .firstOrNull { it.id == thread.groupId }
+                         ChatThreadSelection.Group -> displayConversation.groupContacts.firstOrNull()
+                         is ChatThreadSelection.Private -> null
+                     }
+                     val splitBillMembers = when (val thread = selectedThread) {
+                         is ChatThreadSelection.Private -> emptyList()
+                         is ChatThreadSelection.GroupChat -> {
+                             val groupMembers = splitBillGroup?.groupMemberContacts.orEmpty()
+                             if (groupMembers.isNotEmpty()) groupMembers else transferRecipientCandidatesForThread(
+                                 conversation = displayConversation,
+                                 selectedThread = thread,
+                                 selectedAccountId = selectedAccount.id
+                             )
+                         }
+                         ChatThreadSelection.Group -> {
+                             val groupMembers = splitBillGroup?.groupMemberContacts.orEmpty()
+                             if (groupMembers.isNotEmpty()) groupMembers else displayConversation.contacts
+                         }
+                     }.filterNot { member -> splitBillMemberIsCurrentAccount(member, selectedAccount) }
+                     val splitBillGroupName = splitBillGroup?.name ?: displayConversation.peerName
+                     SplitBillFullScreen(
+                         isGroupConversation = selectedThread !is ChatThreadSelection.Private,
+                         groupName = splitBillGroupName,
+                         members = splitBillMembers,
+                         existingMessages = visibleMessagesForThread(
+                             conversation = displayConversation,
+                             selection = selectedThread,
+                             selectedAccountId = selectedAccount.id
+                         ).filter { it.type == FloatingChatMessageType.SplitBill },
+                         onSubmit = { amount, members ->
+                             toolMessageActions.addSplitBillMessage(
+                                 groupName = splitBillGroupName,
+                                 totalAmount = amount,
+                                 members = members
+                             )
+                         },
+                         onBack = { bottomPanelMode = BottomPanelMode.None }
+                     )
+                 } else if (displayedBottomPanelMode == BottomPanelMode.RedPacket) {
+                     val conversationLabel = when (val thread = selectedThread) {
+                         is ChatThreadSelection.Private -> displayConversation.contacts
+                             .firstOrNull { it.id == thread.contactId }
+                             ?.name ?: displayConversation.peerName
+                         is ChatThreadSelection.GroupChat -> displayConversation.groupContacts
+                             .firstOrNull { it.id == thread.groupId }
+                             ?.name ?: displayConversation.peerName
+                         ChatThreadSelection.Group -> displayConversation.peerName
+                     }
+                     val maxRedPacketCount = (selectedThread as? ChatThreadSelection.GroupChat)
+                         ?.let { thread ->
+                             displayConversation.groupContacts
+                                 .firstOrNull { it.id == thread.groupId }
+                                 ?.groupMemberContacts
+                                 ?.size
+                         }
+                         ?.coerceAtLeast(1)
+                         ?: 1
+                     RedPacketFullScreen(
+                         conversationLabel = conversationLabel,
+                         maxPacketCount = maxRedPacketCount,
+                         onBack = { bottomPanelMode = BottomPanelMode.None },
+                         // 对接钱包余额接口，付款页仅展示真实设备任务返回的余额状态。
+                         onQueryWallet = {
+                             val route = scrmFloatingAccountRouteForContactId(selectedAccount.id)
+                                 ?: throw IllegalStateException("当前账号没有可用的 SCRM 设备路由")
+                             val outcome = withContext(Dispatchers.IO) {
+                                 val session = ScrmSettingsManager(context.applicationContext)
+                                     .loadSelectedSessionOrBootstrap()
+                                 val api = session.readApi as? ScrmPaymentApi
+                                     ?: throw IllegalStateException("当前 SCRM 客户端不支持零钱查询")
+                                 PaymentTaskRunner(session.taskApi).submitAndAwait {
+                                     api.getWalletBalance(PaymentRequestFactory.walletBalance(route))
+                                 }
+                             }
+                             outcome.data?.let(WalletBalanceParser::parse)?.displayText?.let { "零钱 $it" }
+                                 ?: outcome.message ?: "零钱任务状态：${outcome.state}"
+                         },
+                         // 对接 POST /openapi/v1/payments/lucky-money，保留幂等键、任务轮询与消息回显。
+                         onSubmit = { draft ->
+                             val route = scrmFloatingAccountRouteForContactId(selectedAccount.id)
+                                 ?: throw IllegalStateException("当前账号没有可用的 SCRM 设备路由")
+                             val conversationId = when (val thread = selectedThread) {
+                                 is ChatThreadSelection.Private -> scrmFloatingContactConversationId(thread.contactId)
+                                 is ChatThreadSelection.GroupChat -> scrmFloatingContactConversationId(thread.groupId)
+                                 ChatThreadSelection.Group -> null
+                             } ?: throw IllegalStateException("当前会话没有可用的 SCRM wxid")
+                             val intent = "lucky:${route.deviceUuid}:${route.weChatId}:$conversationId:${draft.amount}:${draft.packetCount}:${draft.greeting}"
+                             val outcome = withContext(Dispatchers.IO) {
+                                 val session = ScrmSettingsManager(context.applicationContext)
+                                     .loadSelectedSessionOrBootstrap()
+                                 val api = session.readApi as? ScrmPaymentApi
+                                     ?: throw IllegalStateException("当前 SCRM 客户端不支持发送红包")
+                                 val request = PaymentRequestFactory.sendLuckyMoney(
+                                     route = route,
+                                     conversationId = conversationId,
+                                     amountText = draft.amount,
+                                     packetCount = draft.packetCount,
+                                     paymentPassword = draft.paymentPassword,
+                                     wish = draft.greeting
+                                 )
+                                 val key = paymentIdempotencyRegistry.keyFor(intent, draft.paymentPassword)
+                                 PaymentTaskRunner(session.taskApi).submitAndAwait {
+                                     api.sendLuckyMoney(request, key)
+                                 }
+                             }
+                             if (outcome.completed) {
+                                 paymentIdempotencyRegistry.complete(intent, draft.paymentPassword)
+                                 toolMessageActions.addToolMessage(FloatingChatToolAction.RedPacket) { message ->
+                                     message.copy(
+                                         text = "红包 ¥${draft.amount}",
+                                         appName = "微信红包",
+                                         detail = draft.greeting.ifBlank { "恭喜发财，大吉大利" },
+                                         remoteTaskId = outcome.taskId,
+                                         sendState = FloatingChatSendState.Succeeded
+                                     )
+                                 }
+                             }
+                             outcome.message ?: if (outcome.completed) "红包任务已完成" else "红包任务状态：${outcome.state}"
+                         }
+                     )
+                 } else if (displayedBottomPanelMode == BottomPanelMode.CouponWallet) {
+                     CouponWalletFullScreen(
+                         onBack = { bottomPanelMode = BottomPanelMode.None }
+                     )
+                 } else if (displayedBottomPanelMode == BottomPanelMode.SideEffect) {
+                     SideEffectFullScreen(
+                         onBack = { bottomPanelMode = BottomPanelMode.None }
+                     )
+                 } else if (displayedBottomPanelMode == BottomPanelMode.Voice) {
+                     VoiceMessageFullScreen(
+                         voiceMessages = displayConversation.messages.filter { message ->
+                             message.type == FloatingChatMessageType.Voice
+                         },
+                         permissionRequestToken = voicePermissionRequestToken,
+                         onSendVoice = { audioUri, durationMs ->
+                             inputMessageActions.sendVoiceMessage(audioUri, durationMs, closePanel = false)
+                         },
+                         onBack = { bottomPanelMode = BottomPanelMode.None }
+                     )
+                 } else if (displayedBottomPanelMode == BottomPanelMode.ToolbarSearch ||
+                    displayedBottomPanelMode == BottomPanelMode.ToolbarScan ||
+                    displayedBottomPanelMode == BottomPanelMode.ToolbarAddFriend
+                ) {
+                    val workspaceMode = when (displayedBottomPanelMode) {
+                        BottomPanelMode.ToolbarSearch -> ToolbarWorkspaceMode.Search
+                        BottomPanelMode.ToolbarScan -> ToolbarWorkspaceMode.Scan
+                        BottomPanelMode.ToolbarAddFriend -> ToolbarWorkspaceMode.AddFriend
+                        else -> error("Unsupported toolbar workspace mode: $displayedBottomPanelMode")
+                    }
+                    ToolbarWorkspaceFullScreen(
+                        mode = workspaceMode,
+                        messages = visibleMessagesForThread(
+                            conversation = displayConversation,
+                            selection = selectedThread,
+                            selectedAccountId = selectedAccount.id
+                        ),
+                        onBack = { bottomPanelMode = BottomPanelMode.None },
+                        onRequestScan = {
+                            bottomPanelMode = BottomPanelMode.None
+                            FloatingChatMediaPickerBridge.requestScan()
+                        },
+                        onOpenAddFriend = {
+                            bottomPanelMode = BottomPanelMode.ToolbarAddFriend
+                        },
+                        onSubmitFriend = { account, message ->
+                            val route = scrmFloatingAccountRouteForContactId(selectedAccount.id)
+                                ?: throw IllegalStateException("当前账号没有可用的 SCRM 设备路由")
+                            withContext(Dispatchers.IO) {
+                                val session = ScrmSettingsManager(context.applicationContext)
+                                    .loadSelectedSessionOrBootstrap()
+                                val result = if (scrmAddFriendInputLooksLikePhone(account)) {
+                                    session.contactApi.addFriendsByPhone(
+                                        com.paifa.ubikitouch.accessibility.scrm.ScrmAddFriendsByPhoneRequest(
+                                            deviceUuid = route.deviceUuid,
+                                            weChatId = route.weChatId,
+                                            phones = listOf(account.trim()),
+                                            message = message.trim().takeIf { it.isNotEmpty() }
+                                        )
+                                    )
+                                } else {
+                                    session.contactApi.addFriend(
+                                        scrmDirectAddFriendRequest(
+                                            deviceUuid = route.deviceUuid,
+                                            weChatId = route.weChatId,
+                                            friendAccount = account,
+                                            message = message
+                                        )
+                                    )
+                                }
+                                if (!result.success) {
+                                    throw IllegalStateException(result.message ?: "好友申请提交失败")
+                                }
+                                friendApplySubmittedStatus(result.message.orEmpty())
+                            }
+                        }
+                    )
+                } else if (displayedBottomPanelMode == BottomPanelMode.QuickPhrase) {
+                    QuickPhraseFullScreen(
+                        phrases = quickPhrases,
+                        onSendPhrase = { phrase -> quickPhraseActions.sendQuickPhrase(phrase) },
+                        onAddPhrase = { phrase -> quickPhraseActions.addQuickPhrase(phrase) },
+                        onUpdatePhrase = { index, phrase -> quickPhraseActions.updateQuickPhrase(index, phrase) },
+                        onDeletePhrase = { index -> quickPhraseActions.deleteQuickPhrase(index) },
+                        onBack = { bottomPanelMode = BottomPanelMode.None }
+                    )
+                } else if (displayedBottomPanelMode == BottomPanelMode.Gallery) {
+                    GalleryFullScreen(
+                        onPickImage = {
+                            bottomPanelMode = BottomPanelMode.None
+                            FloatingChatMediaPickerBridge.requestPick(
+                                FloatingChatPrototype.PickedMediaKind.Image
+                            )
+                        },
+                        onBack = { bottomPanelMode = BottomPanelMode.None }
+                    )
+                } else if (displayedBottomPanelMode == BottomPanelMode.AccountDevice) {
+                    // Reuse the existing accessibility overlay root rather than attaching a new window or dialog.
+                    AccountDeviceFullScreen(
+                        manager = remember(context) { ScrmSettingsManager(context.applicationContext) },
+                        onBack = { bottomPanelMode = BottomPanelMode.None }
+                    )
+                } else if (displayedBottomPanelMode == BottomPanelMode.CustomerProfile) {
+                    // Keep the customer profile inside this overlay root to avoid Window token failures.
+                    CustomerProfileFullScreen(
+                        manager = remember(context) { ScrmSettingsManager(context.applicationContext) },
+                        onBack = { bottomPanelMode = BottomPanelMode.None }
+                    )
+                } else if (displayedBottomPanelMode == BottomPanelMode.HiddenUsers) {
+                    HiddenUsersFullScreen(
+                        participants = (displayConversation.contacts + displayConversation.groupContacts)
+                            .distinctBy { participant -> participant.id }
+                            .sortedBy { participant -> participant.name.lowercase() },
+                        groupIds = displayConversation.groupContacts.map { group -> group.id }.toSet(),
+                        hiddenParticipantIds = hiddenParticipantIds.filterValues { hidden -> hidden }.keys,
+                        onHide = { participant -> hiddenParticipantIds[participant.id] = true },
+                        onRestore = { participant -> hiddenParticipantIds.remove(participant.id) },
+                        onBack = { bottomPanelMode = BottomPanelMode.None }
+                    )
+                } else if (displayedBottomPanelMode == BottomPanelMode.SendName) {
+                    SendNameFullScreen(
+                        accountName = selectedAccount.name,
+                        enabled = sendNameEnabledByAccountId[selectedAccount.id] ?: true,
+                        onEnabledChange = { enabled ->
+                            sendNameEnabledByAccountId = sendNameEnabledByAccountId + (selectedAccount.id to enabled)
+                        },
+                        onBack = { bottomPanelMode = BottomPanelMode.None }
+                    )
+                } else if (displayedBottomPanelMode == BottomPanelMode.Card) {
+                    AccountCardFullScreen(
+                        accounts = effectiveConversation.accountContacts,
+                        accountProfiles = accountProfiles,
+                        onSendAccountCard = { accountId -> toolMessageActions.sendAccountCard(accountId) },
+                        onBack = { bottomPanelMode = BottomPanelMode.None }
+                    )
+                } else if (displayedBottomPanelMode == BottomPanelMode.Location) {
+                    LocationFullScreen(
+                        permissionRequestToken = locationPermissionRequestToken,
+                        isLiveLocation = locationIsLive,
+                        onSendLocation = { location ->
+                            toolMessageActions.addToolMessage(FloatingChatToolAction.Location) { message ->
+                                message.copy(
+                                    type = locationFullScreenMessageType(locationIsLive),
+                                    text = location.title,
+                                    locationTitle = location.title,
+                                    locationAddress = location.address,
+                                    resourceUrl = location.geoUri
+                                )
+                            }
+                        },
+                        onBack = { bottomPanelMode = BottomPanelMode.None }
+                    )
+                } else if (displayedBottomPanelMode == BottomPanelMode.VideoShort) {
+                    VideoShortFullScreen(
+                        onPickVideo = {
+                            bottomPanelMode = BottomPanelMode.None
+                            FloatingChatMediaPickerBridge.requestPick(FloatingChatPrototype.PickedMediaKind.Video)
+                        },
+                        onBack = { bottomPanelMode = BottomPanelMode.None }
+                    )
+                } else if (displayedBottomPanelMode == BottomPanelMode.ChannelsLive) {
+                    ChannelsLiveFullScreen(
+                        channelsLives = displayConversation.messages.filter { message ->
+                            message.type == FloatingChatMessageType.ChannelsLive
+                        },
+                        draftState = channelsLiveDraftState,
+                        onCreateLiveDraft = { snsId, materialName ->
+                            val route = scrmFloatingAccountRouteForContactId(selectedAccount.id)
+                            if (route == null) {
+                                channelsLiveDraftState = ChannelsLiveDraftState.Failed("当前账号没有可用的 SCRM 设备路由")
+                            } else {
+                                channelsLiveDraftState = ChannelsLiveDraftState.Creating
+                                coroutineScope.launch {
+                                    runCatching {
+                                        withContext(Dispatchers.IO) {
+                                            createScrmChannelsLiveMaterial(
+                                                context = context,
+                                                route = route,
+                                                snsId = snsId,
+                                                materialName = materialName
+                                            )
+                                        }
+                                    }.onSuccess { result ->
+                                        channelsLiveDraftState = if (result.success) {
+                                            val readiness = if (result.publishReady) {
+                                                "素材已创建，可进入视频号继续发布"
+                                            } else {
+                                                "素材已创建，待补充：${result.missingFields.joinToString().ifBlank { "服务端校验项" }}"
+                                            }
+                                            ChannelsLiveDraftState.Created(result.safeSummary ?: readiness)
+                                        } else {
+                                            ChannelsLiveDraftState.Failed(result.message ?: "直播素材创建失败")
+                                        }
+                                    }.onFailure { error ->
+                                        channelsLiveDraftState = ChannelsLiveDraftState.Failed(
+                                            error.message ?: "直播素材请求失败"
+                                        )
+                                    }
+                                }
+                            }
+                        },
+                        onBack = { bottomPanelMode = BottomPanelMode.None }
+                    )
+                } else if (displayedBottomPanelMode == BottomPanelMode.WebLink) {
+                    WebLinkFullScreen(
+                        webLinks = displayConversation.messages.filter { message ->
+                            message.type == FloatingChatMessageType.WebLink
+                        },
+                        submissionState = webLinkSubmissionState,
+                        // 使用 iOS 同源的 link-card 接口，成功状态完全来自 SCRM 任务响应。
+                        onSendWebLink = { draft ->
+                            val route = scrmFloatingAccountRouteForContactId(selectedAccount.id)
+                            val conversationId = when (val thread = selectedThread) {
+                                is ChatThreadSelection.Private -> scrmFloatingContactConversationId(thread.contactId)
+                                is ChatThreadSelection.GroupChat -> scrmFloatingContactConversationId(thread.groupId)
+                                ChatThreadSelection.Group -> null
+                            }
+                            if (route == null || conversationId.isNullOrBlank()) {
+                                webLinkSubmissionState = WebLinkSubmissionState.Failed(
+                                    "当前会话没有可用的 SCRM 发送路由"
+                                )
+                            } else {
+                                webLinkSubmissionState = WebLinkSubmissionState.Sending
+                                coroutineScope.launch {
+                                    runCatching {
+                                        withContext(Dispatchers.IO) {
+                                            val session = ScrmSettingsManager(context.applicationContext)
+                                                .loadSelectedSessionOrBootstrap()
+                                            session.messageApi.sendLinkCard(
+                                                ScrmSendLinkCardMessageRequest(
+                                                    deviceUuid = route.deviceUuid,
+                                                    weChatId = route.weChatId,
+                                                    conversationId = conversationId,
+                                                    url = draft.url,
+                                                    title = draft.title,
+                                                    description = draft.description.ifBlank { null },
+                                                    thumb = draft.thumbnailUrl.ifBlank { null }
+                                                )
+                                            )
+                                        }
+                                    }.onSuccess { result ->
+                                        webLinkSubmissionState = if (result.success) {
+                                            WebLinkSubmissionState.Sent("链接发送任务已提交，任务 #${result.taskId}")
+                                        } else {
+                                            WebLinkSubmissionState.Failed(result.message ?: "网页链接发送失败")
+                                        }
+                                    }.onFailure { error ->
+                                        webLinkSubmissionState = WebLinkSubmissionState.Failed(
+                                            error.message ?: "网页链接请求失败"
+                                        )
+                                    }
+                                }
+                            }
+                        },
+                        onBack = { bottomPanelMode = BottomPanelMode.None }
+                    )
+                } else if (displayedBottomPanelMode == BottomPanelMode.Article) {
+                    OfficialArticleFullScreen(
+                        articles = displayConversation.messages.filter { message ->
+                            message.type == FloatingChatMessageType.Article
+                        },
+                        submissionState = officialArticleSubmissionState,
+                        // 对接 iOS 同源的公众号文章卡片接口 /openapi/v1/messages/official-article-card。
+                        onSendArticle = { draft ->
+                            val route = scrmFloatingAccountRouteForContactId(selectedAccount.id)
+                            val conversationId = when (val thread = selectedThread) {
+                                is ChatThreadSelection.Private -> scrmFloatingContactConversationId(thread.contactId)
+                                is ChatThreadSelection.GroupChat -> scrmFloatingContactConversationId(thread.groupId)
+                                ChatThreadSelection.Group -> null
+                            }
+                            if (route == null || conversationId.isNullOrBlank()) {
+                                officialArticleSubmissionState = OfficialArticleSubmissionState.Failed(
+                                    "当前会话没有可用的 SCRM 发送路由"
+                                )
+                            } else {
+                                officialArticleSubmissionState = OfficialArticleSubmissionState.Sending
+                                coroutineScope.launch {
+                                    runCatching {
+                                        withContext(Dispatchers.IO) {
+                                            val session = ScrmSettingsManager(context.applicationContext)
+                                                .loadSelectedSessionOrBootstrap()
+                                            session.messageApi.sendOfficialArticleCard(
+                                                ScrmSendLinkCardMessageRequest(
+                                                    deviceUuid = route.deviceUuid,
+                                                    weChatId = route.weChatId,
+                                                    conversationId = conversationId,
+                                                    url = draft.url,
+                                                    title = draft.title,
+                                                    description = draft.description.ifBlank { null },
+                                                    thumb = draft.thumbnailUrl.ifBlank { null },
+                                                    sourceName = draft.sourceName.ifBlank { "公众号" },
+                                                    source = "official_article"
+                                                )
+                                            )
+                                        }
+                                    }.onSuccess { result ->
+                                        officialArticleSubmissionState = if (result.success) {
+                                            OfficialArticleSubmissionState.Sent("公众号文章发送任务已提交，任务 #${result.taskId}")
+                                        } else {
+                                            OfficialArticleSubmissionState.Failed(result.message ?: "公众号文章发送失败")
+                                        }
+                                    }.onFailure { error ->
+                                        officialArticleSubmissionState = OfficialArticleSubmissionState.Failed(
+                                            error.message ?: "公众号文章请求失败"
+                                        )
+                                    }
+                                }
+                            }
+                        },
+                        onBack = { bottomPanelMode = BottomPanelMode.None }
+                    )
+                } else if (displayedBottomPanelMode == BottomPanelMode.Music) {
+                    MusicFullScreen(
+                        musicMessages = displayConversation.messages.filter { message ->
+                            message.type == FloatingChatMessageType.Music
+                        },
+                        // iOS 音乐分享没有对应的远端接口，分享动作写入本地 Music 消息并保留真实音频地址。
+                        onShareMusic = { draft ->
+                            toolMessageActions.sendMusicMessage(
+                                title = draft.title,
+                                artist = draft.artist,
+                                audioUrl = draft.audioUrl,
+                                durationLabel = draft.durationLabel
+                            )
+                        },
+                        onBack = { bottomPanelMode = BottomPanelMode.None }
+                    )
+                } else if (displayedBottomPanelMode == BottomPanelMode.ChannelsVideo) {
+                    ChannelsVideoFullScreen(
+                        channelsVideos = displayConversation.messages.filter { message ->
+                            message.type == FloatingChatMessageType.ChannelsVideo
+                        },
+                        onSendChannelsVideo = {
+                            toolMessageActions.addToolMessage(FloatingChatToolAction.ChannelsVideo)
+                        },
+                        onBack = { bottomPanelMode = BottomPanelMode.None }
+                    )
+                } else FloatingBottomPanel(
                 mode = displayedBottomPanelMode,
                 scrmContactsRoute = scrmContactsPanelRouteForSelectedAccount(
                     selectedAccountId = selectedAccount.id,
@@ -1888,12 +2510,57 @@ internal fun FloatingChatOverlay(
                 momentPosts = currentMomentPosts,
                 pendingMomentMedia = pendingMomentMedia,
                 favoriteItems = favoriteItems,
+                documentMessages = visibleMessagesForThread(
+                    conversation = displayConversation,
+                    selection = selectedThread,
+                    selectedAccountId = selectedAccount.id
+                ),
+                voiceCallTargetName = when (val thread = selectedThread) {
+                    is ChatThreadSelection.Private -> displayConversation.contacts
+                        .firstOrNull { it.id == thread.contactId }
+                        ?.name ?: displayConversation.peerName
+                    is ChatThreadSelection.GroupChat -> displayConversation.groupContacts
+                        .firstOrNull { it.id == thread.groupId }
+                        ?.name ?: displayConversation.peerName
+                    ChatThreadSelection.Group -> displayConversation.peerName
+                },
+                voiceCallParticipantNames = when (val thread = selectedThread) {
+                    is ChatThreadSelection.Private -> displayConversation.contacts
+                        .firstOrNull { it.id == thread.contactId }
+                        ?.let { listOf(it.name) }.orEmpty()
+                    is ChatThreadSelection.GroupChat -> displayConversation.groupContacts
+                        .firstOrNull { it.id == thread.groupId }
+                        ?.groupMemberContacts?.map { it.name }.orEmpty()
+                    ChatThreadSelection.Group -> displayConversation.contacts.map { it.name }
+                },
+                voiceCallIsGroup = selectedThread !is ChatThreadSelection.Private,
+                videoCallTargetName = when (val thread = selectedThread) {
+                    is ChatThreadSelection.Private -> displayConversation.contacts
+                        .firstOrNull { it.id == thread.contactId }
+                        ?.name ?: displayConversation.peerName
+                    is ChatThreadSelection.GroupChat -> displayConversation.groupContacts
+                        .firstOrNull { it.id == thread.groupId }
+                        ?.name ?: displayConversation.peerName
+                    ChatThreadSelection.Group -> displayConversation.peerName
+                },
+                videoCallParticipantNames = when (val thread = selectedThread) {
+                    is ChatThreadSelection.Private -> displayConversation.contacts
+                        .firstOrNull { it.id == thread.contactId }
+                        ?.let { listOf(it.name) }.orEmpty()
+                    is ChatThreadSelection.GroupChat -> displayConversation.groupContacts
+                        .firstOrNull { it.id == thread.groupId }
+                        ?.groupMemberContacts?.map { it.name }.orEmpty()
+                    ChatThreadSelection.Group -> displayConversation.contacts.map { it.name }
+                },
+                videoCallIsGroup = selectedThread !is ChatThreadSelection.Private,
                 accounts = effectiveConversation.accountContacts,
                 accountProfiles = accountProfiles,
                 aiConfig = aiConfig,
                 aiConfigStatus = aiConfigStatus,
                 aiPredicting = aiPredicting,
                 aiConfigTesting = aiConfigTesting,
+                aiModels = aiModels,
+                aiModelsLoading = aiModelsLoading,
                 transferRecipients = transferRecipientCandidatesForThread(
                     conversation = displayConversation,
                     selectedThread = selectedThread,
@@ -1911,6 +2578,26 @@ internal fun FloatingChatOverlay(
                     }
                 },
                 onTestAiConfig = { candidate -> aiConfigTestActions.test(candidate) },
+                onFetchAiModels = { candidate ->
+                    if (!candidate.isConfigured || aiModelsLoading) return@FloatingBottomPanel
+                    coroutineScope.launch {
+                        aiModelsLoading = true
+                        aiConfigStatus = "正在获取模型列表..."
+                        runCatching {
+                            withContext(Dispatchers.IO) { FloatingChatAiClient().listModels(candidate) }
+                        }.onSuccess { models ->
+                            aiModels = models
+                            aiConfigStatus = "已获取 ${models.size} 个模型"
+                        }.onFailure { error ->
+                            val httpError = error as? FloatingChatAiHttpException
+                            aiConfigStatus = floatingChatAiFailureMessage(
+                                statusCode = httpError?.statusCode,
+                                detail = httpError?.message ?: error.message.orEmpty()
+                            )
+                        }
+                        aiModelsLoading = false
+                    }
+                },
                 onSendQuickPhrase = { phrase -> quickPhraseActions.sendQuickPhrase(phrase) },
                 onAddQuickPhrase = { phrase -> quickPhraseActions.addQuickPhrase(phrase) },
                 onUpdateQuickPhrase = { index, phrase -> quickPhraseActions.updateQuickPhrase(index, phrase) },
@@ -1938,6 +2625,24 @@ internal fun FloatingChatOverlay(
                 onCancelFavoriteSelection = {
                     selectedFavoriteItemIds.clear()
                     favoriteMultiSelectMode = false
+                },
+                onPickDocument = { FloatingChatMediaPickerBridge.requestDocumentPick() },
+                onPreviewDocument = { message -> runtimeState.openDocumentPreview(message) },
+                onEndVoiceCall = { durationSeconds ->
+                    toolMessageActions.addToolMessage(FloatingChatToolAction.VoiceCall) { message ->
+                        message.copy(
+                            text = "语音通话 ${formatVoiceCallDuration(durationSeconds)}",
+                            detail = "已结束"
+                        )
+                    }
+                },
+                onEndVideoCall = { durationSeconds ->
+                    toolMessageActions.addToolMessage(FloatingChatToolAction.VideoCall) { message ->
+                        message.copy(
+                            text = "视频通话 ${formatVoiceCallDuration(durationSeconds)}",
+                            detail = "已结束"
+                        )
+                    }
                 },
                 onSendRedPacket = { amount, greeting, paymentPassword, packetCount ->
                     val route = scrmFloatingAccountRouteForContactId(selectedAccount.id)
@@ -2070,6 +2775,7 @@ internal fun FloatingChatOverlay(
                     }
                 },
                 onSendAccountCard = { accountId -> toolMessageActions.sendAccountCard(accountId) },
+                onSendGroupInvite = { groupId -> toolMessageActions.sendGroupInvite(groupId) },
                 modifier = if (displayedBottomPanelMode.isCenteredToolFeaturePanel()) {
                     Modifier
                         .align(Alignment.Center)

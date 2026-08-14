@@ -21,6 +21,22 @@ class ScrmMessageComposerRequestFactoryTest {
         assertEquals("emoji-md5", request.md5)
     }
 
+    /** 测试流程：在小程序卡片页填写真实链接后生成请求，确认接口 payload 不会遗漏 url。 */
+    @Test
+    fun buildsWeAppCardRequestWithTheRequiredUrl() {
+        val request = buildScrmWeAppCardRequest(
+            route = route,
+            conversationId = "wxid_friend",
+            appId = "wx1234567890abcdee",
+            title = "服务首页",
+            pagePath = "pages/home/index",
+            url = "https://service.example.cn/mini/home",
+            thumb = "https://cdn.example.cn/mini-thumb.png"
+        )
+
+        assertEquals("https://service.example.cn/mini/home", request.url)
+    }
+
     @Test
     fun buildsFilterBatchPreviewWithAConservativeDefaultLimit() {
         val request = buildScrmBatchTextPreview(

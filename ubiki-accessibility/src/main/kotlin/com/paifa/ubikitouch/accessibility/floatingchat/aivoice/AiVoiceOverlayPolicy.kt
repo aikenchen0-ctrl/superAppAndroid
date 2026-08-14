@@ -2,6 +2,14 @@ package com.paifa.ubikitouch.accessibility.floatingchat.aivoice
 
 internal fun rightRailAssistantOpensAiConfigPanel(): Boolean = true
 
+/** Voice assistant uses the same full-screen accessibility workspace as the AI reply settings. */
+internal fun aiVoiceUsesFullscreenWorkspace(): Boolean = true
+
+/** UI test: opening starts below the viewport; closing leaves above it. */
+internal fun aiVoiceEnterOffsetDirection(): Int = 1
+
+internal fun aiVoiceExitOffsetDirection(): Int = -1
+
 internal fun aiConfigPanelSupportsConnectionTest(): Boolean = true
 
 internal fun aiConfigTemperatureLabel(): String = "生成内容温度"

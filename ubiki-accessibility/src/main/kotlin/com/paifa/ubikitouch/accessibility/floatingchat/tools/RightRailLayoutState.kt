@@ -41,11 +41,12 @@ internal fun rightRailUsesAreaBasedExpansion(): Boolean = true
 
 internal fun rightRailUsesIndependentListScrolling(): Boolean = true
 
-internal fun rightRailKeepsAccountAndToolSectionHeightsStableWhileScrolling(): Boolean = false
+/** 测试流程：分别滚动联系人、功能列表，松手两秒后确认对应区域仍保持 70% 高度。 */
+internal fun rightRailKeepsAccountAndToolSectionHeightsStableWhileScrolling(): Boolean = true
 
 internal fun rightRailStopsExpansionAtContentHeightWhenItemsAreShort(): Boolean = true
 
-internal fun rightRailPinsSelectedAccountAvatarWhileScrolledOffscreen(): Boolean = true
+internal fun rightRailPinsSelectedAccountAvatarWhileScrolledOffscreen(): Boolean = false
 
 internal fun rightRailWeightsForAccountWeight(accountWeight: Float): RightRailWeights {
     val safeAccountWeight = rightRailNormalizeAccountWeight(accountWeight).coerceIn(
@@ -172,7 +173,8 @@ private const val RightRailItemGapDp = 6
 private const val RightRailExpansionSlackDp = 10
 private const val RightRailMinimumVisibleToolCount = 3
 private const val RightRailDefaultAccountWeight = 0.48f
-private const val RightRailMinAccountWeight = 0.10f
-private const val RightRailMaxAccountWeight = 0.90f
-private const val RightRailSectionShiftFraction = 0.48f
+// 触摸任一虚拟化列表时扩大该区域，另一侧始终保留至少 30% 高度。
+private const val RightRailMinAccountWeight = 0.30f
+private const val RightRailMaxAccountWeight = 0.70f
+private const val RightRailSectionShiftFraction = 0.25f
 private const val RightRailSectionResizeMs = 140

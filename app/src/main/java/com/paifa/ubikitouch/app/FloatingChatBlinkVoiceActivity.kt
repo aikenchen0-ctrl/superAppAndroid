@@ -95,6 +95,13 @@ class FloatingChatBlinkVoiceActivity : ComponentActivity(), BlinkDetector.BlinkL
         requestWindowFeature(Window.FEATURE_NO_TITLE)
         super.onCreate(savedInstanceState)
         headlessMode = intent.getBooleanExtra(BlinkVoiceHeadlessExtraName, false)
+        if (!headlessMode) {
+            if (!FloatingChatBlinkVoiceOverlayHost.show()) {
+                FloatingChatBlinkVoiceBridge.notifyCaptureClosed()
+            }
+            finish()
+            return
+        }
         setFinishOnTouchOutside(false)
         configureFloatingWindow()
         previewView = PreviewView(this).apply {

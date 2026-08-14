@@ -49,6 +49,12 @@ class UbikiAccessibilityService : AccessibilityService() {
     private lateinit var bottomGestureBarPreviewController: BottomGestureBarPreviewController
     private lateinit var bottomGestureBarIndicatorController: BottomGestureBarIndicatorController
     private lateinit var floatingChatOverlayController: FloatingChatOverlayController
+    private lateinit var favoriteLibraryOverlayController: FavoriteLibraryOverlayController
+    private lateinit var finderPublishOverlayController: FinderPublishOverlayController
+    private lateinit var friendManagementOverlayController: FriendManagementOverlayController
+    private lateinit var aiAutoReplyOverlayController: AiAutoReplyOverlayController
+    private lateinit var contactRelationsOverlayController: ContactRelationsOverlayController
+    private lateinit var leftSidebarOverlayController: LeftSidebarOverlayController
     private lateinit var videoDemoOverlayController: VideoDemoOverlayController
     private lateinit var meteorSwipeEffectController: MeteorSwipeEffectController
     private lateinit var pullDistancePreviewController: PullDistancePreviewController
@@ -165,6 +171,13 @@ class UbikiAccessibilityService : AccessibilityService() {
             onExpandedChanged = ::handleFloatingChatExpandedChanged,
             onOverlayRecreated = ::scheduleBottomGestureBarZOrderRefresh
         )
+        favoriteLibraryOverlayController = FavoriteLibraryOverlayController(this, windowManager)
+        finderPublishOverlayController = FinderPublishOverlayController(this, windowManager)
+        friendManagementOverlayController = FriendManagementOverlayController(this, windowManager)
+        aiAutoReplyOverlayController = AiAutoReplyOverlayController(this, windowManager)
+        contactRelationsOverlayController = ContactRelationsOverlayController(this, windowManager)
+        leftSidebarOverlayController = LeftSidebarOverlayController(this, windowManager)
+        FloatingChatLeftSidebarBridge.loadDisplayMode(this)
         preferences = UbikiPreferences(this)
         actionExecutor = UbikiActionExecutor(
             this,
@@ -246,6 +259,25 @@ class UbikiAccessibilityService : AccessibilityService() {
         }
         if (::videoDemoOverlayController.isInitialized) {
             videoDemoOverlayController.dismissImmediately()
+        }
+        if (::favoriteLibraryOverlayController.isInitialized) {
+            favoriteLibraryOverlayController.dismissImmediately()
+        }
+        FloatingChatBlinkVoiceBridge.dismissFullscreenCapture()
+        if (::finderPublishOverlayController.isInitialized) {
+            finderPublishOverlayController.dismissImmediately()
+        }
+        if (::friendManagementOverlayController.isInitialized) {
+            friendManagementOverlayController.dismissImmediately()
+        }
+        if (::aiAutoReplyOverlayController.isInitialized) {
+            aiAutoReplyOverlayController.dismissImmediately()
+        }
+        if (::contactRelationsOverlayController.isInitialized) {
+            contactRelationsOverlayController.dismissImmediately()
+        }
+        if (::leftSidebarOverlayController.isInitialized) {
+            leftSidebarOverlayController.dismissImmediately()
         }
         if (::meteorSwipeEffectController.isInitialized) {
             meteorSwipeEffectController.dismissImmediately()
@@ -424,19 +456,40 @@ class UbikiAccessibilityService : AccessibilityService() {
     }
 
     fun requestFloatingChatFinderPublish() {
-        val intent = Intent()
-            .setClassName(packageName, "com.paifa.ubikitouch.accessibility.FinderPublishActivity")
-            .addFloatingChatBridgeFlags()
-        runCatching { startActivity(intent) }
-            .onFailure { Log.e(TAG, "failed to start Finder publish", it) }
+        if (!::finderPublishOverlayController.isInitialized) {
+            Log.w(TAG, "skip Finder publish before overlay initialization")
+            return
+        }
+        finderPublishOverlayController.show()
+    }
+
+    /** 右侧 AI 自动回复入口使用独立全屏悬浮页，避免复用聊天内部的底部面板。 */
+    fun requestFloatingChatAiAutoReply() {
+        if (!::aiAutoReplyOverlayController.isInitialized) {
+            Log.w(TAG, "skip AI auto reply before overlay initialization")
+            return
+        }
+        aiAutoReplyOverlayController.show()
     }
 
     fun requestFloatingChatFavoriteLibrary() {
-        val intent = Intent()
-            .setClassName(packageName, "com.paifa.ubikitouch.accessibility.FavoriteLibraryActivity")
-            .addFloatingChatBridgeFlags()
-        runCatching { startActivity(intent) }
-            .onFailure { Log.e(TAG, "failed to start favorite library", it) }
+        if (::floatingChatOverlayController.isInitialized) {
+            FloatingChatFavoriteLibraryBridge.updateSnapshot(
+                floatingChatOverlayController.favoriteLibrarySnapshot()
+            )
+        }
+        if (!::favoriteLibraryOverlayController.isInitialized) {
+            Log.w(TAG, "skip favorite library before overlay initialization")
+            return
+        }
+        favoriteLibraryOverlayController.show()
+    }
+
+    internal fun sendFloatingChatFavorite(
+        item: com.paifa.ubikitouch.accessibility.floatingchat.tools.FavoriteCollectionItem
+    ): Boolean {
+        if (!::floatingChatOverlayController.isInitialized) return false
+        return floatingChatOverlayController.sendFavoriteCollectionItem(item)
     }
 
     fun requestFloatingChatMaterialLibrary() {
@@ -452,7 +505,7 @@ class UbikiAccessibilityService : AccessibilityService() {
         val intent = Intent()
             .setClassName(
                 packageName,
-                "com.paifa.ubikitouch.app.FloatingChatCameraActivity"
+                "com.paifa.ubikitouch.app.FloatingChatPhotoCameraPermissionActivity"
             )
             .addFloatingChatBridgeFlags()
         runCatching {
@@ -479,13 +532,14 @@ class UbikiAccessibilityService : AccessibilityService() {
 
     fun requestFloatingChatBlinkVoiceCapture() {
         hideFloatingChatForExternalActivity("BlinkVoice")
+        if (FloatingChatBlinkVoiceBridge.requestFullscreenCapture()) return
         val intent = Intent()
-            .setClassName(packageName, blinkVoiceBridgeActivityClassName())
+            .setClassName(packageName, "com.paifa.ubikitouch.app.FloatingChatBlinkCameraPermissionActivity")
             .addFloatingChatBridgeFlags()
         runCatching {
             startActivity(intent)
         }.onFailure {
-            Log.e(TAG, "failed to start BlinkVoice capture", it)
+            Log.e(TAG, "failed to request BlinkVoice camera permission", it)
             onFloatingChatBlinkVoiceClosed()
         }
     }
@@ -549,14 +603,11 @@ class UbikiAccessibilityService : AccessibilityService() {
         if (::floatingChatOverlayController.isInitialized) {
             FloatingChatFriendManagementBridge.updateSnapshot(floatingChatOverlayController.friendManagementSnapshot())
         }
-        hideFloatingChatForExternalActivity("friend management")
-        val intent = Intent()
-            .setClassName(packageName, "com.paifa.ubikitouch.app.FriendManagementActivity")
-            .addFloatingChatBridgeFlags()
-        runCatching { startActivity(intent) }.onFailure {
-            Log.e(TAG, "failed to start friend management", it)
-            onFloatingChatFriendManagementClosed()
+        if (!::friendManagementOverlayController.isInitialized) {
+            Log.w(TAG, "skip friend management before overlay initialization")
+            return
         }
+        friendManagementOverlayController.show()
     }
 
     fun requestFloatingChatContactRelations() {
@@ -568,15 +619,23 @@ class UbikiAccessibilityService : AccessibilityService() {
                 groups = friendSnapshot.groups
             )
         }
-        hideFloatingChatForExternalActivity("contact relations")
-        val intent = Intent()
-            .setClassName(packageName, "com.paifa.ubikitouch.app.ContactRelationsActivity")
-            .addFloatingChatBridgeFlags()
-        runCatching { startActivity(intent) }.onFailure {
-            Log.e(TAG, "failed to start contact relations", it)
-            onFloatingChatContactRelationsClosed()
+        if (!::contactRelationsOverlayController.isInitialized) {
+            Log.w(TAG, "skip contact relations before overlay initialization")
+            return
         }
-        FloatingChatContactRelationsBridge.refresh()
+        contactRelationsOverlayController.show()
+    }
+
+    /** 打开左侧全部前先从当前 SCRM 会话同步快照，模式由 Bridge 的持久化状态提供。 */
+    fun requestFloatingChatLeftSidebar() {
+        if (::floatingChatOverlayController.isInitialized) {
+            FloatingChatLeftSidebarBridge.updateSnapshot(floatingChatOverlayController.leftSidebarSnapshot())
+        }
+        if (!::leftSidebarOverlayController.isInitialized) {
+            Log.w(TAG, "skip left sidebar before overlay initialization")
+            return
+        }
+        leftSidebarOverlayController.show()
     }
 
     fun requestFloatingChatTransfer() {

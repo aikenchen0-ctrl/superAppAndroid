@@ -25,10 +25,12 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface as MaterialSurface
@@ -564,6 +566,31 @@ internal fun AccountCardPickerPanel(
                     ) {
                         AccountCardPreview(profile = profile)
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun GroupInvitePickerPanel(
+    groups: List<FloatingChatContact>,
+    onBack: () -> Unit,
+    onSend: (FloatingChatContact) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = OverlayTokens.panelPrimaryText)
+            }
+            TextLabel(text = "群邀请卡", size = 12.sp, weight = FontWeight.SemiBold, color = OverlayTokens.panelPrimaryText, maxLines = 1)
+        }
+        TextLabel(text = "选择要邀请加入的群聊", size = 9.sp, color = OverlayTokens.panelSecondaryText, maxLines = 1)
+        if (groups.isEmpty()) TextLabel(text = "暂无可用群聊", size = 10.sp, color = OverlayTokens.panelSecondaryText, maxLines = 1)
+        else LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            itemsIndexed(groups) { _, group ->
+                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { onSend(group) }) {
+                    AccountCardPreview(profile = defaultAccountProfileFor(group))
                 }
             }
         }

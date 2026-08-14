@@ -144,6 +144,10 @@ internal interface ScrmMomentApi {
         materialId: Long,
         request: ScrmMomentMaterialCopyRequest
     ): ScrmMomentMaterial
+    fun copyMomentToFinderMaterial(
+        snsId: Long,
+        request: ScrmMomentCopyFinderMaterialRequest
+    ): ScrmMomentCopyFinderMaterialResult
     fun archiveMomentMaterial(
         materialId: Long,
         request: ScrmMomentMaterialControlRequest
@@ -207,10 +211,12 @@ internal interface ScrmContactApi {
         count: Int = 50,
         pendingOnly: Boolean = false
     ): List<ScrmFriendRequest>
+    fun pullFriendRequests(request: ScrmPullFriendRequestsRequest): ScrmTaskSubmissionResult
     fun handleFriendRequest(request: ScrmHandleFriendRequestRequest): ScrmTaskSubmissionResult
 }
 
 internal interface ScrmChatRoomApi {
+    fun getGroupInvitations(query: ScrmGroupInvitationQuery = ScrmGroupInvitationQuery()): List<ScrmGroupInvitation>
     fun getChatRooms(query: ScrmChatRoomQuery = ScrmChatRoomQuery()): ScrmChatRoomPage
     fun getChatRoomMembers(
         chatRoomId: String,
@@ -276,6 +282,18 @@ internal class ScrmApiClient(
     override fun getDevices(): List<ScrmDevice> = get("devices")
 
     override fun getWechatAccounts(): List<ScrmWechatAccount> = get("wechat-accounts")
+
+    override fun getGroupInvitations(query: ScrmGroupInvitationQuery): List<ScrmGroupInvitation> {
+        return get(
+            path = "group-invitations",
+            query = linkedMapOf(
+                "weChatId" to query.weChatId,
+                "chatRoomId" to query.chatRoomId,
+                "count" to query.count.toString(),
+                "pendingOnly" to query.pendingOnly.toString()
+            )
+        )
+    }
 
     override fun getQuickStart(
         deviceUuid: String?,
@@ -823,6 +841,22 @@ internal class ScrmApiClient(
             path = "moments/materials/$materialId/copy",
             body = json.encodeToString(request),
             safeRoute = "/openapi/v1/moments/materials/{materialId}/copy"
+        )
+    }
+
+    /**
+     * 从已同步朋友圈创建视频号动态或直播素材草稿。
+     * 测试流程：传入真实 snsId 与 preferredType=live，验证 POST 路由和响应中的 publishReady。
+     */
+    override fun copyMomentToFinderMaterial(
+        snsId: Long,
+        request: ScrmMomentCopyFinderMaterialRequest
+    ): ScrmMomentCopyFinderMaterialResult {
+        require(snsId > 0L) { "snsId must be greater than 0" }
+        return post(
+            path = "moments/$snsId/copy-finder-material",
+            body = json.encodeToString(request),
+            safeRoute = "/openapi/v1/moments/{snsId}/copy-finder-material"
         )
     }
 
@@ -1398,6 +1432,17 @@ internal class ScrmApiClient(
             path = "friend-requests/handle",
             body = json.encodeToString(request),
             safeRoute = "/openapi/v1/friend-requests/handle"
+        )
+    }
+
+    /** 对应 iOS 拉取好友申请流程，任务回包后由页面重新读取服务端列表。 */
+    override fun pullFriendRequests(
+        request: ScrmPullFriendRequestsRequest
+    ): ScrmTaskSubmissionResult {
+        return post(
+            path = "friend-requests/pull",
+            body = json.encodeToString(request),
+            safeRoute = "/openapi/v1/friend-requests/pull"
         )
     }
 

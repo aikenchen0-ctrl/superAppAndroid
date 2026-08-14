@@ -47,16 +47,29 @@ class FloatingChatMediaPickerActivity : Activity() {
         }
     }
 
+    /** 对齐 iOS PHPicker：接收系统图库的单选或多选真实 URI，不在此层构造媒体数据。 */
     @Deprecated("Used for the platform media picker result bridge.")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_PICK_MEDIA && resultCode == RESULT_OK) {
-            val uri = data?.data
-            if (uri != null) {
-                val pickedKind = resolvedMediaKindFor(uri, mediaKind)
-                grantReadAccess(uri)
+            val selectedUris = buildList {
+                data?.clipData?.let { clipData ->
+                    repeat(clipData.itemCount) { index ->
+                        add(clipData.getItemAt(index).uri)
+                    }
+                }
+                data?.data?.let { uri ->
+                    if (isEmpty()) add(uri)
+                }
+            }.distinct()
+            if (selectedUris.isNotEmpty()) {
+                val selections = selectedUris.map { uri ->
+                    val pickedKind = resolvedMediaKindFor(uri, mediaKind)
+                    grantReadAccess(uri)
+                    PickedMediaSelection(pickedKind, uri, mediaTarget)
+                }
                 pickerLifecycle.startPickedMediaProcessing()
-                processPickedMediaInBackground(pickedKind, uri, mediaTarget)
+                processPickedMediaInBackground(selections)
                 return
             }
         }
@@ -79,13 +92,15 @@ class FloatingChatMediaPickerActivity : Activity() {
             FloatingChatPrototype.PickedMediaKind.Image -> MediaStore.Images.Media.EXTERNAL_CONTENT_URI
             FloatingChatPrototype.PickedMediaKind.Video -> MediaStore.Video.Media.EXTERNAL_CONTENT_URI
         }
-        return Intent(Intent.ACTION_PICK, mediaUri).apply {
+        return Intent(Intent.ACTION_OPEN_DOCUMENT, mediaUri).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
             if (kind == FloatingChatPrototype.PickedMediaKind.Any) {
                 setType("*/*")
                 putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "video/*"))
             } else {
                 setType(type)
             }
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
     }
@@ -109,49 +124,53 @@ class FloatingChatMediaPickerActivity : Activity() {
         }
     }
 
-    private fun processPickedMediaInBackground(
-        mediaKind: FloatingChatPrototype.PickedMediaKind,
-        uri: Uri,
-        target: FloatingChatMediaTarget
-    ) {
+    /** 先在后台顺序处理所有选择项，再按原顺序通过桥接交付聊天层。 */
+    private fun processPickedMediaInBackground(selections: List<PickedMediaSelection>) {
         mediaProcessingExecutor.execute {
-            val result = runCatching {
-                val previewUri = cachePreviewFor(mediaKind, uri) ?: uri
-                val playbackUri = cacheOriginalMediaFor(mediaKind, uri) ?: uri
-                val mediaMeta = mediaMetadataFor(mediaKind, uri)
-                ProcessedPickedMedia(
-                    mediaUri = playbackUri,
-                    previewUri = previewUri,
-                    orientation = mediaMeta.orientation,
-                    aspectRatio = mediaMeta.aspectRatio
-                )
-            }.onFailure { error ->
-                Log.w(TAG, "failed to process picked floating chat media", error)
-            }.getOrElse {
-                ProcessedPickedMedia(
-                    mediaUri = uri,
-                    previewUri = uri,
-                    orientation = if (mediaKind == FloatingChatPrototype.PickedMediaKind.Video) {
-                        FloatingChatThumbnailOrientation.Horizontal
-                    } else {
-                        FloatingChatThumbnailOrientation.Vertical
-                    },
-                    aspectRatio = null
-                )
-            }
+            val results = selections.map(::processPickedMedia)
             mainHandler.post {
                 pickerLifecycle.completePickedMediaProcessing {
-                    FloatingChatMediaPickerBridge.deliverPickedMedia(
-                        mediaKind = mediaKind,
-                        mediaUri = result.mediaUri,
-                        previewUri = result.previewUri,
-                        orientation = result.orientation,
-                        aspectRatio = result.aspectRatio,
-                        target = target
-                    )
+                    results.forEach { result ->
+                        FloatingChatMediaPickerBridge.deliverPickedMedia(
+                            mediaKind = result.mediaKind,
+                            mediaUri = result.media.mediaUri,
+                            previewUri = result.media.previewUri,
+                            orientation = result.media.orientation,
+                            aspectRatio = result.media.aspectRatio,
+                            target = result.target
+                        )
+                    }
                 }
             }
         }
+    }
+
+    private fun processPickedMedia(selection: PickedMediaSelection): ProcessedMediaSelection {
+        val result = runCatching {
+            val previewUri = cachePreviewFor(selection.mediaKind, selection.uri) ?: selection.uri
+            val playbackUri = cacheOriginalMediaFor(selection.mediaKind, selection.uri) ?: selection.uri
+            val mediaMeta = mediaMetadataFor(selection.mediaKind, selection.uri)
+            ProcessedPickedMedia(
+                mediaUri = playbackUri,
+                previewUri = previewUri,
+                orientation = mediaMeta.orientation,
+                aspectRatio = mediaMeta.aspectRatio
+            )
+        }.onFailure { error ->
+            Log.w(TAG, "failed to process picked floating chat media", error)
+        }.getOrElse {
+            ProcessedPickedMedia(
+                mediaUri = selection.uri,
+                previewUri = selection.uri,
+                orientation = if (selection.mediaKind == FloatingChatPrototype.PickedMediaKind.Video) {
+                    FloatingChatThumbnailOrientation.Horizontal
+                } else {
+                    FloatingChatThumbnailOrientation.Vertical
+                },
+                aspectRatio = null
+            )
+        }
+        return ProcessedMediaSelection(selection.mediaKind, result, selection.target)
     }
 
     private fun cachePreviewFor(
@@ -330,6 +349,18 @@ class FloatingChatMediaPickerActivity : Activity() {
         val previewUri: Uri,
         val orientation: FloatingChatThumbnailOrientation,
         val aspectRatio: Float?
+    )
+
+    private data class PickedMediaSelection(
+        val mediaKind: FloatingChatPrototype.PickedMediaKind,
+        val uri: Uri,
+        val target: FloatingChatMediaTarget
+    )
+
+    private data class ProcessedMediaSelection(
+        val mediaKind: FloatingChatPrototype.PickedMediaKind,
+        val media: ProcessedPickedMedia,
+        val target: FloatingChatMediaTarget
     )
 
     companion object {

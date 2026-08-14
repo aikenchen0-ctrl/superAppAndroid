@@ -59,6 +59,7 @@ internal fun messageBubbleBorderColor(message: FloatingChatMessage, claimed: Boo
         return when {
             message.kind == FloatingChatMessageKind.AiDraft -> OverlayTokens.aiBorder
             message.type == FloatingChatMessageType.Location ||
+                message.type == FloatingChatMessageType.LiveLocation ||
                 message.type == FloatingChatMessageType.InlineLocation -> OverlayTokens.locationCardBorder
             message.type == FloatingChatMessageType.ContactLink ||
                 message.type == FloatingChatMessageType.InlineContact -> OverlayTokens.contactCardBorder
@@ -84,6 +85,7 @@ private fun cardMessageColor(message: FloatingChatMessage): Color {
 private fun cardMessageColorFor(type: FloatingChatMessageType): Color {
     return when (type) {
         FloatingChatMessageType.Location,
+        FloatingChatMessageType.LiveLocation,
         FloatingChatMessageType.InlineLocation -> OverlayTokens.locationCard
         FloatingChatMessageType.ContactLink,
         FloatingChatMessageType.InlineContact -> OverlayTokens.contactCard
@@ -201,6 +203,7 @@ internal fun messageTypeUsesImModuleBubble(type: FloatingChatMessageType): Boole
         FloatingChatMessageType.MixedText,
         FloatingChatMessageType.Quote,
         FloatingChatMessageType.Location,
+        FloatingChatMessageType.LiveLocation,
         FloatingChatMessageType.ContactLink,
         FloatingChatMessageType.MiniProgramLink,
         FloatingChatMessageType.FilePreview,

@@ -4,6 +4,18 @@ import com.paifa.ubikitouch.accessibility.floatingchat.chat.groupMemberRailConta
 import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingContactConversationId
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
+
+/** 群信息全屏页的三个高性能分页，与 iOS 的资料和成员分区对应。 */
+internal enum class GroupInfoFullScreenTab(val label: String) {
+    Profile("群资料"),
+    Members("成员"),
+    Settings("设置")
+}
+
+/** 成员列表至少保留头像或名称，避免列表失去可识别性。 */
+internal fun groupInfoCanHideMemberIdentity(showAvatars: Boolean, showNames: Boolean): Boolean {
+    return showAvatars || showNames
+}
 internal fun groupInfoMemberCount(members: List<FloatingChatContact>): Int {
     return members.size
 }

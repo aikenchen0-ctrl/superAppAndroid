@@ -97,10 +97,15 @@ private fun createVoiceRecorderSession(context: Context): VoiceRecorderSession {
 }
 
 
+/**
+ * 真实录音组件：申请麦克风权限并生成 AAC/m4a 文件，停止录音后把本地 URI 和时长交给消息发送链路。
+ * 测试流程：允许录音权限，开始录音后等待一秒以上，点击停止发送并确认当前会话出现可播放语音。
+ */
 @Composable
 internal fun RealVoiceInputPanel(
     permissionRequestToken: Int,
-    onSendVoice: (String, Int) -> Unit
+    onSendVoice: (String, Int) -> Unit,
+    showCancelButton: Boolean = true
 ) {
     val context = LocalContext.current
     var state by remember { mutableStateOf(VoiceInputState.Idle) }
@@ -216,7 +221,7 @@ internal fun RealVoiceInputPanel(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
         ) {
-            if (state == VoiceInputState.Recording) {
+            if (showCancelButton && state == VoiceInputState.Recording) {
                 SmallChoiceButton(
                     label = "取消",
                     onClick = { stopRecording(false) }

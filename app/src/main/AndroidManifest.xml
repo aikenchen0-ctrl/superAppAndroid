@@ -50,7 +50,7 @@
             android:excludeFromRecents="true"
             android:exported="false"
             android:taskAffinity="com.paifa.ubikitouch.floatingchat"
-            android:theme="@style/Theme.UbikiTouch" />
+            android:theme="@style/Theme.UbikiTouch.Transparent" />
         <activity
             android:name=".MaterialLibraryActivity"
             android:excludeFromRecents="true"
@@ -132,11 +132,25 @@
             android:theme="@style/Theme.UbikiTouch.MediaPreview" />
 
         <activity
+            android:name=".FloatingChatPhotoCameraPermissionActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity="com.paifa.ubikitouch.floatingchat"
+            android:theme="@style/Theme.UbikiTouch.Transparent" />
+
+        <activity
             android:name=".FloatingChatBlinkVoiceActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:taskAffinity="com.paifa.ubikitouch.floatingchat"
             android:theme="@style/Theme.UbikiTouch.FloatingBlinkVoice" />
+
+        <activity
+            android:name=".FloatingChatBlinkCameraPermissionActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity="com.paifa.ubikitouch.floatingchat"
+            android:theme="@style/Theme.UbikiTouch.Transparent" />
 
         <activity
             android:name=".FloatingChatVoicePermissionActivity"

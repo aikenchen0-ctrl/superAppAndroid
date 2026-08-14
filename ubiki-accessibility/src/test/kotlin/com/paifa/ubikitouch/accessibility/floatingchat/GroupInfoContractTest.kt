@@ -39,7 +39,10 @@ class GroupInfoContractTest {
     @Test
     fun commandEventsMapToExplicitHostActions() {
         assertEquals(GroupInfoAction.RenameGroup, groupInfoAction(GroupInfoUiEvent.RenameRequested))
+        assertEquals(GroupInfoAction.RefreshGroup, groupInfoAction(GroupInfoUiEvent.RefreshRequested))
         assertEquals(GroupInfoAction.PublishAnnouncement, groupInfoAction(GroupInfoUiEvent.PublishAnnouncementRequested))
+        assertEquals(GroupInfoAction.SaveRemark, groupInfoAction(GroupInfoUiEvent.SaveRemarkRequested))
+        assertEquals(GroupInfoAction.SaveMyNickname, groupInfoAction(GroupInfoUiEvent.SaveMyNicknameRequested))
         assertEquals(GroupInfoAction.LoadQrCode, groupInfoAction(GroupInfoUiEvent.QrCodeRequested))
         assertEquals(GroupInfoAction.SearchChatHistory, groupInfoAction(GroupInfoUiEvent.SearchChatHistoryRequested))
         assertEquals(GroupInfoAction.ClearChatHistory, groupInfoAction(GroupInfoUiEvent.ClearChatHistoryRequested))

@@ -6,6 +6,8 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterial
 import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterialControlRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterialCopyRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterialCreateRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentCopyFinderMaterialRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentCopyFinderMaterialResult
 import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterialDetail
 import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterialQuery
 import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentPostPayload
@@ -55,6 +57,27 @@ internal fun scrmMomentMaterialCreateRequest(
 
 internal fun copyScrmMomentMaterial(context: Context, material: ScrmMomentMaterial): ScrmMomentMaterial =
     session(context).momentApi.copyMomentMaterial(material.id, ScrmMomentMaterialCopyRequest("${material.displayName} 副本", true))
+
+/**
+ * 视频号直播页面从已同步朋友圈创建素材草稿，不拼接原始 XML，也不在客户端伪造发布结果。
+ * 测试流程：使用真实 snsId 打开视频号直播，提交后检查服务端返回的 publishReady 与 missingFields。
+ */
+internal fun createScrmChannelsLiveMaterial(
+    context: Context,
+    route: ScrmFloatingAccountRoute,
+    snsId: Long,
+    materialName: String?
+): ScrmMomentCopyFinderMaterialResult = session(context).momentApi.copyMomentToFinderMaterial(
+    snsId = snsId,
+    request = ScrmMomentCopyFinderMaterialRequest(
+        deviceUuid = route.deviceUuid,
+        weChatId = route.weChatId,
+        snsId = snsId,
+        preferredType = "live",
+        materialName = materialName?.trim()?.takeIf { it.isNotBlank() },
+        enableImmediately = true
+    )
+)
 
 internal fun archiveScrmMomentMaterial(context: Context, material: ScrmMomentMaterial): ScrmMomentMaterial =
     session(context).momentApi.archiveMomentMaterial(material.id, ScrmMomentMaterialControlRequest("app archive"))

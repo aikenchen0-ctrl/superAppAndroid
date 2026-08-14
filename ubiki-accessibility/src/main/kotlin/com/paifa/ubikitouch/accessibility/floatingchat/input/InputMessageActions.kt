@@ -30,9 +30,12 @@ internal class InputMessageActions(
         }
     }
 
-    fun sendVoiceMessage(audioUri: String, durationMs: Int) {
+    /** 录音完成后创建语音消息；SCRM 路由可用时由既有出站队列执行语音上传和发送接口。 */
+    fun sendVoiceMessage(audioUri: String, durationMs: Int, closePanel: Boolean = true) {
         outgoingMessageActions.addVoiceMessage(audioUri, durationMs)
-        onBottomPanelModeChanged(BottomPanelMode.None)
+        if (closePanel) {
+            onBottomPanelModeChanged(BottomPanelMode.None)
+        }
     }
 
     fun showBlinkInputStatus(message: String, autoDismiss: Boolean) {

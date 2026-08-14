@@ -21,4 +21,36 @@ class ToolActionDispatchTest {
             toolActionDispatchFor(FloatingChatToolAction.Finder)
         )
     }
+
+    @Test
+    fun favoriteActionOpensTheFavoriteLibrary() {
+        assertEquals(
+            ToolActionDispatch.OpenFavoriteLibrary,
+            toolActionDispatchFor(FloatingChatToolAction.Favorite)
+        )
+    }
+
+    @Test
+    fun uiComponentsActionOpensTheUiComponentsWorkspace() {
+        assertEquals(
+            ToolActionDispatch.OpenBottomPanel(BottomPanelMode.UiComponents),
+            toolActionDispatchFor(FloatingChatToolAction.UiComponents)
+        )
+    }
+
+    @Test
+    fun miniProgramActionOpensTheMiniProgramWorkspace() {
+        assertEquals(
+            ToolActionDispatch.OpenBottomPanel(BottomPanelMode.MiniProgram),
+            toolActionDispatchFor(FloatingChatToolAction.MiniProgram)
+        )
+    }
+
+    @Test
+    fun reviewRequestsActionOpensTheReviewRequestsWorkspace() {
+        assertEquals(
+            ToolActionDispatch.OpenBottomPanel(BottomPanelMode.ReviewRequests),
+            toolActionDispatchFor(FloatingChatToolAction.ReviewRequests)
+        )
+    }
 }

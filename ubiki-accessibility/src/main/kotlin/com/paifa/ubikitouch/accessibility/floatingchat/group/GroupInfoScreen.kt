@@ -1,285 +1,406 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.group
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
-import com.paifa.ubikitouch.accessibility.floatingchat.components.TextLabel
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoMemberUiState
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoUiEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoUiState
+import kotlinx.coroutines.launch
 
+private const val GroupInfoAnimationDurationMillis = 260
+
+/**
+ * iOS 群信息的 Android 全屏悬浮实现。
+ *
+ * 测试流程：从群聊右侧工具进入，检查 30dp 顶部安全区、三个分页及返回动画；依次刷新群资料、
+ * 编辑资料、邀请成员和切换群设置，确认 SCRM 返回状态显示在页面顶部。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun GroupInfoScreen(
     state: GroupInfoUiState,
     onEvent: (GroupInfoUiEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    LazyColumn(
-        modifier = modifier.fillMaxWidth().background(PageBackground),
-        contentPadding = PaddingValues(bottom = 12.dp)
+    val scope = rememberCoroutineScope()
+    val pagerState = rememberPagerState(pageCount = { GroupInfoFullScreenTab.entries.size })
+    var pageHeightPx by remember { mutableFloatStateOf(0f) }
+    var entered by remember { mutableStateOf(false) }
+    val translationY = remember { Animatable(0f) }
+
+    LaunchedEffect(pageHeightPx) {
+        if (pageHeightPx > 0f && !entered) {
+            translationY.snapTo(pageHeightPx)
+            translationY.animateTo(0f, tween(GroupInfoAnimationDurationMillis))
+            entered = true
+        }
+    }
+
+    fun closeFullScreenView() {
+        scope.launch {
+            translationY.animateTo(pageHeightPx, tween(GroupInfoAnimationDurationMillis))
+            onEvent(GroupInfoUiEvent.BackRequested)
+        }
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
+            .onSizeChanged { pageHeightPx = it.height.toFloat() }
+            .graphicsLayer { this.translationY = translationY.value }
     ) {
-        item { GroupInfoTopBar(state.memberCount) { onEvent(GroupInfoUiEvent.BackRequested) } }
-        if (state.status != null || state.error != null) {
-            item { StatusRow(state.error ?: state.status.orEmpty(), state.error != null) }
-        }
-        items(memberRows(state), key = { row -> row.joinToString("-") { it.id } }) { row ->
-            GroupInfoMemberGridRow(row, state.canManageMembers, onEvent)
-        }
-        item { GroupInfoSectionGap() }
-        item { Section { InfoRow("群管理操作") { onEvent(GroupInfoUiEvent.ScrmManagementRequested) } } }
-        item { GroupInfoSectionGap() }
-        item {
-            Section {
-                GroupInfoEditableRow("缇よ亰鍚嶇О", state.groupName, "濉啓缇よ亰鍚嶇О", {
-                    onEvent(GroupInfoUiEvent.GroupNameChanged(it))
-                }, actionLabel = "淇濆瓨", actionEnabled = !state.loading && state.groupName.isNotBlank()) {
-                    onEvent(GroupInfoUiEvent.RenameRequested)
+        // Accessibility overlay does not automatically consume system-bar insets.
+        Spacer(Modifier.height(30.dp))
+        TopAppBar(
+            title = {
+                Text(
+                    text = "群信息",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Normal
+                )
+            },
+            navigationIcon = {
+                IconButton(onClick = ::closeFullScreenView) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                 }
-                Divider()
-                GroupInfoQrRow { onEvent(GroupInfoUiEvent.QrCodeRequested) }
-                Divider()
-                GroupInfoEditableRow("群公告", state.announcement, "未设置", {
-                    onEvent(GroupInfoUiEvent.AnnouncementChanged(it))
-                }, maxLines = 2, actionLabel = "发布", actionEnabled = !state.loading && state.announcement.isNotBlank()) {
-                    onEvent(GroupInfoUiEvent.PublishAnnouncementRequested)
+            },
+            actions = {
+                IconButton(
+                    onClick = { onEvent(GroupInfoUiEvent.RefreshRequested) },
+                    enabled = !state.loading
+                ) {
+                    Icon(Icons.Filled.Refresh, contentDescription = "刷新群资料")
                 }
-                Divider()
-                GroupInfoEditableRow("备注", state.remark, "添加备注", {
-                    onEvent(GroupInfoUiEvent.RemarkChanged(it))
-                })
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
+        )
+        TabRow(selectedTabIndex = pagerState.currentPage) {
+            GroupInfoFullScreenTab.entries.forEachIndexed { index, tab ->
+                Tab(
+                    selected = pagerState.currentPage == index,
+                    onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
+                    text = { Text(tab.label, fontWeight = FontWeight.Normal) }
+                )
             }
         }
-        item { GroupInfoSectionGap() }
-        item { Section { InfoRow("查找聊天记录") { onEvent(GroupInfoUiEvent.SearchChatHistoryRequested) } } }
-        item { GroupInfoSectionGap() }
-        item {
-            Section {
-                SwitchRow("消息免打扰", state.muted) { onEvent(GroupInfoUiEvent.MutedChanged(it)) }
-                Divider()
-                SwitchRow("置顶聊天", state.pinned) { onEvent(GroupInfoUiEvent.PinnedChanged(it)) }
-                Divider()
-                SwitchRow("保存到通讯录", state.savedToContacts) {
-                    onEvent(GroupInfoUiEvent.SavedToContactsChanged(it))
-                }
+        GroupInfoStatus(state)
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize()
+        ) { page ->
+            when (GroupInfoFullScreenTab.entries[page]) {
+                GroupInfoFullScreenTab.Profile -> GroupInfoProfilePage(state, onEvent)
+                GroupInfoFullScreenTab.Members -> GroupInfoMembersPage(state, onEvent)
+                GroupInfoFullScreenTab.Settings -> GroupInfoSettingsPage(state, onEvent)
             }
         }
-        item { GroupInfoSectionGap() }
-        item {
-            Section {
-                GroupInfoEditableRow("我在群里的昵称", state.myNickname, "濉啓鏄电О", {
-                    onEvent(GroupInfoUiEvent.MyNicknameChanged(it))
-                })
-                Divider()
-                SwitchRow("显示群成员昵称", state.memberNicknamesVisible) {
-                    onEvent(GroupInfoUiEvent.MemberNicknamesVisibleChanged(it))
-                }
-                Divider()
-                SwitchRow("显示群成员头像", state.memberAvatarsVisible) {
-                    onEvent(GroupInfoUiEvent.MemberAvatarsVisibleChanged(it))
-                }
-            }
-        }
-        item { GroupInfoSectionGap() }
-        item {
-            Section {
-                GroupInfoEditableRow("设置当前聊天背景", state.backgroundLabel, "榛樿鑳屾櫙", {
-                    onEvent(GroupInfoUiEvent.BackgroundChanged(it))
-                })
-                Divider()
-                InfoRow("清空聊天记录") { onEvent(GroupInfoUiEvent.ClearChatHistoryRequested) }
-                Divider()
-                InfoRow("鎶曡瘔") { onEvent(GroupInfoUiEvent.ReportRequested) }
-            }
-        }
-        item { DestructiveRow { onEvent(GroupInfoUiEvent.ExitGroupRequested) } }
-    }
-}
-
-private data class MemberCell(val id: String, val member: GroupInfoMemberUiState? = null, val action: Int = 0)
-
-private fun memberRows(state: GroupInfoUiState): List<List<MemberCell>> {
-    val cells = state.members.map { MemberCell(it.id, it) }.toMutableList()
-    cells += MemberCell("add", action = 1)
-    if (state.canManageMembers) cells += MemberCell("remove", action = -1)
-    return cells.chunked(5)
-}
-
-@Composable
-private fun GroupInfoTopBar(memberCount: Int, onBack: () -> Unit) {
-    Box(Modifier.fillMaxWidth().height(48.dp).background(CardBackground)) {
-        IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "杩斿洖", tint = PrimaryText)
-        }
-        TextLabel("聊天信息($memberCount)", 15.sp, modifier = Modifier.align(Alignment.Center),
-            weight = FontWeight.SemiBold, color = PrimaryText, maxLines = 1)
     }
 }
 
 @Composable
-private fun StatusRow(text: String, error: Boolean) {
-    TextLabel(text, 10.sp, color = if (error) Color(0xFFE45858) else SecondaryText,
-        lineHeight = 13.sp, maxLines = 2,
-        modifier = Modifier.fillMaxWidth().background(CardBackground).padding(horizontal = 20.dp, vertical = 8.dp))
+private fun GroupInfoStatus(state: GroupInfoUiState) {
+    val message = state.error ?: state.status ?: return
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+        colors = androidx.compose.material3.CardDefaults.cardColors(
+            containerColor = if (state.error != null) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (state.loading) {
+                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(10.dp))
+            }
+            Text(
+                text = message,
+                color = if (state.error != null) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
+}
+
+/** iOS 群名称、公告、二维码、备注与群内昵称对应的资料分页。 */
+@Composable
+private fun GroupInfoProfilePage(state: GroupInfoUiState, onEvent: (GroupInfoUiEvent) -> Unit) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp)
+    ) {
+        item { GroupInfoSectionTitle("群资料") }
+        item {
+            GroupInfoEditableField(
+                label = "群聊名称",
+                value = state.groupName,
+                actionLabel = "保存",
+                onValueChange = { onEvent(GroupInfoUiEvent.GroupNameChanged(it)) },
+                onAction = { onEvent(GroupInfoUiEvent.RenameRequested) },
+                enabled = !state.loading
+            )
+        }
+        item {
+            GroupInfoEditableField(
+                label = "群公告",
+                value = state.announcement,
+                actionLabel = "发布",
+                singleLine = false,
+                onValueChange = { onEvent(GroupInfoUiEvent.AnnouncementChanged(it)) },
+                onAction = { onEvent(GroupInfoUiEvent.PublishAnnouncementRequested) },
+                enabled = !state.loading
+            )
+        }
+        item {
+            GroupInfoEditableField(
+                label = "群备注",
+                value = state.remark,
+                actionLabel = "保存",
+                onValueChange = { onEvent(GroupInfoUiEvent.RemarkChanged(it)) },
+                onAction = { onEvent(GroupInfoUiEvent.SaveRemarkRequested) },
+                enabled = !state.loading
+            )
+        }
+        item {
+            GroupInfoEditableField(
+                label = "我在群里的昵称",
+                value = state.myNickname,
+                actionLabel = "保存",
+                onValueChange = { onEvent(GroupInfoUiEvent.MyNicknameChanged(it)) },
+                onAction = { onEvent(GroupInfoUiEvent.SaveMyNicknameRequested) },
+                enabled = !state.loading
+            )
+        }
+        item {
+            OutlinedButton(
+                onClick = { onEvent(GroupInfoUiEvent.QrCodeRequested) },
+                enabled = !state.loading,
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("拉取群二维码", fontWeight = FontWeight.Normal) }
+        }
+    }
+}
+
+/** iOS 成员列表对应的 LazyColumn，邀请和移出复用已有真实成员接口。 */
+@Composable
+private fun GroupInfoMembersPage(state: GroupInfoUiState, onEvent: (GroupInfoUiEvent) -> Unit) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp)
+    ) {
+        item { GroupInfoSectionTitle("成员 (${state.memberCount})") }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                FilledTonalButton(
+                    onClick = { onEvent(GroupInfoUiEvent.AddMemberRequested) },
+                    enabled = !state.loading,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Filled.Add, null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("邀请成员", fontWeight = FontWeight.Normal)
+                }
+                OutlinedButton(
+                    onClick = { onEvent(GroupInfoUiEvent.RemoveMemberRequested) },
+                    enabled = !state.loading && state.canManageMembers,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Filled.Remove, null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("移出成员", fontWeight = FontWeight.Normal)
+                }
+            }
+        }
+        items(state.members, key = { it.id }) { member ->
+            GroupInfoMemberRow(member = member, onClick = { onEvent(GroupInfoUiEvent.MemberSelected(member.id)) })
+        }
+    }
 }
 
 @Composable
-private fun GroupInfoMemberGridRow(
-    row: List<MemberCell>,
-    canManageMembers: Boolean,
-    onEvent: (GroupInfoUiEvent) -> Unit
+private fun GroupInfoMemberRow(member: GroupInfoMemberUiState, onClick: () -> Unit) {
+    ListItem(
+        modifier = Modifier.clickable(onClick = onClick),
+        headlineContent = { Text(member.displayName, fontWeight = FontWeight.Normal) },
+        supportingContent = { Text("群成员") },
+        leadingContent = {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(Color(member.avatarColor)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(member.initials.take(2), color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Normal)
+            }
+        }
+    )
+}
+
+/** 群通知、置顶、通讯录及成员显示偏好分页。 */
+@Composable
+private fun GroupInfoSettingsPage(state: GroupInfoUiState, onEvent: (GroupInfoUiEvent) -> Unit) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp)
+    ) {
+        item { GroupInfoSectionTitle("群设置") }
+        item {
+            GroupInfoSwitchRow("新消息通知", !state.muted, !state.loading) {
+                onEvent(GroupInfoUiEvent.MutedChanged(!it))
+            }
+        }
+        item { HorizontalDivider() }
+        item {
+            GroupInfoSwitchRow("置顶聊天", state.pinned, !state.loading) {
+                onEvent(GroupInfoUiEvent.PinnedChanged(it))
+            }
+        }
+        item { HorizontalDivider() }
+        item {
+            GroupInfoSwitchRow("保存到通讯录", state.savedToContacts, !state.loading) {
+                onEvent(GroupInfoUiEvent.SavedToContactsChanged(it))
+            }
+        }
+        item { Spacer(Modifier.height(14.dp)) }
+        item { GroupInfoSectionTitle("成员显示") }
+        item {
+            GroupInfoSwitchRow("显示成员头像", state.memberAvatarsVisible, !state.loading) { next ->
+                if (groupInfoCanHideMemberIdentity(next, state.memberNicknamesVisible)) {
+                    onEvent(GroupInfoUiEvent.MemberAvatarsVisibleChanged(next))
+                }
+            }
+        }
+        item { HorizontalDivider() }
+        item {
+            GroupInfoSwitchRow("显示成员名称", state.memberNicknamesVisible, !state.loading) { next ->
+                if (groupInfoCanHideMemberIdentity(state.memberAvatarsVisible, next)) {
+                    onEvent(GroupInfoUiEvent.MemberNicknamesVisibleChanged(next))
+                }
+            }
+        }
+        item { Spacer(Modifier.height(14.dp)) }
+        item {
+            Button(
+                onClick = { onEvent(GroupInfoUiEvent.ExitGroupRequested) },
+                enabled = !state.loading,
+                modifier = Modifier.fillMaxWidth(),
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError
+                )
+            ) { Text("退出群聊", fontWeight = FontWeight.Normal) }
+        }
+    }
+}
+
+@Composable
+private fun GroupInfoSectionTitle(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.primary,
+        fontWeight = FontWeight.Normal,
+        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+    )
+}
+
+@Composable
+private fun GroupInfoEditableField(
+    label: String,
+    value: String,
+    actionLabel: String,
+    singleLine: Boolean = true,
+    enabled: Boolean,
+    onValueChange: (String) -> Unit,
+    onAction: () -> Unit
 ) {
-    Row(Modifier.fillMaxWidth().background(CardBackground).padding(horizontal = 12.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        row.forEach { cell ->
-            when {
-                cell.member != null -> GroupInfoMemberCell(cell.member, Modifier.weight(1f)) {
-                    onEvent(GroupInfoUiEvent.MemberSelected(cell.member.id))
-                }
-                cell.action > 0 -> GroupInfoAddMemberCell(true, Modifier.weight(1f)) {
-                    onEvent(GroupInfoUiEvent.AddMemberRequested)
-                }
-                else -> GroupInfoAddMemberCell(canManageMembers, Modifier.weight(1f)) {
-                    onEvent(GroupInfoUiEvent.RemoveMemberRequested)
-                }
-            }
-        }
-        repeat(5 - row.size) { Spacer(Modifier.weight(1f)) }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            label = { Text(label, fontWeight = FontWeight.Normal) },
+            singleLine = singleLine,
+            minLines = if (singleLine) 1 else 3,
+            enabled = enabled,
+            modifier = Modifier.fillMaxWidth()
+        )
+        FilledTonalButton(
+            onClick = onAction,
+            enabled = enabled && value.isNotBlank(),
+            modifier = Modifier.align(Alignment.End)
+        ) { Text(actionLabel, fontWeight = FontWeight.Normal) }
     }
 }
 
 @Composable
-private fun GroupInfoMemberCell(member: GroupInfoMemberUiState, modifier: Modifier, onClick: () -> Unit) {
-    Column(modifier.clickable(onClick = onClick), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.size(42.dp).clip(RoundedCornerShape(6.dp)).background(Color(member.avatarColor)),
-            contentAlignment = Alignment.Center) {
-            TextLabel(member.initials.take(2), 12.sp, weight = FontWeight.Bold, color = PrimaryText, maxLines = 1)
-        }
-        Spacer(Modifier.height(4.dp))
-        TextLabel(member.displayName, 10.sp, color = SecondaryText, maxLines = 1)
-    }
+private fun GroupInfoSwitchRow(label: String, checked: Boolean, enabled: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    ListItem(
+        headlineContent = { Text(label, fontWeight = FontWeight.Normal) },
+        trailingContent = { Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled) }
+    )
 }
-
-@Composable
-private fun GroupInfoAddMemberCell(enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    Column(modifier.clickable(enabled = enabled, onClick = onClick), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.size(42.dp).clip(RoundedCornerShape(6.dp)).background(Color(0xFFF4F5F6)),
-            contentAlignment = Alignment.Center) {
-            Icon(if (enabled) Icons.Filled.Add else Icons.Filled.Remove, null, tint = SecondaryText)
-        }
-        Spacer(Modifier.height(4.dp))
-        TextLabel(if (enabled) "添加" else "移出", 10.sp, color = SecondaryText, maxLines = 1)
-    }
-}
-
-@Composable
-private fun GroupInfoQrRow(onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 44.dp).clickable(onClick = onClick)
-        .padding(horizontal = 18.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-        TextLabel("群二维码", 13.sp, color = PrimaryText, modifier = Modifier.weight(1f), maxLines = 1)
-        TextLabel("›", 19.sp, color = SecondaryText, maxLines = 1)
-        Spacer(Modifier.width(6.dp)); Chevron()
-    }
-}
-
-@Composable
-private fun GroupInfoEditableRow(
-    label: String, value: String, placeholder: String, onValueChange: (String) -> Unit,
-    maxLines: Int = 1, actionLabel: String? = null, actionEnabled: Boolean = true, onAction: (() -> Unit)? = null
-) {
-    Row(Modifier.fillMaxWidth().heightIn(min = if (maxLines == 1) 44.dp else 58.dp)
-        .padding(horizontal = 18.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        TextLabel(label, 13.sp, color = PrimaryText, modifier = Modifier.width(126.dp), maxLines = 1)
-        BasicTextField(value, onValueChange, Modifier.weight(1f), singleLine = maxLines == 1, maxLines = maxLines,
-            textStyle = TextStyle(color = SecondaryText, fontSize = 12.sp, textAlign = TextAlign.End),
-            cursorBrush = SolidColor(OverlayTokens.accent), decorationBox = { field ->
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-                    if (value.isBlank()) TextLabel(placeholder, 12.sp, color = PlaceholderText, maxLines = 1)
-                    field()
-                }
-            })
-        if (actionLabel != null && onAction != null) {
-            Spacer(Modifier.width(6.dp))
-            Button(onClick = onAction, enabled = actionEnabled,
-                colors = ButtonDefaults.buttonColors(containerColor = OverlayTokens.accent),
-                contentPadding = PaddingValues(horizontal = 9.dp, vertical = 4.dp)) {
-                TextLabel(actionLabel, 10.sp, color = Color.White, maxLines = 1)
-            }
-        }
-        Spacer(Modifier.width(6.dp)); Chevron()
-    }
-}
-
-@Composable private fun Section(content: @Composable () -> Unit) = Column(Modifier.fillMaxWidth().background(CardBackground)) { content() }
-
-@Composable
-private fun InfoRow(label: String, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 44.dp).clickable(onClick = onClick).padding(horizontal = 18.dp),
-        verticalAlignment = Alignment.CenterVertically) {
-        TextLabel(label, 13.sp, color = PrimaryText, modifier = Modifier.weight(1f), maxLines = 1); Chevron()
-    }
-}
-
-@Composable
-private fun SwitchRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-        TextLabel(label, 13.sp, color = PrimaryText, modifier = Modifier.weight(1f), maxLines = 1)
-        Switch(checked, onCheckedChange)
-    }
-}
-
-@Composable private fun Divider() = Spacer(Modifier.fillMaxWidth().height(1.dp).background(DividerColor))
-@Composable private fun Chevron() = Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = ChevronText, modifier = Modifier.size(18.dp))
-@Composable private fun GroupInfoSectionGap() = Spacer(Modifier.fillMaxWidth().height(8.dp).background(PageBackground))
-
-@Composable
-private fun DestructiveRow(onClick: () -> Unit) {
-    Box(Modifier.fillMaxWidth().background(CardBackground).clickable(onClick = onClick).padding(vertical = 17.dp),
-        contentAlignment = Alignment.Center) {
-        TextLabel("退出群聊", 14.sp, weight = FontWeight.SemiBold, color = Color(0xFFE95A5A), maxLines = 1)
-    }
-}
-
-private val PageBackground = Color(0xFFF2F3F5)
-private val CardBackground = Color.White
-private val PrimaryText = Color(0xFF111111)
-private val SecondaryText = Color(0xFF656A70)
-private val PlaceholderText = Color(0xFFB2B8BE)
-private val ChevronText = Color(0xFFB4BBC2)
-private val DividerColor = Color(0xFFE8ECEF)

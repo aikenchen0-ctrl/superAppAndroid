@@ -1,6 +1,8 @@
 package com.paifa.ubikitouch.accessibility.scrm
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
@@ -504,6 +506,43 @@ internal data class ScrmMomentMaterialCopyRequest(
     }
 }
 
+/** 对应 OpenAPI copy-finder-material 请求，preferredType 使用 live 创建直播素材。 */
+@Serializable
+internal data class ScrmMomentCopyFinderMaterialRequest(
+    val deviceUuid: String,
+    val weChatId: String,
+    val snsId: Long,
+    val preferredType: String,
+    val materialName: String? = null,
+    val tenantId: String? = null,
+    val enableImmediately: Boolean = true
+) {
+    init {
+        require(deviceUuid.isNotBlank()) { "deviceUuid cannot be blank" }
+        require(weChatId.isNotBlank()) { "weChatId cannot be blank" }
+        require(snsId > 0L) { "snsId must be greater than 0" }
+        require(preferredType == "live" || preferredType == "dynamic") {
+            "preferredType must be live or dynamic"
+        }
+        require(materialName == null || materialName.isNotBlank()) { "materialName cannot be blank" }
+        require(tenantId == null || tenantId.isNotBlank()) { "tenantId cannot be blank" }
+    }
+}
+
+/** 对应 OpenAPI copy-finder-material 响应，服务端不会把失败伪装为可发布素材。 */
+@Serializable
+internal data class ScrmMomentCopyFinderMaterialResult(
+    val success: Boolean = false,
+    val message: String? = null,
+    val material: ScrmMomentMaterial? = null,
+    val detectedType: String? = null,
+    val detectedShape: String? = null,
+    val publishReady: Boolean = false,
+    val missingFields: List<String> = emptyList(),
+    val warnings: List<String> = emptyList(),
+    val safeSummary: String? = null
+)
+
 @Serializable
 internal data class ScrmMomentMaterialControlRequest(
     val reason: String? = null
@@ -658,6 +697,45 @@ internal data class ScrmChatRoomQuery(
         require(search == null || search.isNotBlank()) { "search 涓嶈兘涓虹┖" }
     }
 }
+
+internal data class ScrmGroupInvitationQuery(
+    val weChatId: String? = null,
+    val chatRoomId: String? = null,
+    val count: Int = 50,
+    val pendingOnly: Boolean = true
+) {
+    init {
+        require(weChatId == null || weChatId.isNotBlank()) { "weChatId cannot be blank" }
+        require(chatRoomId == null || chatRoomId.isNotBlank()) { "chatRoomId cannot be blank" }
+        require(count in 1..200) { "count must be between 1 and 200" }
+    }
+}
+
+@Serializable
+internal data class ScrmGroupInvitationMember(
+    val userName: String? = null,
+    val nickName: String? = null,
+    val avatar: String? = null
+)
+
+@Serializable
+internal data class ScrmGroupInvitation(
+    val id: Int = 0,
+    val weChatId: String? = null,
+    val chatRoomId: String? = null,
+    val inviter: String? = null,
+    val inviteName: String? = null,
+    val reason: String? = null,
+    val msgId: Long = 0L,
+    val msgSvrId: Long = 0L,
+    val updateTime: Long = 0L,
+    val taskId: Long = 0L,
+    val status: Int = 0,
+    val source: String? = null,
+    val invitationTime: String? = null,
+    val updatedAt: String? = null,
+    val invited: List<ScrmGroupInvitationMember> = emptyList()
+)
 
 internal data class ScrmCommonChatRoomQuery(
     val weChatId: String? = null,
@@ -1321,9 +1399,28 @@ internal data class ScrmHandleFriendRequestRequest(
     }
 }
 
+/** 对应 POST /openapi/v1/friend-requests/pull，仅下发 Android 拉取任务。 */
+@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+internal data class ScrmPullFriendRequestsRequest(
+    val deviceUuid: String,
+    val weChatId: String,
+    @EncodeDefault
+    val startTime: Long = 0,
+    @EncodeDefault
+    val onlyNew: Boolean = false,
+    @EncodeDefault
+    val getAll: Boolean = true
+) {
+    init {
+        require(deviceUuid.isNotBlank()) { "deviceUuid 不能为空" }
+        require(weChatId.isNotBlank()) { "weChatId 不能为空" }
+    }
+}
+
 @Serializable(with = ScrmFriendRequestOperationSerializer::class)
 internal enum class ScrmFriendRequestOperation(val wireValue: Int) {
-    Reject(0),
+    Reject(2),
     Accept(1)
 }
 

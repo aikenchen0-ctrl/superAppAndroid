@@ -205,8 +205,14 @@ enum class FloatingChatToolAction {
     Contacts,
     Blink,
     Gallery,
+    Video,
+    ChannelsVideo,
+    ChannelsLive,
+    WebLink,
     Camera,
     Voice,
+    VoiceCall,
+    VideoCall,
     Files,
     Device,
     Notes,
@@ -225,8 +231,16 @@ enum class FloatingChatToolAction {
     Translate,
     Screenshot,
     Reminder,
+    UiComponents,
+    MiniProgram,
+    ReviewRequests,
     Command,
-    Share
+    Share,
+    GroupInvite,
+    Relay,
+    SideEffect,
+    HiddenUsers,
+    SendName
 }
 
 object FloatingChatPrototype {
@@ -501,12 +515,72 @@ object FloatingChatPrototype {
                 threadContactId = threadContactId,
                 sequence = sequence
             )
+            FloatingChatToolAction.ChannelsVideo -> FloatingChatMessage(
+                id = "$idPrefix-channels-video-$accountId-$sequence",
+                type = FloatingChatMessageType.ChannelsVideo,
+                text = "视频号：开业现场回放",
+                fromMe = true,
+                senderName = accountName,
+                time = "刚刚",
+                presentation = FloatingChatMessagePresentation.MediaStandalone,
+                connectionTarget = FloatingChatConnectionTarget.Account,
+                connectionTargetId = accountId,
+                threadContactId = threadContactId,
+                thumbnailOrientation = FloatingChatThumbnailOrientation.Vertical,
+                thumbnailUrl = "https://aiff.app/finder/local-$sequence/channels-video-cover.jpg",
+                resourceUrl = "https://aiff.app/finder/local-$sequence/channels-video.mp4",
+                detail = "视频号视频 · 00:18",
+                visibility = FloatingChatVisibilityScope.Public,
+                accessState = FloatingChatAccessState.Visible
+            )
+            FloatingChatToolAction.ChannelsLive -> FloatingChatMessage(
+                id = "$idPrefix-channels-live-$accountId-$sequence",
+                type = FloatingChatMessageType.ChannelsLive,
+                text = "视频号直播：20:00 开场",
+                fromMe = true,
+                senderName = accountName,
+                time = "刚刚",
+                presentation = FloatingChatMessagePresentation.SpecialCard,
+                connectionTarget = FloatingChatConnectionTarget.Account,
+                connectionTargetId = accountId,
+                threadContactId = threadContactId,
+                detail = "直播中 · 3,286 人看过",
+                resourceUrl = "https://aiff.app/finder/local-$sequence/channels-live",
+                visibility = FloatingChatVisibilityScope.Public,
+                accessState = FloatingChatAccessState.Visible
+            )
             FloatingChatToolAction.Voice -> simulatedToolVideoMessage(
                 id = "$idPrefix-video-$accountId-$sequence",
                 accountName = accountName,
                 accountId = accountId,
                 threadContactId = threadContactId,
                 sequence = sequence
+            )
+            FloatingChatToolAction.VoiceCall -> FloatingChatMessage(
+                id = "$idPrefix-voice-call-$accountId-$sequence",
+                type = FloatingChatMessageType.VoiceCall,
+                text = "语音通话 00:00",
+                fromMe = true,
+                senderName = accountName,
+                time = "刚刚",
+                presentation = FloatingChatMessagePresentation.SpecialCard,
+                connectionTarget = FloatingChatConnectionTarget.Account,
+                connectionTargetId = accountId,
+                threadContactId = threadContactId,
+                detail = "已结束"
+            )
+            FloatingChatToolAction.VideoCall -> FloatingChatMessage(
+                id = "$idPrefix-video-call-$accountId-$sequence",
+                type = FloatingChatMessageType.VideoCall,
+                text = "视频通话 00:00",
+                fromMe = true,
+                senderName = accountName,
+                time = "刚刚",
+                presentation = FloatingChatMessagePresentation.SpecialCard,
+                connectionTarget = FloatingChatConnectionTarget.Account,
+                connectionTargetId = accountId,
+                threadContactId = threadContactId,
+                detail = "已结束"
             )
             else -> FloatingChatMessage(
                 id = "$idPrefix-text-$accountId-$sequence",

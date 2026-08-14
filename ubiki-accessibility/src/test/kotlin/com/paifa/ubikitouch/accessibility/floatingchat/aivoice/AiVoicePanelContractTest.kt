@@ -2,6 +2,7 @@ package com.paifa.ubikitouch.accessibility.floatingchat.aivoice
 
 import java.io.File
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -69,6 +70,13 @@ class AiVoicePanelContractTest {
         listOf("语音输入", "点击开始录音", "停止发送", "需要麦克风权限").forEach {
             assertTrue("Missing readable label: $it", text.contains(it))
         }
+    }
+
+    @Test
+    fun voiceAssistantUsesTheFullscreenWorkspacePresentation() {
+        assertTrue(aiVoiceUsesFullscreenWorkspace())
+        assertEquals(1, aiVoiceEnterOffsetDirection())
+        assertEquals(-1, aiVoiceExitOffsetDirection())
     }
 
     private fun sourceFile(name: String): File {

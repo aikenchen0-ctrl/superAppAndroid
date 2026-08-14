@@ -29,7 +29,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface as MaterialSurface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -67,15 +66,13 @@ import com.paifa.ubikitouch.accessibility.floatingchat.components.CompactAvatar
 import com.paifa.ubikitouch.accessibility.floatingchat.components.CompactInteractiveSize
 import com.paifa.ubikitouch.accessibility.floatingchat.components.TextLabel
 import com.paifa.ubikitouch.accessibility.floatingchat.account.FloatingChatAccountProfile
-import com.paifa.ubikitouch.accessibility.FloatingChatCouponWalletBridge
 import com.paifa.ubikitouch.accessibility.FloatingChatBackgroundRemovalBridge
 import com.paifa.ubikitouch.accessibility.FloatingChatFriendManagementBridge
 import com.paifa.ubikitouch.accessibility.FloatingChatContactRelationsBridge
+import com.paifa.ubikitouch.accessibility.FloatingChatLeftSidebarBridge
 import com.paifa.ubikitouch.accessibility.floatingchat.account.toContact
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ConnectorCoordinateState
-import com.paifa.ubikitouch.accessibility.floatingchat.chat.RailPinnedAvatarEdge
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.RightRailVisibleAccountItem
-import com.paifa.ubikitouch.accessibility.floatingchat.chat.rightRailPinnedSelectedAccountEdge
 import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatToolAction
@@ -83,6 +80,11 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.sqrt
+/**
+ * 右侧账号与功能的两个虚拟化滚动列表。
+ * 测试流程：拖动账号列表后账号仍仅显示在列表内；触摸账号区和功能区，验证对应区扩至约 70%，
+ * 另一侧保持至少 30%，并可继续独立滚动。
+ */
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
 internal fun RightCoordinateRail(
@@ -93,6 +95,10 @@ internal fun RightCoordinateRail(
     actions: List<FloatingChatToolAction>,
     connectorState: ConnectorCoordinateState,
     onToolAction: (FloatingChatToolAction) -> Unit,
+    onLiveLocationClick: () -> Unit = {},
+    onOfficialArticleClick: () -> Unit = {},
+    onMusicShareClick: () -> Unit = {},
+    onSplitBillClick: () -> Unit = {},
     bubbleAppearanceLabel: String = "3D气泡",
     onBubbleAppearanceToggle: () -> Unit = {},
     onAccountAvatarClick: (FloatingChatContact) -> Unit,
@@ -195,24 +201,19 @@ internal fun RightCoordinateRail(
     }
     var railHeightPx by remember { mutableStateOf(0f) }
     var accountWeight by remember { mutableStateOf(defaultRightRailAccountWeight()) }
-    var sectionInteractionVersion by remember { mutableStateOf(0) }
     val displayedAccountWeight by animateFloatAsState(
         targetValue = accountWeight,
         animationSpec = tween(durationMillis = rightRailSectionResizeMs()),
         label = "rightRailAccountWeight"
     )
+    /** 联系人列表发生用户滚动后固定占用右侧轨道 70% 高度，不在停止手势后回弹。 */
     fun expandAccountSection() {
         accountWeight = rightRailAccountWeightForAccountAreaDrag()
-        sectionInteractionVersion += 1
     }
+
+    /** 功能列表发生用户滚动后固定占用右侧轨道 70% 高度，不在停止手势后回弹。 */
     fun expandToolSection() {
         accountWeight = rightRailAccountWeightForToolAreaDrag()
-        sectionInteractionVersion += 1
-    }
-    LaunchedEffect(sectionInteractionVersion) {
-        if (sectionInteractionVersion == 0) return@LaunchedEffect
-        delay(2_000)
-        accountWeight = defaultRightRailAccountWeight()
     }
     val accountResizeConnection = remember {
         object : NestedScrollConnection {
@@ -250,40 +251,8 @@ internal fun RightCoordinateRail(
     )
     var accountViewportBounds by remember { mutableStateOf<Rect?>(null) }
     val accountIds = remember(accounts) { accounts.map { account -> account.id } }
-    val selectedAccount = remember(accounts, selectedAccountId) {
-        accounts.firstOrNull { account -> account.id == selectedAccountId }
-    }
     val accountVirtualFallbackStepPx = remember(density) {
         with(density) { (rightRailAvatarSizeDp().dp + rightRailItemGapDp().dp).toPx() }
-    }
-    val pinnedSelectedAccountEdge by remember(
-        accountIds,
-        selectedAccountId,
-        accountListState,
-        accountVirtualFallbackStepPx
-    ) {
-        derivedStateOf {
-            val layoutInfo = accountListState.layoutInfo
-            val viewportHeight = (layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset).toFloat()
-            if (viewportHeight <= 0f) {
-                null
-            } else {
-                rightRailPinnedSelectedAccountEdge(
-                accountIds = accountIds,
-                selectedAccountId = selectedAccountId,
-                    visibleItems = layoutInfo.visibleItemsInfo.map { item ->
-                        RightRailVisibleAccountItem(
-                            index = item.index,
-                            offset = item.offset,
-                            size = item.size
-                        )
-                    },
-                    viewportHeightPx = viewportHeight,
-                    fallbackStepPx = accountVirtualFallbackStepPx,
-                    reverseLayout = true
-                )
-            }
-        }
     }
     LaunchedEffect(selectedAccountId) {
         val targetIndex = accountIds.indexOf(selectedAccountId)
@@ -352,7 +321,11 @@ internal fun RightCoordinateRail(
                         selectedAccountId = selectedAccountId,
                         highlightColor = highlightedAccountColors[account.id],
                         connectorState = connectorState,
-                        onAccountAvatarClick = onAccountAvatarClick,
+                        // 点击头像也视为账号区触摸，先扩展账号列表，再继续原有账号切换接口。
+                        onAccountAvatarClick = { account ->
+                            expandAccountSection()
+                            onAccountAvatarClick(account)
+                        },
                         onAccountAvatarLongClick = onAccountAvatarLongClick,
                         removeBoundsOnDispose = true,
                         modifier = Modifier.padding(end = railScreenEdgeInsetDp)
@@ -364,22 +337,6 @@ internal fun RightCoordinateRail(
                         modifier = Modifier.padding(end = railScreenEdgeInsetDp)
                     )
                 }
-            }
-            val pinnedEdge = pinnedSelectedAccountEdge
-            if (pinnedEdge != null && selectedAccount != null) {
-                AccountRailAvatarItem(
-                    account = selectedAccount,
-                    profile = accountProfiles[selectedAccount.id],
-                    selectedAccountId = selectedAccountId,
-                    connectorState = connectorState,
-                    onAccountAvatarClick = onAccountAvatarClick,
-                    onAccountAvatarLongClick = onAccountAvatarLongClick,
-                    removeBoundsOnDispose = false,
-                    modifier = Modifier
-                        .align(pinnedEdge.toRightRailAlignment())
-                        .padding(end = railScreenEdgeInsetDp)
-                        .zIndex(14f)
-                )
             }
         }
         RightRailDivider()
@@ -418,6 +375,8 @@ internal fun RightCoordinateRail(
                         selected = selectedCatalogToolIndex == index,
                         bubbleAppearanceLabel = bubbleAppearanceLabel,
                         onClick = {
+                            // 点击功能按钮也扩展功能区；具体工具接口仍由原分发链路处理。
+                            expandToolSection()
                             selectedCatalogToolIndex = index
                             if (item.isBubbleAppearanceToggle) {
                                 onBubbleAppearanceToggle()
@@ -425,10 +384,18 @@ internal fun RightCoordinateRail(
                                 FloatingChatFriendManagementBridge.open()
                             } else if (item.opensContactRelations) {
                                 FloatingChatContactRelationsBridge.open()
+                            } else if (item.opensLeftSidebar) {
+                                FloatingChatLeftSidebarBridge.open()
+                            } else if (item.opensLiveLocation) {
+                                onLiveLocationClick()
+                            } else if (item.opensOfficialArticle) {
+                                onOfficialArticleClick()
+                            } else if (item.opensMusic) {
+                                onMusicShareClick()
+                            } else if (item.opensSplitBill) {
+                                onSplitBillClick()
                             } else if (item.opensBackgroundRemoval) {
                                 FloatingChatBackgroundRemovalBridge.open()
-                            } else if (item.opensCouponWallet) {
-                                FloatingChatCouponWalletBridge.open()
                             } else {
                                 item.action?.let(onToolAction)
                             }
@@ -817,11 +784,4 @@ private fun toolReorderDraggedTranslationY(
 
 private fun Offset.getDistance(): Float {
     return sqrt((x * x) + (y * y))
-}
-
-private fun RailPinnedAvatarEdge.toRightRailAlignment(): Alignment {
-    return when (this) {
-        RailPinnedAvatarEdge.Top -> Alignment.TopEnd
-        RailPinnedAvatarEdge.Bottom -> Alignment.BottomEnd
-    }
 }

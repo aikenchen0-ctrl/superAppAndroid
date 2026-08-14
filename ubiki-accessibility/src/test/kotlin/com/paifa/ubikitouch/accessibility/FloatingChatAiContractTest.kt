@@ -123,6 +123,26 @@ class FloatingChatAiContractTest {
     }
 
     @Test
+    fun aiModelsEndpointAndResponseUseOpenAiCompatibleContract() {
+        assertEquals(
+            "https://api.example.com/v1/models",
+            floatingChatAiModelsEndpoint(
+                FloatingChatAiConfig(
+                    baseUrl = "https://api.example.com/v1",
+                    apiKey = "sk-test",
+                    model = "gpt-test"
+                )
+            )
+        )
+        assertEquals(
+            listOf("gpt-5.6-luna", "gpt-5.6-sol"),
+            parseFloatingChatAiModelsResponse(
+                """{"data":[{"id":"gpt-5.6-luna"},{"id":"gpt-5.6-sol"}]}"""
+            )
+        )
+    }
+
+    @Test
     fun aiPromptUsesLatestNormalMessagesOnly() {
         val messages = listOf(
             baseMessage(id = "old", senderName = "A", text = "old message"),
@@ -175,6 +195,7 @@ class FloatingChatAiContractTest {
         assertTrue(body.contains("A: ping"))
         assertTrue(body.contains("\"temperature\":0.2"))
         assertTrue(body.contains("\"max_tokens\":120"))
+        assertTrue(body.contains("\"stream\":true"))
     }
 
     @Test

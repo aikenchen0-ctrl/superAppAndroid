@@ -14,8 +14,12 @@ import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoUiEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoUiState
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.groupInfoAction
 import com.paifa.ubikitouch.accessibility.scrm.ScrmChatRoomActionRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmChatRoomManagementApi
 import com.paifa.ubikitouch.accessibility.scrm.ScrmChatRoomMemberMutationRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmChatRoomSwitchRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmChatRoomTextRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmContactTaskRunner
+import com.paifa.ubikitouch.accessibility.scrm.ScrmRefreshChatRoomRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmRenameChatRoomRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSetChatRoomNoticeRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSettingsManager
@@ -239,6 +243,16 @@ internal fun GroupInfoHost(
                     )
                 }
             }
+            // 对应 iOS“刷新群资料”，请求手机端回写最新群资料和成员快照。
+            GroupInfoAction.RefreshGroup -> {
+                val currentRoute = route ?: return
+                submitRemoteGroupTask("正在刷新群资料", "已提交群资料刷新") {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    session.chatRoomApi.refreshChatRoom(
+                        ScrmRefreshChatRoomRequest(currentRoute.deviceUuid, currentRoute.weChatId, requireNotNull(chatRoomId))
+                    )
+                }
+            }
             GroupInfoAction.LoadQrCode -> {
                 val currentRoute = route ?: return
                 submitRemoteGroupTask("正在获取群二维码", "已提交群二维码获取") {
@@ -265,31 +279,80 @@ internal fun GroupInfoHost(
                 remark = action.value
                 persistProfile(nextRemark = action.value)
             }
+            // 群备注使用 /chatrooms/remark，成功后保留已编辑的本地资料镜像。
+            GroupInfoAction.SaveRemark -> {
+                val currentRoute = route ?: return
+                submitRemoteGroupTask("正在保存群备注", "已提交群备注") {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    val api = session.chatRoomApi as? ScrmChatRoomManagementApi
+                        ?: error("当前 SCRM 客户端不支持群备注接口")
+                    api.setChatRoomRemark(
+                        ScrmChatRoomTextRequest(currentRoute.deviceUuid, currentRoute.weChatId, requireNotNull(chatRoomId), remark.trim())
+                    )
+                }
+            }
             GroupInfoAction.SearchChatHistory -> {
                 actionStatus = "查找聊天记录入口已保留"
                 actionError = null
             }
             is GroupInfoAction.SetMuted -> {
-                mute = action.enabled
-                persistProfile(nextMute = action.enabled)
-                actionStatus = if (action.enabled) "已在悬浮窗口开启消息免打扰" else "已在悬浮窗口关闭消息免打扰"
-                actionError = null
+                val currentRoute = route ?: return
+                // API 是“新消息通知”，与 UI 的“消息免打扰”语义相反。
+                submitRemoteGroupTask("正在更新消息通知", "已提交消息通知设置", onSuccess = {
+                    mute = action.enabled
+                    persistProfile(nextMute = action.enabled)
+                }) {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    val api = session.chatRoomApi as? ScrmChatRoomManagementApi
+                        ?: error("当前 SCRM 客户端不支持消息通知接口")
+                    api.setChatRoomNewMessageNotify(
+                        ScrmChatRoomSwitchRequest(currentRoute.deviceUuid, currentRoute.weChatId, requireNotNull(chatRoomId), !action.enabled)
+                    )
+                }
             }
             is GroupInfoAction.SetPinned -> {
-                pinned = action.enabled
-                persistProfile(nextPinned = action.enabled)
-                actionStatus = if (action.enabled) "已在悬浮窗口置顶聊天" else "已取消悬浮窗口置顶聊天"
-                actionError = null
+                val currentRoute = route ?: return
+                submitRemoteGroupTask("正在更新置顶状态", "已提交置顶设置", onSuccess = {
+                    pinned = action.enabled
+                    persistProfile(nextPinned = action.enabled)
+                }) {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    val api = session.chatRoomApi as? ScrmChatRoomManagementApi
+                        ?: error("当前 SCRM 客户端不支持置顶群聊接口")
+                    api.setChatRoomTop(
+                        ScrmChatRoomSwitchRequest(currentRoute.deviceUuid, currentRoute.weChatId, requireNotNull(chatRoomId), action.enabled)
+                    )
+                }
             }
             is GroupInfoAction.SetSavedToContacts -> {
-                saveToContacts = action.enabled
-                persistProfile(nextSaveToContacts = action.enabled)
-                actionStatus = if (action.enabled) "已在悬浮窗口保存到通讯录" else "已从悬浮窗口移出通讯录"
-                actionError = null
+                val currentRoute = route ?: return
+                submitRemoteGroupTask("正在更新通讯录", "已提交通讯录设置", onSuccess = {
+                    saveToContacts = action.enabled
+                    persistProfile(nextSaveToContacts = action.enabled)
+                }) {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    val api = session.chatRoomApi as? ScrmChatRoomManagementApi
+                        ?: error("当前 SCRM 客户端不支持通讯录接口")
+                    api.setChatRoomSavedToPhonebook(
+                        ScrmChatRoomSwitchRequest(currentRoute.deviceUuid, currentRoute.weChatId, requireNotNull(chatRoomId), action.enabled)
+                    )
+                }
             }
             is GroupInfoAction.UpdateMyNickname -> {
                 myNickname = action.value
                 persistProfile(nextMyNickname = action.value)
+            }
+            // 与 iOS 的群内昵称编辑对应，Android 已有 /chatrooms/self-display-name 接口时同步到手机端。
+            GroupInfoAction.SaveMyNickname -> {
+                val currentRoute = route ?: return
+                submitRemoteGroupTask("正在保存群内昵称", "已提交群内昵称") {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    val api = session.chatRoomApi as? ScrmChatRoomManagementApi
+                        ?: error("当前 SCRM 客户端不支持群内昵称接口")
+                    api.setChatRoomSelfDisplayName(
+                        ScrmChatRoomTextRequest(currentRoute.deviceUuid, currentRoute.weChatId, requireNotNull(chatRoomId), myNickname.trim())
+                    )
+                }
             }
             is GroupInfoAction.SetMemberNicknamesVisible -> {
                 showMemberNicknames = action.visible

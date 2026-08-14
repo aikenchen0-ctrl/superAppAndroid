@@ -1562,6 +1562,29 @@ class ScrmApiClientTest {
         assertNull(transport.lastRequest)
     }
 
+    /** 测试流程：在申请审核点击刷新，确认拉取接口使用当前设备和微信帐号下发 Android 任务。 */
+    @Test
+    fun pullFriendRequestsUsesTheDocumentedTaskRequest() {
+        val transport = RecordingTransport(ok("""{"taskId":104,"success":true,"message":"queued"}"""))
+        val task = ScrmApiClient(config, transport).pullFriendRequests(
+            ScrmPullFriendRequestsRequest(
+                deviceUuid = "device-1",
+                weChatId = "wxid_account"
+            )
+        )
+
+        val request = requireNotNull(transport.lastRequest)
+        val body = Json.parseToJsonElement(requireNotNull(request.body)).jsonObject
+        assertEquals(104L, task.taskId)
+        assertEquals("POST", request.method)
+        assertEquals("https://api.example.com/openapi/v1/friend-requests/pull", request.url)
+        assertEquals("device-1", body.getValue("deviceUuid").jsonPrimitive.content)
+        assertEquals("wxid_account", body.getValue("weChatId").jsonPrimitive.content)
+        assertEquals("0", body.getValue("startTime").jsonPrimitive.content)
+        assertEquals("false", body.getValue("onlyNew").jsonPrimitive.content)
+        assertEquals("true", body.getValue("getAll").jsonPrimitive.content)
+    }
+
     @Test
     fun paymentWriteUsesIdempotencyKeyAndDocumentedRoute() {
         val transport = RecordingTransport(

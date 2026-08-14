@@ -2,9 +2,23 @@ package com.paifa.ubikitouch.accessibility
 
 object FloatingChatBlinkVoiceBridge {
     private var headlessCaptureCloser: (() -> Unit)? = null
+    private var fullscreenCaptureStarter: (() -> Boolean)? = null
+    private var fullscreenCaptureCloser: (() -> Unit)? = null
 
     fun requestCapture() {
         UbikiAccessibilityService.instance?.requestFloatingChatBlinkVoiceCapture()
+    }
+
+    /** App camera module registers the fullscreen overlay host; the accessibility module stays camera-SDK free. */
+    fun registerFullscreenCaptureHost(starter: () -> Boolean, closer: () -> Unit) {
+        fullscreenCaptureStarter = starter
+        fullscreenCaptureCloser = closer
+    }
+
+    fun requestFullscreenCapture(): Boolean = fullscreenCaptureStarter?.invoke() ?: false
+
+    fun dismissFullscreenCapture() {
+        fullscreenCaptureCloser?.invoke()
     }
 
     fun requestHeadlessCapture() {

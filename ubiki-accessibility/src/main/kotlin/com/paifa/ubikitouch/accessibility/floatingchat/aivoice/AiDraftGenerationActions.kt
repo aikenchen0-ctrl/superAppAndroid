@@ -2,10 +2,12 @@ package com.paifa.ubikitouch.accessibility.floatingchat.aivoice
 
 import com.paifa.ubikitouch.accessibility.FloatingChatAiClient
 import com.paifa.ubikitouch.accessibility.FloatingChatAiConfig
+import com.paifa.ubikitouch.accessibility.FloatingChatAiHttpException
 import com.paifa.ubikitouch.accessibility.buildFloatingChatAiDraftPrompt
 import com.paifa.ubikitouch.accessibility.createFloatingChatAiDraftMessage
 import com.paifa.ubikitouch.accessibility.createFloatingChatAiLoadingDraftMessage
 import com.paifa.ubikitouch.accessibility.floatingChatAiDraftLoadingText
+import com.paifa.ubikitouch.accessibility.floatingChatAiFailureMessage
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.visibleMessagesForThread
 import com.paifa.ubikitouch.accessibility.isConfigured
@@ -85,7 +87,11 @@ internal class AiDraftGenerationActions(
                 onAiConfigStatusChanged("AI 回复已生成")
                 onCloseAssistantPanel()
             }.onFailure { error ->
-                val status = "AI 生成失败：${error.message?.take(80) ?: "未知错误"}"
+                val httpError = error as? FloatingChatAiHttpException
+                val status = floatingChatAiFailureMessage(
+                    statusCode = httpError?.statusCode,
+                    detail = httpError?.message ?: error.message.orEmpty()
+                )
                 onAiConfigStatusChanged(status)
                 val failedDraft = editedAiDraftMessage(
                     loadingDraft,

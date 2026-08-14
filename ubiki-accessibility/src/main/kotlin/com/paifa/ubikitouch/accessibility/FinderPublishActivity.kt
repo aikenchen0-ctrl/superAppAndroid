@@ -1,9 +1,11 @@
 package com.paifa.ubikitouch.accessibility
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,22 +17,28 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.VideoLibrary
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,16 +47,19 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.paifa.ubikitouch.accessibility.floatingchat.finder.FinderMediaType
+import com.paifa.ubikitouch.accessibility.floatingchat.finder.FinderPoi
+import com.paifa.ubikitouch.accessibility.floatingchat.finder.FinderPostRequest
 import com.paifa.ubikitouch.accessibility.floatingchat.finder.FinderPostTemplateRequest
 import com.paifa.ubikitouch.accessibility.floatingchat.finder.FinderTaskAwaiter
+import com.paifa.ubikitouch.accessibility.floatingchat.finder.FinderTaskOutcome
 import com.paifa.ubikitouch.accessibility.floatingchat.finder.ScrmFinderApi
+import com.paifa.ubikitouch.accessibility.floatingchat.finder.finderComposeContent
 import com.paifa.ubikitouch.accessibility.floatingchat.finder.finderParseMediaUrls
+import com.paifa.ubikitouch.accessibility.floatingchat.finder.toFinderUserMessage
 import com.paifa.ubikitouch.accessibility.floatingchat.finder.validatedFinderPostRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSettingsManager
 import kotlinx.coroutines.Dispatchers
@@ -58,31 +69,430 @@ import kotlinx.coroutines.withContext
 class FinderPublishActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { BackHandler(onBack = ::finish); FinderPublishScreen(applicationContext, ::finish) }
+        setContent {
+            BackHandler(onBack = ::finish)
+            FinderPublishScreen(applicationContext, ::finish)
+        }
     }
 }
 
-private val Background = Color(0xFFF2F3F5)
-private val Primary = Color(0xFF1A1F24)
-private val Secondary = Color(0xFF6D7076)
-private val Purple = Color(0xFF805CDB)
-
-@Composable private fun FinderPublishScreen(context: android.content.Context, onBack: () -> Unit) {
-    val manager = remember { ScrmSettingsManager(context) }; val scope = rememberCoroutineScope()
-    var content by remember { mutableStateOf("") }; var mediaUrl by remember { mutableStateOf("") }; var coverUrl by remember { mutableStateOf("") }; var confirmation by remember { mutableStateOf(false) }; var validationError by remember { mutableStateOf<String?>(null) }; var showEnvironment by remember { mutableStateOf(false) }; var working by remember { mutableStateOf(false) }; var status by remember { mutableStateOf("草稿状态 · 未上传") }; var banner by remember { mutableStateOf("尚未调用真实接口 · 填写媒体 URL 后发布") }; var rows by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
-    fun publish() { scope.launch { working = true; status = "正在校验真实媒体和发布参数"; banner = "正在调用 /openapi/v1/finder/posts/template"; runCatching { withContext(Dispatchers.IO) { val session = manager.loadSelectedSessionOrBootstrap(); val request = FinderPostTemplateRequest(session.deviceUuid, session.weChatId, content.trim(), finderParseMediaUrls(mediaUrl), FinderMediaType.Video.code, coverUrl.trim().takeIf(String::isNotEmpty)); val api = ScrmFinderApi(manager.loadApiConfig()); val template = api.buildPostTemplate(request); val validatedPost = validatedFinderPostRequest(template); val outcome = FinderTaskAwaiter(api).await { api.publishPost(validatedPost) }; listOf("template.path" to "/openapi/v1/finder/posts/template", "request.path" to "/openapi/v1/finder/posts", "deviceUuid" to validatedPost.deviceUuid, "weChatId" to validatedPost.weChatId, "content" to validatedPost.content, "medias" to validatedPost.medias.joinToString(", "), "mediaType" to "video", "cover" to (validatedPost.cover ?: "未提供"), "taskId" to outcome.taskId.toString(), "status" to outcome.message) } }.onSuccess { rows = it; status = "服务端任务已完成"; banner = "真实发布任务已完成" }.onFailure { rows = listOf("template.path" to "/openapi/v1/finder/posts/template", "request.path" to "/openapi/v1/finder/posts", "error" to (it.message ?: "视频号发布失败")); status = "发布失败，未确认微信端结果"; banner = "真实接口调用失败 · 未生成本地成功状态" }; working = false } }
-    Column(Modifier.fillMaxSize().background(Background)) {
-        Row(Modifier.fillMaxWidth().statusBarsPadding().height(52.dp), verticalAlignment = Alignment.CenterVertically) { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = Color(0xFF007AFF)) }; Text("视频号发布", Modifier.weight(1f), fontSize = 17.sp, color = Primary); TextButton(onClick = { if (content.isBlank() || mediaUrl.isBlank()) validationError = "请填写正文和真实视频媒体 URL，不能使用演示地址或本地占位内容。" else confirmation = true }, enabled = !working) { Text("发布", color = Color(0xFF007AFF), fontSize = 16.sp) }; TextButton(onClick = { showEnvironment = true }) { Text("环境", color = Color(0xFF007AFF), fontSize = 16.sp) } }
-        LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { item { HeaderCard(manager.loadSummary().selectedWeChatId.orEmpty()) }; item { PreviewCard(mediaUrl.isNotBlank()) }; item { Card { CardTitle("正文内容", "可编辑"); OutlinedTextField(content, { content = it }, Modifier.fillMaxWidth().height(128.dp), placeholder = { Text("填写视频号发布正文") }) } }; item { Card { CardTitle("发布设置"); Setting("发布账号", manager.loadSummary().selectedWeChatId ?: "未选择"); Setting("话题", "未设置"); Setting("位置", "未设置"); Setting("可见范围", "后端默认"); Setting("审核方式", "后端决定"); OutlinedTextField(mediaUrl, { mediaUrl = it }, Modifier.fillMaxWidth(), label = { Text("真实视频 URL（https://...）") }); Spacer(Modifier.height(10.dp)); OutlinedTextField(coverUrl, { coverUrl = it }, Modifier.fillMaxWidth(), label = { Text("真实封面 URL（可选）") }) } }; item { Card { CardTitle("上传与后台任务"); Text(status, fontSize = 14.sp, color = Purple, fontWeight = FontWeight.SemiBold); LinearProgressIndicator(progress = { if (working) .45f else if (rows.isNotEmpty() && !status.startsWith("发布失败")) 1f else 0f }, Modifier.fillMaxWidth().padding(vertical = 10.dp), color = Purple); Setting("上传队列", if (working) "正在发布" else "等待发布"); Setting("后台任务", "TaskResult"); Setting("发布审核", if (working) "正在提交" else "待提交") } }; item { Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp), color = Color(0x1A805CDB), modifier = Modifier.fillMaxWidth()) { Text(banner, color = Color(0xFF5C3DAE), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(14.dp)) } }; if (rows.isNotEmpty()) item { ResultRows(rows) } }
-    }
-    if (confirmation) AlertDialog(onDismissRequest = { confirmation = false }, title = { Text("确认发布视频号") }, text = { Text("将使用当前微信帐号调用真实视频号发布接口。发布成功后可能产生公开内容，是否继续？") }, confirmButton = { TextButton(onClick = { confirmation = false; publish() }) { Text("发布", color = Color(0xFFD32F2F)) } }, dismissButton = { TextButton(onClick = { confirmation = false }) { Text("取消") } })
-    validationError?.let { message -> AlertDialog(onDismissRequest = { validationError = null }, title = { Text("无法发布") }, text = { Text(message) }, confirmButton = { TextButton(onClick = { validationError = null }) { Text("知道了") } }) }
-    if (showEnvironment) { val environment = remember { manager.loadSummary() }; AlertDialog(onDismissRequest = { showEnvironment = false }, title = { Text("环境") }, text = { Text("服务地址\n${environment.baseUrl}\n\nX-API-Key\n${environment.maskedApiKey ?: "未配置"}") }, confirmButton = { TextButton(onClick = { showEnvironment = false }) { Text("完成") } }) }
+private enum class FinderPublishTab(val label: String) {
+    Publish("发布"),
+    Tasks("任务")
 }
 
-@Composable private fun HeaderCard(account: String) { Card { Row(verticalAlignment = Alignment.CenterVertically) { Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp), color = Purple, modifier = Modifier.size(36.dp)) { Icon(Icons.Filled.VideoLibrary, null, tint = Color.White, modifier = Modifier.padding(8.dp)) }; Spacer(Modifier.width(12.dp)); Column(Modifier.weight(1f)) { Text("视频号发布", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Primary); Text("使用当前微信帐号发布", fontSize = 13.sp, color = Secondary) }; Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp), color = Color(0x1A805CDB)) { Text(account.ifBlank { "未选择帐号" }, fontSize = 12.sp, color = Color(0xFF5C3DAE), modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp), maxLines = 1, overflow = TextOverflow.Ellipsis) } } } }
-@Composable private fun PreviewCard(hasMedia: Boolean) { Card { CardTitle("视频预览"); Box(Modifier.fillMaxWidth().height(190.dp).background(Color(0xFF171A21), androidx.compose.foundation.shape.RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Filled.PlayArrow, null, tint = Color.White, modifier = Modifier.size(42.dp)); Text(if (hasMedia) "已填写真实视频 URL" else "未选择真实视频", color = Color.White, fontSize = 13.sp, modifier = Modifier.align(Alignment.BottomStart).padding(14.dp)) }; Text("短视频     封面可选     位置未设置", color = Secondary, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp)); Text("发布位置：未设置（接口不会发送位置字段）", color = Secondary, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp)) } }
-@Composable private fun Card(content: @Composable () -> Unit) { Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp), color = Color.White, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), content = { content() }) } }
-@Composable private fun CardTitle(title: String, trailing: String? = null) { Row(Modifier.fillMaxWidth()) { Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Primary, modifier = Modifier.weight(1f)); trailing?.let { Text(it, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Secondary) } } }
-@Composable private fun Setting(title: String, value: String) { Row(Modifier.fillMaxWidth().height(32.dp), verticalAlignment = Alignment.CenterVertically) { Text(title, fontSize = 13.sp, color = Secondary, modifier = Modifier.weight(1f)); Text(value, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Primary, maxLines = 1, overflow = TextOverflow.Ellipsis) } }
-@Composable private fun ResultRows(rows: List<Pair<String, String>>) { Card { Text("OpenApiFinderPostRequest / TaskResult", fontSize = 13.sp, color = Secondary); rows.forEach { (key, value) -> Text(key, fontSize = 12.sp, color = Color(0xFF193852), modifier = Modifier.padding(top = 10.dp)); Text(value, fontSize = 15.sp, color = Primary, modifier = Modifier.padding(top = 4.dp)) } } }
+private data class FinderPublishAuditRow(val label: String, val value: String)
+
+private data class FinderPublishDraft(
+    val content: String,
+    val medias: List<String>,
+    val mediaType: FinderMediaType,
+    val cover: String?,
+    val poi: FinderPoi?
+) {
+    fun templateFor(deviceUuid: String, weChatId: String) = FinderPostTemplateRequest(
+        deviceUuid = deviceUuid,
+        weChatId = weChatId,
+        content = content,
+        medias = medias,
+        mediaType = mediaType.code,
+        cover = cover,
+        poi = poi,
+        includePostRequest = true
+    )
+}
+
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@Composable
+internal fun FinderPublishScreen(context: Context, onBack: () -> Unit) {
+    val settingsManager = remember { ScrmSettingsManager(context) }
+    val scope = rememberCoroutineScope()
+    val pagerState = rememberPagerState { FinderPublishTab.entries.size }
+    val summary = remember { settingsManager.loadSummary() }
+    var content by remember { mutableStateOf("") }
+    var topics by remember { mutableStateOf("") }
+    var mediaUrls by remember { mutableStateOf("") }
+    var coverUrl by remember { mutableStateOf("") }
+    var poiCity by remember { mutableStateOf("") }
+    var poiName by remember { mutableStateOf("") }
+    var poiAddress by remember { mutableStateOf("") }
+    var mediaType by remember { mutableStateOf(FinderMediaType.Video) }
+    var validatedPost by remember { mutableStateOf<FinderPostRequest?>(null) }
+    var confirmed by remember { mutableStateOf(false) }
+    var working by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf("尚未调用视频号接口") }
+    var failure by remember { mutableStateOf<String?>(null) }
+    var auditRows by remember {
+        mutableStateOf(
+            listOf(
+                FinderPublishAuditRow("模板接口", "/openapi/v1/finder/posts/template"),
+                FinderPublishAuditRow("发布接口", "/openapi/v1/finder/posts")
+            )
+        )
+    }
+
+    fun invalidateTemplate() {
+        validatedPost = null
+        confirmed = false
+    }
+
+    fun snapshotDraft(): FinderPublishDraft {
+        val hasPoi = listOf(poiCity, poiName, poiAddress).any { it.isNotBlank() }
+        return FinderPublishDraft(
+            content = finderComposeContent(content, topics),
+            medias = finderParseMediaUrls(mediaUrls),
+            mediaType = mediaType,
+            cover = coverUrl.trim().takeIf(String::isNotEmpty),
+            poi = if (hasPoi) {
+                FinderPoi(
+                    city = poiCity.trim().takeIf(String::isNotEmpty),
+                    name = poiName.trim().takeIf(String::isNotEmpty),
+                    address = poiAddress.trim().takeIf(String::isNotEmpty)
+                )
+            } else {
+                null
+            }
+        )
+    }
+
+    fun templateRows(post: FinderPostRequest, warnings: List<String>) = buildList {
+        add(FinderPublishAuditRow("模板接口", "/openapi/v1/finder/posts/template"))
+        add(FinderPublishAuditRow("发布接口", "/openapi/v1/finder/posts"))
+        add(FinderPublishAuditRow("账号", post.weChatId))
+        add(FinderPublishAuditRow("媒体类型", mediaType.label))
+        add(FinderPublishAuditRow("媒体数量", post.medias.size.toString()))
+        post.cover?.let { add(FinderPublishAuditRow("封面", it)) }
+        post.poi?.name?.let { add(FinderPublishAuditRow("位置", it)) }
+        warnings.forEach { add(FinderPublishAuditRow("模板提示", it)) }
+    }
+
+    fun validateTemplate() {
+        val draft = runCatching(::snapshotDraft).getOrElse { error ->
+            failure = error.toFinderUserMessage()
+            status = "模板校验未开始"
+            return
+        }
+        scope.launch {
+            working = true
+            failure = null
+            status = "正在调用模板预检接口"
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val session = settingsManager.loadSelectedSessionOrBootstrap()
+                    val api = ScrmFinderApi(settingsManager.loadApiConfig())
+                    val template = api.buildPostTemplate(draft.templateFor(session.deviceUuid, session.weChatId))
+                    validatedFinderPostRequest(template) to (template.warnings ?: emptyList())
+                }
+            }.onSuccess { (post, warnings) ->
+                validatedPost = post
+                auditRows = templateRows(post, warnings)
+                status = "模板预检通过，请确认后提交发布任务"
+            }.onFailure { error ->
+                validatedPost = null
+                failure = error.toFinderUserMessage()
+                status = "模板预检失败，未创建发布任务"
+            }
+            working = false
+        }
+    }
+
+    fun publish() {
+        val post = validatedPost ?: return
+        scope.launch {
+            working = true
+            failure = null
+            status = "正在提交视频号发布任务并等待服务端结果"
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val api = ScrmFinderApi(settingsManager.loadApiConfig())
+                    FinderTaskAwaiter(api).await { api.publishPost(post) }
+                }
+            }.onSuccess { outcome ->
+                auditRows = auditRows + outcome.toAuditRows()
+                status = if (outcome.completed) "服务端任务已完成" else outcome.message
+            }.onFailure { error ->
+                failure = error.toFinderUserMessage()
+                status = "发布失败，未确认微信端结果"
+                auditRows = auditRows + FinderPublishAuditRow("发布错误", failure.orEmpty())
+            }
+            working = false
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
+    ) {
+        Spacer(Modifier.height(finderPublishStatusBarHeightDp().dp))
+        FinderPublishTopBar(onBack = onBack)
+        PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
+            FinderPublishTab.entries.forEachIndexed { index, tab ->
+                Tab(
+                    selected = pagerState.currentPage == index,
+                    onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
+                    text = { Text(tab.label, fontWeight = FontWeight.Normal) }
+                )
+            }
+        }
+        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
+            when (FinderPublishTab.entries[page]) {
+                FinderPublishTab.Publish -> FinderPublishForm(
+                    accountId = summary.selectedWeChatId.orEmpty(),
+                    content = content,
+                    topics = topics,
+                    mediaUrls = mediaUrls,
+                    coverUrl = coverUrl,
+                    poiCity = poiCity,
+                    poiName = poiName,
+                    poiAddress = poiAddress,
+                    mediaType = mediaType,
+                    confirmed = confirmed,
+                    working = working,
+                    status = status,
+                    failure = failure,
+                    templateReady = validatedPost != null,
+                    onContentChange = { content = it; invalidateTemplate() },
+                    onTopicsChange = { topics = it; invalidateTemplate() },
+                    onMediaUrlsChange = { mediaUrls = it; invalidateTemplate() },
+                    onCoverUrlChange = { coverUrl = it; invalidateTemplate() },
+                    onPoiCityChange = { poiCity = it; invalidateTemplate() },
+                    onPoiNameChange = { poiName = it; invalidateTemplate() },
+                    onPoiAddressChange = { poiAddress = it; invalidateTemplate() },
+                    onMediaTypeChange = { mediaType = it; invalidateTemplate() },
+                    onConfirmedChange = { confirmed = it },
+                    onValidateTemplate = ::validateTemplate,
+                    onPublish = ::publish
+                )
+                FinderPublishTab.Tasks -> FinderPublishTaskList(
+                    rows = auditRows,
+                    status = status,
+                    failure = failure,
+                    working = working
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FinderPublishTopBar(onBack: () -> Unit) {
+    Box(Modifier.fillMaxWidth().height(56.dp)) {
+        IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+        }
+        Text(
+            text = "视频号发布",
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Normal,
+            modifier = Modifier.align(Alignment.Center)
+        )
+    }
+}
+
+@Composable
+private fun FinderPublishForm(
+    accountId: String,
+    content: String,
+    topics: String,
+    mediaUrls: String,
+    coverUrl: String,
+    poiCity: String,
+    poiName: String,
+    poiAddress: String,
+    mediaType: FinderMediaType,
+    confirmed: Boolean,
+    working: Boolean,
+    status: String,
+    failure: String?,
+    templateReady: Boolean,
+    onContentChange: (String) -> Unit,
+    onTopicsChange: (String) -> Unit,
+    onMediaUrlsChange: (String) -> Unit,
+    onCoverUrlChange: (String) -> Unit,
+    onPoiCityChange: (String) -> Unit,
+    onPoiNameChange: (String) -> Unit,
+    onPoiAddressChange: (String) -> Unit,
+    onMediaTypeChange: (FinderMediaType) -> Unit,
+    onConfirmedChange: (Boolean) -> Unit,
+    onValidateTemplate: () -> Unit,
+    onPublish: () -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            FinderPublishHeader(accountId)
+        }
+        item {
+            FinderSection(title = "发布内容") {
+                OutlinedTextField(
+                    value = content,
+                    onValueChange = onContentChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("正文") },
+                    minLines = 4
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = topics,
+                    onValueChange = onTopicsChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("话题，使用逗号分隔") }
+                )
+            }
+        }
+        item {
+            FinderSection(title = "媒体与封面") {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    FinderMediaType.entries.forEach { type ->
+                        FilterChip(
+                            selected = mediaType == type,
+                            onClick = { onMediaTypeChange(type) },
+                            label = { Text(type.label) },
+                            enabled = !working
+                        )
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = mediaUrls,
+                    onValueChange = onMediaUrlsChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("媒体 URL，每行一条") },
+                    supportingText = { Text("仅支持手机可访问的 HTTP(S) 地址") },
+                    minLines = 3
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = coverUrl,
+                    onValueChange = onCoverUrlChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("封面 URL，可选") }
+                )
+            }
+        }
+        item {
+            FinderSection(title = "位置，可选") {
+                OutlinedTextField(value = poiCity, onValueChange = onPoiCityChange, modifier = Modifier.fillMaxWidth(), label = { Text("城市") })
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(value = poiName, onValueChange = onPoiNameChange, modifier = Modifier.fillMaxWidth(), label = { Text("地点名称") })
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(value = poiAddress, onValueChange = onPoiAddressChange, modifier = Modifier.fillMaxWidth(), label = { Text("地点地址") })
+            }
+        }
+        item {
+            FinderPublishStatusCard(status = status, failure = failure, working = working, templateReady = templateReady)
+        }
+        item {
+            FinderSection(title = "提交发布") {
+                Button(onClick = onValidateTemplate, modifier = Modifier.fillMaxWidth(), enabled = !working) {
+                    Text("校验发布模板")
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 12.dp)) {
+                    Checkbox(
+                        checked = confirmed,
+                        onCheckedChange = onConfirmedChange,
+                        enabled = templateReady && !working
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text("我确认提交视频号发布任务", style = MaterialTheme.typography.bodyMedium)
+                }
+                Button(
+                    onClick = onPublish,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    enabled = templateReady && confirmed && !working
+                ) {
+                    Text("确认发布")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FinderPublishHeader(accountId: String) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Filled.VideoLibrary, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text("视频号发布", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Normal)
+                Text("使用当前微信账号提交服务端发布任务", modifier = Modifier.padding(top = 6.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (accountId.isNotBlank()) {
+                Text(accountId, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+@Composable
+private fun FinderSection(title: String, content: @Composable () -> Unit) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        Column(Modifier.padding(16.dp)) {
+            Text(title, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Normal)
+            Spacer(Modifier.height(16.dp))
+            content()
+        }
+    }
+}
+
+@Composable
+private fun FinderPublishStatusCard(status: String, failure: String?, working: Boolean, templateReady: Boolean) {
+    FinderSection(title = "接口状态") {
+        Text(status, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+        LinearProgressIndicator(
+            progress = { if (working) 0.5f else if (templateReady && failure == null) 1f else 0f },
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+        )
+        failure?.let {
+            Text(it, modifier = Modifier.padding(top = 12.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+        }
+    }
+}
+
+@Composable
+private fun FinderPublishTaskList(
+    rows: List<FinderPublishAuditRow>,
+    status: String,
+    failure: String?,
+    working: Boolean
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item { FinderPublishStatusCard(status = status, failure = failure, working = working, templateReady = false) }
+        item {
+            Text(
+                text = "请求与任务记录",
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Normal,
+                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+            )
+        }
+        items(rows, key = { "${it.label}:${it.value}" }) { row ->
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+                Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                    Text(row.label, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal)
+                    Text(row.value, modifier = Modifier.padding(top = 6.dp), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+    }
+}
+
+private fun FinderTaskOutcome.toAuditRows() = listOf(
+    FinderPublishAuditRow("任务 ID", taskId.toString()),
+    FinderPublishAuditRow("任务结果", message),
+    FinderPublishAuditRow("任务完成", if (completed) "已完成" else "服务端未确认完成")
+)

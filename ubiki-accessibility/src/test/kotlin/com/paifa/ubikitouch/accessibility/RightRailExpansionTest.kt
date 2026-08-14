@@ -2,7 +2,9 @@ package com.paifa.ubikitouch.accessibility
 
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.*
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
+import java.io.File
 
 class RightRailExpansionTest {
     @Test
@@ -25,9 +27,9 @@ class RightRailExpansionTest {
 
     @Test
     fun toolAreaDragExpandsToolSection() {
-        assertEquals(0.24f, rightRailAccountWeightForToolAreaDrag())
+        assertEquals(0.30f, rightRailAccountWeightForToolAreaDrag())
         assertEquals(
-            RightRailWeights(accountWeight = 0.24f, toolWeight = 0.76f),
+            RightRailWeights(accountWeight = 0.30f, toolWeight = 0.70f),
             rightRailWeightsForAccountWeight(rightRailAccountWeightForToolAreaDrag())
         )
     }
@@ -38,7 +40,25 @@ class RightRailExpansionTest {
         assertEquals(false, rightRailUsesContinuousDragExpansion())
         assertEquals(true, rightRailUsesAreaBasedExpansion())
         assertEquals(true, rightRailUsesIndependentListScrolling())
-        assertEquals(false, rightRailKeepsAccountAndToolSectionHeightsStableWhileScrolling())
+        assertEquals(true, rightRailKeepsAccountAndToolSectionHeightsStableWhileScrolling())
+    }
+
+    /** 测试流程：滚动联系人或功能列表后松手，确认源码没有延迟恢复默认高度的回弹任务。 */
+    @Test
+    fun scrollingKeepsTheExpandedSectionAtSeventyPercent() {
+        val source = File(
+            System.getProperty("user.dir"),
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/RightCoordinateRail.kt"
+        ).readText()
+
+        assertFalse(source.contains("delay(2_000)"))
+        assertEquals(0.70f, rightRailAccountWeightForAccountAreaDrag())
+        assertEquals(0.30f, rightRailAccountWeightForToolAreaDrag())
+    }
+
+    @Test
+    fun selectedAccountDoesNotPinWhileTheAccountListScrolls() {
+        assertEquals(false, rightRailPinsSelectedAccountAvatarWhileScrolledOffscreen())
     }
 
     @Test

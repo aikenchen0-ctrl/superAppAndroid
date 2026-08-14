@@ -201,15 +201,18 @@ sealed interface GroupInfoUiEvent {
     data class MemberSelected(val memberId: String) : GroupInfoUiEvent
     data class GroupNameChanged(val value: String) : GroupInfoUiEvent
     data object RenameRequested : GroupInfoUiEvent
+    data object RefreshRequested : GroupInfoUiEvent
     data object QrCodeRequested : GroupInfoUiEvent
     data class AnnouncementChanged(val value: String) : GroupInfoUiEvent
     data object PublishAnnouncementRequested : GroupInfoUiEvent
     data class RemarkChanged(val value: String) : GroupInfoUiEvent
+    data object SaveRemarkRequested : GroupInfoUiEvent
     data object SearchChatHistoryRequested : GroupInfoUiEvent
     data class MutedChanged(val enabled: Boolean) : GroupInfoUiEvent
     data class PinnedChanged(val enabled: Boolean) : GroupInfoUiEvent
     data class SavedToContactsChanged(val enabled: Boolean) : GroupInfoUiEvent
     data class MyNicknameChanged(val value: String) : GroupInfoUiEvent
+    data object SaveMyNicknameRequested : GroupInfoUiEvent
     data class MemberNicknamesVisibleChanged(val visible: Boolean) : GroupInfoUiEvent
     data class MemberAvatarsVisibleChanged(val visible: Boolean) : GroupInfoUiEvent
     data class BackgroundChanged(val value: String) : GroupInfoUiEvent
@@ -226,15 +229,18 @@ sealed interface GroupInfoAction {
     data class OpenMember(val memberId: String) : GroupInfoAction
     data class UpdateGroupName(val value: String) : GroupInfoAction
     data object RenameGroup : GroupInfoAction
+    data object RefreshGroup : GroupInfoAction
     data object LoadQrCode : GroupInfoAction
     data class UpdateAnnouncement(val value: String) : GroupInfoAction
     data object PublishAnnouncement : GroupInfoAction
     data class UpdateRemark(val value: String) : GroupInfoAction
+    data object SaveRemark : GroupInfoAction
     data object SearchChatHistory : GroupInfoAction
     data class SetMuted(val enabled: Boolean) : GroupInfoAction
     data class SetPinned(val enabled: Boolean) : GroupInfoAction
     data class SetSavedToContacts(val enabled: Boolean) : GroupInfoAction
     data class UpdateMyNickname(val value: String) : GroupInfoAction
+    data object SaveMyNickname : GroupInfoAction
     data class SetMemberNicknamesVisible(val visible: Boolean) : GroupInfoAction
     data class SetMemberAvatarsVisible(val visible: Boolean) : GroupInfoAction
     data class UpdateBackground(val value: String) : GroupInfoAction
@@ -251,15 +257,18 @@ fun groupInfoAction(event: GroupInfoUiEvent): GroupInfoAction = when (event) {
     is GroupInfoUiEvent.MemberSelected -> GroupInfoAction.OpenMember(event.memberId)
     is GroupInfoUiEvent.GroupNameChanged -> GroupInfoAction.UpdateGroupName(event.value)
     GroupInfoUiEvent.RenameRequested -> GroupInfoAction.RenameGroup
+    GroupInfoUiEvent.RefreshRequested -> GroupInfoAction.RefreshGroup
     GroupInfoUiEvent.QrCodeRequested -> GroupInfoAction.LoadQrCode
     is GroupInfoUiEvent.AnnouncementChanged -> GroupInfoAction.UpdateAnnouncement(event.value)
     GroupInfoUiEvent.PublishAnnouncementRequested -> GroupInfoAction.PublishAnnouncement
     is GroupInfoUiEvent.RemarkChanged -> GroupInfoAction.UpdateRemark(event.value)
+    GroupInfoUiEvent.SaveRemarkRequested -> GroupInfoAction.SaveRemark
     GroupInfoUiEvent.SearchChatHistoryRequested -> GroupInfoAction.SearchChatHistory
     is GroupInfoUiEvent.MutedChanged -> GroupInfoAction.SetMuted(event.enabled)
     is GroupInfoUiEvent.PinnedChanged -> GroupInfoAction.SetPinned(event.enabled)
     is GroupInfoUiEvent.SavedToContactsChanged -> GroupInfoAction.SetSavedToContacts(event.enabled)
     is GroupInfoUiEvent.MyNicknameChanged -> GroupInfoAction.UpdateMyNickname(event.value)
+    GroupInfoUiEvent.SaveMyNicknameRequested -> GroupInfoAction.SaveMyNickname
     is GroupInfoUiEvent.MemberNicknamesVisibleChanged -> GroupInfoAction.SetMemberNicknamesVisible(event.visible)
     is GroupInfoUiEvent.MemberAvatarsVisibleChanged -> GroupInfoAction.SetMemberAvatarsVisible(event.visible)
     is GroupInfoUiEvent.BackgroundChanged -> GroupInfoAction.UpdateBackground(event.value)

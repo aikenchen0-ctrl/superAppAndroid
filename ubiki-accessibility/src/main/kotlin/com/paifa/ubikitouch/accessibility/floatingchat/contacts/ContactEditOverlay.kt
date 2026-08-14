@@ -52,6 +52,7 @@ internal fun ContactEditOverlay(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // 群信息复用已附着的无障碍悬浮根视图，不创建 Dialog、Activity 或新 Window，避免 BadTokenException。
     var selectedGroupMember by remember(target) { mutableStateOf<FloatingChatContact?>(null) }
     var friendProfileTarget by remember(target) { mutableStateOf<FloatingChatContact?>(null) }
     Box(
@@ -63,12 +64,16 @@ internal fun ContactEditOverlay(
         contentAlignment = Alignment.Center
     ) {
         val fullScreenProfile = target is ContactEditorTarget.User || friendProfileTarget != null
+        val fullScreenGroupInfo = target is ContactEditorTarget.Group
         MaterialSurface(
             modifier = if (fullScreenProfile) {
                 Modifier
                     .fillMaxSize()
                     // 悬浮窗不自动消费系统状态栏 inset，显式保留顶部安全区。
                     .padding(top = ContactProfileStatusBarReserve)
+            } else if (fullScreenGroupInfo) {
+                // 群信息自身绘制 30dp 安全区和进出场 translationY 动画，不能再作为居中对话框展示。
+                Modifier.fillMaxSize()
             } else {
                 Modifier
                     .widthIn(min = 320.dp, max = 390.dp)
@@ -77,10 +82,10 @@ internal fun ContactEditOverlay(
                 .pointerInput(target) {
                     detectTapGestures(onTap = {})
                 },
-            shape = if (fullScreenProfile) RoundedCornerShape(0.dp) else RoundedCornerShape(14.dp),
+            shape = if (fullScreenProfile || fullScreenGroupInfo) RoundedCornerShape(0.dp) else RoundedCornerShape(14.dp),
             color = OverlayTokens.panel,
-            border = if (fullScreenProfile) null else BorderStroke(1.dp, OverlayTokens.panelBorder),
-            shadowElevation = if (fullScreenProfile) 0.dp else 10.dp
+            border = if (fullScreenProfile || fullScreenGroupInfo) null else BorderStroke(1.dp, OverlayTokens.panelBorder),
+            shadowElevation = if (fullScreenProfile || fullScreenGroupInfo) 0.dp else 10.dp
         ) {
             val activeFriendProfile = friendProfileTarget
             val activeGroupMember = selectedGroupMember

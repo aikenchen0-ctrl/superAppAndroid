@@ -59,6 +59,7 @@ internal fun ScrmMessageComposerPanel(
     var appId by remember { mutableStateOf("") }
     var title by remember { mutableStateOf("") }
     var pagePath by remember { mutableStateOf("") }
+    var url by remember { mutableStateOf("") }
     var thumb by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
     var labels by remember { mutableStateOf("") }
@@ -75,7 +76,7 @@ internal fun ScrmMessageComposerPanel(
             when (kind) {
                 ScrmComposerKind.Emoji -> buildScrmEmojiSendRequest(safeRoute, safeConversationId, emojiMd5)
                 ScrmComposerKind.WeAppCard -> buildScrmWeAppCardRequest(
-                    safeRoute, safeConversationId, appId, title, pagePath, thumb
+                    safeRoute, safeConversationId, appId, title, pagePath, url, thumb
                 )
                 ScrmComposerKind.BatchText -> buildScrmBatchTextPreview(
                     safeRoute, content, labels.split(',').map(String::trim)
@@ -108,6 +109,7 @@ internal fun ScrmMessageComposerPanel(
                 ComposerField(appId, { appId = it }, "App ID")
                 ComposerField(title, { title = it }, "标题")
                 ComposerField(pagePath, { pagePath = it }, "页面路径")
+                ComposerField(url, { url = it }, "真实链接 URL")
                 ComposerField(thumb, { thumb = it }, "缩略图 URL")
             }
             ScrmComposerKind.BatchText -> {

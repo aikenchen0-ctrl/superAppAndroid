@@ -94,8 +94,15 @@ class UrlConnectionAiVoiceTransport : AiVoiceHttpTransport {
     }
 }
 
+/** Maps gateway authentication failures to an actionable UI message without exposing token details. */
+internal fun aiVoiceGatewayFailureMessage(statusCode: Int, responseBody: String): String = when (statusCode) {
+    401 -> "语音服务凭证无效或已失效，请更新后重试"
+    403 -> "当前凭证没有语音服务权限"
+    else -> "语音服务请求失败：HTTP $statusCode ${responseBody.take(160)}"
+}
+
 class AiVoiceGatewayException(val statusCode: Int, responseBody: String) :
-    IllegalStateException("AI voice gateway returned HTTP $statusCode: $responseBody")
+    IllegalStateException(aiVoiceGatewayFailureMessage(statusCode, responseBody))
 
 private const val ConnectTimeoutMs = 15_000
 private const val ReadTimeoutMs = 60_000

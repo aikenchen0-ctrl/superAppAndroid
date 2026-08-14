@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -80,6 +81,8 @@ import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.accessibility.floatingchat.components.TextLabel
 import com.paifa.ubikitouch.accessibility.floatingchat.components.avatarPressModifier
 import com.paifa.ubikitouch.accessibility.floatingchat.components.avatarTextTagsVisible
+import com.paifa.ubikitouch.accessibility.FloatingChatLeftSidebarBridge
+import com.paifa.ubikitouch.accessibility.LeftSidebarDisplayMode
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.groupConnectorId
 import com.paifa.ubikitouch.accessibility.floatingchat.account.leftRailSelectedAvatarHighlightStrokeDp
 import com.paifa.ubikitouch.accessibility.floatingchat.components.rememberAsyncAvatarBitmap
@@ -106,6 +109,7 @@ internal fun ChatSessionRail(
     selectedAccountId: String,
     selectedThread: ChatThreadSelection,
     unreadThreadIds: Set<String>,
+    hiddenParticipantIds: Set<String> = emptySet(),
     onThreadSelected: (ChatThreadSelection) -> Unit,
     onGroupAvatarLongClick: (FloatingChatContact) -> Unit,
     onContactAvatarLongClick: (FloatingChatContact) -> Unit,
@@ -113,13 +117,15 @@ internal fun ChatSessionRail(
     connectorState: ConnectorCoordinateState,
     modifier: Modifier = Modifier
 ) {
+    val displayMode by FloatingChatLeftSidebarBridge.displayMode.collectAsState()
     ScrollableSessionRail(
-        groups = groups,
-        contacts = contacts,
+        groups = if (displayMode == LeftSidebarDisplayMode.Friends) emptyList() else groups,
+        contacts = if (displayMode == LeftSidebarDisplayMode.Groups) emptyList() else contacts,
         conversation = conversation,
         selectedAccountId = selectedAccountId,
         selectedThread = selectedThread,
         unreadThreadIds = unreadThreadIds,
+        hiddenParticipantIds = hiddenParticipantIds,
         onThreadSelected = onThreadSelected,
         onGroupAvatarLongClick = onGroupAvatarLongClick,
         onContactAvatarLongClick = onContactAvatarLongClick,
@@ -137,6 +143,7 @@ private fun ScrollableSessionRail(
     selectedAccountId: String,
     selectedThread: ChatThreadSelection,
     unreadThreadIds: Set<String>,
+    hiddenParticipantIds: Set<String>,
     onThreadSelected: (ChatThreadSelection) -> Unit,
     onGroupAvatarLongClick: (FloatingChatContact) -> Unit,
     onContactAvatarLongClick: (FloatingChatContact) -> Unit,
@@ -144,15 +151,16 @@ private fun ScrollableSessionRail(
     connectorState: ConnectorCoordinateState,
     modifier: Modifier = Modifier
 ) {
-    val visibleGroups = remember(groups) {
-        groups.ifEmpty {
-            listOf(FloatingChatContact(GroupThreadId, "群聊", "群", "群聊", 0xFF5B7CFA, selected = true))
-        }
+    val visibleGroups = remember(groups, hiddenParticipantIds) {
+        groups.filterNot { group -> group.id in hiddenParticipantIds }
     }
-    val railItems = remember(visibleGroups, contacts, conversation.messages, selectedAccountId) {
+    val visibleContacts = remember(contacts, hiddenParticipantIds) {
+        contacts.filterNot { contact -> contact.id in hiddenParticipantIds }
+    }
+    val railItems = remember(visibleGroups, visibleContacts, conversation.messages, selectedAccountId) {
         sessionRailItemsByLatestChatTime(
             groups = visibleGroups,
-            contacts = contacts,
+            contacts = visibleContacts,
             conversation = conversation,
             selectedAccountId = selectedAccountId
         )
