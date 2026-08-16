@@ -18,6 +18,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.message.MiniProgramLinkCo
 import com.paifa.ubikitouch.accessibility.floatingchat.message.MixedTextMessageContent
 import com.paifa.ubikitouch.accessibility.floatingchat.message.MoneyMessageCard
 import com.paifa.ubikitouch.accessibility.floatingchat.message.NoticeMessageCard
+import com.paifa.ubikitouch.accessibility.floatingchat.message.OfficialArticleMessageCard
 import com.paifa.ubikitouch.accessibility.floatingchat.message.QuoteMessageContent
 import com.paifa.ubikitouch.accessibility.floatingchat.message.SimpleTextMessageContent
 import com.paifa.ubikitouch.accessibility.floatingchat.message.StackedMessageCard
@@ -96,10 +97,10 @@ internal fun renderLegacyMessage(
             FloatingChatMessageType.InlineContact -> InlineContactContent(message)
             else -> ContactLinkCardContent(message.copy(type = FloatingChatMessageType.ContactLink))
         }
-        MessageRendererGroup.Link -> if (model.type == FloatingChatMessageType.MiniProgramLink) {
-            MiniProgramLinkContent(message, environment.claimed)
-        } else {
-            LinkMessageCard(message)
+        MessageRendererGroup.Link -> when (model.type) {
+            FloatingChatMessageType.MiniProgramLink -> MiniProgramLinkContent(message, environment.claimed)
+            FloatingChatMessageType.Article -> OfficialArticleMessageCard(message)
+            else -> LinkMessageCard(message)
         }
         MessageRendererGroup.Stacked -> if (model.type == FloatingChatMessageType.ChatHistory) {
             ChatHistoryMessageContent(message)

@@ -179,9 +179,7 @@ private data class VoiceRecordSession(val recorder: MediaRecorder, val file: Fil
 @Composable
 internal fun VoiceSendConfirmationOverlay(
     recording: PendingVoiceRecording,
-    statusMessage: String? = null,
     onCancel: () -> Unit,
-    onTranscribe: () -> Unit,
     onConfirm: () -> Unit
 ) {
     Box(
@@ -201,26 +199,13 @@ internal fun VoiceSendConfirmationOverlay(
             ) {
                 Text("发送语音？", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge)
                 Text("录音时长 ${recording.durationMs / 1000}s，是否发送到当前会话？", style = MaterialTheme.typography.bodyMedium)
-                statusMessage?.takeIf { it.isNotBlank() }?.let { message ->
-                    Text(
-                        text = message,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(onClick = onCancel) { Text("取消") }
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TextButton(onClick = onTranscribe) { Text("转文字") }
-                        Button(onClick = onConfirm) { Text("发送") }
-                    }
+                    Button(onClick = onConfirm) { Text("发送") }
                 }
             }
         }

@@ -75,3 +75,17 @@
 - `ScrmSelectedSession` 当前显式暴露 read/contact/chatRoom/message/moment/task API，但缺少 `ScrmMessageOperationApi`。应把 message-operation API 作为具名依赖加入 session，由同一 `ScrmApiClient` 注入，避免运行时强制转换。
 - `FloatingChatOverlayController` 已持有唯一的 `refreshScrmConversationFromApi()` 刷新入口，并在展开、切换账号和发送任务处理后复用。转写终态刷新应由 Controller 以回调注入 Overlay，避免 UI 复制缓存合并或网络刷新逻辑。
 - 新增 `MessageLongPressAction` 不会破坏收藏列表操作分支，`FavoriteCollectionOverlayHost` 对非收藏专用操作已有显式 `else -> Unit`；主消息操作的 exhaustive `when` 则必须新增真实转写回调。
+- 普通消息气泡的 `combinedClickable.onClick` 已直接调用 `onLongPressMessage` 打开同一操作层，Overlay 的 `onMessageClick` 也打开该层；因此新增首层 action 同时覆盖用户所说的“点击消息”和既有长按入口，无需新增第二套菜单。
+- Overlay 已统一在 `Dispatchers.IO` 内加载 `ScrmSelectedSession` 和执行设备任务；语音转写应遵循同一协程边界，并由主线程更新 Toast/在途状态及触发 Controller 刷新。
+- 并行新增的 `ScrmVoiceTranscriptionTaskRunnerTest` 已锁定执行器 API：`transcribeAndAwait(remoteMessageId, deviceUuid, weChatId)`，结果状态区分 `SUCCEEDED`、`SUBMISSION_FAILED`、`TASK_FAILED`、`PROCESSING`、`RESULT_UNKNOWN`，并验证只提交一次后轮询既有 taskId。
+- `FloatingChatOverlay` 生产调用点只有 Controller 一处，新增 `onRefreshConversation` 注入不会扩散到多套宿主；现有源码契约测试已有双工作目录 `sourceFile` 模式，可用于验证真实 UI 接线而不启动悬浮 Window。
+- 当前待发送录音确认层仍保留 `statusMessage/onTranscribe` 和只报“不支持”的死入口；最新需求已把真实入口指定到已同步语音消息选项，因此该状态、按钮与 Overlay 错误文案都应删除，确认层恢复“取消/发送”。
+- `ScrmApiClient.transcribeVoiceMessage` 已正确复用 `postMessageOperation(messageId, "voice-trans-text", request)`，并对非正数 ID 失败；但现有测试没有断言真实 URL 和 JSON body，需要补充 HTTP 传输契约以防把 msgSvrId 误接到 path。
+- 刷新链修复已保持最小范围：`scrmMergeReadOnlyMessages` 对相同远端 key 原位替换 incoming，同时保留本地独有消息；Voice 映射只调整为 `voiceText > content > 默认文案`，没有改变其他消息类型。
+- Controller 的刷新门已经支持 in-flight 时排队下一次请求；Overlay 成功回调直接调用该入口不会打断正在进行的刷新，也无需创建新 Window 或重建悬浮根。
+- UI 装配红灯已稳定落到两项缺口：`FloatingChatOverlay` 缺少刷新回调参数及真实 `onTranscribeMessage`，Controller 唯一生产调用点也未注入该回调。实现使用当前 `selectedAccount.id` 映射出的 `ScrmFloatingAccountRoute` 作为请求账号参数，并以 `remoteMessageId` 作为同消息并发键。
+- 语音消息按现有展示策略进入 Card 分组，普通点击经 `onMessageClick` 设置 `longPressMessage`，长按经 `onLongPressMessage` 设置同一状态；两种操作均复用根节点内的消息选项层。UI 契约测试需精确匹配 `transcribe@` 标签，禁止 `substringAfter` 在缺失分隔符时静默退回整文件。
+- 独立审查发现 PROCESSING 生命周期风险：runner 会保留已提交的 `taskId`，但当前 UI 结束协程后丢弃它；下一次用户点击会再次按 messageId 提交。应在明确终态前保留 messageId -> taskId，并复用原 taskId 查询，不能靠延长超时或再次写请求掩盖。
+- 成功刷新还有缓存短路：`loadScrmConversationForSession` 先用 `scrmInitialConversationRoutesToLoad` 排除已缓存选中账号，导致 `loadScrmAccountConversation` 的 cache-hit changes 分支不可达。显式刷新必须始终加载选中 route；该加载函数自身再决定走 bootstrap 或 changes。
+- IosFloat 没有专属 voice-trans-text 入口，不能照搬缺失行为；其通用消息操作以消息 `recipientAccountID` 优先、当前账号兜底，异步 helper 只轮询原 taskId 且未知结果禁止自动重发。Android 应沿用此归属语义，并保留比 iOS 更完整的 remoteMessageId 与 voiceText 展示链。
+- 转写完成时的刷新必须携带任务开始账号；Controller 的 pending gate 还需保存待刷新账号 ID，否则并发刷新结束后无参重试会改为刷新当时当前账号。

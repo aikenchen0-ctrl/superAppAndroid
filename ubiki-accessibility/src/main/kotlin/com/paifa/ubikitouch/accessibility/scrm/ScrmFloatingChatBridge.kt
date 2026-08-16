@@ -1,6 +1,7 @@
 package com.paifa.ubikitouch.accessibility.scrm
 
 import com.paifa.ubikitouch.accessibility.floatingchat.media.normalizedRemoteImageUri
+import com.paifa.ubikitouch.core.model.FloatingChatArticleItem
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatConversation
 import com.paifa.ubikitouch.core.model.FloatingChatConnectionTarget
@@ -27,6 +28,11 @@ private const val ScrmChatRoomMemberAdminRole = 2
 private val ScrmMessageJson = Json { isLenient = true; ignoreUnknownKeys = true }
 private const val ScrmFinderVideoMessageType = 754974769
 private val ScrmFinderLiveMessageTypes = setOf(973078577, 975175729)
+
+private data class ScrmFloatingArticlePayload(
+    val senderNickname: String?,
+    val items: List<FloatingChatArticleItem>
+)
 
 private val ScrmAvatarPalette = longArrayOf(
     0xFFFFB4AB,
@@ -225,17 +231,30 @@ private fun scrmFloatingMappedMessage(
     connectionTargetId: String,
     threadContactId: String,
 ): FloatingChatMessage {
-    val type = scrmFloatingMessageType(remote.messageType, remote.content)
-    val text = scrmFloatingMessageText(type, remote.content)
+    val articlePayload = scrmFloatingArticlePayload(remote.content)
+    val articleItems = articlePayload?.items.orEmpty()
+    val type = scrmFloatingMessageType(
+        messageType = remote.messageType,
+        content = remote.content,
+        hasOfficialArticleItems = articleItems.isNotEmpty()
+    )
+    val text = if (type == FloatingChatMessageType.Article) {
+        scrmFloatingArticleTitle(articleItems)
+    } else {
+        scrmFloatingMessageText(type, remote.content)
+    }
     val system = remote.messageType == 10000 || remote.messageType == 10002
     val mediaUrl = remote.media.firstOrNull()?.resolvedUrl
         ?: remote.extensions.firstNotNullOfOrNull { extension ->
             extension.value.takeIf { extension.key.lowercase() in ScrmMediaUrlKeys && it.isNotBlank() }
         }
-    val thumbnailUrl = mediaUrl ?: scrmFloatingMessageThumbnailUrl(remote.content)
+    val thumbnailUrl = mediaUrl
+        ?: articleItems.firstOrNull()?.let { it.bannerImageUrl ?: it.imageUrl }
+        ?: scrmFloatingMessageThumbnailUrl(remote.content)
     // WeChat messageType=14/47 stores its only downloadable media address in resBody.Thumb.
     // Preserve it as the resource URL as well, so the same image is used by the bubble and preview flows.
     val resourceUrl = mediaUrl
+        ?: articleItems.firstOrNull()?.detailUrl
         ?: scrmFloatingMessageUrl(remote.content)
         ?: thumbnailUrl.takeIf { type == FloatingChatMessageType.StickerGif }
     val detail = scrmFloatingMessageDetail(type, remote.content, remote.voiceText)
@@ -260,6 +279,8 @@ private fun scrmFloatingMappedMessage(
         connectionTargetId = connectionTargetId,
         threadContactId = threadContactId,
         detail = detail,
+        appName = articlePayload?.senderNickname,
+        articleItems = articleItems,
         resourceUrl = resourceUrl,
         thumbnailUrl = thumbnailUrl,
         fileName = remote.media.firstOrNull()?.fileExtension?.takeIf { it.isNotBlank() },
@@ -271,13 +292,18 @@ private fun scrmFloatingMappedMessage(
 }
 
 /** Maps WeChat messageType values used by iOS to the Android read-only renderer. */
-private fun scrmFloatingMessageType(messageType: Int, content: String): FloatingChatMessageType {
+private fun scrmFloatingMessageType(
+    messageType: Int,
+    content: String,
+    hasOfficialArticleItems: Boolean = false
+): FloatingChatMessageType {
     // Some history/change payloads omit the outer WeChat type or flatten it to text,
     // but retain the original sticker body. Md5 plus Thumb is the stable image-sticker
     // signature and must not be presented as JSON text.
     if (messageType in ScrmStickerFallbackMessageTypes && scrmFloatingStickerPayload(content)) {
         return FloatingChatMessageType.StickerGif
     }
+    if (hasOfficialArticleItems) return FloatingChatMessageType.Article
     val lower = content.lowercase()
     return when (messageType) {
         // Full WeChat outer types are required. Do not infer Finder messages from appmsg internals.
@@ -307,6 +333,43 @@ private fun scrmFloatingMessageType(messageType: Int, content: String): Floating
         // while presentation is switched to System above so they render without a bubble.
         else -> FloatingChatMessageType.Text
     }
+}
+
+/** Parses the structured official-account article list returned in a WeChat app message body. */
+private fun scrmFloatingArticlePayload(content: String): ScrmFloatingArticlePayload? {
+    if (!content.contains("\"appMessageItems\"")) return null
+    val root = scrmFloatingJsonElement(content) as? JsonObject ?: return null
+    val elements = root["appMessageItems"] as? JsonArray ?: return null
+    val items = elements.mapNotNull { element ->
+        val item = element as? JsonObject ?: return@mapNotNull null
+        val title = item.scrmPrimitiveContent("title")?.trim().orEmpty()
+        if (title.isBlank()) return@mapNotNull null
+        FloatingChatArticleItem(
+            title = title,
+            description = item.scrmPrimitiveContent("description").orEmpty(),
+            detailUrl = item.scrmPrimitiveContent("detailUrl")?.takeIf(String::isNotBlank),
+            bannerImageUrl = item.scrmPrimitiveContent("bannerImageUrl")?.takeIf(String::isNotBlank),
+            imageUrl = item.scrmPrimitiveContent("imageUrl")?.takeIf(String::isNotBlank),
+            itemType = item.scrmPrimitiveContent("itemType")?.toIntOrNull(),
+            timestampSeconds = item.scrmPrimitiveContent("timestamp")?.toLongOrNull()
+        )
+    }
+    if (items.isEmpty()) return null
+    return ScrmFloatingArticlePayload(
+        senderNickname = root.scrmPrimitiveContent("senderNickname")
+            ?.trim()
+            ?.takeIf(String::isNotBlank),
+        items = items
+    )
+}
+
+private fun scrmFloatingArticleTitle(items: List<FloatingChatArticleItem>): String {
+    val firstTitle = items.firstOrNull()?.title.orEmpty()
+    return if (items.size > 1) "$firstTitle 等 ${items.size} 篇" else firstTitle
+}
+
+private fun JsonObject.scrmPrimitiveContent(key: String): String? {
+    return (this[key] as? JsonPrimitive)?.contentOrNull
 }
 
 private fun scrmFloatingMessageText(type: FloatingChatMessageType, content: String): String {
@@ -339,8 +402,10 @@ private fun scrmFloatingMessageDetail(
 ): String? {
     val extracted = scrmFloatingJsonText(content)?.takeIf { it.isNotBlank() }
     val voice = voiceText?.scrmTextValue()?.takeIf { it.isNotBlank() }
+    if (type == FloatingChatMessageType.Voice) {
+        return voice ?: extracted ?: "语音消息"
+    }
     return extracted ?: when (type) {
-        FloatingChatMessageType.Voice -> voice ?: "语音消息"
         FloatingChatMessageType.StickerGif -> "GIF 贴纸"
         FloatingChatMessageType.VoiceCall -> "通话记录"
         else -> null

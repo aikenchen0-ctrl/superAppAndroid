@@ -114,6 +114,36 @@ class MessageStandardActionsTest {
         assertTrue(menuClosed)
     }
 
+    /**
+     * 测试流程：在“全部未回消息”中点击其他微信账号的语音消息，再选择“转文字”。
+     * 转写必须使用消息所属账号，不能误用当前工具栏选中的账号。
+     */
+    @Test
+    fun voiceTranscriptionUsesMessageScopedAccountBeforeSelectedAccount() {
+        val message = FloatingChatMessage(
+            id = "voice-other-account",
+            type = FloatingChatMessageType.Voice,
+            text = "[语音]",
+            fromMe = false,
+            senderName = "张三",
+            time = "10:00",
+            threadContactId = "account-from-message__scrm-contact:peer",
+            remoteMessageId = 72L
+        )
+
+        assertEquals(
+            "account-from-message",
+            voiceTranscriptionAccountId(message, fallbackAccountId = "account-selected")
+        )
+        assertEquals(
+            "account-selected",
+            voiceTranscriptionAccountId(
+                message.copy(threadContactId = "legacy-unscoped-thread"),
+                fallbackAccountId = "account-selected"
+            )
+        )
+    }
+
     @Test
     fun asideAnalysisRequiresEmotionStanceAndSubtext() {
         assertEquals(

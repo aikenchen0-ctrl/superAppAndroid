@@ -85,3 +85,20 @@
 - 已完成只读链路审计：接口与 HTTP 实现存在，缺口位于消息操作回调、任务轮询、聊天刷新和转写结果覆盖旧缓存；下一步先运行新增契约测试确认红灯。
 - `MessageStandardActionsTest` 已按预期红灯：仅缺失 `MessageLongPressAction.Transcribe` 与 `messageLongPressActionsFor`，Gradle 配置和生产源码编译均正常，确认进入最小实现阶段。
 - 已补充无效 `0/负数 messageId` 和 action 回调关闭菜单契约；第二次红灯同时确认缺少筛选函数、枚举值和 `onTranscribeMessage` 构造参数，失败原因与预期一致。
+- 已实现消息感知操作列表和 `Transcribe` 业务回调分支；当前尚未接入真实任务执行器，因此暂不宣称该定向测试转绿，继续完成 SCRM 与 Overlay 装配。
+- 并行执行器测试已写入，覆盖真实 remoteMessageId、单次提交、终态/处理中/未知结果和输入校验；为解除各红灯测试互相阻塞，`onTranscribeMessage` 暂设为明确抛错默认值，最终接线时必须删除。
+- 已新增 UI 装配契约，要求使用 `message.remoteMessageId`、`session.messageOperationApi` 和执行器成功终态刷新，并禁止转写回调引用 `remoteMessageServerId`；待执行器生产类落盘后观察该契约自身红灯。
+- 已按最新入口要求删除待发送录音确认层的 `statusMessage/onTranscribe`、限制文案和相关 Overlay 状态；根节点内确认层继续保留“取消/发送”，不新增 Dialog 或 Window。
+- 第一次生产 Kotlin 编译在并行 Gradle 期间失败，根因是 `shrunk-classpath-snapshot.bin` 被并发清理及 Kotlin storage 重复注册；日志未出现本轮源码编译错误。按用户的多 AI 约束等待，后续使用非增量模式重试。
+- 并行协作者已开始落盘 `ScrmVoiceTranscriptionTaskRunner.kt`，刷新链也已在 Controller/Bridge 及 Bridge 测试中产生增量改动；主线程暂不触碰这些文件，等待其完成定向验证后复核。
+- 已补充 `ScrmApiClientTest` 的真实转写 HTTP 契约：固定 SCRM messageId 路径、POST 方法、帐号 JSON body 与无效 ID 请求前失败。
+- UI 契约红灯第一次因 PowerShell Gradle 属性未引用而未执行；修正后生产源码编译通过，但测试编译命中并发遗留的损坏 `classes.jar`，尚未进入断言。下一步由 Gradle 自身强制重建该产物后再跑。
+- 已恢复本轮上下文：执行器、消息菜单、HTTP 路由及刷新替换已落盘；当前只补齐 Overlay 的真实调用、并发防重、全状态反馈与成功刷新，再做串行回归。
+- UI 装配契约已取得有效红灯：2 个断言分别锁定 Overlay 真实转写/成功刷新接线和 Controller 刷新回调注入；同一次构建中生产 Kotlin 编译成功，排除共享 Gradle 产物损坏。
+- 首次实现后的编译失败已定位：`FloatingChatMessage.remoteMessageId` 按模型契约为 `Long?`，因为本地消息没有远端主键；Overlay 尚未在边界收窄为空值/非正数。既有菜单使用同一可空契约，修复只在回调入口提取正数 `Long`。
+- Overlay 已接入当前账号路由、IO 会话加载、单次提交/原 taskId 轮询、五类结果提示、同 messageId 并发防重和成功刷新；Controller 已注入既有刷新入口，消息操作回调改为必传。UI 契约 3 项及生产 Kotlin 编译返回 `BUILD SUCCESSFUL`。
+- 组合定向回归已返回 `BUILD SUCCESSFUL`：覆盖消息菜单、UI 装配、转写 runner、selected session、Controller 合并刷新、Bridge voiceText 优先级、真实 HTTP 路由和待发送录音确认层。
+- 测试报告汇总为 54 tests、0 failures、0 errors；`git diff --check` 退出码为 0，仅报告工作区既有 LF/CRLF 转换提示。首次回调静态扫描因仍匹配旧的无标签 lambda 字符串而脚本报错，已改为匹配当前 `transcribe@` 标签后重跑，不把该次输出作为验证结论。
+- 独立审查发现 PROCESSING 结果的 taskId 尚未跨点击保留，存在再次 POST 的风险；实现阶段重新打开。计划复用 Controller 持有的 `FloatingChatOverlayRuntimeState` 保存账号/消息对应 taskId，并给 runner 增加只续查既有 taskId 的路径。
+- 续查与缓存刷新契约已取得有效红灯：测试编译仅因 `awaitExistingTask`、runtime task 映射方法和始终刷新选中 route 的策略函数不存在而失败，生产源码同轮编译成功。
+- 合并账号路由契约时发现并发协作者已先补入 `voiceTranscriptionAccountId` 测试与 `(String) -> Unit` UI 断言；首个补丁因旧上下文不匹配而安全失败，随后按当前文件合并，未覆盖其改动。

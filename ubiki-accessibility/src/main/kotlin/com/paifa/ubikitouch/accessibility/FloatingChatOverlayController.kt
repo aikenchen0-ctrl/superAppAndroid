@@ -80,6 +80,7 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.security.MessageDigest
 import kotlin.math.roundToInt
 
@@ -137,6 +138,7 @@ internal class FloatingChatOverlayController(
     private val scrmSettingsManager = ScrmSettingsManager(context.applicationContext)
     private val scrmConversationRefreshInFlight = AtomicBoolean(false)
     private val scrmConversationRefreshPending = AtomicBoolean(false)
+    private val pendingScrmConversationRefreshAccountIds = ConcurrentLinkedQueue<String>()
     /** Monotonically identifies refresh requests so an older response cannot replace a newer account selection. */
     private val scrmConversationRefreshGeneration = AtomicLong(0L)
     private val cachedScrmAccountConversations = ConcurrentHashMap<String, ScrmFloatingAccountConversation>()
@@ -646,6 +648,7 @@ internal class FloatingChatOverlayController(
                         onBackGestureCancel = onBackGestureCancel,
                         voicePermissionRequestToken = voicePermissionRequestToken,
                         locationPermissionRequestToken = locationPermissionRequestToken,
+                        onRefreshConversation = ::refreshScrmConversationFromApi,
                         runtimeState = runtimeState,
                             onCollapse = ::collapse
                         )
@@ -919,9 +922,13 @@ internal class FloatingChatOverlayController(
         }.getOrNull()
     }
 
-    private fun refreshScrmConversationFromApi() {
+    /**
+     * 按发起操作的微信账号刷新会话；异步任务完成期间即使用户切号，也不会刷错账号。
+     * 测试流程：账号 A 的语音开始转写后切到账号 B，完成时应先刷新 A 的缓存，再保持 B 为当前页。
+     */
+    private fun refreshScrmConversationFromApi(requestedAccountId: String = selectedAccountId) {
+        require(requestedAccountId.isNotBlank()) { "requestedAccountId 不能为空" }
         val requestGeneration = scrmConversationRefreshGeneration.incrementAndGet()
-        val requestedAccountId = selectedAccountId
         Log.i(
             CHAT_DATA_TAG,
             "stage=refresh_requested generation=$requestGeneration " +
@@ -935,7 +942,7 @@ internal class FloatingChatOverlayController(
                 inFlight = !scrmConversationRefreshInFlight.compareAndSet(false, true)
             ) == ScrmConversationRefreshGate.QueuePending
         ) {
-            scrmConversationRefreshPending.set(true)
+            queueScrmConversationRefresh(requestedAccountId)
             Log.i(CHAT_DATA_TAG, "stage=refresh_queued generation=$requestGeneration reason=in_flight")
             return
         }
@@ -961,7 +968,7 @@ internal class FloatingChatOverlayController(
                     } else {
                         // The response can still populate the per-account cache, but it must
                         // never replace the account the user selected while it was in flight.
-                        scrmConversationRefreshPending.set(true)
+                        queueScrmConversationRefresh(currentAccountId)
                         Log.i(
                             CHAT_DATA_TAG,
                             "discard stale SCRM conversation refresh requestGeneration=$requestGeneration " +
@@ -981,10 +988,24 @@ internal class FloatingChatOverlayController(
                     )
                 }
                 scrmConversationRefreshInFlight.set(false)
-                if (scrmConversationRefreshPending.getAndSet(false)) {
-                    refreshScrmConversationFromApi()
-                }
+                runNextPendingScrmConversationRefresh()
             }
+        }
+    }
+
+    private fun queueScrmConversationRefresh(accountId: String) {
+        if (!pendingScrmConversationRefreshAccountIds.contains(accountId)) {
+            pendingScrmConversationRefreshAccountIds.offer(accountId)
+        }
+        scrmConversationRefreshPending.set(true)
+    }
+
+    private fun runNextPendingScrmConversationRefresh() {
+        if (!scrmConversationRefreshPending.get()) return
+        val nextAccountId = pendingScrmConversationRefreshAccountIds.poll()
+        scrmConversationRefreshPending.set(pendingScrmConversationRefreshAccountIds.isNotEmpty())
+        if (nextAccountId != null) {
+            refreshScrmConversationFromApi(nextAccountId)
         }
     }
 
@@ -1046,9 +1067,7 @@ internal class FloatingChatOverlayController(
                     Log.w(TAG, "failed to prefetch SCRM floating chat conversation", error)
                 }
                 scrmConversationRefreshInFlight.set(false)
-                if (scrmConversationRefreshPending.getAndSet(false)) {
-                    refreshScrmConversationFromApi()
-                }
+                runNextPendingScrmConversationRefresh()
             }
         }
     }
@@ -1137,11 +1156,8 @@ internal class FloatingChatOverlayController(
                 "device=${floatingChatDiagnosticId(selectedRoute.deviceUuid)} " +
                 "wechat=${floatingChatDiagnosticId(selectedRoute.weChatId)}"
         )
-        val loadedAccountConversations = scrmInitialConversationRoutesToLoad(
-            accounts = accounts,
-            devices = devices,
-            selectedRoute = selectedRoute,
-            cachedRouteKeys = cachedScrmAccountConversations.keys
+        val loadedAccountConversations = listOf(
+            scrmSelectedConversationRouteToRefresh(selectedRoute)
         ).map { route ->
             loadScrmAccountConversation(
                 session = session,
@@ -1951,16 +1967,12 @@ internal fun scrmConversationRefreshRecreatesExpandedFloatingChatOverlay(): Bool
 
 internal fun floatingChatOverlayHidesSemanticsFromItsOwningAccessibilityService(): Boolean = true
 
-internal fun scrmInitialConversationRoutesToLoad(
-    accounts: List<ScrmWechatAccount>,
-    devices: List<ScrmDevice>,
-    selectedRoute: ScrmFloatingAccountRoute,
-    cachedRouteKeys: Set<String> = emptySet()
-): List<ScrmFloatingAccountRoute> {
+internal fun scrmSelectedConversationRouteToRefresh(
+    selectedRoute: ScrmFloatingAccountRoute
+): ScrmFloatingAccountRoute {
     require(selectedRoute.deviceUuid.isNotBlank()) { "selected deviceUuid cannot be blank" }
     require(selectedRoute.weChatId.isNotBlank()) { "selected weChatId cannot be blank" }
-    if (scrmAccountRouteCacheKey(selectedRoute) in cachedRouteKeys) return emptyList()
-    return listOf(selectedRoute)
+    return selectedRoute
 }
 
 internal fun floatingChatPersistedMessageThreadIdsForSelection(
@@ -2099,8 +2111,13 @@ internal fun scrmMergeReadOnlyMessages(
     incoming: ScrmChatMessage
 ): List<ScrmChatMessage> {
     val incomingKey = scrmReadOnlyMessageKey(incoming)
-    if (existing.any { scrmReadOnlyMessageKey(it) == incomingKey }) return existing
-    return existing + incoming
+    val matchingIndex = existing.indexOfFirst { message ->
+        scrmReadOnlyMessageKey(message) == incomingKey
+    }
+    if (matchingIndex < 0) return existing + incoming
+    return existing.toMutableList().apply {
+        this[matchingIndex] = incoming
+    }
 }
 
 private fun scrmReadOnlyMessageKey(message: ScrmChatMessage): String {

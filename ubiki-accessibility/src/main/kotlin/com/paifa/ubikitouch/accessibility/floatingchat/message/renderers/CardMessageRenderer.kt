@@ -9,6 +9,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.message.InlineLocationCon
 import com.paifa.ubikitouch.accessibility.floatingchat.message.LinkMessageCard
 import com.paifa.ubikitouch.accessibility.floatingchat.message.LocationMessageContent
 import com.paifa.ubikitouch.accessibility.floatingchat.message.MiniProgramLinkContent
+import com.paifa.ubikitouch.accessibility.floatingchat.message.OfficialArticleMessageCard
 import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 
 internal object CardMessageRenderer : MessageRenderer {
@@ -47,8 +48,8 @@ internal object CardMessageRenderer : MessageRenderer {
                 message.copy(type = FloatingChatMessageType.ContactLink)
             )
             FloatingChatMessageType.MiniProgramLink -> MiniProgramLinkContent(message, environment.claimed)
-            FloatingChatMessageType.WebLink,
-            FloatingChatMessageType.Article,
+            FloatingChatMessageType.WebLink -> LinkMessageCard(message)
+            FloatingChatMessageType.Article -> OfficialArticleMessageCard(message)
             FloatingChatMessageType.ChannelsLive,
             FloatingChatMessageType.Music,
             FloatingChatMessageType.Favorite -> LinkMessageCard(message)

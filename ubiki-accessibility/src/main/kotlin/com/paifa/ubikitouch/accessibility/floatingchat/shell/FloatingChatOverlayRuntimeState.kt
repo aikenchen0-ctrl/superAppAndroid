@@ -14,7 +14,12 @@ import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 import com.paifa.ubikitouch.core.model.FloatingChatPrototype
 import com.paifa.ubikitouch.core.model.FloatingChatThumbnailOrientation
+import java.util.concurrent.ConcurrentHashMap
+
 internal class FloatingChatOverlayRuntimeState {
+    private val voiceTranscriptionTaskIds =
+        ConcurrentHashMap<VoiceTranscriptionTaskKey, Long>()
+
     var previewVisible by mutableStateOf(false)
     var mediaActionSheetVisible by mutableStateOf(false)
     var dismissSignal by mutableStateOf(0L)
@@ -162,6 +167,29 @@ internal class FloatingChatOverlayRuntimeState {
         }
     }
 
+    /**
+     * 保存已受理的语音转写 taskId，使全屏浮层重建后只续查任务而不会重复提交写操作。
+     * 测试流程：发起转写后收起并重新展开聊天，再次点击同一语音消息并选择“转文字”。
+     */
+    fun rememberVoiceTranscriptionTask(accountId: String, remoteMessageId: Long, taskId: Long) {
+        require(accountId.isNotBlank()) { "accountId 不能为空" }
+        require(remoteMessageId > 0L) { "remoteMessageId 必须大于 0" }
+        require(taskId > 0L) { "taskId 必须大于 0" }
+        voiceTranscriptionTaskIds[VoiceTranscriptionTaskKey(accountId, remoteMessageId)] = taskId
+    }
+
+    fun voiceTranscriptionTaskId(accountId: String, remoteMessageId: Long): Long? {
+        require(accountId.isNotBlank()) { "accountId 不能为空" }
+        require(remoteMessageId > 0L) { "remoteMessageId 必须大于 0" }
+        return voiceTranscriptionTaskIds[VoiceTranscriptionTaskKey(accountId, remoteMessageId)]
+    }
+
+    fun clearVoiceTranscriptionTask(accountId: String, remoteMessageId: Long) {
+        require(accountId.isNotBlank()) { "accountId 不能为空" }
+        require(remoteMessageId > 0L) { "remoteMessageId 必须大于 0" }
+        voiceTranscriptionTaskIds.remove(VoiceTranscriptionTaskKey(accountId, remoteMessageId))
+    }
+
     fun openMediaPreview(
         mediaMessages: List<FloatingChatMessage>,
         initialIndex: Int,
@@ -193,6 +221,11 @@ internal class FloatingChatOverlayRuntimeState {
         previewVisible = false
     }
 }
+
+private data class VoiceTranscriptionTaskKey(
+    val accountId: String,
+    val remoteMessageId: Long
+)
 
 /** 单次工作区请求使用 token，避免 Compose 重组重复打开已消费的页面。 */
 internal data class FloatingChatWorkspaceRequest(

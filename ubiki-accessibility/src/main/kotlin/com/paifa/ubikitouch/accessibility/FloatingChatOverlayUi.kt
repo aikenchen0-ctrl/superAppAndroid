@@ -338,6 +338,8 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskApi
 import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskPollState
 import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskResult
 import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskSubmissionResult
+import com.paifa.ubikitouch.accessibility.scrm.ScrmVoiceTranscriptionState
+import com.paifa.ubikitouch.accessibility.scrm.ScrmVoiceTranscriptionTaskRunner
 import com.paifa.ubikitouch.accessibility.scrm.ScrmPaymentApi
 import com.paifa.ubikitouch.accessibility.scrm.ScrmRedPacketQueryByMessageRequest
 import com.paifa.ubikitouch.accessibility.scrm.PaymentDetailParser
@@ -517,6 +519,7 @@ internal fun FloatingChatOverlay(
     onBackGestureCancel: () -> Unit = {},
     voicePermissionRequestToken: Int = 0,
     locationPermissionRequestToken: Int = 0,
+    onRefreshConversation: (String) -> Unit,
     runtimeState: FloatingChatOverlayRuntimeState = FloatingChatOverlayRuntimeState(),
     onCollapse: () -> Unit
 ) {
@@ -532,7 +535,6 @@ internal fun FloatingChatOverlay(
     var inputFocused by remember { mutableStateOf(false) }
     var voiceInputMode by remember { mutableStateOf(false) }
     var pendingVoiceRecording by remember { mutableStateOf<PendingVoiceRecording?>(null) }
-    var pendingVoiceTranscriptionError by remember { mutableStateOf<String?>(null) }
     var sendNameEnabledByAccountId by remember { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
     var bottomPanelMode by remember { mutableStateOf(BottomPanelMode.None) }
     var locationIsLive by remember { mutableStateOf(false) }
@@ -644,6 +646,7 @@ internal fun FloatingChatOverlay(
     val selectedMessageIds = remember { mutableStateMapOf<String, Boolean>() }
     val selectedFavoriteItemIds = remember { mutableStateMapOf<String, Boolean>() }
     val hiddenMessageIds = remember { mutableStateMapOf<String, Boolean>() }
+    val transcribingRemoteMessageIds = remember { mutableSetOf<Long>() }
     val hiddenParticipantIds = remember { mutableStateMapOf<String, Boolean>() }
     val contactProfiles = remember(initialContactProfiles) {
         mutableStateMapOf<String, LocalContactProfile>().apply {
@@ -1309,6 +1312,109 @@ internal fun FloatingChatOverlay(
                 }
             }
         },
+        // 测试流程：点击或长按已同步语音消息 -> 转文字；成功后刷新当前会话读取服务端 voiceText。
+        // 接口：POST /openapi/v1/messages/{messageId}/voice-trans-text，路径只使用 SCRM remoteMessageId。
+        onTranscribeMessage = transcribe@{ message ->
+            val remoteMessageId = message.remoteMessageId?.takeIf { it > 0L }
+            if (remoteMessageId == null) {
+                Toast.makeText(context, "该语音消息尚未同步，无法转文字", Toast.LENGTH_SHORT).show()
+                return@transcribe
+            }
+            val transcriptionAccountId = voiceTranscriptionAccountId(message, selectedAccount.id)
+            val route = scrmFloatingAccountRouteForContactId(transcriptionAccountId)
+            if (route == null) {
+                Toast.makeText(context, "该消息所属账号没有可用的 SCRM 设备路由", Toast.LENGTH_SHORT).show()
+                return@transcribe
+            }
+            val existingTaskId = runtimeState.voiceTranscriptionTaskId(
+                transcriptionAccountId,
+                remoteMessageId
+            )
+            if (!transcribingRemoteMessageIds.add(remoteMessageId)) {
+                Toast.makeText(context, "该语音消息正在转文字", Toast.LENGTH_SHORT).show()
+                return@transcribe
+            }
+            coroutineScope.launch {
+                try {
+                    val outcome = withContext(Dispatchers.IO) {
+                        val session = ScrmSettingsManager(context.applicationContext)
+                            .loadSelectedSessionOrBootstrap()
+                        ScrmVoiceTranscriptionTaskRunner(
+                            messageApi = session.messageOperationApi,
+                            taskApi = session.taskApi
+                        ).let { runner ->
+                            if (existingTaskId != null) {
+                                runner.awaitExistingTask(existingTaskId)
+                            } else {
+                                runner.transcribeAndAwait(
+                                    remoteMessageId = remoteMessageId,
+                                    deviceUuid = route.deviceUuid,
+                                    weChatId = route.weChatId,
+                                    onTaskAccepted = { taskId ->
+                                        runtimeState.rememberVoiceTranscriptionTask(
+                                            transcriptionAccountId,
+                                            remoteMessageId,
+                                            taskId
+                                        )
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    val feedback = when (outcome.state) {
+                        ScrmVoiceTranscriptionState.SUCCEEDED -> "转文字完成，正在刷新消息"
+                        ScrmVoiceTranscriptionState.SUBMISSION_FAILED ->
+                            "转文字提交失败：${outcome.message}"
+                        ScrmVoiceTranscriptionState.TASK_FAILED -> "转文字失败：${outcome.message}"
+                        ScrmVoiceTranscriptionState.PROCESSING -> "转文字处理中：${outcome.message}"
+                        ScrmVoiceTranscriptionState.RESULT_UNKNOWN ->
+                            "转文字结果待确认：${outcome.message}"
+                    }
+                    Toast.makeText(context, feedback, Toast.LENGTH_SHORT).show()
+                    when (outcome.state) {
+                        ScrmVoiceTranscriptionState.PROCESSING -> {
+                            outcome.taskId?.let { taskId ->
+                                runtimeState.rememberVoiceTranscriptionTask(
+                                    transcriptionAccountId,
+                                    remoteMessageId,
+                                    taskId
+                                )
+                            }
+                        }
+                        ScrmVoiceTranscriptionState.SUCCEEDED -> {
+                            runtimeState.clearVoiceTranscriptionTask(
+                                transcriptionAccountId,
+                                remoteMessageId
+                            )
+                            onRefreshConversation(transcriptionAccountId)
+                        }
+                        ScrmVoiceTranscriptionState.SUBMISSION_FAILED,
+                        ScrmVoiceTranscriptionState.TASK_FAILED -> {
+                            runtimeState.clearVoiceTranscriptionTask(
+                                transcriptionAccountId,
+                                remoteMessageId
+                            )
+                        }
+                        ScrmVoiceTranscriptionState.RESULT_UNKNOWN -> {
+                            // 未知结果仍保留原 taskId；下一次点击只续查该任务，禁止重新 POST。
+                            outcome.taskId?.let { taskId ->
+                                runtimeState.rememberVoiceTranscriptionTask(
+                                    transcriptionAccountId,
+                                    remoteMessageId,
+                                    taskId
+                                )
+                            }
+                        }
+                    }
+                } catch (error: Exception) {
+                    if (error is kotlinx.coroutines.CancellationException) throw error
+                    val detail = error.message?.takeIf(String::isNotBlank) ?: "未知错误"
+                    Toast.makeText(context, "转文字失败：$detail", Toast.LENGTH_SHORT).show()
+                } finally {
+                    transcribingRemoteMessageIds.remove(remoteMessageId)
+                }
+            }
+        },
         onScrmOperationRequested = { message -> scrmMessageOperationTarget = message },
         onCloseLongPressMenu = { longPressMessage = null }
     )
@@ -1689,7 +1795,6 @@ internal fun FloatingChatOverlay(
                     onVoiceInputModeChange = { voiceInputMode = it },
                     voicePermissionRequestToken = voicePermissionRequestToken,
                     onRecordingReady = {
-                        pendingVoiceTranscriptionError = null
                         pendingVoiceRecording = it
                     },
                     panelMode = bottomPanelMode,
@@ -2801,7 +2906,6 @@ internal fun FloatingChatOverlay(
                             onVoiceInputModeChange = { voiceInputMode = it },
                             voicePermissionRequestToken = voicePermissionRequestToken,
                             onRecordingReady = {
-                                pendingVoiceTranscriptionError = null
                                 pendingVoiceRecording = it
                             },
                             panelMode = bottomPanelMode,
@@ -2830,23 +2934,15 @@ internal fun FloatingChatOverlay(
         pendingVoiceRecording?.let { recording ->
             VoiceSendConfirmationOverlay(
                 recording = recording,
-                statusMessage = pendingVoiceTranscriptionError,
                 onCancel = {
                     recording.file.delete()
-                    pendingVoiceTranscriptionError = null
                     pendingVoiceRecording = null
-                },
-                // 本地待发送录音没有服务端 messageId，不能误调用仅支持已同步语音的转文字接口。
-                onTranscribe = {
-                    pendingVoiceTranscriptionError =
-                        "当前录音尚未发送。现有转文字接口仅支持已同步的语音消息，无法直接处理本地录音。"
                 },
                 onConfirm = {
                     inputMessageActions.sendVoiceMessage(
                         Uri.fromFile(recording.file).toString(),
                         recording.durationMs
                     )
-                    pendingVoiceTranscriptionError = null
                     pendingVoiceRecording = null
                 }
             )

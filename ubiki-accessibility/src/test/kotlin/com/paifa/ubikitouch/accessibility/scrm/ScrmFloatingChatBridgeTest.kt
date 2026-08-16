@@ -18,6 +18,77 @@ import org.junit.Test
 
 class ScrmFloatingChatBridgeTest {
     @Test
+    fun floatingChatMapsOfficialAccountArticleItems() {
+        val content = """
+            {
+              "appMessageItems": [
+                {
+                  "bannerImageUrl": "https://mmbiz.qpic.cn/banner-1.jpg",
+                  "description": "",
+                  "detailUrl": "http://mp.weixin.qq.com/s?idx=1",
+                  "imageUrl": "https://mmbiz.qpic.cn/avatar-1.jpg",
+                  "itemType": 0,
+                  "timestamp": 1786677814,
+                  "title": "暗战！爆了！彻底捂不住了！"
+                },
+                {
+                  "bannerImageUrl": "https://mmbiz.qpic.cn/banner-2.jpg",
+                  "description": "",
+                  "detailUrl": "http://mp.weixin.qq.com/s?idx=2",
+                  "imageUrl": "https://mmbiz.qpic.cn/avatar-2.jpg",
+                  "itemType": 0,
+                  "timestamp": 1786677814,
+                  "title": "日本广岛突发爆炸事故"
+                }
+              ],
+              "appMessageType": 20,
+              "senderNickname": "血饮"
+            }
+        """.trimIndent()
+        val conversation = scrmFloatingChatConversation(
+            base = FloatingChatPrototype.sampleConversation(),
+            contacts = emptyList(),
+            accountConversations = listOf(
+                ScrmFloatingAccountConversation(
+                    deviceUuid = "device-1",
+                    weChatId = "wxid_account",
+                    contacts = emptyList(),
+                    messagesByConversation = mapOf(
+                        "wxid_friend" to listOf(
+                            ScrmChatMessage(
+                                messageId = 81L,
+                                messageType = 49,
+                                content = content
+                            )
+                        )
+                    )
+                )
+            ),
+            accounts = listOf(ScrmWechatAccount("wxid_account", "Account", "device-1")),
+            devices = listOf(device("device-1", "wxid_account", online = true)),
+            selectedDeviceUuid = "device-1",
+            selectedWeChatId = "wxid_account"
+        )
+
+        val message = conversation.messages.single()
+        assertEquals("Article", message.type.name)
+        assertEquals("暗战！爆了！彻底捂不住了！ 等 2 篇", message.text)
+        assertEquals("血饮", message.appName)
+        assertEquals("https://mmbiz.qpic.cn/banner-1.jpg", message.thumbnailUrl)
+        assertEquals("http://mp.weixin.qq.com/s?idx=1", message.resourceUrl)
+
+        val itemsGetter = message::class.java.methods.singleOrNull { it.name == "getArticleItems" }
+        assertNotNull("FloatingChatMessage must expose structured articleItems", itemsGetter)
+        val items = itemsGetter!!.invoke(message) as List<*>
+        assertEquals(2, items.size)
+        assertEquals("暗战！爆了！彻底捂不住了！", articleProperty(items[0], "getTitle"))
+        assertEquals("https://mmbiz.qpic.cn/banner-1.jpg", articleProperty(items[0], "getBannerImageUrl"))
+        assertEquals("https://mmbiz.qpic.cn/avatar-1.jpg", articleProperty(items[0], "getImageUrl"))
+        assertEquals(1786677814L, articleProperty(items[0], "getTimestampSeconds"))
+        assertEquals("日本广岛突发爆炸事故", articleProperty(items[1], "getTitle"))
+    }
+
+    @Test
     fun floatingChatMapsFinderAppMessagesAndTrustedUsernameMetadata() {
         val conversation = scrmFloatingChatConversation(
             base = FloatingChatPrototype.sampleConversation(),
@@ -922,5 +993,10 @@ class ScrmFloatingChatBridgeTest {
             appVersionCode = 1,
             updatedAt = "2026-07-13T00:00:00Z"
         )
+    }
+
+    private fun articleProperty(item: Any?, getterName: String): Any? {
+        requireNotNull(item)
+        return item::class.java.methods.single { it.name == getterName }.invoke(item)
     }
 }

@@ -164,8 +164,8 @@ internal fun IosAlignedMessageContent(message: FloatingChatMessage) {
         FloatingChatMessageType.StickerGif -> StickerMessageCard(message)
         FloatingChatMessageType.LiveLocation -> LocationMessageContent(message.copy(type = FloatingChatMessageType.Location))
         FloatingChatMessageType.GroupInvite -> ContactLinkCardContent(message.copy(type = FloatingChatMessageType.ContactLink))
+        FloatingChatMessageType.Article -> OfficialArticleMessageCard(message)
         FloatingChatMessageType.WebLink,
-        FloatingChatMessageType.Article,
         FloatingChatMessageType.ChannelsLive,
         FloatingChatMessageType.Music,
         FloatingChatMessageType.Favorite -> LinkMessageCard(message)

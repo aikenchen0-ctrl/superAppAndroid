@@ -16,50 +16,10 @@ import org.junit.Test
 
 class FloatingChatOverlayControllerContractTest {
     @Test
-    fun scrmInitialRefreshLoadsOnlySelectedAccountDetails() {
+    fun scrmRefreshAlwaysLoadsSelectedAccountDetails() {
         val selected = ScrmFloatingAccountRoute("device-5", "wxid_5")
-        val routes = scrmInitialConversationRoutesToLoad(
-            accounts = (1..9).map { index ->
-                ScrmWechatAccount(
-                    wxid = "wxid_$index",
-                    nickname = "Account $index",
-                    clientUuid = "device-$index"
-                )
-            },
-            devices = (1..11).map { index ->
-                ScrmDevice(
-                    uuid = "device-$index",
-                    isOnline = true,
-                    status = 1,
-                    weChatId = "wxid_$index",
-                    androidApi = 34,
-                    appVersionCode = 1,
-                    updatedAt = "now"
-                )
-            },
-            selectedRoute = selected
-        )
 
-        assertEquals(listOf(selected), routes)
-    }
-
-    @Test
-    fun scrmInitialRefreshDoesNotReloadSelectedAccountDetailsWhenCached() {
-        val selected = ScrmFloatingAccountRoute("device-aiken", "wxid_aiken")
-        val routes = scrmInitialConversationRoutesToLoad(
-            accounts = listOf(
-                ScrmWechatAccount(
-                    wxid = selected.weChatId,
-                    nickname = "aiken",
-                    clientUuid = selected.deviceUuid
-                )
-            ),
-            devices = listOf(device(uuid = selected.deviceUuid, weChatId = selected.weChatId, online = true)),
-            selectedRoute = selected,
-            cachedRouteKeys = setOf(scrmAccountRouteCacheKey(selected))
-        )
-
-        assertEquals(emptyList<ScrmFloatingAccountRoute>(), routes)
+        assertEquals(selected, scrmSelectedConversationRouteToRefresh(selected))
     }
 
     @Test

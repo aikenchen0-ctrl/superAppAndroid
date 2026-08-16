@@ -33,6 +33,16 @@ data class FloatingChatContact(
     val tags: List<String> = emptyList()
 )
 
+data class FloatingChatArticleItem(
+    val title: String,
+    val description: String = "",
+    val detailUrl: String? = null,
+    val bannerImageUrl: String? = null,
+    val imageUrl: String? = null,
+    val itemType: Int? = null,
+    val timestampSeconds: Long? = null
+)
+
 data class FloatingChatMessage(
     val id: String,
     val type: FloatingChatMessageType,
@@ -56,6 +66,7 @@ data class FloatingChatMessage(
     val cardName: String? = null,
     val cardSubtitle: String? = null,
     val appName: String? = null,
+    val articleItems: List<FloatingChatArticleItem> = emptyList(),
     val locationTitle: String? = null,
     val locationAddress: String? = null,
     val resourceUrl: String? = null,

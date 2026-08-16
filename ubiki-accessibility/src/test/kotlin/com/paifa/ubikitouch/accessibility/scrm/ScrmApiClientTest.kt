@@ -1627,6 +1627,42 @@ class ScrmApiClientTest {
         assertEquals("1", handleBody.getValue("operation").jsonPrimitive.content)
     }
 
+    /** 测试流程：点击已同步语音消息的“转文字”，确认路径使用 SCRM messageId，帐号信息只进入 JSON body。 */
+    @Test
+    fun voiceTranscriptionUsesScrmMessageIdPathAndAccountBody() {
+        val transport = RecordingTransport(
+            ok("""{"taskId":701,"success":true,"message":"queued"}""")
+        )
+        val result = ScrmApiClient(config, transport).transcribeVoiceMessage(
+            messageId = 123L,
+            request = ScrmMessageOperationRequest(
+                deviceUuid = "device-1",
+                weChatId = "wxid_account"
+            )
+        )
+
+        val request = requireNotNull(transport.lastRequest)
+        val body = Json.parseToJsonElement(requireNotNull(request.body)).jsonObject
+        assertEquals(701L, result.taskId)
+        assertEquals("POST", request.method)
+        assertEquals(
+            "https://api.example.com/openapi/v1/messages/123/voice-trans-text",
+            request.url
+        )
+        assertEquals("device-1", body.getValue("deviceUuid").jsonPrimitive.content)
+        assertEquals("wxid_account", body.getValue("weChatId").jsonPrimitive.content)
+
+        val invalidTransport = RecordingTransport(ok("{}"))
+        val invalid = runCatching {
+            ScrmApiClient(config, invalidTransport).transcribeVoiceMessage(
+                messageId = 0L,
+                request = ScrmMessageOperationRequest("device-1", "wxid_account")
+            )
+        }
+        assertTrue(invalid.exceptionOrNull() is IllegalArgumentException)
+        assertNull(invalidTransport.lastRequest)
+    }
+
     @Test
     fun missingApiKeyFailsBeforeTransportIsCalled() {
         val transport = RecordingTransport(ok("{}"))

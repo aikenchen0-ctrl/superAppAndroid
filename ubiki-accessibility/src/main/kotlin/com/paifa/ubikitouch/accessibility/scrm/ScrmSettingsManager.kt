@@ -176,6 +176,7 @@ class ScrmSettingsManager(context: Context) {
             contactApi = client,
             chatRoomApi = client,
             messageApi = client,
+            messageOperationApi = client,
             momentApi = client,
             taskApi = client
         )
@@ -218,6 +219,7 @@ internal data class ScrmSelectedSession(
     val contactApi: ScrmContactApi,
     val chatRoomApi: ScrmChatRoomApi,
     val messageApi: ScrmMessageApi,
+    val messageOperationApi: ScrmMessageOperationApi,
     val momentApi: ScrmMomentApi,
     val taskApi: ScrmTaskApi
 ) {

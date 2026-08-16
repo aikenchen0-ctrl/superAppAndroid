@@ -1,5 +1,6 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.message
 
+import com.paifa.ubikitouch.accessibility.floatingchat.chat.accountIdForScopedThreadId
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 
@@ -50,6 +51,19 @@ internal fun parseMessageAsideAnalysis(response: String): MessageAsideAnalysis {
         throw IllegalStateException("AI 分析结果缺少情绪、立场或话外音")
     }
     return MessageAsideAnalysis(emotion = emotion, stance = stance, subtext = subtext)
+}
+
+/**
+ * 转文字应跟随被点击消息的账号作用域；旧的非作用域消息才回退到当前选中账号。
+ * 测试流程：在“全部未回消息”中点击其他账号的语音消息，操作菜单选择“转文字”。
+ */
+internal fun voiceTranscriptionAccountId(
+    message: FloatingChatMessage,
+    fallbackAccountId: String
+): String {
+    return message.threadContactId
+        ?.let(::accountIdForScopedThreadId)
+        ?: fallbackAccountId
 }
 
 internal class MessageLongPressActions(

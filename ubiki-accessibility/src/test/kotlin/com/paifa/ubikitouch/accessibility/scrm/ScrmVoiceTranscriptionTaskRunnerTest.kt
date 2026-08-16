@@ -23,6 +23,7 @@ class ScrmVoiceTranscriptionTaskRunnerTest {
             )
         )
         val sleeps = mutableListOf<Long>()
+        val acceptedTaskIds = mutableListOf<Long>()
         val runner = ScrmVoiceTranscriptionTaskRunner(
             messageApi = messageApi,
             taskApi = taskApi,
@@ -34,7 +35,8 @@ class ScrmVoiceTranscriptionTaskRunnerTest {
         val outcome = runner.transcribeAndAwait(
             remoteMessageId = 123L,
             deviceUuid = "device-1",
-            weChatId = "wxid_account"
+            weChatId = "wxid_account",
+            onTaskAccepted = { taskId -> acceptedTaskIds += taskId }
         )
 
         assertEquals(ScrmVoiceTranscriptionState.SUCCEEDED, outcome.state)
@@ -47,6 +49,7 @@ class ScrmVoiceTranscriptionTaskRunnerTest {
         )
         assertEquals(listOf(71L, 71L), taskApi.requestedTaskIds)
         assertEquals(listOf(5L), sleeps)
+        assertEquals(listOf(71L), acceptedTaskIds)
     }
 
     @Test
@@ -148,6 +151,31 @@ class ScrmVoiceTranscriptionTaskRunnerTest {
     }
 
     @Test
+    fun existingTaskCanResumeWithoutSubmittingTheMessageAgain() {
+        val messageApi = RecordingMessageOperationApi()
+        val taskApi = RecordingTaskApi(
+            results = listOf(
+                taskResult(75L, "processing", message = "still recognizing"),
+                taskResult(75L, "success", message = "transcribed")
+            )
+        )
+        val runner = ScrmVoiceTranscriptionTaskRunner(
+            messageApi = messageApi,
+            taskApi = taskApi,
+            pollDelayMillis = 1L,
+            maxPollAttempts = 2,
+            sleepMillis = {}
+        )
+
+        val outcome = runner.awaitExistingTask(75L)
+
+        assertEquals(ScrmVoiceTranscriptionState.SUCCEEDED, outcome.state)
+        assertEquals(75L, outcome.taskId)
+        assertTrue(messageApi.calls.isEmpty())
+        assertEquals(listOf(75L, 75L), taskApi.requestedTaskIds)
+    }
+
+    @Test
     fun unknownTaskResultRequiresManualReview() {
         val messageApi = RecordingMessageOperationApi(
             submission = ScrmTaskSubmissionResult(taskId = 76L, success = true)
@@ -187,10 +215,14 @@ class ScrmVoiceTranscriptionTaskRunnerTest {
         val invalidAccount = runCatching {
             runner.transcribeAndAwait(123L, "device-1", "")
         }.exceptionOrNull()
+        val invalidTaskId = runCatching {
+            runner.awaitExistingTask(0L)
+        }.exceptionOrNull()
 
         assertTrue(invalidId is IllegalArgumentException)
         assertTrue(invalidDevice is IllegalArgumentException)
         assertTrue(invalidAccount is IllegalArgumentException)
+        assertTrue(invalidTaskId is IllegalArgumentException)
         assertTrue(messageApi.calls.isEmpty())
     }
 
