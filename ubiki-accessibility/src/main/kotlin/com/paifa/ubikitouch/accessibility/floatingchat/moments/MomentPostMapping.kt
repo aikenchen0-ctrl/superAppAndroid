@@ -61,12 +61,23 @@ internal fun AppMomentPost.toLocalMomentPost(): LocalMomentPost {
         mediaColor = media?.color?.toArgb()?.toLong(),
         mediaLabel = media?.label,
         linkTitle = linkTitle,
+        linkUrl = linkUrl,
         sourceLabel = sourceLabel,
         likedBy = likedBy,
         comments = comments.map { comment ->
-            LocalMomentComment(author = comment.author, text = comment.text)
+            LocalMomentComment(
+                author = comment.author,
+                text = comment.text,
+                id = comment.id,
+                authorWxId = comment.authorWxId,
+                replyTo = comment.replyTo,
+                replyCommentId = comment.replyCommentId
+            )
         },
-        createdAt = createdAt
+        createdAt = createdAt,
+        authorWxId = authorWxId,
+        circleId = circleId,
+        publishTime = publishTime
     )
 }
 
@@ -94,11 +105,22 @@ internal fun LocalMomentPost.toAppMomentPost(): AppMomentPost {
             )
         },
         linkTitle = linkTitle,
+        linkUrl = linkUrl,
         sourceLabel = sourceLabel,
         likedBy = likedBy,
         comments = comments.map { comment ->
-            AppMomentComment(author = comment.author, text = comment.text)
+            AppMomentComment(
+                author = comment.author,
+                text = comment.text,
+                id = comment.id,
+                authorWxId = comment.authorWxId,
+                replyTo = comment.replyTo,
+                replyCommentId = comment.replyCommentId
+            )
         },
+        authorWxId = authorWxId,
+        circleId = circleId,
+        publishTime = publishTime,
         createdAt = createdAt
     )
 }

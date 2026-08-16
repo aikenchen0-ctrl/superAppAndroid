@@ -1,12 +1,9 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.tools
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,7 +13,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -24,27 +20,22 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import kotlinx.coroutines.launch
 
@@ -83,50 +74,13 @@ internal fun OfficialArticleFullScreen(
 ) {
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { OfficialArticleFullScreenTab.entries.size })
-    var pageHeightPx by remember { mutableFloatStateOf(0f) }
-    var entered by remember { mutableStateOf(false) }
-    var exiting by remember { mutableStateOf(false) }
-    val pageTranslationY = remember { Animatable(0f) }
-
-    LaunchedEffect(pageHeightPx) {
-        if (pageHeightPx > 0f && !entered) {
-            pageTranslationY.snapTo(pageHeightPx)
-            pageTranslationY.animateTo(0f, tween(OfficialArticleAnimationDurationMillis))
-            entered = true
-        }
-    }
-
-    fun closeWithExitAnimation() {
-        if (exiting) return
-        exiting = true
-        scope.launch {
-            pageTranslationY.animateTo(pageHeightPx, tween(OfficialArticleAnimationDurationMillis))
-            onBack()
-        }
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
-            .onSizeChanged { pageHeightPx = it.height.toFloat() }
-            .graphicsLayer { translationY = pageTranslationY.value }
     ) {
-        Spacer(Modifier.height(30.dp))
-        TopAppBar(
-            title = {
-                Text(
-                    text = "公众号文章",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Normal
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = ::closeWithExitAnimation) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            }
-        )
+        // 文章内容占用工具栏后的稳定工作区，统一工具栏处理顶部安全区。
+        FloatingWorkspaceTopAppBar(title = "公众号文章", onBack = onBack)
         PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
             OfficialArticleFullScreenTab.entries.forEachIndexed { index, tab ->
                 Tab(
@@ -136,7 +90,7 @@ internal fun OfficialArticleFullScreen(
                 )
             }
         }
-        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
+        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) { page ->
             when (OfficialArticleFullScreenTab.entries[page]) {
                 OfficialArticleFullScreenTab.Compose -> OfficialArticleComposePage(
                     submissionState = submissionState,
@@ -297,5 +251,3 @@ private fun OfficialArticleConversationPage(articles: List<FloatingChatMessage>)
         }
     }
 }
-
-private const val OfficialArticleAnimationDurationMillis = 260

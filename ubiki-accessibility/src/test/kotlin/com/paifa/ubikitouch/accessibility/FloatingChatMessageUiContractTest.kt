@@ -2140,8 +2140,8 @@ class FloatingChatMessageUiContractTest {
             ),
             bottomInputActionOrder()
         )
-        assertEquals(false, bottomInputBarVisibleForCenteredToolPanel(centeredToolFeaturePanelVisible = true))
-        assertEquals(true, bottomInputBarVisibleForCenteredToolPanel(centeredToolFeaturePanelVisible = false))
+        assertEquals(false, bottomInputBarVisibleForFullscreenWorkspace(fullscreenWorkspaceVisible = true))
+        assertEquals(true, bottomInputBarVisibleForFullscreenWorkspace(fullscreenWorkspaceVisible = false))
         assertEquals(BottomInputAction.Assistant, bottomInputTrailingAction())
     }
 
@@ -3281,10 +3281,9 @@ class FloatingChatMessageUiContractTest {
         assertEquals(true, momentsComposedPostsPersistInSqlite())
         assertEquals(true, momentsTimelineRestoresPersistedPostsOnOverlayRecreate())
         assertEquals(true, locationPermissionRequestHidesFloatingOverlayUntilResult())
-        assertEquals(true, toolFeaturePanelsUseCenteredFloatingSheet())
-        assertEquals(330, toolFeaturePanelMinWidthDp())
-        assertEquals(430, toolFeaturePanelMaxWidthDp())
-        assertEquals(560, toolFeaturePanelMaxHeightDp())
+        assertEquals(true, BottomPanelMode.RedPacket.isFullscreenWorkspace())
+        assertEquals(true, BottomPanelMode.Transfer.isFullscreenWorkspace())
+        assertEquals(true, BottomPanelMode.Location.isFullscreenWorkspace())
         assertEquals(true, redPacketToolOpensInAppComposer())
         assertEquals(true, redPacketPanelSendsAmountAndGreeting())
         assertEquals(true, transferToolOpensInAppComposer())

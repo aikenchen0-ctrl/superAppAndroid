@@ -1,16 +1,12 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.account
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,7 +15,6 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Card
@@ -32,11 +27,8 @@ import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -44,14 +36,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import kotlinx.coroutines.launch
-
-private const val AccountCardAnimationDurationMillis = 260
 
 internal enum class AccountCardFullScreenTab(val label: String) {
     Accounts("选择账号"),
@@ -75,59 +64,26 @@ internal fun AccountCardFullScreen(
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { AccountCardFullScreenTab.entries.size })
     var selectedAccountId by remember(accounts) { mutableStateOf(accounts.firstOrNull()?.id) }
-    var pageHeightPx by remember { mutableFloatStateOf(0f) }
-    var entered by remember { mutableStateOf(false) }
-    var exiting by remember { mutableStateOf(false) }
-    val translationY = remember { Animatable(0f) }
     val selectedAccount = accounts.firstOrNull { it.id == selectedAccountId }
     val selectedProfile = selectedAccount?.let { account ->
         accountProfiles[account.id] ?: defaultAccountProfileFor(account)
-    }
-
-    LaunchedEffect(pageHeightPx) {
-        if (pageHeightPx > 0f && !entered) {
-            translationY.snapTo(pageHeightPx)
-            translationY.animateTo(0f, tween(AccountCardAnimationDurationMillis))
-            entered = true
-        }
-    }
-
-    fun exit(afterExit: () -> Unit) {
-        if (exiting) return
-        exiting = true
-        scope.launch {
-            translationY.animateTo(pageHeightPx, tween(AccountCardAnimationDurationMillis))
-            afterExit()
-        }
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
-            .onSizeChanged { pageHeightPx = it.height.toFloat() }
-            .graphicsLayer { this.translationY = translationY.value }
     ) {
-        Spacer(Modifier.height(30.dp))
-        TopAppBar(
-            title = {
-                Text(
-                    text = "推名片",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Normal
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = { exit(onBack) }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            },
+        FloatingWorkspaceTopAppBar(
+            title = "推名片",
+            onBack = onBack,
             actions = {
                 IconButton(
                     enabled = selectedAccount != null,
                     onClick = {
                         selectedAccount?.id?.let { accountId ->
-                            exit { onSendAccountCard(accountId) }
+                            onSendAccountCard(accountId)
+                            onBack()
                         }
                     }
                 ) {
@@ -144,7 +100,7 @@ internal fun AccountCardFullScreen(
                 )
             }
         }
-        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) { page ->
             when (AccountCardFullScreenTab.entries[page]) {
                 AccountCardFullScreenTab.Accounts -> AccountCardAccountsPage(
                     accounts = accounts,

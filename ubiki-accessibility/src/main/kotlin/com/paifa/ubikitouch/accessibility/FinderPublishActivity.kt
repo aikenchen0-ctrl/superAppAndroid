@@ -8,7 +8,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -23,7 +22,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -32,7 +30,6 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -47,6 +44,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -61,6 +59,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.finder.finderComposeConte
 import com.paifa.ubikitouch.accessibility.floatingchat.finder.finderParseMediaUrls
 import com.paifa.ubikitouch.accessibility.floatingchat.finder.toFinderUserMessage
 import com.paifa.ubikitouch.accessibility.floatingchat.finder.validatedFinderPostRequest
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSettingsManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -224,8 +223,9 @@ internal fun FinderPublishScreen(context: Context, onBack: () -> Unit) {
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
     ) {
-        Spacer(Modifier.height(finderPublishStatusBarHeightDp().dp))
-        FinderPublishTopBar(onBack = onBack)
+        // UI：视频号发布复用悬浮聊天工作区的工具栏，状态区由工具栏内边距统一处理。
+        // 测试流程：从聊天根打开视频号发布，确认顶部无独立空白区，点击左上返回由宿主执行退出动画。
+        FloatingWorkspaceTopAppBar(title = "视频号发布", onBack = onBack)
         PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
             FinderPublishTab.entries.forEachIndexed { index, tab ->
                 Tab(
@@ -272,22 +272,6 @@ internal fun FinderPublishScreen(context: Context, onBack: () -> Unit) {
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun FinderPublishTopBar(onBack: () -> Unit) {
-    Box(Modifier.fillMaxWidth().height(56.dp)) {
-        IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-        }
-        Text(
-            text = "视频号发布",
-            color = MaterialTheme.colorScheme.primary,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Normal,
-            modifier = Modifier.align(Alignment.Center)
-        )
     }
 }
 

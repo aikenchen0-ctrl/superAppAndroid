@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -42,7 +44,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingDialogCloseButton
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.BottomPanelMode
 import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.accessibility.scrm.ScrmFloatingAccountRoute
@@ -84,22 +86,18 @@ internal fun ScrmOperationsHubPanel(
     val actions = remember(tab) { scrmHubActions(tab) }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(OverlayTokens.momentsBackground)
+        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 16.dp, end = 10.dp, top = 12.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("SCRM 运营", color = OverlayTokens.panelPrimaryText, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                Text(route?.weChatId ?: "未选择账号", color = OverlayTokens.panelSecondaryText, fontSize = 11.sp, maxLines = 1)
-            }
-            FloatingDialogCloseButton(onClose = onClose)
-        }
+        // UI：复用右侧全屏工作区工具栏，30dp 状态区由 AppBar 内边距承载。
+        // 测试流程：从功能栏打开 SCRM运营，点击左上返回并确认根动画结束后回到聊天页。
+        FloatingWorkspaceTopAppBar(title = "SCRM运营", onBack = onClose)
+        Text(
+            text = route?.weChatId ?: "未选择账号",
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 11.sp,
+            maxLines = 1
+        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -149,7 +147,7 @@ internal fun ScrmOperationsHubPanel(
 
         Spacer(Modifier.height(8.dp))
         LazyColumn(
-            modifier = Modifier.fillMaxWidth().height(390.dp),
+            modifier = Modifier.weight(1f).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(1.dp)
         ) {
             item {

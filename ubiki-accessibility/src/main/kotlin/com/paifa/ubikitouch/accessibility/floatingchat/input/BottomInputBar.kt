@@ -86,9 +86,10 @@ internal fun bottomInputBarHorizontalClearanceDp(): Int = BottomInputBarHorizont
 
 internal fun bottomInputBarUsesKeyboardInsets(): Boolean = true
 
-internal fun bottomInputBarVisibleForCenteredToolPanel(
-    centeredToolFeaturePanelVisible: Boolean
-): Boolean = !centeredToolFeaturePanelVisible
+/** 全屏功能工作区打开时隐藏聊天输入栏，避免输入栏叠加在 surface 页面之上。 */
+internal fun bottomInputBarVisibleForFullscreenWorkspace(
+    fullscreenWorkspaceVisible: Boolean
+): Boolean = !fullscreenWorkspaceVisible
 
 internal fun bottomInputControlsUseCenterAlignment(): Boolean = true
 
@@ -154,6 +155,10 @@ internal fun BottomInputBar(
     onClearAiGeneratedInput: () -> Unit,
     inputFocused: Boolean,
     onInputFocusedChange: (Boolean) -> Unit,
+    voiceInputMode: Boolean,
+    onVoiceInputModeChange: (Boolean) -> Unit,
+    voicePermissionRequestToken: Int,
+    onRecordingReady: (PendingVoiceRecording) -> Unit,
     panelMode: BottomPanelMode,
     onPanelModeChange: (BottomPanelMode) -> Unit,
     onSend: () -> Unit,
@@ -207,30 +212,34 @@ internal fun BottomInputBar(
                 )
                 BottomIcon(
                     action = BottomInputAction.Voice,
-                    active = panelMode == BottomPanelMode.Voice,
+                    active = voiceInputMode,
                     onClick = {
-                        onPanelModeChange(
-                            if (panelMode == BottomPanelMode.Voice) {
-                                BottomPanelMode.None
-                            } else {
-                                BottomPanelMode.Voice
-                            }
-                        )
+                        onVoiceInputModeChange(!voiceInputMode)
+                        if (voiceInputMode) onInputFocusedChange(false)
+                        onPanelModeChange(BottomPanelMode.None)
                     }
                 )
-                AlignedMessageInputField(
-                    value = inputText,
-                    onValueChange = onInputTextChange,
-                    focused = inputFocused,
-                    onFocusedChange = onInputFocusedChange,
-                    onSend = onSend,
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(
-                            min = BottomInputFieldMinHeightDp.dp,
-                            max = BottomInputFieldMaxHeightDp.dp
-                        )
-                )
+                if (voiceInputMode) {
+                    HoldToRecordVoiceBox(
+                        permissionRequestToken = voicePermissionRequestToken,
+                        onRecordingReady = onRecordingReady,
+                        modifier = Modifier.weight(1f)
+                    )
+                } else {
+                    AlignedMessageInputField(
+                        value = inputText,
+                        onValueChange = onInputTextChange,
+                        focused = inputFocused,
+                        onFocusedChange = onInputFocusedChange,
+                        onSend = onSend,
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(
+                                min = BottomInputFieldMinHeightDp.dp,
+                                max = BottomInputFieldMaxHeightDp.dp
+                            )
+                    )
+                }
                 if (aiGeneratedClearable) {
                     CompactInteractiveSize {
                         IconButton(

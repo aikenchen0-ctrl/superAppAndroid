@@ -1,6 +1,9 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.components
 
 import java.io.File
+import com.paifa.ubikitouch.accessibility.floatingchat.shell.BottomPanelMode
+import com.paifa.ubikitouch.accessibility.floatingchat.shell.isFullscreenWorkspace
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -23,13 +26,20 @@ class FloatingWorkspaceAdoptionContractTest {
             "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/VideoCallFullScreen.kt",
             "src/main/kotlin/com/paifa/ubikitouch/accessibility/AiAutoReplyOverlayController.kt",
             "src/main/kotlin/com/paifa/ubikitouch/accessibility/ContactRelationsOverlayController.kt",
-            "src/main/kotlin/com/paifa/ubikitouch/accessibility/LeftSidebarOverlayController.kt"
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/LeftSidebarOverlayController.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/FriendManagementOverlayController.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/FavoriteLibraryActivity.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/FinderPublishActivity.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/moments/MaterialLibraryActivityContent.kt"
         )
 
         sourceFiles.forEach { relativePath ->
             val source = File(System.getProperty("user.dir"), relativePath).readText()
             assertTrue("$relativePath must use the shared toolbar", source.contains("FloatingWorkspaceTopAppBar("))
-            assertTrue("$relativePath must keep the floating workspace background transparent", source.contains("Color.Transparent"))
+            assertTrue(
+                "$relativePath must use the Material 3 surface as its floating workspace background",
+                source.contains("background(MaterialTheme.colorScheme.surface)")
+            )
             assertFalse("$relativePath must not reserve a standalone 30dp status spacer", source.contains("Spacer(Modifier.height(30.dp))"))
         }
     }
@@ -67,7 +77,7 @@ class FloatingWorkspaceAdoptionContractTest {
 
         assertTrue(overlayUi.contains("FloatingWorkspaceTopAppBar("))
         assertTrue(toolbarWorkspace.contains("FloatingWorkspaceTopAppBar("))
-        assertTrue(toolbarWorkspace.contains("Color.Transparent"))
+        assertTrue(toolbarWorkspace.contains("background(MaterialTheme.colorScheme.surface)"))
         assertFalse(toolbarWorkspace.contains("Animatable"))
         assertFalse(toolbarWorkspace.contains("graphicsLayer"))
         assertFalse(toolbarWorkspace.contains("onSizeChanged"))
@@ -75,10 +85,10 @@ class FloatingWorkspaceAdoptionContractTest {
 
     /**
      * 测试流程：打开全部未回消息、具体账号未回消息、搜索和扫码，确认状态区属于 M3 AppBar，
-     * 未回消息页根保持透明，只有普通会话继续保留用户可配置的磨砂背景。
+     * 右侧工作区的工具栏使用 surface，普通会话继续保留用户可配置的磨砂背景。
      */
     @Test
-    fun unreadAndToolbarWorkspacesKeepTheUiComponentsInsetAndTransparentRoot() {
+    fun unreadAndToolbarWorkspacesKeepTheUiComponentsInsetAndSurfaceRoot() {
         val presentation = File(
             System.getProperty("user.dir"),
             "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/components/FloatingWorkspacePresentation.kt"
@@ -90,13 +100,81 @@ class FloatingWorkspaceAdoptionContractTest {
 
         assertTrue(presentation.contains("windowInsets = WindowInsets(top = FloatingWorkspaceTopBarDefaults.StatusBarTopPaddingDp.dp)"))
         assertFalse(presentation.contains("modifier = modifier.padding(top = FloatingWorkspaceTopBarDefaults.StatusBarTopPaddingDp.dp)"))
-        assertTrue(overlayUi.contains("floatingChatRouteUsesTransparentWorkspaceRoot"))
-        assertTrue(overlayUi.contains("enabled = frostedBackgroundEnabled &&"))
+        assertTrue(presentation.contains("containerColor = MaterialTheme.colorScheme.surface"))
+        assertTrue(presentation.contains("scrolledContainerColor = MaterialTheme.colorScheme.surface"))
         assertTrue(
             overlayUi.contains(
-                "!floatingChatRouteUsesTransparentWorkspaceRoot(chatNavigationState.route)"
+                "floatingChatRouteUsesSurfaceWorkspaceRoot(chatNavigationState.route)"
             )
         )
+        assertTrue(overlayUi.contains("Modifier.background(MaterialTheme.colorScheme.surface)"))
+        assertFalse(overlayUi.contains("floatingChatRouteUsesTransparentWorkspaceRoot"))
+    }
+
+    /**
+     * 测试流程：依次打开智能抠图、边缘特效、卡包、收藏、素材库、群接龙和 OpenAPI，
+     * 确认工具栏与 Tab 之后的主列表只占用剩余高度，避免使用 fillMaxSize 导致内容越界或被裁剪。
+     */
+    @Test
+    fun fullscreenWorkspacesAllocateScrollableContentToTheRemainingHeight() {
+        val sourceFiles = listOf(
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/BackgroundRemovalWorkspace.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/SideEffectFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/CouponWalletFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/FavoriteLibraryActivity.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/moments/MaterialLibraryActivityContent.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/RelayFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/scrm/OpenApiWorkbenchPanel.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/account/AccountCardFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/scrm/AccountDeviceFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/scrm/CustomerProfileFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/group/GroupInfoScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/group/GroupInvitationFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/ChannelsVideoFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/HiddenUsersFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/LocationFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/RedPacketFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/SplitBillFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/VideoShortFullScreen.kt"
+        )
+
+        sourceFiles.forEach { relativePath ->
+            val source = File(System.getProperty("user.dir"), relativePath).readText()
+            assertTrue(
+                "$relativePath must allocate its scrollable content to the remaining full-screen height",
+                source.contains("Modifier.weight(1f).fillMaxWidth()")
+            )
+        }
+    }
+
+    /**
+     * 测试流程：在素材库进入详情和编辑页，再分别打开工具栏搜索、扫一扫和添加好友，
+     * 确认内部页面同样使用 surface 根，并将内容限制在共享工具栏后的剩余高度。
+     */
+    @Test
+    fun nestedFullscreenPagesKeepSurfaceRootsAndRemainingHeight() {
+        val materialLibrary = File(
+            System.getProperty("user.dir"),
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/moments/MaterialLibraryActivityContent.kt"
+        ).readText()
+        val toolbarWorkspace = File(
+            System.getProperty("user.dir"),
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/ToolbarWorkspaceFullScreen.kt"
+        ).readText()
+
+        assertEquals(
+            3,
+            Regex("Column\\(Modifier\\.fillMaxSize\\(\\)\\.background\\(MaterialTheme\\.colorScheme\\.surface\\)\\)")
+                .findAll(materialLibrary)
+                .count()
+        )
+        assertEquals(
+            3,
+            Regex("Modifier\\.weight\\(1f\\)\\.fillMaxWidth\\(\\)")
+                .findAll(materialLibrary)
+                .count()
+        )
+        assertTrue(toolbarWorkspace.contains("Column(Modifier.weight(1f).fillMaxWidth())"))
     }
 
     /**
@@ -123,11 +201,12 @@ class FloatingWorkspaceAdoptionContractTest {
     }
 
     /**
-     * 测试流程：从右侧依次打开 UI组件 与智能抠图，确认全屏工作区不由父级铺设白底，
-     * 智能抠图启动前不隐藏聊天悬浮根节点，因此可在原界面之上连续完成位移动画。
+     * 测试流程：从右侧依次打开联系人、朋友圈、视频号、素材库、AI 配置、语音助手、通话、收藏和文件，
+     * 确认每个工作区都占满悬浮根，
+     * 并使用 Material 3 surface，而非透明或受限的居中面板。
      */
     @Test
-    fun fullscreenWorkspacesKeepTheSharedChatRootVisibleBehindTheirTransparentSurface() {
+    fun fullscreenWorkspacesUseSurfaceAndAvoidCenteredInsetsForEveryFullPageTool() {
         val bottomPanel = File(
             System.getProperty("user.dir"),
             "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/shell/FloatingBottomPanel.kt"
@@ -136,8 +215,23 @@ class FloatingWorkspaceAdoptionContractTest {
             System.getProperty("user.dir"),
             "src/main/kotlin/com/paifa/ubikitouch/accessibility/UbikiAccessibilityService.kt"
         ).readText()
-
-        assertTrue(bottomPanel.contains("color = if (isFullscreenWorkspace) Color.Transparent"))
+        listOf(
+            BottomPanelMode.Moments,
+            BottomPanelMode.Finder,
+            BottomPanelMode.MomentMaterials,
+            BottomPanelMode.Contacts,
+            BottomPanelMode.Assistant,
+            BottomPanelMode.AiVoice,
+            BottomPanelMode.VoiceCall,
+            BottomPanelMode.VideoCall,
+            BottomPanelMode.Favorite,
+            BottomPanelMode.FileDocument
+        ).forEach { mode ->
+            assertTrue("$mode must use the full-screen workspace", mode.isFullscreenWorkspace())
+        }
+        assertTrue(bottomPanel.contains("val isFullscreenWorkspace = mode.isFullscreenWorkspace()"))
+        assertTrue(bottomPanel.contains("color = if (isFullscreenWorkspace) MaterialTheme.colorScheme.surface"))
+        assertTrue(bottomPanel.contains("modifier = if (isFullscreenWorkspace) Modifier.fillMaxSize()"))
         assertFalse(service.contains("hideFloatingChatForExternalActivity(\"background removal\")"))
     }
 
@@ -170,5 +264,76 @@ class FloatingWorkspaceAdoptionContractTest {
         assertTrue(service.contains("openWorkspace(BottomPanelMode.BackgroundRemoval)"))
         assertTrue(panelMode.contains("OpenApiWorkbench"))
         assertTrue(panelMode.contains("BackgroundRemoval"))
+    }
+
+    /**
+     * 测试流程：从右侧素材库进入，确认素材列表页面使用 UI组件 的 surface 根和 M3 工具栏，
+     * 顶部 30dp 仅由共享 AppBar 处理，不能再保留页面级状态栏占位。
+     */
+    @Test
+    fun materialLibraryUsesTheSharedSurfaceWorkspacePresentation() {
+        val source = File(
+            System.getProperty("user.dir"),
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/moments/MaterialLibraryActivityContent.kt"
+        ).readText()
+
+        assertTrue(source.contains("FloatingWorkspaceTopAppBar("))
+        assertTrue(source.contains("background(MaterialTheme.colorScheme.surface)"))
+        assertFalse(source.contains("Spacer(Modifier.height(30.dp))"))
+    }
+
+    /**
+     * 测试流程：依次从右侧功能栏和工具栏打开全屏页面，确认仅聊天根负责进出场位移，
+     * 子页面不能再次创建整页 Animatable、graphicsLayer 或 onSizeChanged 动画。
+     */
+    @Test
+    fun fullscreenRoutesDelegatePageMotionToTheOverlayRoot() {
+        val sourceFiles = listOf(
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/account/AccountCardFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/scrm/AccountDeviceFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/scrm/CustomerProfileFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/ChannelsLiveFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/ChannelsVideoFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/CouponWalletFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/FavoriteShareFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/FileDocumentFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/GalleryFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/HiddenUsersFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/LocationFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/MiniProgramFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/MusicFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/OfficialArticleFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/QuickPhraseFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/RedPacketFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/RelayFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/ReviewRequestsFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/SendNameFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/SplitBillFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/TransferFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/VideoCallFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/VideoShortFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/VoiceCallFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/VoiceMessageFullScreen.kt",
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/floatingchat/tools/WebLinkFullScreen.kt"
+        )
+
+        sourceFiles.forEach { relativePath ->
+            val source = File(System.getProperty("user.dir"), relativePath).readText()
+            assertTrue(
+                "$relativePath must keep a Material 3 surface root",
+                source.contains("background(MaterialTheme.colorScheme.surface)")
+            )
+            assertTrue(
+                "$relativePath must reuse the shared floating workspace toolbar",
+                source.contains("FloatingWorkspaceTopAppBar(")
+            )
+            assertFalse(
+                "$relativePath must not reserve an independent 30dp status spacer",
+                source.contains("Spacer(Modifier.height(30.dp))")
+            )
+            assertFalse("$relativePath must not create a second page Animatable", source.contains("Animatable"))
+            assertFalse("$relativePath must not add a second page graphicsLayer", source.contains("graphicsLayer"))
+            assertFalse("$relativePath must not measure itself for page motion", source.contains("onSizeChanged"))
+        }
     }
 }

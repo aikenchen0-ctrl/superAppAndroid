@@ -1,7 +1,5 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.tools
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -20,7 +18,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
@@ -35,17 +32,14 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,8 +48,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
@@ -63,8 +55,6 @@ import kotlinx.coroutines.launch
 import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 
 internal const val VoiceCallStatusBarHeightDp = 30
-private const val VoiceCallAnimationDurationMillis = 260
-
 internal enum class VoiceCallTab(val label: String) {
     Call("通话"),
     Participants("参与者")
@@ -86,13 +76,10 @@ internal fun VoiceCallFullScreen(
 ) {
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { VoiceCallTab.entries.size })
-    var pageHeightPx by remember { mutableFloatStateOf(0f) }
-    var entered by remember { mutableStateOf(false) }
-    var exiting by remember { mutableStateOf(false) }
     var elapsedSeconds by remember { mutableIntStateOf(0) }
     var muted by remember { mutableStateOf(false) }
     var speakerOn by remember { mutableStateOf(true) }
-    val pageTranslationY = remember { Animatable(0f) }
+    var isClosing by remember { mutableStateOf(false) }
     val visibleParticipants = remember(participantNames, targetName) {
         participantNames.filter(String::isNotBlank).ifEmpty { listOf(targetName.ifBlank { "当前好友" }) }.take(9)
     }
@@ -103,34 +90,21 @@ internal fun VoiceCallFullScreen(
             elapsedSeconds += 1
         }
     }
-    LaunchedEffect(pageHeightPx) {
-        if (pageHeightPx > 0f && !entered) {
-            pageTranslationY.snapTo(pageHeightPx)
-            pageTranslationY.animateTo(0f, tween(VoiceCallAnimationDurationMillis))
-            entered = true
-        }
-    }
-
-    fun closeWithExitAnimation(recordCall: Boolean) {
-        if (exiting) return
-        exiting = true
-        scope.launch {
-            pageTranslationY.animateTo(-pageHeightPx, tween(VoiceCallAnimationDurationMillis))
-            if (recordCall) onEndCall(elapsedSeconds)
-            onBack()
-        }
+    fun close(recordCall: Boolean) {
+        if (isClosing) return
+        isClosing = true
+        if (recordCall) onEndCall(elapsedSeconds)
+        onBack()
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Transparent)
-            .onSizeChanged { pageHeightPx = it.height.toFloat() }
-            .graphicsLayer { translationY = pageTranslationY.value }
+            .background(MaterialTheme.colorScheme.surface)
     ) {
         FloatingWorkspaceTopAppBar(
             title = if (isGroup) "群语音通话" else "语音通话",
-            onBack = { closeWithExitAnimation(recordCall = false) }
+            onBack = { close(recordCall = false) }
         )
         PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
             VoiceCallTab.entries.forEachIndexed { index, tab ->
@@ -141,7 +115,7 @@ internal fun VoiceCallFullScreen(
                 )
             }
         }
-        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
+        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) { page ->
             when (VoiceCallTab.entries[page]) {
                 VoiceCallTab.Call -> VoiceCallPage(
                     targetName = targetName,
@@ -151,7 +125,7 @@ internal fun VoiceCallFullScreen(
                     speakerOn = speakerOn,
                     onMutedChanged = { muted = !muted },
                     onSpeakerChanged = { speakerOn = !speakerOn },
-                    onEndCall = { closeWithExitAnimation(recordCall = true) }
+                    onEndCall = { close(recordCall = true) }
                 )
                 VoiceCallTab.Participants -> VoiceCallParticipantsPage(
                     names = visibleParticipants,

@@ -1238,7 +1238,7 @@ class ChatExtractionContractTest {
 
         val modeText = panelMode.readText()
         assertTrue(modeText.contains("enum class BottomPanelMode"))
-        assertTrue(modeText.contains("fun BottomPanelMode.isCenteredToolFeaturePanel("))
+        assertTrue(modeText.contains("fun BottomPanelMode.isFullscreenWorkspace("))
 
         val legacy = sourceFile("FloatingChatOverlayUi.kt").readText()
         assertFalse(legacy.contains("private fun BottomInputBar("))
@@ -1247,7 +1247,7 @@ class ChatExtractionContractTest {
         assertFalse(legacy.contains("private fun BottomIcon("))
         assertFalse(legacy.contains("internal enum class BottomInputAction"))
         assertFalse(legacy.contains("private enum class BottomPanelMode"))
-        assertFalse(legacy.contains("private fun BottomPanelMode.isCenteredToolFeaturePanel("))
+        assertFalse(legacy.contains("private fun BottomPanelMode.isFullscreenWorkspace("))
         assertFalse(legacy.contains("private const val BottomInputBarMinHeightDp"))
     }
 

@@ -65,11 +65,11 @@ class BlinkVoiceFullscreenOverlayPresentationTest {
     }
 
     /**
-     * 测试流程：分别打开智能抠图与眨眼测试，确认全屏悬浮 View 的根容器透出下层聊天界面，
-     * 而输入区域和 M3 卡片仍由各自组件负责绘制背景。
+     * 测试流程：分别打开智能抠图与眨眼测试，确认可见工作区根使用 Material 3 surface，
+     * 不再透出下层聊天界面。
      */
     @Test
-    fun activityWorkspaceRootsKeepTheOverlayBackgroundTransparent() {
+    fun blinkVoiceFullscreenWorkspaceUsesAnOpaqueSurfaceRoot() {
         val backgroundRemoval = File(
             System.getProperty("user.dir"),
             "src/main/java/com/paifa/ubikitouch/app/BackgroundRemovalActivity.kt"
@@ -79,7 +79,17 @@ class BlinkVoiceFullscreenOverlayPresentationTest {
             "src/main/java/com/paifa/ubikitouch/app/BlinkVoiceFullscreenOverlayController.kt"
         ).readText()
 
-        assertTrue(backgroundRemoval.contains("Color.Transparent"))
-        assertTrue(blinkVoice.contains("Color.Transparent"))
+        assertTrue(
+            blinkVoice.contains(
+                "Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)"
+            )
+        )
+        assertFalse(blinkVoice.contains("background(Color.Transparent)"))
+        assertTrue(
+            backgroundRemoval.contains(
+                "Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)"
+            )
+        )
+        assertFalse(backgroundRemoval.contains("background(Color.Transparent)"))
     }
 }

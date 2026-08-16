@@ -75,7 +75,7 @@ internal fun AiVoicePanel(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.Transparent),
+            .background(MaterialTheme.colorScheme.surface),
         verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing)
     ) {
         // UI：右侧语音助手复用 UI组件 工具栏，状态区由 toolbar 顶部 padding 统一处理。

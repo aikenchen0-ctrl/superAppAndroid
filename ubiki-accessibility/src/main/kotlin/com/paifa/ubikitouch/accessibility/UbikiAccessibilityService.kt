@@ -459,11 +459,11 @@ class UbikiAccessibilityService : AccessibilityService() {
     }
 
     fun requestFloatingChatFinderPublish() {
-        if (!::finderPublishOverlayController.isInitialized) {
+        if (!::floatingChatOverlayController.isInitialized) {
             Log.w(TAG, "skip Finder publish before overlay initialization")
             return
         }
-        finderPublishOverlayController.show()
+        floatingChatOverlayController.openWorkspace(BottomPanelMode.FinderPublish)
     }
 
     /** 右侧 AI 自动回复入口使用独立全屏悬浮页，避免复用聊天内部的底部面板。 */
@@ -476,16 +476,14 @@ class UbikiAccessibilityService : AccessibilityService() {
     }
 
     fun requestFloatingChatFavoriteLibrary() {
-        if (::floatingChatOverlayController.isInitialized) {
-            FloatingChatFavoriteLibraryBridge.updateSnapshot(
-                floatingChatOverlayController.favoriteLibrarySnapshot()
-            )
-        }
-        if (!::favoriteLibraryOverlayController.isInitialized) {
+        if (!::floatingChatOverlayController.isInitialized) {
             Log.w(TAG, "skip favorite library before overlay initialization")
             return
         }
-        favoriteLibraryOverlayController.show()
+        FloatingChatFavoriteLibraryBridge.updateSnapshot(
+            floatingChatOverlayController.favoriteLibrarySnapshot()
+        )
+        floatingChatOverlayController.openWorkspace(BottomPanelMode.FavoriteLibrary)
     }
 
     internal fun sendFloatingChatFavorite(
@@ -496,11 +494,11 @@ class UbikiAccessibilityService : AccessibilityService() {
     }
 
     fun requestFloatingChatMaterialLibrary() {
-        val intent = Intent()
-            .setClassName(packageName, "com.paifa.ubikitouch.app.MaterialLibraryActivity")
-            .addFloatingChatBridgeFlags()
-        runCatching { startActivity(intent) }
-            .onFailure { Log.e(TAG, "failed to start material library", it) }
+        if (!::floatingChatOverlayController.isInitialized) {
+            Log.w(TAG, "skip material library before floating chat initialization")
+            return
+        }
+        floatingChatOverlayController.openWorkspace(BottomPanelMode.MaterialLibrary)
     }
 
     fun requestFloatingChatMediaCapture() {
@@ -533,9 +531,14 @@ class UbikiAccessibilityService : AccessibilityService() {
         }
     }
 
+    /**
+     * UI：从悬浮聊天的眨眼测试入口请求全屏采集，已有采集宿主时保持聊天根可见。
+     * 接口：优先调用 [FloatingChatBlinkVoiceBridge]；仅缺少相机权限时启动已有权限宿主。
+     * 测试流程：聊天展开后触发眨眼测试，确认捕获可用时不闪退聊天根，拒绝权限后可正常返回。
+     */
     fun requestFloatingChatBlinkVoiceCapture() {
-        hideFloatingChatForExternalActivity("BlinkVoice")
         if (FloatingChatBlinkVoiceBridge.requestFullscreenCapture()) return
+        hideFloatingChatForExternalActivity("BlinkVoice")
         val intent = Intent()
             .setClassName(packageName, "com.paifa.ubikitouch.app.FloatingChatBlinkCameraPermissionActivity")
             .addFloatingChatBridgeFlags()

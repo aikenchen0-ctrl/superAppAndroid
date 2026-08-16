@@ -2,8 +2,6 @@ package com.paifa.ubikitouch.accessibility.floatingchat.tools
 
 import android.media.MediaPlayer
 import android.net.Uri
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,7 +19,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -31,17 +28,13 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -49,11 +42,10 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import kotlinx.coroutines.launch
 
@@ -83,53 +75,17 @@ internal fun VoiceMessageFullScreen(
 ) {
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { VoiceMessageFullScreenTab.entries.size })
-    var pageHeightPx by remember { mutableFloatStateOf(0f) }
-    var entered by remember { mutableStateOf(false) }
-    var exiting by remember { mutableStateOf(false) }
-    val pageTranslationY = remember { Animatable(0f) }
-
-    LaunchedEffect(pageHeightPx) {
-        if (pageHeightPx > 0f && !entered) {
-            pageTranslationY.snapTo(pageHeightPx * voiceMessageEnterOffsetDirection())
-            pageTranslationY.animateTo(0f, tween(VoiceMessageAnimationDurationMillis))
-            entered = true
-        }
-    }
-
-    fun closeWithExitAnimation() {
-        if (exiting) return
-        exiting = true
-        scope.launch {
-            pageTranslationY.animateTo(
-                pageHeightPx * voiceMessageExitOffsetDirection(),
-                tween(VoiceMessageAnimationDurationMillis)
-            )
-            onBack()
-        }
+    fun closeWorkspace() {
+        onBack()
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
-            .onSizeChanged { pageHeightPx = it.height.toFloat() }
-            .graphicsLayer { translationY = pageTranslationY.value }
     ) {
-        Spacer(Modifier.height(VoiceMessageStatusBarHeightDp.dp))
-        TopAppBar(
-            title = {
-                Text(
-                    text = "语音消息",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Normal
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = ::closeWithExitAnimation) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            }
-        )
+        // 语音录制与播放共享悬浮根动画，工具栏只负责安全区和返回操作。
+        FloatingWorkspaceTopAppBar(title = "语音消息", onBack = ::closeWorkspace)
         PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
             VoiceMessageFullScreenTab.entries.forEachIndexed { index, tab ->
                 Tab(
@@ -139,13 +95,13 @@ internal fun VoiceMessageFullScreen(
                 )
             }
         }
-        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
+        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) { page ->
             when (VoiceMessageFullScreenTab.entries[page]) {
                 VoiceMessageFullScreenTab.Recorder -> VoiceRecorderPage(
                     permissionRequestToken = permissionRequestToken,
                     onSendVoice = { audioUri, durationMs ->
                         onSendVoice(audioUri, durationMs)
-                        closeWithExitAnimation()
+                        closeWorkspace()
                     }
                 )
                 VoiceMessageFullScreenTab.Conversation -> VoiceConversationPage(voiceMessages)
@@ -320,5 +276,3 @@ private fun VoiceConversationPage(messages: List<FloatingChatMessage>) {
         }
     }
 }
-
-private const val VoiceMessageAnimationDurationMillis = 260

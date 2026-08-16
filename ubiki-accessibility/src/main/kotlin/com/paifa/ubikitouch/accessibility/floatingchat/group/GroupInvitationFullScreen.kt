@@ -166,7 +166,7 @@ internal fun GroupInvitationFullScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Transparent)
+            .background(MaterialTheme.colorScheme.surface)
     ) {
         // UI：群邀请卡与 UI组件共享全屏工具栏，避免独立状态栏空白区域造成布局跳变。
         // 测试流程：打开群邀请卡后确认从底部进入，点击左上返回后确认向顶部退出。
@@ -190,7 +190,7 @@ internal fun GroupInvitationFullScreen(
         }
         status?.let { Text(it, modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
         error?.let { Text(it, modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp), color = MaterialTheme.colorScheme.error) }
-        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) {
+        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) {
             when {
                 loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 invitations.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

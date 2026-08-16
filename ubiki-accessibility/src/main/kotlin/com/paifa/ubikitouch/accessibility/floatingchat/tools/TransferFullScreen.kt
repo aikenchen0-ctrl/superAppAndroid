@@ -1,7 +1,5 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.tools
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,7 +16,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material3.Button
@@ -26,28 +23,23 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import kotlinx.coroutines.launch
 
@@ -79,52 +71,18 @@ internal fun TransferFullScreen(
 ) {
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { TransferFullScreenTab.entries.size })
-    var pageHeightPx by remember { mutableFloatStateOf(0f) }
-    val pageTranslationY = remember { Animatable(0f) }
-    var exiting by remember { mutableStateOf(false) }
     var selectedRecipient by remember(recipients) { mutableStateOf(recipients.firstOrNull()) }
     var amount by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    LaunchedEffect(pageHeightPx) {
-        if (pageHeightPx > 0f && !exiting) {
-            pageTranslationY.snapTo(pageHeightPx * transferEnterOffsetDirection())
-            pageTranslationY.animateTo(0f, tween(260))
-        }
-    }
-
-    fun closeWithExitAnimation() {
-        if (exiting) return
-        exiting = true
-        scope.launch {
-            pageTranslationY.animateTo(pageHeightPx * transferExitOffsetDirection(), tween(220))
-            onBack()
-        }
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
-            .onSizeChanged { pageHeightPx = it.height.toFloat() }
-            .graphicsLayer { translationY = pageTranslationY.value }
     ) {
-        Spacer(Modifier.height(TransferStatusBarHeightDp.dp))
-        TopAppBar(
-            title = {
-                Text(
-                    text = "转账",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Normal
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = ::closeWithExitAnimation) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            }
-        )
+        // 共享工具栏承接顶部 inset 和关闭回调，转账表单不再维护页面级位移。
+        FloatingWorkspaceTopAppBar(title = "转账", onBack = onBack)
         PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
             TransferFullScreenTab.entries.forEachIndexed { index, tab ->
                 Tab(
@@ -134,7 +92,7 @@ internal fun TransferFullScreen(
                 )
             }
         }
-        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
+        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) { page ->
             when (TransferFullScreenTab.entries[page]) {
                 TransferFullScreenTab.Compose -> TransferComposePage(
                     recipients = recipients,

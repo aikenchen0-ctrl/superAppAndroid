@@ -47,6 +47,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -160,7 +161,9 @@ internal fun ScrmContactsPanel(
 
     if (route == null) {
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surface),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             TextLabel(
@@ -685,7 +688,7 @@ internal fun ScrmContactsPanel(
         scrmContactsBySummaryId(state.contacts)
     }
 
-    Box(modifier = Modifier.fillMaxWidth()) {
+    Box(modifier = Modifier.fillMaxSize()) {
         when (panelScreen) {
             WechatContactsPanelScreen.Contacts -> ContactsScreen(
                 state = ContactsUiState(
@@ -889,9 +892,8 @@ private fun WechatStartGroupPanel(
     val selectedCount = selectedContactIds.values.count { selected -> selected }
     Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(WechatContactsPageBackground)
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
     ) {
         Row(
             modifier = Modifier
@@ -944,7 +946,7 @@ private fun WechatStartGroupPanel(
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 360.dp, max = 520.dp)
+                .weight(1f)
         ) {
             wechatStartGroupOptionLabels().forEachIndexed { index, label ->
                 item(key = "start-group-option-$index") {
@@ -1006,7 +1008,7 @@ private fun WechatContactsStatusText(
         lineHeight = 13.sp,
         modifier = Modifier
             .fillMaxWidth()
-            .background(WechatContactsPageBackground)
+            .background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 18.dp, vertical = 6.dp)
     )
 }
@@ -1141,7 +1143,7 @@ private fun WechatContactsStatusLine(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(WechatContactsPageBackground)
+            .background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 12.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1341,7 +1343,7 @@ private fun WechatContactSectionHeader(title: String) {
         color = WechatContactsSecondaryText,
         modifier = Modifier
             .fillMaxWidth()
-            .background(WechatContactsPageBackground)
+            .background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 16.dp, vertical = 6.dp),
         maxLines = 1
     )
@@ -1411,9 +1413,8 @@ private fun WechatAddFriendPanel(
 ) {
     Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(WechatContactsRowBackground)
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
     ) {
         WechatContactsTopBar(title = "添加朋友", showBack = true, onBack = onBack)
         Row(
@@ -1450,7 +1451,7 @@ private fun WechatAddFriendPanel(
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 320.dp, max = 450.dp)
+                .weight(1f)
         ) {
             item {
                 WechatAddFriendEntryRow(
@@ -2323,7 +2324,6 @@ private fun collectScrmFindContactObjects(data: JsonElement?): List<JsonObject> 
 }
 
 private val WechatContactsHeaderBackground = Color(0xFFF1F1F1)
-private val WechatContactsPageBackground = Color(0xFFEDEDED)
 private val WechatContactsRowBackground = Color(0xFFFCFCFC)
 private val WechatContactsSearchBackground = Color(0xFFE9E9E9)
 private val WechatContactsPrimaryText = Color(0xFF202020)

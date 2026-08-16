@@ -1,7 +1,5 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.tools
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,7 +17,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
@@ -36,22 +33,19 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.accessibility.scrm.ScrmFloatingAccountRoute
 import com.paifa.ubikitouch.accessibility.scrm.ScrmFriendRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmFriendRequestOperation
@@ -96,8 +90,6 @@ internal fun ReviewRequestsFullScreen(
     var submittingId by remember { mutableStateOf<Int?>(null) }
     var status by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
-    var pageHeightPx by remember { mutableFloatStateOf(0f) }
-    val pageTranslationY = remember { Animatable(0f) }
 
     /** 读取服务端已同步的好友申请，待审核页只请求 pendingOnly，已处理页在本地筛除待处理项。 */
     fun load(tab: ReviewRequestsFullScreenTab) {
@@ -195,47 +187,17 @@ internal fun ReviewRequestsFullScreen(
     LaunchedEffect(route, pagerState.currentPage) {
         load(ReviewRequestsFullScreenTab.entries[pagerState.currentPage])
     }
-    LaunchedEffect(pageHeightPx) {
-        if (pageHeightPx > 0f) {
-            pageTranslationY.snapTo(pageHeightPx)
-            pageTranslationY.animateTo(0f, animationSpec = tween(durationMillis = WorkspaceEnterDurationMillis))
-        }
-    }
-    fun closeWithExitAnimation() {
-        scope.launch {
-            pageTranslationY.animateTo(-pageHeightPx, animationSpec = tween(durationMillis = WorkspaceExitDurationMillis))
-            onBack()
-        }
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .onSizeChanged { pageHeightPx = it.height.toFloat() }
-            .graphicsLayer { translationY = pageTranslationY.value }
             .background(MaterialTheme.colorScheme.surface)
     ) {
-        Spacer(Modifier.height(ReviewRequestsStatusBarHeightDp.dp))
-        TopAppBar(
-            title = {
-                Text(
-                    text = "申请审核",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Normal
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = ::closeWithExitAnimation) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            },
-            actions = {
+        // 审核接口页只保留业务状态，外层悬浮根视图统一处理页面进出场。
+        FloatingWorkspaceTopAppBar(title = "申请审核", onBack = onBack) {
                 IconButton(onClick = ::pull, enabled = !loading && submittingId == null) {
                     Icon(Icons.Filled.Refresh, contentDescription = "拉取并刷新申请")
                 }
-            }
-        )
+        }
         PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
             ReviewRequestsFullScreenTab.entries.forEachIndexed { index, tab ->
                 Tab(
@@ -261,7 +223,7 @@ internal fun ReviewRequestsFullScreen(
                 style = MaterialTheme.typography.bodyMedium
             )
         }
-        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
+        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) { page ->
             ReviewRequestsPage(
                 tab = ReviewRequestsFullScreenTab.entries[page],
                 requests = requests,
@@ -441,5 +403,3 @@ private const val ReviewRequestListPageSize = 100
 private const val PendingFriendRequestStatus = 0
 private const val AcceptedFriendRequestStatus = 1
 private const val RejectedFriendRequestStatus = 2
-private const val WorkspaceEnterDurationMillis = 240
-private const val WorkspaceExitDurationMillis = 200

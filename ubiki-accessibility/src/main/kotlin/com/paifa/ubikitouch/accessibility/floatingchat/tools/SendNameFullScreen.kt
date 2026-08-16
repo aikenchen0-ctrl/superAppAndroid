@@ -1,45 +1,26 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.tools
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
-
-private const val SendNameAnimationDurationMillis = 260
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 
 /**
  * iOS「发送名字设置」对应的 Android Material 3 全屏悬浮页。
@@ -48,7 +29,6 @@ private const val SendNameAnimationDurationMillis = 260
  * 不伪造服务端接口。测试流程：从右侧「携带名字」进入，切换开关后返回聊天，确认当前账号
  * 的发送消息名称立即显示或隐藏；切换账号后，确认两者状态互不影响。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SendNameFullScreen(
     accountName: String,
@@ -56,48 +36,14 @@ internal fun SendNameFullScreen(
     onEnabledChange: (Boolean) -> Unit,
     onBack: () -> Unit
 ) {
-    val scope = rememberCoroutineScope()
-    var pageHeightPx by remember { mutableFloatStateOf(0f) }
-    var entered by remember { mutableStateOf(false) }
-    val translationY = remember { Animatable(0f) }
-
-    LaunchedEffect(pageHeightPx) {
-        if (pageHeightPx > 0f && !entered) {
-            translationY.snapTo(pageHeightPx)
-            translationY.animateTo(0f, tween(SendNameAnimationDurationMillis))
-            entered = true
-        }
-    }
-    fun close() = scope.launch {
-        translationY.animateTo(pageHeightPx, tween(SendNameAnimationDurationMillis))
-        onBack()
-    }
-
-    // 复用已有 accessibility overlay 根视图，不创建 Dialog 或新 Window，避免 BadTokenException。
+    // UI：由聊天根 AnimatedVisibility 承担唯一进出场，避免页面位移叠加造成首帧不可见。
+    // 测试流程：从右侧“携带名字”打开，确认标题栏内置状态区，点击返回后内容随根视图上滑退出。
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
-            .onSizeChanged { pageHeightPx = it.height.toFloat() }
-            .graphicsLayer { this.translationY = translationY.value }
+        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)
     ) {
-        Spacer(Modifier.height(30.dp))
-        TopAppBar(
-            title = {
-                Text(
-                    text = "携带名字",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Normal
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = ::close) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            }
-        )
+        FloatingWorkspaceTopAppBar(title = "携带名字", onBack = onBack)
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.weight(1f).fillMaxWidth(),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {

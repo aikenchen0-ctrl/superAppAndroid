@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface as MaterialSurface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -17,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.paifa.ubikitouch.accessibility.data.LocalContactProfile
@@ -50,18 +52,25 @@ internal fun ContactEditOverlay(
     onOpenPrivateChat: (FloatingChatContact) -> Unit,
     onAddFriendFromGroupMember: (FloatingChatContact) -> Unit,
     onDismiss: () -> Unit,
+    useFullScreenWorkspace: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     // 群信息复用已附着的无障碍悬浮根视图，不创建 Dialog、Activity 或新 Window，避免 BadTokenException。
+    // 测试流程：右侧“群信息”以透明全屏工作区打开；从成员页返回后仍停留在同一工作区。
+    val isGroupInfoWorkspace = useFullScreenWorkspace && target is ContactEditorTarget.Group
     var selectedGroupMember by remember(target) { mutableStateOf<FloatingChatContact?>(null) }
     var friendProfileTarget by remember(target) { mutableStateOf<FloatingChatContact?>(null) }
     Box(
-        modifier = modifier
-            .background(OverlayTokens.centerPanelScrim)
-            .pointerInput(target) {
-                detectTapGestures(onTap = { onDismiss() })
-            },
-        contentAlignment = Alignment.Center
+        modifier = if (isGroupInfoWorkspace) {
+            modifier.background(MaterialTheme.colorScheme.surface)
+        } else {
+            modifier
+                .background(OverlayTokens.centerPanelScrim)
+                .pointerInput(target) {
+                    detectTapGestures(onTap = { onDismiss() })
+                }
+        },
+        contentAlignment = if (isGroupInfoWorkspace) Alignment.TopStart else Alignment.Center
     ) {
         val fullScreenProfile = target is ContactEditorTarget.User || friendProfileTarget != null
         val fullScreenGroupInfo = target is ContactEditorTarget.Group
@@ -83,7 +92,7 @@ internal fun ContactEditOverlay(
                     detectTapGestures(onTap = {})
                 },
             shape = if (fullScreenProfile || fullScreenGroupInfo) RoundedCornerShape(0.dp) else RoundedCornerShape(14.dp),
-            color = OverlayTokens.panel,
+            color = if (isGroupInfoWorkspace) MaterialTheme.colorScheme.surface else OverlayTokens.panel,
             border = if (fullScreenProfile || fullScreenGroupInfo) null else BorderStroke(1.dp, OverlayTokens.panelBorder),
             shadowElevation = if (fullScreenProfile || fullScreenGroupInfo) 0.dp else 10.dp
         ) {

@@ -28,7 +28,7 @@ class FavoriteLibraryOverlayPresentationTest {
     }
 
     @Test
-    fun favoriteLibraryScreenUsesTheReusableTransparentWorkspaceChrome() {
+    fun favoriteLibraryScreenUsesTheReusableSurfaceWorkspaceChrome() {
         val source = File(
             System.getProperty("user.dir"),
             "src/main/kotlin/com/paifa/ubikitouch/accessibility/FavoriteLibraryActivity.kt"
@@ -36,7 +36,7 @@ class FavoriteLibraryOverlayPresentationTest {
 
         listOf(
             "internal fun FavoriteLibraryScreen(",
-            "background(Color.Transparent)",
+            "background(MaterialTheme.colorScheme.surface)",
             "FloatingWorkspaceTopAppBar(title = \"收藏\", onBack = onBack)",
             "loadFavoriteCollectionItems(context)",
             "OutlinedTextField(",

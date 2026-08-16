@@ -1,7 +1,7 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.tools
 
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.BottomPanelMode
-import com.paifa.ubikitouch.accessibility.floatingchat.shell.isCenteredToolFeaturePanel
+import com.paifa.ubikitouch.accessibility.floatingchat.shell.isFullscreenWorkspace
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.transferEnterOffsetDirection
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.transferExitOffsetDirection
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.transferUsesFullscreenWorkspace
@@ -21,7 +21,7 @@ class TransferFullScreenContractTest {
             toolActionDispatchFor(FloatingChatToolAction.Transfer)
         )
         assertTrue(transferUsesFullscreenWorkspace())
-        assertFalse(BottomPanelMode.Transfer.isCenteredToolFeaturePanel())
+        assertTrue(BottomPanelMode.Transfer.isFullscreenWorkspace())
     }
 
     /** 测试流程：检查 M3 分页、列表、30dp 状态区及实体 translationY 动画契约。 */
@@ -35,9 +35,11 @@ class TransferFullScreenContractTest {
         assertTrue(source.contains("PrimaryTabRow"))
         assertTrue(source.contains("HorizontalPager"))
         assertTrue(source.contains("LazyColumn"))
-        assertTrue(source.contains("TransferStatusBarHeightDp = 30"))
-        assertTrue(source.contains("Animatable"))
-        assertTrue(source.contains("translationY = pageTranslationY.value"))
+        assertTrue(source.contains("FloatingWorkspaceTopAppBar("))
+        assertTrue(source.contains("background(MaterialTheme.colorScheme.surface)"))
+        assertFalse(source.contains("Animatable"))
+        assertFalse(source.contains("graphicsLayer"))
+        assertFalse(source.contains("Spacer(Modifier.height(30.dp))"))
         assertFalse(source.contains("Dialog("))
         assertFalse(source.contains("WindowManager"))
 
@@ -60,6 +62,6 @@ class TransferFullScreenContractTest {
     @Test
     fun transferSlideDirectionsMatchWorkspaceContract() {
         assertEquals(1, transferEnterOffsetDirection())
-        assertEquals(1, transferExitOffsetDirection())
+        assertEquals(-1, transferExitOffsetDirection())
     }
 }

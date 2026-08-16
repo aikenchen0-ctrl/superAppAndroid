@@ -7,14 +7,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface as MaterialSurface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.paifa.ubikitouch.accessibility.AppLocationOption
@@ -22,6 +21,8 @@ import com.paifa.ubikitouch.accessibility.AppMomentMedia
 import com.paifa.ubikitouch.accessibility.AppMomentPost
 import com.paifa.ubikitouch.accessibility.AiAutoReplyFullScreen
 import com.paifa.ubikitouch.accessibility.ContactRelationsFullScreen
+import com.paifa.ubikitouch.accessibility.FavoriteLibraryScreen
+import com.paifa.ubikitouch.accessibility.FinderPublishScreen
 import com.paifa.ubikitouch.accessibility.FloatingChatAiConfig
 import com.paifa.ubikitouch.accessibility.FriendManagementFullscreenScreen
 import com.paifa.ubikitouch.accessibility.LeftSidebarFullScreen
@@ -42,7 +43,9 @@ import com.paifa.ubikitouch.accessibility.floatingchat.input.BottomGestureTouchC
 import com.paifa.ubikitouch.accessibility.floatingchat.input.BottomEmojiPanelHeightDp
 import com.paifa.ubikitouch.accessibility.floatingchat.input.BottomInputBarMaxHeightDp
 import com.paifa.ubikitouch.accessibility.floatingchat.moments.MomentMaterialsPanel
-import com.paifa.ubikitouch.accessibility.floatingchat.moments.MomentsTimelinePanel
+import com.paifa.ubikitouch.accessibility.floatingchat.moments.launchMomentExternalLink
+import com.paifa.ubikitouch.accessibility.floatingchat.moments.MomentsWorkspace
+import com.paifa.ubikitouch.accessibility.floatingchat.moments.MaterialLibraryActivityContent
 import com.paifa.ubikitouch.accessibility.floatingchat.message.ScrmComposerKind
 import com.paifa.ubikitouch.accessibility.floatingchat.message.ScrmMessageComposerPanel
 import com.paifa.ubikitouch.accessibility.floatingchat.scrm.ScrmOperationsHubPanel
@@ -77,14 +80,6 @@ internal fun bottomFloatingPanelUsesDarkText(): Boolean = true
 internal fun bottomComposerDrawersUseOpaqueInputBarSurface(): Boolean {
     return OverlayTokens.bottomComposerSurface.alpha == 1f
 }
-
-internal fun toolFeaturePanelsUseCenteredFloatingSheet(): Boolean = true
-
-internal fun toolFeaturePanelMinWidthDp(): Int = ToolFeaturePanelMinWidthDp
-
-internal fun toolFeaturePanelMaxWidthDp(): Int = ToolFeaturePanelMaxWidthDp
-
-internal fun toolFeaturePanelMaxHeightDp(): Int = ToolFeaturePanelMaxHeightDp
 
 internal fun aiAssistantUsesFullscreenWorkspace(): Boolean = true
 
@@ -245,31 +240,7 @@ internal fun FloatingBottomPanel(
 ) {
     val context = LocalContext.current
     val isBottomDrawer = mode == BottomPanelMode.Emoji || mode == BottomPanelMode.More
-    val isFullscreenWorkspace = when (mode) {
-        BottomPanelMode.Assistant -> aiAssistantUsesFullscreenWorkspace()
-        BottomPanelMode.AiVoice -> aiVoiceUsesFullscreenWorkspace()
-        BottomPanelMode.UiComponents -> uiComponentsUsesFullscreenWorkspace()
-        BottomPanelMode.AiAutoReply,
-        BottomPanelMode.ContactRelations,
-        BottomPanelMode.LeftSidebar,
-        BottomPanelMode.FriendManagement,
-        BottomPanelMode.OpenApiWorkbench,
-        BottomPanelMode.BackgroundRemoval -> true
-        BottomPanelMode.MiniProgram -> miniProgramUsesFullscreenWorkspace()
-        BottomPanelMode.ReviewRequests -> reviewRequestsUsesFullscreenWorkspace()
-        BottomPanelMode.Favorite -> favoriteShareUsesFullscreenWorkspace()
-        BottomPanelMode.FileDocument -> fileDocumentUsesFullscreenWorkspace()
-        BottomPanelMode.CouponWallet -> true
-        BottomPanelMode.SideEffect -> true
-        BottomPanelMode.VoiceCall -> voiceCallUsesFullscreenWorkspace()
-        BottomPanelMode.VideoCall -> videoCallUsesFullscreenWorkspace()
-        BottomPanelMode.Transfer -> transferUsesFullscreenWorkspace()
-        BottomPanelMode.ToolbarSearch,
-        BottomPanelMode.ToolbarScan,
-        BottomPanelMode.ToolbarAddFriend,
-        BottomPanelMode.Relay -> true
-        else -> false
-    }
+    val isFullscreenWorkspace = mode.isFullscreenWorkspace()
     val shape = if (isBottomDrawer) {
         RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
     } else {
@@ -334,13 +305,6 @@ internal fun FloatingBottomPanel(
             .then(
                 if (isFullscreenWorkspace) {
                     Modifier.fillMaxSize()
-                } else if (mode.isCenteredToolFeaturePanel()) {
-                    Modifier
-                        .widthIn(
-                            min = ToolFeaturePanelMinWidthDp.dp,
-                            max = ToolFeaturePanelMaxWidthDp.dp
-                        )
-                        .heightIn(min = 120.dp, max = ToolFeaturePanelMaxHeightDp.dp)
                 } else {
                     Modifier
                         .fillMaxWidth(widthFraction)
@@ -348,7 +312,7 @@ internal fun FloatingBottomPanel(
                 }
             ),
         shape = if (isFullscreenWorkspace) RoundedCornerShape(0.dp) else shape,
-        color = if (isFullscreenWorkspace) Color.Transparent else if (isBottomDrawer) {
+        color = if (isFullscreenWorkspace) MaterialTheme.colorScheme.surface else if (isBottomDrawer) {
             OverlayTokens.bottomComposerSurface
         } else {
             OverlayTokens.panel
@@ -357,7 +321,7 @@ internal fun FloatingBottomPanel(
     ) {
         val panelContent: @Composable () -> Unit = {
             Box(
-                modifier = if (isFullscreenWorkspace) Modifier else Modifier.padding(
+                modifier = if (isFullscreenWorkspace) Modifier.fillMaxSize() else Modifier.padding(
                     start = 10.dp,
                     end = 10.dp,
                     top = 10.dp,
@@ -384,22 +348,26 @@ internal fun FloatingBottomPanel(
                 )
                 // Card is rendered by FloatingChatOverlayUi inside the existing overlay root.
                 BottomPanelMode.Card -> Unit
+                // GroupInfo is rendered by FloatingChatOverlayUi because it owns the active group profile state.
+                BottomPanelMode.GroupInfo -> Unit
                 BottomPanelMode.GroupInvite -> GroupInvitePickerPanel(
                     groups = accounts.filter { it.groupMemberContacts.isNotEmpty() },
                     onBack = { onOpenToolPanel(BottomPanelMode.More) },
                     onSend = { onSendGroupInvite(it.id) }
                 )
-                BottomPanelMode.Moments -> MomentsTimelinePanel(
+                BottomPanelMode.Moments -> MomentsWorkspace(
                     route = scrmMomentsRoute,
                     posts = momentPosts,
                     pendingMedia = pendingMomentMedia,
                     onPickMedia = onPickMomentMedia,
                     onClearMedia = onClearMomentMedia,
                     onPreviewMedia = onPreviewMomentMedia,
+                    onOpenLink = { link -> launchMomentExternalLink(context, link) },
                     onUpdatePost = onUpdateMomentPost,
                     onRemotePostsLoaded = { remotePosts ->
                         remotePosts.forEach(onUpdateMomentPost)
-                    }
+                    },
+                    onClose = onClose
                 )
                 BottomPanelMode.Finder -> FinderWorkspaceView(
                     session = finderSession,
@@ -545,6 +513,18 @@ internal fun FloatingBottomPanel(
                 BottomPanelMode.ContactRelations -> ContactRelationsFullScreen(onBack = onClose)
                 BottomPanelMode.LeftSidebar -> LeftSidebarFullScreen(onBack = onClose)
                 BottomPanelMode.FriendManagement -> FriendManagementFullscreenScreen(onBack = onClose)
+                BottomPanelMode.FavoriteLibrary -> FavoriteLibraryScreen(
+                    context = context,
+                    onBack = onClose
+                )
+                BottomPanelMode.FinderPublish -> FinderPublishScreen(
+                    context = context,
+                    onBack = onClose
+                )
+                BottomPanelMode.MaterialLibrary -> MaterialLibraryActivityContent(
+                    context = context,
+                    onClose = onClose
+                )
                 BottomPanelMode.OpenApiWorkbench -> OpenApiWorkbenchActivityContent(
                     context = context.applicationContext,
                     onClose = onClose
@@ -601,7 +581,3 @@ internal fun FloatingBottomPanel(
         }
     }
 }
-
-private const val ToolFeaturePanelMinWidthDp = 330
-private const val ToolFeaturePanelMaxWidthDp = 430
-private const val ToolFeaturePanelMaxHeightDp = 560

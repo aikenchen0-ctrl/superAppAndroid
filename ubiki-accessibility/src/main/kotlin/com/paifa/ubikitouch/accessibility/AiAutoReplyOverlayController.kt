@@ -274,7 +274,7 @@ internal fun AiAutoReplyFullScreen(context: Context, onBack: () -> Unit) {
         }
     }
 
-    Column(Modifier.fillMaxSize().background(Color.Transparent)) {
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         // UI：AI自动回复复用 UI组件 的 toolbar，状态区由共享组件内嵌处理。
         // 测试流程：从右侧打开 AI自动回复，确认自下向上进入并通过左上返回向顶部退出。
         FloatingWorkspaceTopAppBar(title = "AI自动回复", onBack = onBack)

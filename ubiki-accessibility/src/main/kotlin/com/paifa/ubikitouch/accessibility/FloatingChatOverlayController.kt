@@ -1424,7 +1424,11 @@ internal class FloatingChatOverlayController(
     }
 
     private fun persistMomentPost(post: AppMomentPost) {
-        val existingIndex = momentPosts.indexOfFirst { existing -> existing.id == post.id }
+        // circleId is scoped by the active device/account; include accountId in
+        // the in-memory identity just like the SQLite moment-post store does.
+        val existingIndex = momentPosts.indexOfFirst { existing ->
+            existing.accountId == post.accountId && existing.id == post.id
+        }
         if (existingIndex >= 0) {
             momentPosts[existingIndex] = post
         } else {
@@ -1591,9 +1595,10 @@ internal class FloatingChatOverlayController(
      * 测试流程：主界面按钮和无障碍手势分别展开，确认真实 ComposeView 从底部进入。
      */
     private fun animateExpandedEntrance(view: View) {
-        if (!view.isAttachedToWindow) return
+        // WindowManager addView 与 View attach 并非同一时序；必须先投递动画，避免内容停留在屏幕外。
+        // 测试流程：首次展开聊天并延后 Overlay attach，确认聊天根仍从底部滑入而非只留下磨砂背景。
         view.post {
-            if (!view.isAttachedToWindow) return@post
+            if (composeView !== view || !view.isAttachedToWindow) return@post
             if (view.translationY == 0f) {
                 view.translationY = FloatingWorkspaceMotion.enterTranslationY(
                     expandedAnimationHeightPx(view)

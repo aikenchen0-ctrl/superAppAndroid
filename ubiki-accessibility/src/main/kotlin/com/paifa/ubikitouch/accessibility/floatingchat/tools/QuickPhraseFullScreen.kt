@@ -1,23 +1,18 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.tools
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -33,11 +28,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,10 +37,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import kotlinx.coroutines.launch
 
 internal const val QuickPhraseStatusBarHeightDp = 30
@@ -80,24 +71,12 @@ internal fun QuickPhraseFullScreen(
 ) {
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { QuickPhraseFullScreenTab.entries.size })
-    var pageHeightPx by remember { mutableFloatStateOf(0f) }
-    val pageTranslationY = remember { Animatable(0f) }
     var editorIndex by remember { mutableIntStateOf(-1) }
     var editorVisible by remember { mutableStateOf(false) }
     var draft by remember { mutableStateOf("") }
 
-    LaunchedEffect(pageHeightPx) {
-        if (pageHeightPx > 0f) {
-            pageTranslationY.snapTo(pageHeightPx)
-            pageTranslationY.animateTo(0f, animationSpec = tween(durationMillis = 240))
-        }
-    }
-
-    fun closeWithExitAnimation(afterClose: () -> Unit = onBack) {
-        scope.launch {
-            pageTranslationY.animateTo(pageHeightPx, animationSpec = tween(durationMillis = 200))
-            afterClose()
-        }
+    fun finishWorkspace(afterClose: () -> Unit = onBack) {
+        afterClose()
     }
 
     fun beginCreate() {
@@ -124,26 +103,10 @@ internal fun QuickPhraseFullScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .onSizeChanged { pageHeightPx = it.height.toFloat() }
-            .graphicsLayer { translationY = pageTranslationY.value }
             .background(MaterialTheme.colorScheme.surface)
     ) {
-        Spacer(Modifier.height(QuickPhraseStatusBarHeightDp.dp))
-        TopAppBar(
-            title = {
-                Text(
-                    text = "快捷语",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Normal
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = ::closeWithExitAnimation) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            }
-        )
+        // 共享工具栏负责安全区和返回，快捷语选择仍沿用既有发送回调。
+        FloatingWorkspaceTopAppBar(title = "快捷语", onBack = onBack)
         PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
             QuickPhraseFullScreenTab.entries.forEachIndexed { index, tab ->
                 Tab(
@@ -153,12 +116,12 @@ internal fun QuickPhraseFullScreen(
                 )
             }
         }
-        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
+        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) { page ->
             when (QuickPhraseFullScreenTab.entries[page]) {
                 QuickPhraseFullScreenTab.Recent -> QuickPhraseList(
                     phrases = phrases,
                     emptyMessage = "暂无常用快捷语",
-                    onPhraseClick = { phrase -> closeWithExitAnimation { onSendPhrase(phrase) } }
+                    onPhraseClick = { phrase -> finishWorkspace { onSendPhrase(phrase) } }
                 )
                 QuickPhraseFullScreenTab.Manage -> Box(Modifier.fillMaxSize()) {
                     QuickPhraseManageList(

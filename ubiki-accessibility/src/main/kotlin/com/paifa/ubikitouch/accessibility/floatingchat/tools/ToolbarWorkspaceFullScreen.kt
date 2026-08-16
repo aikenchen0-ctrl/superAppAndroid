@@ -67,7 +67,7 @@ internal fun ToolbarWorkspaceFullScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Transparent)
+            .background(MaterialTheme.colorScheme.surface)
     ) {
         FloatingWorkspaceTopAppBar(
             title = when (mode) {
@@ -77,13 +77,15 @@ internal fun ToolbarWorkspaceFullScreen(
             },
             onBack = onBack
         )
-        when (mode) {
-            ToolbarWorkspaceMode.Search -> ToolbarMessageSearchContent(messages)
-            ToolbarWorkspaceMode.Scan -> ToolbarScanActions(
-                onRequestScan = { close(onRequestScan) },
-                onOpenAddFriend = onOpenAddFriend
-            )
-            ToolbarWorkspaceMode.AddFriend -> ToolbarAddFriendContent(onSubmitFriend)
+        Column(Modifier.weight(1f).fillMaxWidth()) {
+            when (mode) {
+                ToolbarWorkspaceMode.Search -> ToolbarMessageSearchContent(messages)
+                ToolbarWorkspaceMode.Scan -> ToolbarScanActions(
+                    onRequestScan = { close(onRequestScan) },
+                    onOpenAddFriend = onOpenAddFriend
+                )
+                ToolbarWorkspaceMode.AddFriend -> ToolbarAddFriendContent(onSubmitFriend)
+            }
         }
     }
 }

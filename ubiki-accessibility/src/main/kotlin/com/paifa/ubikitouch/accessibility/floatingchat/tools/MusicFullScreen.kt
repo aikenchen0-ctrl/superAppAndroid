@@ -3,8 +3,6 @@ package com.paifa.ubikitouch.accessibility.floatingchat.tools
 import android.content.Context
 import android.media.MediaPlayer
 import android.net.Uri
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,7 +20,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.MusicNote
@@ -44,7 +41,6 @@ import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -56,11 +52,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -103,10 +98,6 @@ internal fun MusicFullScreen(
     var progress by remember { mutableFloatStateOf(0f) }
     var playing by remember { mutableStateOf(false) }
     var favorite by remember { mutableStateOf(false) }
-    var pageHeightPx by remember { mutableFloatStateOf(0f) }
-    var entered by remember { mutableStateOf(false) }
-    var exiting by remember { mutableStateOf(false) }
-    val pageTranslationY = remember { Animatable(0f) }
     val mediaPlayer = rememberPlayableMediaPlayer(context, audioUrl)
 
     DisposableEffect(mediaPlayer) {
@@ -124,14 +115,6 @@ internal fun MusicFullScreen(
             }
         }
     }
-    LaunchedEffect(pageHeightPx) {
-        if (pageHeightPx > 0f && !entered) {
-            pageTranslationY.snapTo(pageHeightPx)
-            pageTranslationY.animateTo(0f, tween(MusicAnimationDurationMillis))
-            entered = true
-        }
-    }
-
     fun togglePlayback() {
         if (mediaPlayer == null) {
             playing = !playing
@@ -146,34 +129,18 @@ internal fun MusicFullScreen(
         }
     }
 
-    fun closeWithExitAnimation() {
-        if (exiting) return
-        exiting = true
-        scope.launch {
-            mediaPlayer?.stop()
-            pageTranslationY.animateTo(pageHeightPx, tween(MusicAnimationDurationMillis))
-            onBack()
-        }
+    fun closeWorkspace() {
+        mediaPlayer?.stop()
+        onBack()
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
-            .onSizeChanged { pageHeightPx = it.height.toFloat() }
-            .graphicsLayer { translationY = pageTranslationY.value }
     ) {
-        Spacer(Modifier.height(30.dp))
-        TopAppBar(
-            title = {
-                Text("音乐分享", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Normal)
-            },
-            navigationIcon = {
-                IconButton(onClick = ::closeWithExitAnimation) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            }
-        )
+        // 关闭交给外层悬浮根视图，避免媒体页再叠加一次整页运动。
+        FloatingWorkspaceTopAppBar(title = "音乐分享", onBack = ::closeWorkspace)
         PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
             MusicFullScreenTab.entries.forEachIndexed { index, tab ->
                 Tab(
@@ -183,7 +150,7 @@ internal fun MusicFullScreen(
                 )
             }
         }
-        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
+        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) { page ->
             when (MusicFullScreenTab.entries[page]) {
                 MusicFullScreenTab.Player -> MusicPlayerPage(
                     title = title,
@@ -364,5 +331,3 @@ private fun rememberPlayableMediaPlayer(context: Context, audioUrl: String): Med
         uri?.let { runCatching { MediaPlayer.create(context, it) }.getOrNull() }
     }
 }
-
-private const val MusicAnimationDurationMillis = 260

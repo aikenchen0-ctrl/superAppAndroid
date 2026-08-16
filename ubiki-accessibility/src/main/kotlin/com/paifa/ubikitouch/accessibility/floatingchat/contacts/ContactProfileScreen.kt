@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -28,6 +29,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -70,9 +72,8 @@ private fun ContactIntroContent(
 ) {
     Column(
         modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(ContactsPageBackground)
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
     ) {
         ContactIntroTopBar { onEvent(ContactProfileUiEvent.BackRequested) }
         if (state.contactId == null) {
@@ -138,7 +139,7 @@ private fun ContactEditorContent(
     modifier: Modifier
 ) {
     LazyColumn(
-        modifier = modifier.fillMaxWidth().background(ProfilePageBackground),
+        modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface),
         contentPadding = PaddingValues(bottom = 12.dp)
     ) {
         item { ProfileTopBar { onEvent(ContactProfileUiEvent.BackRequested) } }

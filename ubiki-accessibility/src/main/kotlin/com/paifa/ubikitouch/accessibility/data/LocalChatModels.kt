@@ -101,15 +101,23 @@ internal data class LocalMomentPost(
     val mediaColor: Long? = null,
     val mediaLabel: String? = null,
     val linkTitle: String? = null,
+    val linkUrl: String? = null,
     val sourceLabel: String? = null,
     val likedBy: List<String> = emptyList(),
     val comments: List<LocalMomentComment> = emptyList(),
-    val createdAt: Long
+    val createdAt: Long,
+    val authorWxId: String? = null,
+    val circleId: Long? = null,
+    val publishTime: Long? = null
 )
 
 internal data class LocalMomentComment(
     val author: String,
-    val text: String
+    val text: String,
+    val id: Long? = null,
+    val authorWxId: String? = null,
+    val replyTo: String? = null,
+    val replyCommentId: Long? = null
 )
 
 internal data class LocalContactProfile(

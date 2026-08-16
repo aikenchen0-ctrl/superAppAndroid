@@ -56,10 +56,10 @@ internal fun BackgroundRemovalWorkspace(onBack: () -> Unit) {
         mutableStateOf(preferences.getBoolean(AutomaticRemovalKey, false))
     }
 
-    Column(Modifier.fillMaxSize().background(Color.Transparent)) {
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         FloatingWorkspaceTopAppBar(title = "智能抠图", onBack = onBack)
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.weight(1f).fillMaxWidth(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {

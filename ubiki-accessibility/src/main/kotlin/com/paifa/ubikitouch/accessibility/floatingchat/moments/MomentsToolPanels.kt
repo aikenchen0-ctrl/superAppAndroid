@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,34 +22,64 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Collections
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Reply
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Textsms
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Surface as MaterialSurface
+import androidx.compose.material3.Tab
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,6 +94,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -78,6 +110,8 @@ import com.paifa.ubikitouch.accessibility.archiveScrmMomentMaterial
 import com.paifa.ubikitouch.accessibility.commentScrmMoment
 import com.paifa.ubikitouch.accessibility.copyScrmMomentMaterial
 import com.paifa.ubikitouch.accessibility.createScrmMomentMaterial
+import com.paifa.ubikitouch.accessibility.deleteScrmMomentComment
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.accessibility.floatingchat.contacts.ScrmPanelButton
 import com.paifa.ubikitouch.accessibility.floatingchat.media.loadImageThumbnailBitmap
 import com.paifa.ubikitouch.accessibility.floatingchat.media.loadVideoPreviewBitmap
@@ -91,15 +125,1152 @@ import com.paifa.ubikitouch.accessibility.loadScrmMoments
 import com.paifa.ubikitouch.accessibility.localScrmMomentPostForSubmittedDraft
 import com.paifa.ubikitouch.accessibility.publishScrmMoment
 import com.paifa.ubikitouch.accessibility.scrm.ScrmFloatingAccountRoute
+import com.paifa.ubikitouch.accessibility.scrm.ScrmContact
+import com.paifa.ubikitouch.accessibility.scrm.ScrmContactQuery
 import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterial
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentPoi
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentPublishOptions
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentVisibility
 import com.paifa.ubikitouch.accessibility.scrm.scrmReadableText
 import com.paifa.ubikitouch.accessibility.scrm.ScrmMomentMaterialDetail
+import com.paifa.ubikitouch.accessibility.scrm.ScrmSettingsManager
 import com.paifa.ubikitouch.accessibility.scrm.toScrmContactsPanelMessage
 import com.paifa.ubikitouch.accessibility.scrmMomentPostsFromTaskData
 import com.paifa.ubikitouch.core.model.FloatingChatPrototype
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+private const val MomentTimelineBatchSize = 10
+private const val MomentTimelinePrefetchThreshold = 2
+
+private enum class MomentsWorkspacePage(val title: String) {
+    Timeline("动态"),
+    Publish("发表")
+}
+
+/**
+ * UI：右侧“朋友圈”使用聊天根内的 Material 3 全屏工作区。
+ * 测试流程：从右侧功能打开后，确认顶部 30dp 安全区属于共享 AppBar，左上返回关闭聊天根，
+ * 动态页按批次加载并可完成同步、点赞、评论、回复和本人评论删除。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun MomentsWorkspace(
+    route: ScrmFloatingAccountRoute?,
+    posts: List<AppMomentPost>,
+    pendingMedia: AppMomentMedia?,
+    onPickMedia: () -> Unit,
+    onClearMedia: () -> Unit,
+    onPreviewMedia: (AppMomentPost) -> Unit,
+    onOpenLink: (String) -> Boolean,
+    onUpdatePost: (AppMomentPost) -> Unit,
+    onRemotePostsLoaded: (List<AppMomentPost>) -> Unit,
+    onClose: () -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val pagerState = rememberPagerState(pageCount = { MomentsWorkspacePage.entries.size })
+    val timelineListState = rememberLazyListState()
+    var panelState by remember(route) { mutableStateOf(ScrmMomentsPanelState()) }
+    var publishDraft by remember { mutableStateOf("") }
+    var publishOptions by remember(route) { mutableStateOf(ScrmMomentPublishOptions()) }
+    var commentDraft by remember { mutableStateOf("") }
+    var commentingPostId by remember { mutableStateOf<String?>(null) }
+    var activeReplyTarget by remember { mutableStateOf<AppMomentComment?>(null) }
+    var openMenuPostId by remember { mutableStateOf<String?>(null) }
+    var pendingOpenLink by remember { mutableStateOf<String?>(null) }
+    var visiblePostCount by remember(posts.size) {
+        mutableIntStateOf(posts.size.coerceAtMost(MomentTimelineBatchSize))
+    }
+    val visiblePosts = remember(posts, visiblePostCount) {
+        posts.sortedByDescending(AppMomentPost::createdAt).take(visiblePostCount)
+    }
+
+    fun momentCircleId(post: AppMomentPost): Long? {
+        return post.circleId ?: scrmCircleIdForMomentPostId(post.id)
+    }
+
+    /** 接口：先读取近期任务或显式同步，再由同步层回读真实朋友圈详情。 */
+    fun loadMoments(syncNow: Boolean) {
+        val currentRoute = route
+        if (currentRoute == null) {
+            panelState = panelState.copy(
+                loading = false,
+                status = null,
+                error = "当前账号缺少 SCRM 路由，无法读取真实朋友圈"
+            )
+            return
+        }
+        scope.launch {
+            panelState = panelState.copy(
+                loading = true,
+                status = if (syncNow) "正在同步真实朋友圈" else "正在读取近期朋友圈任务",
+                error = null
+            )
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    loadScrmMoments(context.applicationContext, currentRoute, syncNow)
+                }
+            }.onSuccess { result ->
+                if (result.posts.isNotEmpty()) onRemotePostsLoaded(result.posts)
+                panelState = panelState.copy(loading = false, status = result.message, error = null)
+            }.onFailure { error ->
+                panelState = panelState.copy(
+                    loading = false,
+                    status = null,
+                    error = error.toScrmContactsPanelMessage()
+                )
+            }
+        }
+    }
+
+    /** 接口：发表动态，只有 SCRM 任务确认完成后才清空草稿并更新时间线。 */
+    fun submitMoment() {
+        val currentRoute = route
+        val trimmedContent = publishDraft.trim()
+        val selectedMedia = pendingMedia
+        if (currentRoute == null) {
+            panelState = panelState.copy(error = "当前账号缺少 SCRM 路由，无法发表朋友圈")
+            return
+        }
+        if (trimmedContent.isBlank() && selectedMedia == null) {
+            panelState = panelState.copy(error = "请输入内容或选择图片、视频")
+            return
+        }
+        val clientRequestId = "moment-${System.currentTimeMillis()}"
+        scope.launch {
+            panelState = panelState.copy(loading = true, status = "正在发表朋友圈", error = null)
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    publishScrmMoment(
+                        context = context.applicationContext,
+                        route = currentRoute,
+                        content = trimmedContent,
+                        media = selectedMedia,
+                        clientRequestId = clientRequestId,
+                        options = publishOptions
+                    )
+                }
+            }.onSuccess { outcome ->
+                panelState = panelState.copy(loading = false, status = outcome.message, error = null)
+                if (outcome.completed) {
+                    val remotePosts = outcome.data
+                        .flatMap(::scrmMomentPostsFromTaskData)
+                        .distinctBy(AppMomentPost::id)
+                    if (remotePosts.isNotEmpty()) {
+                        onRemotePostsLoaded(remotePosts)
+                    } else {
+                        onUpdatePost(
+                            localScrmMomentPostForSubmittedDraft(
+                                clientRequestId = clientRequestId,
+                                weChatId = currentRoute.weChatId,
+                                content = trimmedContent,
+                                media = selectedMedia
+                            )
+                        )
+                    }
+                    publishDraft = ""
+                    publishOptions = ScrmMomentPublishOptions()
+                    onClearMedia()
+                    loadMoments(syncNow = false)
+                }
+            }.onFailure { error ->
+                panelState = panelState.copy(
+                    loading = false,
+                    status = null,
+                    error = error.toScrmContactsPanelMessage()
+                )
+            }
+        }
+    }
+
+    /** 接口：提交或取消点赞，只有已完成任务才同步本地互动状态。 */
+    fun submitLike(post: AppMomentPost) {
+        val currentRoute = route
+        val circleId = momentCircleId(post)
+        if (currentRoute == null || circleId == null) {
+            panelState = panelState.copy(error = "当前朋友圈缺少 circleId，无法点赞")
+            return
+        }
+        val cancel = post.likedBy.contains(CurrentUserMomentLikeName)
+        scope.launch {
+            panelState = panelState.copy(loading = true, status = "正在提交朋友圈点赞", error = null)
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    likeScrmMoment(context.applicationContext, currentRoute, circleId, cancel)
+                }
+            }.onSuccess { outcome ->
+                panelState = panelState.copy(loading = false, status = outcome.message, error = null)
+                if (outcome.completed) {
+                    val likedBy = if (cancel) {
+                        post.likedBy - CurrentUserMomentLikeName
+                    } else {
+                        (post.likedBy + CurrentUserMomentLikeName).distinct()
+                    }
+                    onUpdatePost(post.copy(likedBy = likedBy))
+                }
+            }.onFailure { error ->
+                panelState = panelState.copy(
+                    loading = false,
+                    status = null,
+                    error = error.toScrmContactsPanelMessage()
+                )
+            }
+        }
+    }
+
+    /** 接口：普通评论或回复均走同一 SCRM 任务，回复时携带目标 wxid 与评论 ID。 */
+    fun submitComment(post: AppMomentPost) {
+        val currentRoute = route
+        val circleId = momentCircleId(post)
+        val text = commentDraft.trim()
+        val replyTarget = activeReplyTarget.takeIf { commentingPostId == post.id }
+        if (!canCurrentAccountCommentOnMoment(post, currentRoute?.weChatId, replyTarget)) {
+            panelState = panelState.copy(
+                error = if (replyTarget == null) "不能对自己的动态发表评论" else "不能回复自己的评论"
+            )
+            return
+        }
+        if (currentRoute == null || circleId == null) {
+            panelState = panelState.copy(error = "当前朋友圈缺少 circleId，无法评论")
+            return
+        }
+        if (text.isBlank()) return
+        if (replyTarget != null && (replyTarget.id == null || replyTarget.authorWxId.isNullOrBlank())) {
+            panelState = panelState.copy(error = "该评论缺少真实标识，无法安全回复")
+            return
+        }
+        scope.launch {
+            panelState = panelState.copy(loading = true, status = "正在提交朋友圈评论", error = null)
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    commentScrmMoment(
+                        context = context.applicationContext,
+                        route = currentRoute,
+                        circleId = circleId,
+                        text = text,
+                        toWeChatId = replyTarget?.authorWxId,
+                        replyCommentId = replyTarget?.id ?: 0L
+                    )
+                }
+            }.onSuccess { outcome ->
+                panelState = panelState.copy(loading = false, status = outcome.message, error = null)
+                if (outcome.completed) {
+                    val remotePost = outcome.data
+                        .flatMap(::scrmMomentPostsFromTaskData)
+                        .firstOrNull { it.circleId == circleId }
+                    if (remotePost != null) {
+                        onUpdatePost(remotePost)
+                    } else {
+                        onUpdatePost(
+                            post.copy(
+                                comments = post.comments + AppMomentComment(
+                                    author = CurrentUserMomentLikeName,
+                                    text = text,
+                                    authorWxId = currentRoute.weChatId,
+                                    replyTo = replyTarget?.author,
+                                    replyCommentId = replyTarget?.id
+                                )
+                            )
+                        )
+                    }
+                    commentDraft = ""
+                    commentingPostId = null
+                    activeReplyTarget = null
+                }
+            }.onFailure { error ->
+                panelState = panelState.copy(
+                    loading = false,
+                    status = null,
+                    error = error.toScrmContactsPanelMessage()
+                )
+            }
+        }
+    }
+
+    /** 接口：只有本人、含真实评论 ID 和发布时间的评论才允许删除。 */
+    fun deleteComment(post: AppMomentPost, comment: AppMomentComment) {
+        val currentRoute = route
+        val circleId = momentCircleId(post)
+        val commentId = comment.id
+        val publishTime = post.publishTime
+        if (
+            currentRoute == null ||
+            circleId == null ||
+            commentId == null ||
+            publishTime == null ||
+            comment.authorWxId != currentRoute.weChatId
+        ) {
+            panelState = panelState.copy(error = "该评论缺少删除所需的真实标识")
+            return
+        }
+        scope.launch {
+            panelState = panelState.copy(loading = true, status = "正在删除朋友圈评论", error = null)
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    deleteScrmMomentComment(
+                        context = context.applicationContext,
+                        route = currentRoute,
+                        circleId = circleId,
+                        commentId = commentId,
+                        publishTime = publishTime
+                    )
+                }
+            }.onSuccess { outcome ->
+                panelState = panelState.copy(loading = false, status = outcome.message, error = null)
+                if (outcome.completed) {
+                    onUpdatePost(post.copy(comments = post.comments.filterNot { it.id == commentId }))
+                    if (activeReplyTarget?.id == commentId) {
+                        commentingPostId = null
+                        activeReplyTarget = null
+                        commentDraft = ""
+                    }
+                }
+            }.onFailure { error ->
+                panelState = panelState.copy(
+                    loading = false,
+                    status = null,
+                    error = error.toScrmContactsPanelMessage()
+                )
+            }
+        }
+    }
+
+    LaunchedEffect(route?.deviceUuid, route?.weChatId) {
+        loadMoments(syncNow = false)
+    }
+    LaunchedEffect(timelineListState, posts.size) {
+        snapshotFlow {
+            timelineListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+        }.collect { lastVisibleIndex ->
+            if (
+                lastVisibleIndex >= visiblePostCount - MomentTimelinePrefetchThreshold &&
+                visiblePostCount < posts.size
+            ) {
+                visiblePostCount = (visiblePostCount + MomentTimelineBatchSize).coerceAtMost(posts.size)
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
+    ) {
+        FloatingWorkspaceTopAppBar(
+            title = "朋友圈",
+            onBack = onClose,
+            actions = {
+                IconButton(onClick = { loadMoments(syncNow = false) }, enabled = !panelState.loading) {
+                    Icon(Icons.Filled.Refresh, contentDescription = "刷新朋友圈")
+                }
+                IconButton(onClick = { loadMoments(syncNow = true) }, enabled = !panelState.loading) {
+                    Icon(Icons.Filled.Sync, contentDescription = "同步朋友圈")
+                }
+                IconButton(
+                    onClick = {
+                        scope.launch { pagerState.animateScrollToPage(MomentsWorkspacePage.Publish.ordinal) }
+                    },
+                    enabled = !panelState.loading
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = "发表朋友圈")
+                }
+            }
+        )
+        PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
+            MomentsWorkspacePage.entries.forEachIndexed { index, page ->
+                Tab(
+                    selected = pagerState.currentPage == index,
+                    onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
+                    text = {
+                        Text(
+                            text = page.title,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Normal
+                        )
+                    }
+                )
+            }
+        }
+        MomentsWorkspaceFeedback(panelState)
+        pendingOpenLink?.let { link ->
+            MomentLinkOpenConfirmation(
+                link = link,
+                onCancel = { pendingOpenLink = null },
+                onConfirm = {
+                    if (onOpenLink(link)) {
+                        pendingOpenLink = null
+                        panelState = panelState.copy(status = "已打开网页链接", error = null)
+                    } else {
+                        panelState = panelState.copy(error = "网页链接无法打开，请检查地址或系统浏览器")
+                    }
+                }
+            )
+        }
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+        ) { page ->
+            when (MomentsWorkspacePage.entries[page]) {
+                MomentsWorkspacePage.Timeline -> {
+                    if (visiblePosts.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (panelState.loading) "正在读取朋友圈..." else "暂无可展示的朋友圈",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            state = timelineListState,
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            items(visiblePosts, key = { it.id }) { post ->
+                                MomentWorkspacePostCard(
+                                    post = post,
+                                    route = route,
+                                    menuExpanded = openMenuPostId == post.id,
+                                    commenting = commentingPostId == post.id,
+                                    replyTarget = activeReplyTarget.takeIf { commentingPostId == post.id },
+                                    commentDraft = if (commentingPostId == post.id) commentDraft else "",
+                                    onToggleMenu = {
+                                        openMenuPostId = if (openMenuPostId == post.id) null else post.id
+                                    },
+                                    onDismissMenu = { openMenuPostId = null },
+                                    onLike = {
+                                        openMenuPostId = null
+                                        submitLike(post)
+                                    },
+                                    onStartComment = {
+                                        openMenuPostId = null
+                                        if (canCurrentAccountCommentOnMoment(post, route?.weChatId)) {
+                                            commentingPostId = post.id
+                                            activeReplyTarget = null
+                                            commentDraft = ""
+                                        } else {
+                                            panelState = panelState.copy(error = "不能对自己的动态发表评论")
+                                        }
+                                    },
+                                    onStartReply = { comment ->
+                                        if (comment.id == null || comment.authorWxId.isNullOrBlank()) {
+                                            panelState = panelState.copy(error = "该评论缺少真实标识，无法安全回复")
+                                        } else if (!canCurrentAccountCommentOnMoment(post, route?.weChatId, comment)) {
+                                            panelState = panelState.copy(error = "不能回复自己的评论")
+                                        } else {
+                                            commentingPostId = post.id
+                                            activeReplyTarget = comment
+                                            commentDraft = ""
+                                        }
+                                    },
+                                    onDeleteComment = { comment -> deleteComment(post, comment) },
+                                    onCommentDraftChange = { commentDraft = it },
+                                    onSubmitComment = { submitComment(post) },
+                                    onPreviewMedia = { onPreviewMedia(post) },
+                                    onOpenLink = { pendingOpenLink = it }
+                                )
+                            }
+                            if (visiblePosts.size < posts.size) {
+                                item(key = "moment-loading-more") {
+                                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                                }
+                            }
+                        }
+                    }
+                }
+
+                MomentsWorkspacePage.Publish -> MomentsPublishPage(
+                    route = route,
+                    draft = publishDraft,
+                    pendingMedia = pendingMedia,
+                    publishing = panelState.loading,
+                    onDraftChange = { publishDraft = it },
+                    publishOptions = publishOptions,
+                    onPublishOptionsChange = { publishOptions = it },
+                    onPickMedia = onPickMedia,
+                    onClearMedia = onClearMedia,
+                    onPublish = ::submitMoment
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MomentsWorkspaceFeedback(state: ScrmMomentsPanelState) {
+    if (state.loading) {
+        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+    }
+    state.error?.let { error ->
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Text(
+                text = error,
+                modifier = Modifier.padding(12.dp),
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
+    state.status?.let { status ->
+        Text(
+            text = status,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall
+        )
+    }
+}
+
+@Composable
+private fun MomentWorkspacePostCard(
+    post: AppMomentPost,
+    route: ScrmFloatingAccountRoute?,
+    menuExpanded: Boolean,
+    commenting: Boolean,
+    replyTarget: AppMomentComment?,
+    commentDraft: String,
+    onToggleMenu: () -> Unit,
+    onDismissMenu: () -> Unit,
+    onLike: () -> Unit,
+    onStartComment: () -> Unit,
+    onStartReply: (AppMomentComment) -> Unit,
+    onDeleteComment: (AppMomentComment) -> Unit,
+    onCommentDraftChange: (String) -> Unit,
+    onSubmitComment: () -> Unit,
+    onPreviewMedia: () -> Unit,
+    onOpenLink: (String) -> Unit
+) {
+    val liked = post.likedBy.contains(CurrentUserMomentLikeName)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Column(modifier = Modifier.padding(bottom = 12.dp)) {
+            ListItem(
+                headlineContent = {
+                    Text(
+                        text = post.author,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Normal,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                supportingContent = {
+                    Text(text = post.time, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                },
+                leadingContent = { MomentWorkspaceAvatar(post) },
+                trailingContent = {
+                    Box {
+                        IconButton(onClick = onToggleMenu) {
+                            Icon(Icons.Filled.MoreVert, contentDescription = "动态操作")
+                        }
+                        DropdownMenu(expanded = menuExpanded, onDismissRequest = onDismissMenu) {
+                            DropdownMenuItem(
+                                text = { Text(if (liked) "取消点赞" else "点赞") },
+                                onClick = onLike
+                            )
+                            DropdownMenuItem(text = { Text("评论") }, onClick = onStartComment)
+                        }
+                    }
+                }
+            )
+            if (post.content.isNotBlank()) {
+                Text(
+                    text = post.content,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
+            MomentWorkspaceMedia(post = post, onPreviewMedia = onPreviewMedia)
+            MomentWorkspaceLinkCard(post = post, onOpenLink = onOpenLink)
+            post.sourceLabel?.let { source ->
+                Text(
+                    text = source,
+                    modifier = Modifier.padding(start = 16.dp, top = 10.dp, end = 16.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Normal,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            if (post.likedBy.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.padding(start = 12.dp, top = 8.dp, end = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.ThumbUp,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = post.likedBy.joinToString("、"),
+                        modifier = Modifier.padding(start = 6.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            post.comments.forEach { comment ->
+                val canDelete =
+                    comment.id != null &&
+                        post.publishTime != null &&
+                        (post.circleId ?: scrmCircleIdForMomentPostId(post.id)) != null &&
+                        comment.authorWxId == route?.weChatId
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 8.dp, top = 2.dp, end = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = { onStartReply(comment) },
+                        modifier = Modifier.weight(1f),
+                        enabled = canCurrentAccountCommentOnMoment(post, route?.weChatId, comment)
+                    ) {
+                        Text(
+                            text = buildString {
+                                append(comment.author)
+                                append(": ")
+                                comment.replyTo?.let { append("回复 ").append(it).append(" ") }
+                                append(comment.text)
+                            },
+                            color = MaterialTheme.colorScheme.onSurface,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    if (canDelete) {
+                        IconButton(onClick = { onDeleteComment(comment) }) {
+                            Icon(Icons.Filled.Delete, contentDescription = "删除我的评论")
+                        }
+                    }
+                }
+            }
+            if (commenting) {
+                OutlinedTextField(
+                    value = commentDraft,
+                    onValueChange = onCommentDraftChange,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    placeholder = {
+                        Text(replyTarget?.author?.let { "回复 $it" } ?: "评论")
+                    },
+                    trailingIcon = {
+                        IconButton(onClick = onSubmitComment, enabled = commentDraft.isNotBlank()) {
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "发送评论")
+                        }
+                    },
+                    maxLines = 3
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MomentWorkspaceAvatar(post: AppMomentPost) {
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(post.avatarColor),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = post.avatarText,
+            color = MaterialTheme.colorScheme.onPrimary,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun MomentWorkspaceMedia(post: AppMomentPost, onPreviewMedia: () -> Unit) {
+    val media = post.media ?: return
+    when (media.kind) {
+        MomentMediaKind.Image,
+        MomentMediaKind.Video -> {
+            Spacer(modifier = Modifier.height(10.dp))
+            Box(
+                modifier = Modifier
+                    .width(media.widthDp.coerceIn(120, 260).dp)
+                    .height(media.heightDp.coerceIn(88, 300).dp)
+                    .padding(start = 16.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .clickable(onClick = onPreviewMedia),
+                contentAlignment = Alignment.Center
+            ) {
+                MomentWorkspaceMediaBitmap(media)
+                if (media.kind == MomentMediaKind.Video) {
+                    Icon(
+                        imageVector = Icons.Filled.PlayArrow,
+                        contentDescription = "播放视频",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+            }
+        }
+
+        MomentMediaKind.Link -> Unit
+    }
+}
+
+@Composable
+private fun MomentWorkspaceLinkCard(
+    post: AppMomentPost,
+    onOpenLink: (String) -> Unit
+) {
+    val link = post.linkUrl ?: post.media?.takeIf { it.kind == MomentMediaKind.Link }?.uri ?: return
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .clickable { onOpenLink(link) },
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        ListItem(
+            leadingContent = {
+                Icon(
+                    imageVector = Icons.Filled.Link,
+                    contentDescription = "网页链接",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            headlineContent = {
+                Text(
+                    text = post.linkTitle?.takeIf { it.isNotBlank() } ?: "打开网页链接",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            },
+            supportingContent = {
+                Text(
+                    text = link,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        )
+    }
+}
+
+/**
+ * M3 工作区内的链接确认卡，替代悬浮 Dialog，确认后才把 URL 交给宿主启动系统浏览器。
+ * 测试流程：点击链接卡，先点取消确认卡消失，再点继续验证浏览器跳转或错误状态。
+ */
+@Composable
+private fun MomentLinkOpenConfirmation(
+    link: String,
+    onCancel: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "打开网页链接",
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Normal
+            )
+            Text(
+                text = link,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onCancel) { Text("取消") }
+                Button(onClick = onConfirm) { Text("继续") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MomentWorkspaceMediaBitmap(media: AppMomentMedia) {
+    val context = LocalContext.current
+    val bitmap = remember(media.previewUri, media.uri) {
+        when (media.kind) {
+            MomentMediaKind.Image -> loadImageThumbnailBitmap(context, media.previewUri ?: media.uri)
+            MomentMediaKind.Video -> loadVideoPreviewBitmap(context, media.previewUri, media.uri)
+            MomentMediaKind.Link -> null
+        }
+    }
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+    } else {
+        Text(
+            text = media.label ?: if (media.kind == MomentMediaKind.Video) "视频" else "图片",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelMedium
+        )
+    }
+}
+
+@Composable
+private fun MomentsPublishPage(
+    route: ScrmFloatingAccountRoute?,
+    draft: String,
+    pendingMedia: AppMomentMedia?,
+    publishing: Boolean,
+    onDraftChange: (String) -> Unit,
+    publishOptions: ScrmMomentPublishOptions,
+    onPublishOptionsChange: (ScrmMomentPublishOptions) -> Unit,
+    onPickMedia: () -> Unit,
+    onClearMedia: () -> Unit,
+    onPublish: () -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            Text(
+                text = "发布新动态",
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Normal,
+                style = MaterialTheme.typography.titleMedium
+            )
+        }
+        item {
+            OutlinedTextField(
+                value = draft,
+                onValueChange = onDraftChange,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("这一刻的想法...") },
+                minLines = 5,
+                maxLines = 8
+            )
+        }
+        item {
+            if (pendingMedia == null) {
+                OutlinedButton(onClick = onPickMedia, enabled = !publishing) {
+                    Icon(Icons.Filled.Collections, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("添加图片或视频")
+                }
+            } else {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    ListItem(
+                        headlineContent = {
+                            Text(if (pendingMedia.kind == MomentMediaKind.Video) "已选择视频" else "已选择图片")
+                        },
+                        supportingContent = { Text("发表后由 SCRM 任务上传") },
+                        trailingContent = {
+                            IconButton(onClick = onClearMedia, enabled = !publishing) {
+                                Icon(Icons.Filled.Delete, contentDescription = "移除媒体")
+                            }
+                        }
+                    )
+                }
+            }
+        }
+        item {
+            MomentPublishOptionsSection(
+                route = route,
+                options = publishOptions,
+                enabled = !publishing,
+                onOptionsChange = onPublishOptionsChange
+            )
+        }
+        item {
+            Button(
+                onClick = onPublish,
+                enabled = !publishing && (draft.isNotBlank() || pendingMedia != null)
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("发表")
+            }
+        }
+    }
+}
+
+private enum class MomentAudiencePickerTarget {
+    Visibility,
+    Reminder
+}
+
+/**
+ * M3 发表选项：把 iOS 的“位置、提醒谁看、谁可以看”改成同页可滚动控件，
+ * 不创建 Dialog，也不生成模拟联系人；好友列表来自当前 SCRM 账号的真实 contacts 接口。
+ * 测试流程：切换可见范围 -> 打开好友选择 -> 勾选联系人 -> 填写位置/提醒 -> 点击发表，检查请求 JSON。
+ */
+@Composable
+private fun MomentPublishOptionsSection(
+    route: ScrmFloatingAccountRoute?,
+    options: ScrmMomentPublishOptions,
+    enabled: Boolean,
+    onOptionsChange: (ScrmMomentPublishOptions) -> Unit
+) {
+    val context = LocalContext.current
+    var pickerTarget by remember(route) { mutableStateOf<MomentAudiencePickerTarget?>(null) }
+    var contacts by remember(route) { mutableStateOf<List<ScrmContact>>(emptyList()) }
+    var contactsLoading by remember(route) { mutableStateOf(false) }
+    var contactsError by remember(route) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(pickerTarget, route?.deviceUuid, route?.weChatId) {
+        if (pickerTarget == null || route == null || contacts.isNotEmpty() || contactsLoading) return@LaunchedEffect
+        contactsLoading = true
+        contactsError = null
+        runCatching {
+            withContext(Dispatchers.IO) {
+                val session = ScrmSettingsManager(context.applicationContext).loadSelectedSessionOrBootstrap()
+                val pageSize = 200
+                val loaded = mutableListOf<ScrmContact>()
+                var pageNumber = 1
+                var requestNextPage: Boolean
+                do {
+                    val page = session.contactApi.getContacts(
+                        ScrmContactQuery(
+                            weChatId = route.weChatId,
+                            page = pageNumber,
+                            pageSize = pageSize,
+                            onlyFriends = true,
+                            includeProfile = true
+                        )
+                    )
+                    loaded += page.items
+                    pageNumber += 1
+                    requestNextPage = page.items.size >= pageSize && loaded.size < page.totalCount
+                } while (requestNextPage)
+                loaded.distinctBy { it.wxid ?: "id:${it.id}" }
+            }
+        }.onSuccess { loaded ->
+            contacts = loaded
+            contactsLoading = false
+        }.onFailure { error ->
+            contactsLoading = false
+            contactsError = error.toScrmContactsPanelMessage()
+        }
+    }
+
+    fun selectedIds(target: MomentAudiencePickerTarget): List<String> = when (target) {
+        MomentAudiencePickerTarget.Visibility -> options.selectedFriendWxids
+        MomentAudiencePickerTarget.Reminder -> options.remindWxids
+    }
+
+    fun toggleContact(target: MomentAudiencePickerTarget, wxid: String) {
+        val selected = selectedIds(target).toMutableSet()
+        if (!selected.add(wxid)) selected.remove(wxid)
+        onOptionsChange(
+            when (target) {
+                MomentAudiencePickerTarget.Visibility -> options.copy(selectedFriendWxids = selected.toList())
+                MomentAudiencePickerTarget.Reminder -> options.copy(remindWxids = selected.toList())
+            }
+        )
+    }
+
+    val requiresAudience = options.visibility == ScrmMomentVisibility.PartVisible ||
+        options.visibility == ScrmMomentVisibility.NotVisible
+    val audienceLabel = when (options.visibility) {
+        ScrmMomentVisibility.PartVisible -> "选择可见好友"
+        ScrmMomentVisibility.NotVisible -> "选择排除好友"
+        else -> "选择好友"
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "发表设置",
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Normal,
+                style = MaterialTheme.typography.titleMedium
+            )
+            Text(
+                text = "谁可以看",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelLarge
+            )
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ScrmMomentVisibility.values().forEach { visibility ->
+                    FilterChip(
+                        selected = options.visibility == visibility,
+                        onClick = {
+                            onOptionsChange(
+                                options.copy(
+                                    visibility = visibility,
+                                    selectedFriendWxids = if (
+                                        visibility == ScrmMomentVisibility.PartVisible ||
+                                        visibility == ScrmMomentVisibility.NotVisible
+                                    ) {
+                                        options.selectedFriendWxids
+                                    } else {
+                                        emptyList()
+                                    }
+                                )
+                            )
+                            if (visibility != ScrmMomentVisibility.PartVisible && visibility != ScrmMomentVisibility.NotVisible) {
+                                pickerTarget = null
+                            }
+                        },
+                        label = { Text(visibility.label) }
+                    )
+                }
+            }
+            if (requiresAudience) {
+                OutlinedButton(
+                    onClick = { pickerTarget = MomentAudiencePickerTarget.Visibility },
+                    enabled = enabled && route != null
+                ) {
+                    Icon(Icons.Filled.People, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("$audienceLabel（${options.selectedFriendWxids.size}）")
+                }
+            }
+            OutlinedButton(
+                onClick = { pickerTarget = MomentAudiencePickerTarget.Reminder },
+                enabled = enabled && route != null
+            ) {
+                Icon(Icons.Filled.Textsms, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("提醒谁看（${options.remindWxids.size}）")
+            }
+            OutlinedTextField(
+                value = options.poi?.name.orEmpty(),
+                onValueChange = { value ->
+                    onOptionsChange(
+                        options.copy(
+                            poi = value.trim().takeIf(String::isNotEmpty)?.let { name ->
+                                // iOS 发布请求会将输入的位置同步写入所有可读 POI 字段。
+                                ScrmMomentPoi(name = name, city = name, address = name)
+                            }
+                        )
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("所在位置") },
+                leadingIcon = { Icon(Icons.Filled.LocationOn, contentDescription = null) }
+            )
+            if (pickerTarget != null) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = if (pickerTarget == MomentAudiencePickerTarget.Visibility) audienceLabel else "提醒谁看",
+                                modifier = Modifier.weight(1f),
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Normal,
+                                style = MaterialTheme.typography.titleSmall
+                            )
+                            TextButton(onClick = { pickerTarget = null }) { Text("完成") }
+                        }
+                        contactsError?.let { error ->
+                            Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (contactsLoading) {
+                            LinearProgressIndicator(Modifier.fillMaxWidth())
+                        } else if (contacts.isEmpty()) {
+                            Text(
+                                text = if (route == null) "当前账号缺少 SCRM 路由" else "暂无可选好友",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        } else {
+                            val target = requireNotNull(pickerTarget)
+                            LazyColumn(
+                                modifier = Modifier.fillMaxWidth().height(220.dp),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                items(
+                                    items = contacts,
+                                    key = { contact -> contact.wxid ?: "contact-${contact.id}" }
+                                ) { contact ->
+                                    val wxid = contact.wxid?.trim().orEmpty()
+                                    if (wxid.isNotEmpty()) {
+                                        val selected = wxid in selectedIds(target)
+                                        ListItem(
+                                            headlineContent = {
+                                                Text(
+                                                    contact.displayName,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    fontWeight = FontWeight.Normal,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            },
+                                            supportingContent = { Text(wxid, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                            leadingContent = { Icon(Icons.Filled.People, contentDescription = null) },
+                                            trailingContent = {
+                                                Checkbox(
+                                                    checked = selected,
+                                                    onCheckedChange = { toggleContact(target, wxid) },
+                                                    enabled = enabled
+                                                )
+                                            },
+                                            modifier = Modifier.clickable(enabled = enabled) { toggleContact(target, wxid) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 internal fun MomentsTimelinePanel(
@@ -287,7 +1458,7 @@ internal fun MomentsTimelinePanel(
     LaunchedEffect(route) {
         loadMoments()
     }
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -323,7 +1494,7 @@ internal fun MomentsTimelinePanel(
             MomentAdvancedToolsMenu(
                 status = advancedToolStatus,
                 onSelect = { label ->
-                    advancedToolStatus = "$label：已打开 UI 预览，接口接入后再执行"
+                    advancedToolStatus = "$label：该入口已迁移到对应的 SCRM 工作区"
                 }
             )
             Spacer(modifier = Modifier.height(6.dp))
@@ -386,7 +1557,7 @@ internal fun MomentsTimelinePanel(
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 410.dp)
+                .weight(1f)
                 .padding(top = 6.dp)
                 .background(OverlayTokens.momentsBackground)
         ) {
@@ -1509,7 +2680,7 @@ internal fun MomentMaterialsPanel(
         matchesCategory && searchText.contains(searchQuery.trim(), ignoreCase = true)
     }
 
-    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -1632,11 +2803,10 @@ internal fun MomentMaterialsPanel(
             }
         }
 
-        Box(modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
             LazyColumn(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 180.dp, max = 305.dp),
+                    .fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 if (visibleMaterials.isEmpty()) {

@@ -35,18 +35,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -71,6 +67,7 @@ import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.paifa.ubikitouch.accessibility.FloatingChatMediaPickerBridge
 import com.paifa.ubikitouch.accessibility.UbikiAccessibilityService
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.core.model.FloatingChatPrototype
 import com.paifa.ubikitouch.core.model.FloatingChatThumbnailOrientation
 import java.io.File
@@ -415,27 +412,13 @@ internal class FloatingChatPhotoFullscreenOverlayController(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FloatingChatPhotoFullscreenScreen(controller: FloatingChatPhotoFullscreenOverlayController) {
     val photo = controller.capturedPhoto
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
-        Spacer(Modifier.height(photoFullscreenStatusBarHeightDp().dp))
-        TopAppBar(
-            title = {
-                Text(
-                    text = "拍摄照片",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Normal
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = controller::dismiss) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            }
-        )
+        // UI：拍照页复用全屏悬浮工作区 AppBar，30dp 状态区仅由共享 Insets 承载。
+        // 测试流程：从右侧拍摄照片进入，点击左上返回后确认预览关闭且无独立顶部空白。
+        FloatingWorkspaceTopAppBar(title = "拍摄照片", onBack = controller::dismiss)
         if (photo == null) {
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 AndroidView(

@@ -1,7 +1,5 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.scrm
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,7 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -19,7 +16,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -34,21 +30,18 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.accessibility.scrm.ScrmContactTaskRunner
 import com.paifa.ubikitouch.accessibility.scrm.ScrmDevice
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSettingsManager
@@ -62,8 +55,6 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-
-private const val AccountDeviceAnimationDurationMillis = 260
 
 /** 与 iOS“帐号设备”工具一致的高性能分页。 */
 internal enum class AccountDeviceFullScreenTab(val label: String) {
@@ -98,9 +89,6 @@ internal fun AccountDeviceFullScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var reloadKey by remember { mutableStateOf(0) }
     val pagerState = rememberPagerState(pageCount = { AccountDeviceFullScreenTab.entries.size })
-    var pageHeightPx by remember { mutableFloatStateOf(0f) }
-    var entered by remember { mutableStateOf(false) }
-    val translationY = remember { Animatable(0f) }
 
     suspend fun loadSnapshot() {
         loading = true
@@ -138,31 +126,15 @@ internal fun AccountDeviceFullScreen(
     }
 
     LaunchedEffect(reloadKey) { loadSnapshot() }
-    LaunchedEffect(pageHeightPx) {
-        if (pageHeightPx > 0f && !entered) {
-            translationY.snapTo(pageHeightPx)
-            translationY.animateTo(0f, tween(AccountDeviceAnimationDurationMillis))
-            entered = true
-        }
-    }
-    fun close() = scope.launch {
-        translationY.animateTo(pageHeightPx, tween(AccountDeviceAnimationDurationMillis))
-        onBack()
-    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
-            .onSizeChanged { pageHeightPx = it.height.toFloat() }
-            .graphicsLayer { this.translationY = translationY.value }
     ) {
-        Spacer(Modifier.height(30.dp))
-        TopAppBar(
-            title = { Text("账号设备", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Normal) },
-            navigationIcon = {
-                IconButton(onClick = ::close) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
-            },
+        FloatingWorkspaceTopAppBar(
+            title = "账号设备",
+            onBack = onBack,
             actions = {
                 IconButton(onClick = { reloadKey += 1 }, enabled = !loading) {
                     Icon(Icons.Filled.Refresh, "刷新账号设备")
@@ -179,7 +151,7 @@ internal fun AccountDeviceFullScreen(
             }
         }
         AccountDeviceStatus(loading, error ?: status, error != null)
-        HorizontalPager(pagerState, Modifier.fillMaxSize()) { page ->
+        HorizontalPager(pagerState, Modifier.weight(1f).fillMaxWidth()) { page ->
             when (AccountDeviceFullScreenTab.entries[page]) {
                 AccountDeviceFullScreenTab.Devices -> DeviceListPage(pageState.devices, pageState.selectedDeviceUuid)
                 AccountDeviceFullScreenTab.Accounts -> AccountListPage(pageState.accounts, pageState.selectedWeChatId)

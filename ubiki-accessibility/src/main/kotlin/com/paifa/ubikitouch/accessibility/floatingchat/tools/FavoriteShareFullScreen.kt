@@ -1,7 +1,5 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.tools
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -12,7 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -38,11 +35,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -51,18 +45,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.MaterialTheme
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 import kotlinx.coroutines.launch
 
 internal const val FavoriteShareStatusBarHeightDp = 30
-private const val FavoriteShareAnimationDurationMillis = 260
 
 internal enum class FavoriteShareTab(val label: String) {
     Recent("最近使用"),
@@ -94,51 +86,16 @@ internal fun FavoriteShareFullScreen(
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { FavoriteShareTab.entries.size })
     var query by remember { mutableStateOf("") }
-    var pageHeightPx by remember { mutableFloatStateOf(0f) }
-    var entered by remember { mutableStateOf(false) }
-    var exiting by remember { mutableStateOf(false) }
-    val pageTranslationY = remember { Animatable(0f) }
-
-    LaunchedEffect(pageHeightPx) {
-        if (pageHeightPx > 0f && !entered) {
-            pageTranslationY.snapTo(pageHeightPx)
-            pageTranslationY.animateTo(0f, tween(FavoriteShareAnimationDurationMillis))
-            entered = true
-        }
-    }
-
-    fun closeWithExitAnimation() {
-        if (exiting) return
-        exiting = true
-        scope.launch {
-            pageTranslationY.animateTo(pageHeightPx, tween(FavoriteShareAnimationDurationMillis))
-            onBack()
-        }
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
-            .onSizeChanged { pageHeightPx = it.height.toFloat() }
-            .graphicsLayer { translationY = pageTranslationY.value }
     ) {
-        Spacer(Modifier.height(FavoriteShareStatusBarHeightDp.dp))
-        TopAppBar(
-            title = {
-                Text(
-                    text = if (multiSelectMode) "已选择 ${selectedItemIds.count { it.value }} 项" else "收藏分享",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Normal
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = ::closeWithExitAnimation) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            },
-            actions = {
+        // 页面只提供内容，悬浮聊天根容器统一负责显示和关闭时的实体位移动画。
+        FloatingWorkspaceTopAppBar(
+            title = if (multiSelectMode) "已选择 ${selectedItemIds.count { it.value }} 项" else "收藏分享",
+            onBack = onBack
+        ) {
                 if (multiSelectMode) {
                     IconButton(onClick = onForwardSelected, enabled = selectedItemIds.any { it.value }) {
                         Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "转发已选收藏")
@@ -150,8 +107,7 @@ internal fun FavoriteShareFullScreen(
                         Icon(Icons.Filled.Check, contentDescription = "结束多选")
                     }
                 }
-            }
-        )
+        }
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
@@ -171,7 +127,7 @@ internal fun FavoriteShareFullScreen(
                 )
             }
         }
-        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
+        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) { page ->
             val tab = FavoriteShareTab.entries[page]
             val visibleItems = remember(items, query, tab) {
                 items.filter { it.matchesFavoriteShareTab(tab) && it.matchesFavoriteShareQuery(query) }

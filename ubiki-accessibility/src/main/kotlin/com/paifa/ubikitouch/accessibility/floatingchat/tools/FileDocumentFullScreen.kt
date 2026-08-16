@@ -1,7 +1,5 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.tools
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -37,11 +35,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -49,17 +44,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.core.model.FloatingChatFileFormat
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 import kotlinx.coroutines.launch
 
 internal const val FileDocumentStatusBarHeightDp = 30
-private const val FileDocumentAnimationDurationMillis = 260
 
 internal enum class FileDocumentTab(val label: String) {
     Recent("最近文件"),
@@ -82,54 +75,17 @@ internal fun FileDocumentFullScreen(
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { FileDocumentTab.entries.size })
     var query by remember { mutableStateOf("") }
-    var pageHeightPx by remember { mutableFloatStateOf(0f) }
-    var entered by remember { mutableStateOf(false) }
-    var exiting by remember { mutableStateOf(false) }
-    val pageTranslationY = remember { Animatable(0f) }
     val fileMessages = remember(messages) {
         messages.filter { it.type == FloatingChatMessageType.FilePreview }
-    }
-
-    LaunchedEffect(pageHeightPx) {
-        if (pageHeightPx > 0f && !entered) {
-            pageTranslationY.snapTo(pageHeightPx)
-            pageTranslationY.animateTo(0f, tween(FileDocumentAnimationDurationMillis))
-            entered = true
-        }
-    }
-
-    fun closeWithExitAnimation() {
-        if (exiting) return
-        exiting = true
-        scope.launch {
-            pageTranslationY.animateTo(pageHeightPx, tween(FileDocumentAnimationDurationMillis))
-            onBack()
-        }
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
-            .onSizeChanged { pageHeightPx = it.height.toFloat() }
-            .graphicsLayer { translationY = pageTranslationY.value }
     ) {
-        Spacer(Modifier.height(FileDocumentStatusBarHeightDp.dp))
-        TopAppBar(
-            title = {
-                Text(
-                    text = "文件/文档",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Normal
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = ::closeWithExitAnimation) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            }
-        )
+        // 顶部安全区由共享 AppBar 内部处理，避免页面再创建状态栏空白。
+        FloatingWorkspaceTopAppBar(title = "文件/文档", onBack = onBack)
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
@@ -149,7 +105,7 @@ internal fun FileDocumentFullScreen(
                 )
             }
         }
-        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
+        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) { page ->
             val tab = FileDocumentTab.entries[page]
             val visibleMessages = remember(fileMessages, query, tab) {
                 fileMessages

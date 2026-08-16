@@ -2,6 +2,7 @@ package com.paifa.ubikitouch.app
 
 import java.io.File
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -19,9 +20,9 @@ class FloatingChatPhotoOverlayPresentationTest {
         assertTrue(source.contains("translationY = photoFullscreenEntryTranslationY"))
         assertTrue(source.contains(".translationY(0f)"))
         assertTrue(source.contains("photoFullscreenExitTranslationY"))
-        assertTrue(source.contains("Icons.AutoMirrored.Filled.ArrowBack"))
-        assertTrue(source.contains("MaterialTheme.colorScheme.primary"))
-        assertTrue(source.contains("FontWeight.Normal"))
+        assertTrue(source.contains("FloatingWorkspaceTopAppBar("))
+        assertFalse(source.contains("Spacer(Modifier.height(photoFullscreenStatusBarHeightDp().dp))"))
+        assertFalse(source.contains("import androidx.compose.material3.TopAppBar"))
         assertTrue(source.contains("runCatching { windowManager.addView"))
         assertTrue(source.contains("runCatching { windowManager.removeViewImmediate"))
     }

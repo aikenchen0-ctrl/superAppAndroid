@@ -96,12 +96,16 @@ class FloatingChatMessageStoreContractTest {
             newVersion = 2
         ).joinToString("\n")
 
-        assertEquals(6, FloatingChatDatabaseContract.databaseVersion)
+        assertEquals(9, FloatingChatDatabaseContract.databaseVersion)
         assertTrue(schema.contains("moment_posts"))
         assertTrue(schema.contains("post_id TEXT PRIMARY KEY"))
         assertTrue(schema.contains("media_uri TEXT"))
         assertTrue(schema.contains("liked_by TEXT"))
         assertTrue(schema.contains("comments_json TEXT"))
+        assertTrue(schema.contains("link_url TEXT"))
+        assertTrue(schema.contains("author_wxid TEXT"))
+        assertTrue(schema.contains("circle_id INTEGER"))
+        assertTrue(schema.contains("publish_time INTEGER"))
         assertTrue(v1ToV2Migration.contains("CREATE TABLE IF NOT EXISTS moment_posts"))
     }
 
@@ -113,7 +117,7 @@ class FloatingChatMessageStoreContractTest {
             newVersion = 3
         ).joinToString("\n")
 
-        assertEquals(6, FloatingChatDatabaseContract.databaseVersion)
+        assertEquals(9, FloatingChatDatabaseContract.databaseVersion)
         assertTrue(schema.contains("contact_profiles"))
         assertTrue(schema.contains("PRIMARY KEY(account_id, contact_id)"))
         assertTrue(schema.contains("remark TEXT"))
@@ -136,7 +140,7 @@ class FloatingChatMessageStoreContractTest {
             newVersion = 4
         ).joinToString("\n")
 
-        assertEquals(6, FloatingChatDatabaseContract.databaseVersion)
+        assertEquals(9, FloatingChatDatabaseContract.databaseVersion)
         assertTrue(schema.contains("group_profiles"))
         assertTrue(schema.contains("PRIMARY KEY(account_id, group_id)"))
         assertTrue(schema.contains("group_name TEXT"))
@@ -156,7 +160,7 @@ class FloatingChatMessageStoreContractTest {
         )
         val migration = migrationStatements.joinToString("\n")
 
-        assertEquals(6, FloatingChatDatabaseContract.databaseVersion)
+        assertEquals(9, FloatingChatDatabaseContract.databaseVersion)
         assertTrue(schema.contains("remote_conversation_id TEXT"))
         assertTrue(schema.contains("account_wechat_id TEXT"))
         assertTrue(schema.contains("remote_msg_svr_id TEXT"))

@@ -209,7 +209,7 @@ internal fun ContactRelationsFullScreen(onBack: () -> Unit) {
         }
     }
 
-    Column(Modifier.fillMaxSize().background(Color.Transparent)) {
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         // UI：通讯录关系页复用 UI组件 工具栏，避免独立状态栏 Spacer 造成视觉断层。
         // 测试流程：从右侧联系人入口打开，刷新数据后点击左上返回，确认向顶部退出。
         FloatingWorkspaceTopAppBar(

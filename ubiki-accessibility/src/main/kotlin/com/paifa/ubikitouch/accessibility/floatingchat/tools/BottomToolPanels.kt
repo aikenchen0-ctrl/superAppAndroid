@@ -9,11 +9,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -34,7 +37,10 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Textsms
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -51,6 +57,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.accessibility.floatingchat.components.TextLabel
 import com.paifa.ubikitouch.accessibility.floatingchat.input.BottomEmojiPanelHeightDp
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.BottomPanelMode
@@ -245,23 +252,52 @@ private val EmojiCategories = listOf(
     )
 )
 
+/**
+ * UI：More 菜单的礼物页使用共享的全屏悬浮工作区和 M3 列表，避免取消式小面板。
+ * 回调：保留原有礼物选择后关闭面板的行为，不新增接口或改变会话状态。
+ * 测试流程：从 More 打开礼物，确认顶部安全区归属工具栏；点选任一礼物或左上返回，确认回到原会话。
+ */
 @Composable
 internal fun GiftPanel(onClose: () -> Unit) {
     val gifts = remember { listOf("Coffee", "Flower", "Star", "Cake", "Badge", "Thanks") }
-    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-        TextLabel(
-            text = "\u793c\u7269\u9009\u62e9",
-            size = 10.sp,
-            weight = FontWeight.SemiBold,
-            color = OverlayTokens.panelSecondaryText,
-            maxLines = 1
-        )
-        gifts.chunked(3).forEach { rowItems ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                rowItems.forEach { gift -> SmallChoiceButton(label = gift, onClick = onClose) }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
+    ) {
+        FloatingWorkspaceTopAppBar(title = "\u793c\u7269", onBack = onClose)
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                Text(
+                    text = "\u9009\u62e9\u793c\u7269",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+            items(gifts, key = { it }) { gift ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onClose)
+                ) {
+                    ListItem(
+                        headlineContent = { Text(gift) },
+                        supportingContent = { Text("\u9009\u62e9\u540e\u8fd4\u56de\u5f53\u524d\u4f1a\u8bdd") },
+                        leadingContent = {
+                            Icon(
+                                imageVector = Icons.Filled.CardGiftcard,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    )
+                }
             }
         }
     }

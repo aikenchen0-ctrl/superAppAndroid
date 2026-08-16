@@ -1,31 +1,37 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.group
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.Alignment
-import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingDialogCloseButton
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
+import com.paifa.ubikitouch.accessibility.scrm.ScrmAccountMutationRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmAgreeChatRoomInviteRequest
+import com.paifa.ubikitouch.accessibility.scrm.ScrmApproveChatRoomInviteRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmChatRoomManagersRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmChatRoomMembersByFilterRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmChatRoomSwitchRequest
@@ -33,9 +39,6 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmChatRoomTextRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmCreateChatRoomByFilterRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmJoinChatRoomByQrRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmSendJielongRequest
-import com.paifa.ubikitouch.accessibility.scrm.ScrmAccountMutationRequest
-import com.paifa.ubikitouch.accessibility.scrm.ScrmApproveChatRoomInviteRequest
-import com.paifa.ubikitouch.accessibility.scrm.ScrmAgreeChatRoomInviteRequest
 import com.paifa.ubikitouch.accessibility.scrm.ScrmTransferChatRoomOwnerRequest
 import com.paifa.ubikitouch.accessibility.scrm.scrmContactsPanelRouteForSelectedAccount
 import com.paifa.ubikitouch.accessibility.scrm.scrmFloatingContactConversationId
@@ -57,13 +60,13 @@ private enum class ScrmGroupPreviewOperation(val title: String) {
     SendJielong("群接龙"),
     PullInvites("刷新入群邀请"),
     ApproveInvite("审批入群邀请"),
-    AgreeInvite("同意自己入群邀请")
+    AgreeInvite("同意自己的入群邀请")
 }
 
 /**
- * UI 对接：群资料页 -> 群管理操作。
- * 人工测试：先核对群 ID、预计影响人数和成员 wxid，点击“组装请求”后仅验证状态文案。
- * 禁止在本组件内调用 chatRoomManagementApi 的写方法。
+ * UI：群管理预览使用群信息根视图的透明全屏工作区，不创建 Dialog 或新的 Window。
+ * 接口：保留 iOS 同源 SCRM 请求对象的组装、参数校验和预览结果，不在此 UI 层改变写接口行为。
+ * 测试流程：从群信息点击“群管理”，选择操作、填写参数并确认，检查预览状态后点击左上返回。
  */
 @Composable
 internal fun ScrmGroupOperationPreviewPanel(
@@ -96,109 +99,333 @@ internal fun ScrmGroupOperationPreviewPanel(
         else -> if (targetMemberWxid.isBlank()) 0 else 1
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(operation?.title ?: "群管理操作", modifier = Modifier.weight(1f))
-                FloatingDialogCloseButton(onClose = onDismiss)
+    fun returnToOperationList() {
+        operation = null
+        confirmed = false
+        status = null
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
+    ) {
+        FloatingWorkspaceTopAppBar(
+            title = operation?.title ?: "群管理操作",
+            onBack = {
+                if (operation == null) onDismiss() else returnToOperationList()
             }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("目标群：${group.name}")
-                Text("群 ID：${chatRoomId ?: "缺少 SCRM 群路由"}")
-                Text("预计影响：$estimatedAffectedCount 人")
-                Column(
-                    Modifier.fillMaxWidth().background(Color(0xFFF0F6EC), RoundedCornerShape(8.dp)).padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    Text("仅 UI 预览", color = Color(0xFF4E7A55), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                    Text("写操作暂不发送，接入后将在此处显示确认、执行中和任务结果。", color = Color(0xFF6B766E), fontSize = 10.sp)
+        )
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                Card {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "目标群：${group.name}",
+                            color = MaterialTheme.colorScheme.onSurface,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Normal
+                        )
+                        Text(
+                            text = "群 ID：${chatRoomId ?: "缺少 SCRM 群路由"}",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = "预计影响：$estimatedAffectedCount 人",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = "本页只组装并校验请求，提交状态由现有群资料接口返回。",
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
-                if (operation == null) {
-                    GroupOperationSection("成员与群权限", listOf(ScrmGroupPreviewOperation.CreateByFilter, ScrmGroupPreviewOperation.InviteByFilter, ScrmGroupPreviewOperation.KickByFilter, ScrmGroupPreviewOperation.AddManagers, ScrmGroupPreviewOperation.RemoveManagers, ScrmGroupPreviewOperation.TransferOwner)) { operation = it; confirmed = false; status = null }
-                    GroupOperationSection("群设置", listOf(ScrmGroupPreviewOperation.NewMessageNotify, ScrmGroupPreviewOperation.PinChat, ScrmGroupPreviewOperation.SaveToContacts, ScrmGroupPreviewOperation.SelfNickname, ScrmGroupPreviewOperation.JoinVerification, ScrmGroupPreviewOperation.SendJielong)) { operation = it; confirmed = false; status = null }
-                    GroupOperationSection("入群", listOf(ScrmGroupPreviewOperation.JoinByQr, ScrmGroupPreviewOperation.PullInvites, ScrmGroupPreviewOperation.ApproveInvite, ScrmGroupPreviewOperation.AgreeInvite)) { operation = it; confirmed = false; status = null }
-                } else {
-                    if (operation in setOf(
+            }
+            if (operation == null) {
+                item {
+                    GroupOperationSection(
+                        title = "成员与群权限",
+                        operations = listOf(
                             ScrmGroupPreviewOperation.CreateByFilter,
                             ScrmGroupPreviewOperation.InviteByFilter,
-                            ScrmGroupPreviewOperation.KickByFilter
-                        )
-                    ) {
-                        Text("筛选条件", color = Color(0xFF30343A), fontSize = 12.sp)
-                        Text("空字段不参与筛选，本次仅组装最多 $estimatedAffectedCount 个目标的请求预览。", color = Color(0xFF777E86), fontSize = 10.sp)
-                        OutlinedTextField(filterSearch, { filterSearch = it }, modifier = Modifier.fillMaxWidth(), label = { Text("关键词（选填）") }, singleLine = true)
-                        OutlinedTextField(filterLabelIds, { filterLabelIds = it }, modifier = Modifier.fillMaxWidth(), label = { Text("标签 ID（英文逗号分隔）") }, singleLine = true)
-                        OutlinedTextField(filterLabelNames, { filterLabelNames = it }, modifier = Modifier.fillMaxWidth(), label = { Text("标签名称（英文逗号分隔）") }, singleLine = true)
-                        OutlinedTextField(filterCustomerLevel, { filterCustomerLevel = it }, modifier = Modifier.fillMaxWidth(), label = { Text("客户等级（选填）") }, singleLine = true)
-                        OutlinedTextField(filterSourceChannel, { filterSourceChannel = it }, modifier = Modifier.fillMaxWidth(), label = { Text("来源渠道（选填）") }, singleLine = true)
-                    }
-                    if (operation in setOf(ScrmGroupPreviewOperation.NewMessageNotify, ScrmGroupPreviewOperation.PinChat, ScrmGroupPreviewOperation.SaveToContacts, ScrmGroupPreviewOperation.JoinVerification)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("目标设置", color = Color(0xFF30343A), fontSize = 12.sp)
-                                Text(if (settingEnabled) "开启此群设置" else "关闭此群设置", color = Color(0xFF777E86), fontSize = 10.sp)
-                            }
-                            Switch(checked = settingEnabled, onCheckedChange = { settingEnabled = it })
-                        }
-                    }
-                    if (operation in setOf(
+                            ScrmGroupPreviewOperation.KickByFilter,
                             ScrmGroupPreviewOperation.AddManagers,
                             ScrmGroupPreviewOperation.RemoveManagers,
                             ScrmGroupPreviewOperation.TransferOwner
-                        )
-                    ) {
-                        OutlinedTextField(targetMemberWxid, { targetMemberWxid = it }, modifier = Modifier.fillMaxWidth(), label = { Text("成员 wxid") }, singleLine = true)
-                    }
-                    if (operation in setOf(ScrmGroupPreviewOperation.ApproveInvite, ScrmGroupPreviewOperation.AgreeInvite)) {
-                        OutlinedTextField(inviteMessageId, { inviteMessageId = it.filter(Char::isDigit) }, modifier = Modifier.fillMaxWidth(), label = { Text("邀请消息服务端 ID") }, singleLine = true)
-                        if (operation == ScrmGroupPreviewOperation.AgreeInvite) {
-                            OutlinedTextField(inviteTalker, { inviteTalker = it }, modifier = Modifier.fillMaxWidth(), label = { Text("邀请来源 talker") }, singleLine = true)
+                        ),
+                        onSelect = {
+                            operation = it
+                            confirmed = false
+                            status = null
                         }
-                        OutlinedTextField(inputText, { inputText = it }, modifier = Modifier.fillMaxWidth(), label = { Text("邀请消息内容") }, minLines = 2)
-                    }
-                    if (operation in setOf(
+                    )
+                }
+                item {
+                    GroupOperationSection(
+                        title = "群设置",
+                        operations = listOf(
+                            ScrmGroupPreviewOperation.NewMessageNotify,
+                            ScrmGroupPreviewOperation.PinChat,
+                            ScrmGroupPreviewOperation.SaveToContacts,
                             ScrmGroupPreviewOperation.SelfNickname,
-                            ScrmGroupPreviewOperation.JoinByQr,
+                            ScrmGroupPreviewOperation.JoinVerification,
                             ScrmGroupPreviewOperation.SendJielong
+                        ),
+                        onSelect = {
+                            operation = it
+                            confirmed = false
+                            status = null
+                        }
+                    )
+                }
+                item {
+                    GroupOperationSection(
+                        title = "入群",
+                        operations = listOf(
+                            ScrmGroupPreviewOperation.JoinByQr,
+                            ScrmGroupPreviewOperation.PullInvites,
+                            ScrmGroupPreviewOperation.ApproveInvite,
+                            ScrmGroupPreviewOperation.AgreeInvite
+                        ),
+                        onSelect = {
+                            operation = it
+                            confirmed = false
+                            status = null
+                        }
+                    )
+                }
+            } else {
+                if (operation in setOf(
+                        ScrmGroupPreviewOperation.CreateByFilter,
+                        ScrmGroupPreviewOperation.InviteByFilter,
+                        ScrmGroupPreviewOperation.KickByFilter
+                    )
+                ) {
+                    item {
+                        GroupPreviewSection(title = "筛选条件") {
+                            Text(
+                                text = "空字段不参与筛选，本次最多预览 $estimatedAffectedCount 个目标。",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            OutlinedTextField(
+                                value = filterSearch,
+                                onValueChange = { filterSearch = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text("关键词（选填）") },
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = filterLabelIds,
+                                onValueChange = { filterLabelIds = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text("标签 ID（英文逗号分隔）") },
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = filterLabelNames,
+                                onValueChange = { filterLabelNames = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text("标签名称（英文逗号分隔）") },
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = filterCustomerLevel,
+                                onValueChange = { filterCustomerLevel = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text("客户等级（选填）") },
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = filterSourceChannel,
+                                onValueChange = { filterSourceChannel = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text("来源渠道（选填）") },
+                                singleLine = true
+                            )
+                        }
+                    }
+                }
+                if (operation in setOf(
+                        ScrmGroupPreviewOperation.NewMessageNotify,
+                        ScrmGroupPreviewOperation.PinChat,
+                        ScrmGroupPreviewOperation.SaveToContacts,
+                        ScrmGroupPreviewOperation.JoinVerification
+                    )
+                ) {
+                    item {
+                        GroupPreviewSection(title = "目标设置") {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = if (settingEnabled) "开启此群设置" else "关闭此群设置",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Switch(checked = settingEnabled, onCheckedChange = { settingEnabled = it })
+                            }
+                        }
+                    }
+                }
+                if (operation in setOf(
+                        ScrmGroupPreviewOperation.AddManagers,
+                        ScrmGroupPreviewOperation.RemoveManagers,
+                        ScrmGroupPreviewOperation.TransferOwner
+                    )
+                ) {
+                    item {
+                        GroupPreviewSection(title = "成员") {
+                            OutlinedTextField(
+                                value = targetMemberWxid,
+                                onValueChange = { targetMemberWxid = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text("成员 wxid") },
+                                singleLine = true
+                            )
+                        }
+                    }
+                }
+                if (operation in setOf(
+                        ScrmGroupPreviewOperation.ApproveInvite,
+                        ScrmGroupPreviewOperation.AgreeInvite
+                    )
+                ) {
+                    item {
+                        GroupPreviewSection(title = "邀请信息") {
+                            OutlinedTextField(
+                                value = inviteMessageId,
+                                onValueChange = { inviteMessageId = it.filter(Char::isDigit) },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text("邀请消息服务端 ID") },
+                                singleLine = true
+                            )
+                            if (operation == ScrmGroupPreviewOperation.AgreeInvite) {
+                                OutlinedTextField(
+                                    value = inviteTalker,
+                                    onValueChange = { inviteTalker = it },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    label = { Text("邀请来源 talker") },
+                                    singleLine = true
+                                )
+                            }
+                            OutlinedTextField(
+                                value = inputText,
+                                onValueChange = { inputText = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text("邀请消息内容") },
+                                minLines = 2
+                            )
+                        }
+                    }
+                }
+                if (operation in setOf(
+                        ScrmGroupPreviewOperation.SelfNickname,
+                        ScrmGroupPreviewOperation.JoinByQr,
+                        ScrmGroupPreviewOperation.SendJielong
+                    )
+                ) {
+                    item {
+                        GroupPreviewSection(title = "操作内容") {
+                            OutlinedTextField(
+                                value = inputText,
+                                onValueChange = { inputText = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = {
+                                    Text(
+                                        when (operation) {
+                                            ScrmGroupPreviewOperation.JoinByQr -> "二维码内容"
+                                            ScrmGroupPreviewOperation.SendJielong -> "接龙内容"
+                                            else -> "群内昵称"
+                                        }
+                                    )
+                                },
+                                singleLine = operation != ScrmGroupPreviewOperation.SendJielong,
+                                minLines = if (operation == ScrmGroupPreviewOperation.SendJielong) 2 else 1
+                            )
+                        }
+                    }
+                }
+                item {
+                    GroupPreviewSection(title = "确认") {
+                        Text(
+                            text = "该操作会改变群状态或成员关系，请确认目标群和影响范围。",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall
                         )
-                    ) {
-                        OutlinedTextField(inputText, { inputText = it }, modifier = Modifier.fillMaxWidth(), label = { Text(when (operation) { ScrmGroupPreviewOperation.JoinByQr -> "二维码内容"; ScrmGroupPreviewOperation.SendJielong -> "接龙内容"; else -> "群内昵称" }) }, singleLine = operation != ScrmGroupPreviewOperation.SendJielong, minLines = if (operation == ScrmGroupPreviewOperation.SendJielong) 2 else 1)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = confirmed, onCheckedChange = { confirmed = it })
+                            Text(
+                                text = "我已确认目标群和影响范围",
+                                color = MaterialTheme.colorScheme.onSurface,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                        status?.let { message ->
+                            Text(
+                                text = message,
+                                color = MaterialTheme.colorScheme.primary,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                        Button(
+                            enabled = confirmed,
+                            onClick = {
+                                val selectedOperation = operation ?: return@Button
+                                status = prepareGroupOperationRequest(
+                                    operation = selectedOperation,
+                                    deviceUuid = route?.deviceUuid,
+                                    weChatId = route?.weChatId,
+                                    chatRoomId = chatRoomId,
+                                    memberWxid = targetMemberWxid,
+                                    inviteTalker = inviteTalker,
+                                    text = inputText,
+                                    enabled = settingEnabled,
+                                    inviteMessageId = inviteMessageId.toLongOrNull(),
+                                    filterSearch = filterSearch,
+                                    filterLabelIds = filterLabelIds,
+                                    filterLabelNames = filterLabelNames,
+                                    filterCustomerLevel = filterCustomerLevel,
+                                    filterSourceChannel = filterSourceChannel
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("组装请求")
+                        }
                     }
-                    Text("该操作会改变群状态或成员关系。请求仅组装，不发送。")
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = confirmed, onCheckedChange = { confirmed = it })
-                        Text("我已确认目标群和影响范围", fontSize = 11.sp, color = Color(0xFF5F666D))
-                    }
-                    status?.let { Text(it) }
                 }
             }
-        },
-        confirmButton = {
-            if (operation == null) TextButton(onClick = onDismiss) { Text("关闭") }
-            else Button(enabled = confirmed, onClick = {
-                status = prepareGroupOperationRequest(
-                    operation = operation ?: return@Button,
-                    deviceUuid = route?.deviceUuid,
-                    weChatId = route?.weChatId,
-                    chatRoomId = chatRoomId,
-                    memberWxid = targetMemberWxid,
-                    inviteTalker = inviteTalker,
-                    text = inputText,
-                    enabled = settingEnabled,
-                    inviteMessageId = inviteMessageId.toLongOrNull(),
-                    filterSearch = filterSearch,
-                    filterLabelIds = filterLabelIds,
-                    filterLabelNames = filterLabelNames,
-                    filterCustomerLevel = filterCustomerLevel,
-                    filterSourceChannel = filterSourceChannel
+        }
+    }
+}
+
+@Composable
+private fun GroupPreviewSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Card {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            content = {
+                Text(
+                    text = title,
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Normal
                 )
-            }) { Text("组装请求") }
-        },
-        dismissButton = { TextButton(onClick = { if (operation == null) onDismiss() else { operation = null; confirmed = false } }) { Text(if (operation == null) "取消" else "返回") } }
-    )
+                content()
+            }
+        )
+    }
 }
 
 @Composable
@@ -207,11 +434,32 @@ private fun GroupOperationSection(
     operations: List<ScrmGroupPreviewOperation>,
     onSelect: (ScrmGroupPreviewOperation) -> Unit
 ) {
-    Text(title, color = Color(0xFF858C94), fontSize = 11.sp)
-    operations.forEach { item ->
-        TextButton(onClick = { onSelect(item) }, modifier = Modifier.fillMaxWidth()) {
-            Text(item.title, modifier = Modifier.weight(1f), color = Color(0xFF30343A))
-            Text("预览", color = Color(0xFFB26A00), fontSize = 10.sp)
+    Card {
+        Column(modifier = Modifier.padding(8.dp)) {
+            Text(
+                text = title,
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Normal,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+            )
+            operations.forEach { item ->
+                TextButton(
+                    onClick = { onSelect(item) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = item.title,
+                        modifier = Modifier.weight(1f),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "预览",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+            }
         }
     }
 }
@@ -233,7 +481,14 @@ private fun prepareGroupOperationRequest(
     filterSourceChannel: String
 ): String {
     if (deviceUuid.isNullOrBlank() || weChatId.isNullOrBlank()) return "无法组装：缺少当前账号 SCRM 路由"
-    if (operation != ScrmGroupPreviewOperation.CreateByFilter && operation != ScrmGroupPreviewOperation.JoinByQr && operation != ScrmGroupPreviewOperation.PullInvites && chatRoomId.isNullOrBlank()) return "无法组装：缺少群 ID"
+    if (
+        operation != ScrmGroupPreviewOperation.CreateByFilter &&
+        operation != ScrmGroupPreviewOperation.JoinByQr &&
+        operation != ScrmGroupPreviewOperation.PullInvites &&
+        chatRoomId.isNullOrBlank()
+    ) {
+        return "无法组装：缺少群 ID"
+    }
     val roomId = chatRoomId.orEmpty()
     return when (operation) {
         ScrmGroupPreviewOperation.CreateByFilter -> {

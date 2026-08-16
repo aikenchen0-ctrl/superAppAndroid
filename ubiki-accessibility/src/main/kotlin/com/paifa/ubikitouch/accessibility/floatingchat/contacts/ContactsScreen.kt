@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -34,6 +35,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,9 +63,8 @@ internal fun ContactsScreen(
 ) {
     Column(
         modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(ContactsPageBackground)
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
     ) {
         ContactsTopBar(
             onCloseClick = { onEvent(ContactsUiEvent.CloseRequested) },
@@ -76,11 +77,10 @@ internal fun ContactsScreen(
             ContactsSearchRow(state = state, onEvent = onEvent)
         }
         ContactsStatusLine(state = state, onEvent = onEvent)
-        Box(modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
             LazyColumn(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 360.dp, max = 520.dp)
+                    .fillMaxSize()
                     .padding(end = 16.dp)
             ) {
                 item(key = "new-friends") {

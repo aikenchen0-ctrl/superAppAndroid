@@ -5,8 +5,6 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -26,7 +24,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.Mic
@@ -42,18 +39,15 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -62,8 +56,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -75,8 +67,6 @@ import kotlinx.coroutines.launch
 import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 
 internal const val VideoCallStatusBarHeightDp = 30
-private const val VideoCallAnimationDurationMillis = 260
-
 internal enum class VideoCallTab(val label: String) {
     Call("通话"),
     Participants("参与者")
@@ -85,7 +75,7 @@ internal enum class VideoCallTab(val label: String) {
 /**
  * 对应 iOS VideoCallViewController 的 Android M3 全屏通话工作区，使用 CameraX 预览当前设备摄像头。
  * 测试流程：点击右侧“视频通话”，授权相机后确认预览、开关与前后切换；切换参与者 Tab；点击结束后检查当前会话的通话记录，
- * 最后确认页面使用 translationY 自下向上进入、自上向下退出，且未附着额外 Window。
+ * 最后确认页面由外层全屏悬浮工作区统一负责自下向上进入和自上向下退出，且未附着额外 Window。
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -98,15 +88,12 @@ internal fun VideoCallFullScreen(
 ) {
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { VideoCallTab.entries.size })
-    var pageHeightPx by remember { mutableFloatStateOf(0f) }
-    var entered by remember { mutableStateOf(false) }
-    var exiting by remember { mutableStateOf(false) }
     var elapsedSeconds by remember { mutableIntStateOf(0) }
     var muted by remember { mutableStateOf(false) }
     var speakerOn by remember { mutableStateOf(true) }
     var cameraOn by remember { mutableStateOf(true) }
     var usingFrontCamera by remember { mutableStateOf(true) }
-    val pageTranslationY = remember { Animatable(0f) }
+    var isClosing by remember { mutableStateOf(false) }
     val visibleParticipants = remember(participantNames, targetName) {
         participantNames.filter(String::isNotBlank).ifEmpty { listOf(targetName.ifBlank { "当前好友" }) }.take(9)
     }
@@ -117,35 +104,22 @@ internal fun VideoCallFullScreen(
             elapsedSeconds += 1
         }
     }
-    LaunchedEffect(pageHeightPx) {
-        if (pageHeightPx > 0f && !entered) {
-            pageTranslationY.snapTo(pageHeightPx)
-            pageTranslationY.animateTo(0f, tween(VideoCallAnimationDurationMillis))
-            entered = true
-        }
-    }
-
-    fun closeWithExitAnimation(recordCall: Boolean) {
-        if (exiting) return
-        exiting = true
+    fun close(recordCall: Boolean) {
+        if (isClosing) return
+        isClosing = true
         cameraOn = false
-        scope.launch {
-            pageTranslationY.animateTo(-pageHeightPx, tween(VideoCallAnimationDurationMillis))
-            if (recordCall) onEndCall(elapsedSeconds)
-            onBack()
-        }
+        if (recordCall) onEndCall(elapsedSeconds)
+        onBack()
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Transparent)
-            .onSizeChanged { pageHeightPx = it.height.toFloat() }
-            .graphicsLayer { translationY = pageTranslationY.value }
+            .background(MaterialTheme.colorScheme.surface)
     ) {
         FloatingWorkspaceTopAppBar(
             title = if (isGroup) "群视频通话" else "视频通话",
-            onBack = { closeWithExitAnimation(recordCall = false) }
+            onBack = { close(recordCall = false) }
         )
         PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
             VideoCallTab.entries.forEachIndexed { index, tab ->
@@ -156,7 +130,7 @@ internal fun VideoCallFullScreen(
                 )
             }
         }
-        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
+        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) { page ->
             when (VideoCallTab.entries[page]) {
                 VideoCallTab.Call -> VideoCallPage(
                     targetName = targetName,
@@ -170,7 +144,7 @@ internal fun VideoCallFullScreen(
                     onSpeakerChanged = { speakerOn = !speakerOn },
                     onCameraChanged = { cameraOn = !cameraOn },
                     onSwitchCamera = { usingFrontCamera = !usingFrontCamera },
-                    onEndCall = { closeWithExitAnimation(recordCall = true) }
+                    onEndCall = { close(recordCall = true) }
                 )
                 VideoCallTab.Participants -> VideoCallParticipantsPage(visibleParticipants, isGroup)
             }

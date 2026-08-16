@@ -52,7 +52,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -386,7 +385,7 @@ private enum class BlinkVoiceTab(val label: String) { Recognition("识别"), Rec
 private fun BlinkVoiceFullscreenScreen(controller: BlinkVoiceFullscreenOverlayController) {
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState { BlinkVoiceTab.entries.size }
-    Column(Modifier.fillMaxSize().background(Color.Transparent)) {
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         // UI：复用 UI组件 的 M3 工具栏，30dp 状态区由工具栏 padding 承载，避免独立空白区域跳变。
         // 测试流程：点击右侧眨眼测试，确认页面自下向上进入；点击左上返回，确认页面向顶部退出。
         FloatingWorkspaceTopAppBar(title = "眨眼测试", onBack = controller::dismiss)

@@ -16,8 +16,10 @@ class FloatingChatCameraM3ContractTest {
             "src/main/java/com/paifa/ubikitouch/app/FloatingChatCameraActivity.kt"
         ).readText()
 
-        assertTrue(source.contains("TopAppBar"))
+        assertTrue(source.contains("FloatingWorkspaceTopAppBar("))
         assertTrue(source.contains("FilledTonalIconButton"))
         assertTrue(source.contains("MaterialTheme.colorScheme"))
+        assertTrue(source.contains("floatingWorkspaceSurfaceBackdrop()"))
+        assertTrue(source.contains("color = MaterialTheme.colorScheme.surface"))
     }
 }

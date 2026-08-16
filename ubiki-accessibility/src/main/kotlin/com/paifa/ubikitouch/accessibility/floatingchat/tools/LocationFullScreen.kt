@@ -2,30 +2,24 @@ package com.paifa.ubikitouch.accessibility.floatingchat.tools
 
 import android.location.Geocoder
 import java.util.Locale
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -33,32 +27,27 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.paifa.ubikitouch.accessibility.AppLocationOption
 import com.paifa.ubikitouch.accessibility.DeviceLocationState
 import com.paifa.ubikitouch.accessibility.FloatingChatLocationPermissionBridge
 import com.paifa.ubikitouch.accessibility.currentDeviceLocationState
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.accessibility.hasLocationPermission
 import com.paifa.ubikitouch.accessibility.requestCurrentDeviceLocation
 import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-private const val LocationAnimationDurationMillis = 260
 
 internal enum class LocationFullScreenTab(val label: String) {
     CurrentLocation("当前位置"),
@@ -95,14 +84,11 @@ internal fun LocationFullScreen(
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { LocationFullScreenTab.entries.size })
     var locationState by remember { mutableStateOf(currentDeviceLocationState(context)) }
-    var pageHeightPx by remember { mutableFloatStateOf(0f) }
-    var entered by remember { mutableStateOf(false) }
-    var exiting by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var searching by remember { mutableStateOf(false) }
     var searchResults by remember { mutableStateOf(emptyList<AppLocationOption>()) }
     var searchError by remember { mutableStateOf<String?>(null) }
-    val translationY = remember { Animatable(0f) }
+    var isClosing by remember { mutableStateOf(false) }
 
     fun refreshLocation() {
         locationState = locationState.copy(loading = true, error = null)
@@ -130,43 +116,20 @@ internal fun LocationFullScreen(
     LaunchedEffect(permissionRequestToken) {
         if (hasLocationPermission(context)) refreshLocation()
     }
-    LaunchedEffect(pageHeightPx) {
-        if (pageHeightPx > 0f && !entered) {
-            translationY.snapTo(pageHeightPx)
-            translationY.animateTo(0f, tween(LocationAnimationDurationMillis))
-            entered = true
-        }
-    }
-    fun exit(afterExit: () -> Unit) {
-        if (exiting) return
-        exiting = true
-        scope.launch {
-            translationY.animateTo(pageHeightPx, tween(LocationAnimationDurationMillis))
-            afterExit()
-        }
-    }
 
+    fun close(afterClose: () -> Unit) {
+        if (isClosing) return
+        isClosing = true
+        afterClose()
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
-            .onSizeChanged { pageHeightPx = it.height.toFloat() }
-            .graphicsLayer { this.translationY = translationY.value }
     ) {
-        Spacer(Modifier.height(30.dp))
-        TopAppBar(
-            title = {
-                Text(
-                    text = locationFullScreenTitle(isLiveLocation),
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Normal
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = { exit(onBack) }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            }
+        FloatingWorkspaceTopAppBar(
+            title = locationFullScreenTitle(isLiveLocation),
+            onBack = { close(onBack) }
         )
         PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
             LocationFullScreenTab.entries.forEachIndexed { index, tab ->
@@ -177,13 +140,13 @@ internal fun LocationFullScreen(
                 )
             }
         }
-        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) { page ->
             when (LocationFullScreenTab.entries[page]) {
                 LocationFullScreenTab.CurrentLocation -> LocationCurrentPage(
                     locationState = locationState,
                     onRefresh = ::refreshLocation,
                     onRequestPermission = FloatingChatLocationPermissionBridge::requestLocationPermission,
-                    onSendLocation = { location -> exit { onSendLocation(location) } }
+                    onSendLocation = { location -> close { onSendLocation(location) } }
                 )
                 LocationFullScreenTab.Search -> LocationSearchPage(
                     query = searchQuery,
@@ -192,7 +155,7 @@ internal fun LocationFullScreen(
                     error = searchError,
                     onQueryChange = { searchQuery = it },
                     onSearch = ::searchPlaces,
-                    onSendLocation = { location -> exit { onSendLocation(location) } }
+                    onSendLocation = { location -> close { onSendLocation(location) } }
                 )
             }
         }

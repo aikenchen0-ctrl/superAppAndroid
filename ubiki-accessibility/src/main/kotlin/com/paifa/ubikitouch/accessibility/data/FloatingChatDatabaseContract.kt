@@ -2,7 +2,7 @@ package com.paifa.ubikitouch.accessibility.data
 
 internal object FloatingChatDatabaseContract {
     const val databaseName: String = "floating_chat.db"
-    const val databaseVersion: Int = 7
+    const val databaseVersion: Int = 9
 
     const val tableThreads: String = "chat_threads"
     const val tableMessages: String = "chat_messages"
@@ -104,6 +104,7 @@ internal object FloatingChatDatabaseContract {
                 post_id TEXT PRIMARY KEY,
                 account_id TEXT NOT NULL DEFAULT '',
                 author TEXT NOT NULL,
+                author_wxid TEXT,
                 content TEXT NOT NULL,
                 display_time TEXT NOT NULL,
                 avatar_text TEXT NOT NULL,
@@ -118,7 +119,10 @@ internal object FloatingChatDatabaseContract {
                 media_color INTEGER,
                 media_label TEXT,
                 link_title TEXT,
+                link_url TEXT,
                 source_label TEXT,
+                circle_id INTEGER,
+                publish_time INTEGER,
                 liked_by TEXT,
                 comments_json TEXT,
                 created_at INTEGER NOT NULL
@@ -281,13 +285,23 @@ internal object FloatingChatDatabaseContract {
                 add("CREATE INDEX IF NOT EXISTS idx_scrm_outbox_task ON $tableScrmOutbox(remote_task_id)")
                 add("CREATE INDEX IF NOT EXISTS idx_scrm_tasks_poll ON $tableScrmTasks(poll_state, next_poll_at)")
             }
-            if (oldVersion < 6 && newVersion >= 6) {
+            if (oldVersion in 2..5 && newVersion >= 6) {
                 add("ALTER TABLE $tableMomentPosts ADD COLUMN account_id TEXT NOT NULL DEFAULT ''")
+            }
+            if (oldVersion < 6 && newVersion >= 6) {
                 add("CREATE INDEX IF NOT EXISTS idx_moment_posts_account_created ON $tableMomentPosts(account_id, created_at DESC)")
             }
             if (oldVersion < 7 && newVersion >= 7) {
                 add("ALTER TABLE $tableMessages ADD COLUMN remote_message_id INTEGER")
                 add("CREATE INDEX IF NOT EXISTS idx_chat_messages_remote_id ON $tableMessages(remote_message_id)")
+            }
+            if (oldVersion in 2..7 && newVersion >= 8) {
+                add("ALTER TABLE $tableMomentPosts ADD COLUMN link_url TEXT")
+            }
+            if (oldVersion in 2..8 && newVersion >= 9) {
+                add("ALTER TABLE $tableMomentPosts ADD COLUMN author_wxid TEXT")
+                add("ALTER TABLE $tableMomentPosts ADD COLUMN circle_id INTEGER")
+                add("ALTER TABLE $tableMomentPosts ADD COLUMN publish_time INTEGER")
             }
         }
     }

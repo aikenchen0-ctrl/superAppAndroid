@@ -1,21 +1,16 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.tools
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.Card
@@ -28,27 +23,18 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.paifa.ubikitouch.accessibility.FloatingChatMediaPickerBridge
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.core.model.FloatingChatPrototype
 import kotlinx.coroutines.launch
 
 internal const val GalleryStatusBarHeightDp = 30
-private const val GalleryAnimationDurationMillis = 240
 
 /** 测试流程：从右侧“图片”打开后确认页面自下向上进入。 */
 internal fun galleryEnterOffsetDirection(): Int = 1
@@ -77,49 +63,13 @@ internal fun GalleryFullScreen(
 ) {
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { GalleryFullScreenTab.entries.size })
-    var pageHeightPx by remember { mutableFloatStateOf(0f) }
-    var entered by remember { mutableStateOf(false) }
-    val pageTranslationY = remember { Animatable(0f) }
-
-    LaunchedEffect(pageHeightPx) {
-        if (pageHeightPx > 0f && !entered) {
-            pageTranslationY.snapTo(pageHeightPx)
-            pageTranslationY.animateTo(0f, tween(GalleryAnimationDurationMillis))
-            entered = true
-        }
-    }
-
-    fun closeWithExitAnimation() {
-        scope.launch {
-            pageTranslationY.animateTo(pageHeightPx, tween(GalleryAnimationDurationMillis))
-            onBack()
-        }
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
-            .onSizeChanged { pageHeightPx = it.height.toFloat() }
-            .graphicsLayer { translationY = pageTranslationY.value }
     ) {
-        // 根悬浮层已经处理系统窗口 Insets，这里保留产品要求的 30dp 状态区。
-        androidx.compose.foundation.layout.Spacer(Modifier.height(GalleryStatusBarHeightDp.dp))
-        androidx.compose.foundation.layout.Spacer(Modifier.height(GalleryStatusBarHeightDp.dp))
-        TopAppBar(
-            title = {
-                Text(
-                    text = "图片",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Normal
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = ::closeWithExitAnimation) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            }
-        )
+        // 共享工具栏负责状态栏 inset 和返回入口，页面本身只承载图库内容。
+        FloatingWorkspaceTopAppBar(title = "图片", onBack = onBack)
         PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
             GalleryFullScreenTab.entries.forEachIndexed { index, tab ->
                 Tab(
@@ -129,7 +79,7 @@ internal fun GalleryFullScreen(
                 )
             }
         }
-        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
+        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) { page ->
             when (GalleryFullScreenTab.entries[page]) {
                 GalleryFullScreenTab.Images -> GallerySelectionPage(onPickImage)
                 GalleryFullScreenTab.Recent -> GalleryInformationPage()

@@ -821,6 +821,15 @@ class ScrmApiClientTest {
                 content = "today update",
                 attachmentType = "image",
                 attachments = listOf("https://cdn.example.com/moment.jpg"),
+                sendSlow = true,
+                visibleType = "partVisible",
+                friendWxids = listOf("wxid_friend_1", "wxid_friend_2"),
+                notiUsers = listOf("wxid_notify"),
+                poi = ScrmMomentPoi(
+                    name = "门店",
+                    city = "门店",
+                    address = "门店"
+                ),
                 payload = ScrmMomentPostPayload(
                     clientRequestId = "moment-request-1",
                     weChatId = "wxid_account",
@@ -828,6 +837,17 @@ class ScrmApiClientTest {
                     attachment = ScrmMomentPostAttachment(
                         type = ScrmMomentAttachmentType.Image,
                         content = listOf("https://cdn.example.com/moment.jpg")
+                    ),
+                    sendSlow = true,
+                    notiUsers = listOf("wxid_notify"),
+                    visible = ScrmMomentVisibilityPayload(
+                        type = 2,
+                        friends = listOf("wxid_friend_1", "wxid_friend_2")
+                    ),
+                    poi = ScrmMomentPoi(
+                        name = "门店",
+                        city = "门店",
+                        address = "门店"
                     )
                 )
             )
@@ -845,6 +865,17 @@ class ScrmApiClientTest {
             "https://cdn.example.com/moment.jpg",
             postBody.getValue("attachments").jsonArray.single().jsonPrimitive.content
         )
+        assertEquals("true", postBody.getValue("sendSlow").jsonPrimitive.content)
+        assertEquals("partVisible", postBody.getValue("visibleType").jsonPrimitive.content)
+        assertEquals("wxid_friend_1", postBody.getValue("friendWxids").jsonArray[0].jsonPrimitive.content)
+        assertEquals("wxid_notify", postBody.getValue("notiUsers").jsonArray.single().jsonPrimitive.content)
+        val postPoi = postBody.getValue("poi").jsonObject
+        assertEquals("门店", postPoi.getValue("name").jsonPrimitive.content)
+        assertEquals("门店", postPoi.getValue("city").jsonPrimitive.content)
+        assertEquals("门店", postPoi.getValue("address").jsonPrimitive.content)
+        assertEquals("0.0", postPoi.getValue("lat").jsonPrimitive.content)
+        assertEquals("0.0", postPoi.getValue("lng").jsonPrimitive.content)
+        assertEquals("", postPoi.getValue("poiId").jsonPrimitive.content)
         assertEquals(
             "2",
             postBody.getValue("payload")
@@ -857,6 +888,14 @@ class ScrmApiClientTest {
         assertFalse(postBody.containsKey("extComments"))
         assertFalse(postBody.toString().contains("sns_send_ok"))
         val payloadBody = postBody.getValue("payload").jsonObject
+        assertEquals("true", payloadBody.getValue("sendSlow").jsonPrimitive.content)
+        assertEquals("wxid_notify", payloadBody.getValue("notiUsers").jsonArray.single().jsonPrimitive.content)
+        assertEquals("2", payloadBody.getValue("visible").jsonObject.getValue("type").jsonPrimitive.content)
+        assertEquals(
+            "wxid_friend_2",
+            payloadBody.getValue("visible").jsonObject.getValue("friends").jsonArray[1].jsonPrimitive.content
+        )
+        assertEquals("0.0", payloadBody.getValue("poi").jsonObject.getValue("lat").jsonPrimitive.content)
         assertFalse(payloadBody.containsKey("comment"))
         assertFalse(payloadBody.containsKey("extComment"))
         assertFalse(payloadBody.containsKey("extComments"))
@@ -938,6 +977,46 @@ class ScrmApiClientTest {
         assertEquals("wxid_friend", commentBody.getValue("toWeChatId").jsonPrimitive.content)
         assertEquals("nice", commentBody.getValue("content").jsonPrimitive.content)
         assertEquals("0", commentBody.getValue("replyCommentId").jsonPrimitive.content)
+    }
+
+    @Test
+    fun postMomentSerializesNotVisibleAudienceInPayload() {
+        val transport = RecordingTransport(ok("""{"taskId":208,"success":true}"""))
+        ScrmApiClient(config, transport).postMoment(
+            ScrmPostMomentRequest(
+                deviceUuid = "device-1",
+                weChatId = "wxid_account",
+                clientRequestId = "moment-not-visible-1",
+                content = "not visible moment",
+                sendSlow = true,
+                visibleType = "notVisible",
+                invisibleFriendWxids = listOf("wxid_hidden_1", "wxid_hidden_2"),
+                payload = ScrmMomentPostPayload(
+                    clientRequestId = "moment-not-visible-1",
+                    weChatId = "wxid_account",
+                    content = "not visible moment",
+                    sendSlow = true,
+                    visible = ScrmMomentVisibilityPayload(
+                        type = 3,
+                        friends = listOf("wxid_hidden_1", "wxid_hidden_2")
+                    )
+                )
+            )
+        )
+
+        val body = Json.parseToJsonElement(requireNotNull(transport.lastRequest?.body)).jsonObject
+        val visible = body.getValue("payload").jsonObject.getValue("visible").jsonObject
+        assertEquals("notVisible", body.getValue("visibleType").jsonPrimitive.content)
+        assertFalse(body.containsKey("friendWxids"))
+        assertEquals(
+            listOf("wxid_hidden_1", "wxid_hidden_2"),
+            body.getValue("invisibleFriendWxids").jsonArray.map { it.jsonPrimitive.content }
+        )
+        assertEquals("3", visible.getValue("type").jsonPrimitive.content)
+        assertEquals(
+            listOf("wxid_hidden_1", "wxid_hidden_2"),
+            visible.getValue("friends").jsonArray.map { it.jsonPrimitive.content }
+        )
     }
 
     @Test

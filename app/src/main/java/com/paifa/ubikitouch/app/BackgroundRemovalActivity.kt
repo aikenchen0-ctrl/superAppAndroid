@@ -70,7 +70,7 @@ private fun BackgroundRemovalScreen(onBack: () -> Unit) {
     val preferences = context.getSharedPreferences(BackgroundRemovalPreferences, Context.MODE_PRIVATE)
     var enabled by rememberSaveable { mutableStateOf(preferences.getBoolean(AutomaticRemovalKey, false)) }
 
-    Column(Modifier.fillMaxSize().background(Color.Transparent)) {
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         FloatingWorkspaceTopAppBar(title = "智能抠图", onBack = onBack)
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),

@@ -38,11 +38,15 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,13 +58,12 @@ import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorksp
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoMemberUiState
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoUiEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoUiState
-import kotlinx.coroutines.launch
 
 /**
  * iOS 群信息的 Android 全屏悬浮实现。
  *
  * 测试流程：从群聊右侧工具进入，检查 30dp 顶部安全区、三个分页及返回动画；依次刷新群资料、
- * 编辑资料、邀请成员和切换群设置，确认 SCRM 返回状态显示在页面顶部。进出场由聊天根的
+ * 编辑资料、邀请成员和切换群设置，确认接口返回状态显示在页面顶部。进出场由聊天根的
  * `AnimatedVisibility` 统一执行，禁止页面自行创建第二段位移动画。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -70,47 +73,71 @@ internal fun GroupInfoScreen(
     onEvent: (GroupInfoUiEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { GroupInfoFullScreenTab.entries.size })
+    var requestedPage by remember { mutableStateOf<Int?>(null) }
+    var showExitConfirmation by remember { mutableStateOf(false) }
+    LaunchedEffect(requestedPage) {
+        requestedPage?.let { page ->
+            pagerState.animateScrollToPage(page)
+            requestedPage = null
+        }
+    }
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.Transparent)
+            .background(MaterialTheme.colorScheme.surface)
     ) {
-        // UI：右侧群信息复用 UI组件 的全屏工具栏；状态区由 toolbar 内嵌 padding 承载。
-        // 测试流程：点击群信息后确认自下向上进入，点击左上返回后确认页面向顶部退出。
-        FloatingWorkspaceTopAppBar(
-            title = "群信息",
-            onBack = { onEvent(GroupInfoUiEvent.BackRequested) },
-            actions = {
-                IconButton(
-                    onClick = { onEvent(GroupInfoUiEvent.RefreshRequested) },
-                    enabled = !state.loading
-                ) {
-                    Icon(Icons.Filled.Refresh, contentDescription = "刷新群资料")
+        Column(Modifier.fillMaxSize()) {
+            // UI：右侧群信息复用 UI组件 的全屏工具栏；状态区由 toolbar 内嵌 padding 承载。
+            // 测试流程：点击群信息后确认自下向上进入，点击左上返回后确认页面向顶部退出。
+            FloatingWorkspaceTopAppBar(
+                title = "群信息",
+                onBack = { onEvent(GroupInfoUiEvent.BackRequested) },
+                actions = {
+                    IconButton(
+                        onClick = { onEvent(GroupInfoUiEvent.RefreshRequested) },
+                        enabled = !state.loading
+                    ) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "刷新群资料")
+                    }
+                }
+            )
+            TabRow(selectedTabIndex = pagerState.currentPage) {
+                GroupInfoFullScreenTab.entries.forEachIndexed { index, tab ->
+                    Tab(
+                        selected = pagerState.currentPage == index,
+                        onClick = { requestedPage = index },
+                        text = { Text(tab.label, fontWeight = FontWeight.Normal) }
+                    )
                 }
             }
-        )
-        TabRow(selectedTabIndex = pagerState.currentPage) {
-            GroupInfoFullScreenTab.entries.forEachIndexed { index, tab ->
-                Tab(
-                    selected = pagerState.currentPage == index,
-                    onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
-                    text = { Text(tab.label, fontWeight = FontWeight.Normal) }
-                )
+            GroupInfoStatus(state)
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.weight(1f).fillMaxWidth()
+            ) { page ->
+                when (GroupInfoFullScreenTab.entries[page]) {
+                    GroupInfoFullScreenTab.Profile -> GroupInfoProfilePage(state, onEvent)
+                    GroupInfoFullScreenTab.Members -> GroupInfoMembersPage(state, onEvent)
+                    GroupInfoFullScreenTab.Settings -> GroupInfoSettingsPage(
+                        state = state,
+                        onEvent = onEvent,
+                        onExitRequested = { showExitConfirmation = true }
+                    )
+                }
             }
         }
-        GroupInfoStatus(state)
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize()
-        ) { page ->
-            when (GroupInfoFullScreenTab.entries[page]) {
-                GroupInfoFullScreenTab.Profile -> GroupInfoProfilePage(state, onEvent)
-                GroupInfoFullScreenTab.Members -> GroupInfoMembersPage(state, onEvent)
-                GroupInfoFullScreenTab.Settings -> GroupInfoSettingsPage(state, onEvent)
-            }
+        if (showExitConfirmation) {
+            GroupInfoExitConfirmation(
+                groupName = state.groupName,
+                enabled = !state.loading,
+                onDismiss = { showExitConfirmation = false },
+                onConfirm = {
+                    showExitConfirmation = false
+                    onEvent(GroupInfoUiEvent.ExitGroupRequested)
+                }
+            )
         }
     }
 }
@@ -260,7 +287,11 @@ private fun GroupInfoMemberRow(member: GroupInfoMemberUiState, onClick: () -> Un
 
 /** 群通知、置顶、通讯录及成员显示偏好分页。 */
 @Composable
-private fun GroupInfoSettingsPage(state: GroupInfoUiState, onEvent: (GroupInfoUiEvent) -> Unit) {
+private fun GroupInfoSettingsPage(
+    state: GroupInfoUiState,
+    onEvent: (GroupInfoUiEvent) -> Unit,
+    onExitRequested: () -> Unit
+) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -304,7 +335,7 @@ private fun GroupInfoSettingsPage(state: GroupInfoUiState, onEvent: (GroupInfoUi
         item { Spacer(Modifier.height(14.dp)) }
         item {
             Button(
-                onClick = { onEvent(GroupInfoUiEvent.ExitGroupRequested) },
+                onClick = onExitRequested,
                 enabled = !state.loading,
                 modifier = Modifier.fillMaxWidth(),
                 colors = androidx.compose.material3.ButtonDefaults.buttonColors(
@@ -312,6 +343,63 @@ private fun GroupInfoSettingsPage(state: GroupInfoUiState, onEvent: (GroupInfoUi
                     contentColor = MaterialTheme.colorScheme.onError
                 )
             ) { Text("退出群聊", fontWeight = FontWeight.Normal) }
+        }
+    }
+}
+
+/**
+ * UI：确认层直接绘制在全屏悬浮根内，不创建 Dialog Window，因此不会触发 BadTokenException。
+ * 测试流程：点击“退出群聊”显示确认层；取消不调用接口；点击“确认退出”后才派发退出事件。
+ */
+@Composable
+private fun GroupInfoExitConfirmation(
+    groupName: String,
+    enabled: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.32f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp),
+            colors = androidx.compose.material3.CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 6.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "确认退出群聊",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Normal
+                )
+                Text(
+                    text = if (groupName.isBlank()) {
+                        "确定要退出当前群聊吗？"
+                    } else {
+                        "确定要退出“$groupName”吗？退出后将不再接收该群消息。"
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss, enabled = enabled) { Text("取消") }
+                    Button(onClick = onConfirm, enabled = enabled) { Text("确认退出") }
+                }
+            }
         }
     }
 }

@@ -58,7 +58,9 @@ private fun JsonObject.isScrmMomentObject(): Boolean {
     ) != null ||
         stringListValue("images", "imageUrls", "picUrls", "pictures", "attachments").isNotEmpty() ||
         stringValue("videoUrl", "video", "videoPath") != null ||
-        this["comments"] != null
+        this["comments"] != null ||
+        !momentLinkUrl().isNullOrBlank() ||
+        !momentLinkTitle().isNullOrBlank()
     return hasCircleId && hasMomentBody
 }
 
@@ -75,6 +77,13 @@ private fun scrmMomentPostFromObject(value: JsonObject): AppMomentPost? {
         "wxName",
         "wxid"
     ) ?: "Unknown"
+    val authorWxId = value.stringValue(
+        "authorWxid",
+        "authorWxId",
+        "authorWxID",
+        "wxid",
+        "userName"
+    )
     val content = value.stringValue(
         "content",
         "text",
@@ -84,6 +93,8 @@ private fun scrmMomentPostFromObject(value: JsonObject): AppMomentPost? {
         "description"
     ).orEmpty()
     val publishTime = value.longValue("publishTime", "createTime", "createdTime", "timestamp")
+    val linkUrl = value.momentLinkUrl()
+    val linkTitle = value.momentLinkTitle()
     val imageUrl = value.stringListValue(
         "images",
         "imageUrls",
@@ -113,6 +124,14 @@ private fun scrmMomentPostFromObject(value: JsonObject): AppMomentPost? {
             label = "image"
         )
 
+        !linkUrl.isNullOrBlank() -> AppMomentMedia(
+            kind = MomentMediaKind.Link,
+            uri = linkUrl,
+            widthDp = 260,
+            heightDp = 72,
+            label = linkTitle ?: "链接"
+        )
+
         else -> null
     }
     return AppMomentPost(
@@ -124,9 +143,15 @@ private fun scrmMomentPostFromObject(value: JsonObject): AppMomentPost? {
         avatarText = author.take(2),
         avatarColor = scrmMomentAvatarColor(circleId.toString()),
         media = media,
+        linkTitle = linkTitle,
+        linkUrl = linkUrl,
+        sourceLabel = value.stringValue("linkSourceName", "sourceName", "sourceLabel"),
         likedBy = value.stringListValue("likedBy", "likes", "likeUsers", "praiseUsers", "praiseList")
             .distinct(),
         comments = value.momentComments(),
+        authorWxId = authorWxId,
+        circleId = circleId,
+        publishTime = publishTime,
         createdAt = scrmMomentCreatedAt(publishTime)
     )
 }
@@ -151,7 +176,20 @@ private fun JsonObject.momentComments(): List<AppMomentComment> {
                 val content = element.stringValue("content", "text", "comment", "commentText")
                     ?: return@mapNotNull null
                 if (isScrmMomentSyntheticStatusComment(content)) return@mapNotNull null
-                AppMomentComment(author = author, text = content)
+                AppMomentComment(
+                    author = author,
+                    text = content,
+                    id = element.longValue("commentId", "commentID", "id", "snsCommentId"),
+                    authorWxId = element.stringValue(
+                        "fromWxid",
+                        "fromWeChatId",
+                        "authorWxid",
+                        "authorWxId",
+                        "wxid"
+                    ),
+                    replyTo = element.stringValue("replyTo", "toNickname", "toNickName"),
+                    replyCommentId = element.longValue("replyCommentId", "replyId", "toCommentId")
+                )
             }
 
             else -> element.primitiveText()?.let { text ->
@@ -164,6 +202,53 @@ private fun JsonObject.momentComments(): List<AppMomentComment> {
 
 private fun isScrmMomentSyntheticStatusComment(text: String): Boolean {
     return text.trim().lowercase(Locale.ROOT) == "sns_send_ok"
+}
+
+private fun JsonObject.momentLinkUrl(): String? {
+    return stringValue(
+        "linkUrl",
+        "linkURL",
+        "LinkUrl",
+        "LinkURL",
+        "link",
+        "href",
+        "url",
+        "Url",
+        "sourceUrl",
+        "pageUrl",
+        "weAppUrl"
+    ) ?: momentNestedString(
+        "url",
+        "href",
+        "linkUrl",
+        "linkURL",
+        "pageUrl",
+        "weAppUrl"
+    )
+}
+
+private fun JsonObject.momentLinkTitle(): String? {
+    return stringValue(
+        "linkTitle",
+        "LinkTitle",
+        "title",
+        "Title",
+        "appName",
+        "sourceName",
+        "weAppTitle"
+    ) ?: momentNestedString(
+        "title",
+        "linkTitle",
+        "appName",
+        "sourceName",
+        "weAppTitle"
+    )
+}
+
+private fun JsonObject.momentNestedString(vararg keys: String): String? {
+    return listOf("linkInfo", "appMsg", "link").firstNotNullOfOrNull { objectKey ->
+        (this[objectKey] as? JsonObject)?.stringValue(*keys)
+    }
 }
 
 internal fun JsonObject.stringValue(vararg keys: String): String? {

@@ -1,23 +1,18 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.tools
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Wallet
@@ -27,29 +22,24 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import kotlinx.coroutines.launch
 
 internal data class RedPacketDraft(
@@ -59,7 +49,6 @@ internal data class RedPacketDraft(
     val paymentPassword: String
 )
 
-private const val RedPacketAnimationDurationMillis = 260
 private const val DefaultRedPacketCountLimit = 100
 
 /**
@@ -80,10 +69,6 @@ internal fun RedPacketFullScreen(
 ) {
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState { 2 }
-    var pageHeightPx by remember { mutableFloatStateOf(0f) }
-    var entered by remember { mutableStateOf(false) }
-    var exiting by remember { mutableStateOf(false) }
-    val translationY = remember { Animatable(0f) }
     var amount by remember { mutableStateOf("66.00") }
     var greeting by remember { mutableStateOf("恭喜发财，大吉大利") }
     var packetCount by remember { mutableStateOf(1) }
@@ -92,49 +77,23 @@ internal fun RedPacketFullScreen(
     var walletLoading by remember { mutableStateOf(false) }
     var submitting by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
+    var isClosing by remember { mutableStateOf(false) }
     val packetCountLimit = maxPacketCount.coerceIn(1, DefaultRedPacketCountLimit)
 
-    LaunchedEffect(pageHeightPx) {
-        if (pageHeightPx > 0f && !entered) {
-            translationY.snapTo(pageHeightPx)
-            translationY.animateTo(0f, tween(RedPacketAnimationDurationMillis))
-            entered = true
-        }
-    }
-
-    fun closeWithExitAnimation() {
-        if (exiting) return
-        exiting = true
-        scope.launch {
-            if (pageHeightPx > 0f) {
-                translationY.animateTo(pageHeightPx, tween(RedPacketAnimationDurationMillis))
-            }
-            onBack()
-        }
+    fun close() {
+        if (isClosing) return
+        isClosing = true
+        onBack()
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
-            .onSizeChanged { pageHeightPx = it.height.toFloat() }
-            .graphicsLayer { this.translationY = translationY.value }
     ) {
-        Spacer(Modifier.height(30.dp))
-        TopAppBar(
-            title = {
-                Text(
-                    text = "红包",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Normal
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = ::closeWithExitAnimation) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            }
+        FloatingWorkspaceTopAppBar(
+            title = "红包",
+            onBack = ::close
         )
         PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
             listOf("填写红包", "支付确认").forEachIndexed { index, title ->
@@ -145,7 +104,7 @@ internal fun RedPacketFullScreen(
                 )
             }
         }
-        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) { page ->
             if (page == 0) {
                 RedPacketDraftPage(
                     conversationLabel = conversationLabel,

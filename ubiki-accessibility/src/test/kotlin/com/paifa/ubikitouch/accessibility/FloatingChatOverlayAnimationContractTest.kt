@@ -1,6 +1,7 @@
 package com.paifa.ubikitouch.accessibility
 
 import java.io.File
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -50,5 +51,28 @@ class FloatingChatOverlayAnimationContractTest {
 
         assertTrue(source.contains("shouldAnimateFloatingChatEntrance("))
         assertTrue(source.contains("previousState = state"))
+    }
+
+    /**
+     * 测试流程：首次展开聊天时让无障碍 Overlay 延后 attach，确认 ComposeView 仍会在 attach 后执行入场动画。
+     * 该回归防止窗口背景已挂载、聊天内容却因保留在屏幕外而不可见。
+     */
+    @Test
+    fun entranceAnimationIsPostedBeforeTheOverlayViewFinishesAttaching() {
+        val source = File(
+            System.getProperty("user.dir"),
+            "src/main/kotlin/com/paifa/ubikitouch/accessibility/FloatingChatOverlayController.kt"
+        ).readText()
+
+        val entranceStart = source.indexOf("private fun animateExpandedEntrance")
+        val entranceEnd = source.indexOf("private fun animateExpandedExit", entranceStart)
+        val entrance = source.substring(entranceStart, entranceEnd)
+
+        assertTrue(entrance.contains("view.post {"))
+        assertFalse(
+            entrance.contains(
+                "if (!view.isAttachedToWindow) return\n        view.post"
+            )
+        )
     }
 }

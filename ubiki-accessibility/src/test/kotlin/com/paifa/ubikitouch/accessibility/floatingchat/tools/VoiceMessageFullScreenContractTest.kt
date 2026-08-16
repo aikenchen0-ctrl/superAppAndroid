@@ -1,7 +1,7 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.tools
 
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.BottomPanelMode
-import com.paifa.ubikitouch.accessibility.floatingchat.shell.isCenteredToolFeaturePanel
+import com.paifa.ubikitouch.accessibility.floatingchat.shell.isFullscreenWorkspace
 import com.paifa.ubikitouch.core.model.FloatingChatToolAction
 import java.io.File
 import org.junit.Assert.assertEquals
@@ -16,7 +16,7 @@ class VoiceMessageFullScreenContractTest {
             "语音消息",
             rightRailToolCatalog.first { item -> item.action == FloatingChatToolAction.Voice }.label
         )
-        assertTrue(BottomPanelMode.Voice.isCenteredToolFeaturePanel())
+        assertTrue(BottomPanelMode.Voice.isFullscreenWorkspace())
     }
 
     /** 测试流程：检查全屏实体由下向上进入、由上向下退出。 */
@@ -39,9 +39,11 @@ class VoiceMessageFullScreenContractTest {
         assertTrue(workspace.contains("PrimaryTabRow"))
         assertTrue(workspace.contains("HorizontalPager"))
         assertTrue(workspace.contains("LazyColumn"))
-        assertTrue(workspace.contains("VoiceMessageStatusBarHeightDp = 30"))
-        assertTrue(workspace.contains("Animatable"))
-        assertTrue(workspace.contains("translationY = pageTranslationY.value"))
+        assertTrue(workspace.contains("FloatingWorkspaceTopAppBar("))
+        assertTrue(workspace.contains("background(MaterialTheme.colorScheme.surface)"))
+        assertTrue(workspace.contains("Animatable").not())
+        assertTrue(workspace.contains("graphicsLayer").not())
+        assertTrue(workspace.contains("Spacer(Modifier.height(30.dp))").not())
         assertTrue(workspace.contains("RealVoiceInputPanel"))
         assertTrue(workspace.contains("Dialog(").not())
         assertTrue(workspace.contains("WindowManager").not())

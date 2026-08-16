@@ -1,7 +1,11 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.finder
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -32,9 +36,11 @@ internal fun FinderWorkspaceView(
     modifier: Modifier = Modifier
 ) {
     if (session == null || api == null) {
-        FinderPanelSection(modifier = modifier) {
+        Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+            FinderPanelSection(modifier = Modifier.fillMaxSize()) {
             FinderPanelHeader(title = "视频号", subtitle = "需要当前 SCRM 账号路由和 API 配置后才能操作。")
             FinderOperationStatus(FinderOperationUiState(error = configurationError ?: "当前账号不可用于视频号操作"))
+            }
         }
         return
     }
@@ -49,7 +55,7 @@ internal fun FinderWorkspaceView(
     var feedAuthInput by remember { mutableStateOf("") }
     val selectedIndex = FinderWorkspaceTab.entries.indexOf(selectedTab)
 
-    Column(modifier = modifier.fillMaxWidth()) {
+    Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         TabRow(
             selectedTabIndex = selectedIndex,
             containerColor = OverlayTokens.panel,
@@ -69,7 +75,8 @@ internal fun FinderWorkspaceView(
                 )
             }
         }
-        when (selectedTab) {
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            when (selectedTab) {
             FinderWorkspaceTab.Publish -> FinderPublishView(session = session, api = api)
             FinderWorkspaceTab.UserPage -> FinderUserPageView(
                 session = session,
@@ -98,7 +105,8 @@ internal fun FinderWorkspaceView(
                     )
                 }
             }
-            FinderWorkspaceTab.Navigation -> FinderNavigationView(session = session, api = api)
+                FinderWorkspaceTab.Navigation -> FinderNavigationView(session = session, api = api)
+            }
         }
     }
 }

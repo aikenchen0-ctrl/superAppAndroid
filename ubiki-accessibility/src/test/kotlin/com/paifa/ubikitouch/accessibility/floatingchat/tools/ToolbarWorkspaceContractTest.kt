@@ -22,7 +22,7 @@ class ToolbarWorkspaceContractTest {
     @Test
     /**
      * 测试流程：从未回消息总览和具体账号会话分别打开搜索、扫码，确认页面复用 UI组件
-     * 的透明 M3 toolbar，30dp 顶部空间由 toolbar 内嵌，而不是独立状态栏占位或页面级动画。
+     * 的 surface M3 toolbar，30dp 顶部空间由 toolbar 内嵌，而不是独立状态栏占位或页面级动画。
      */
     fun toolbarWorkspaceUsesSharedUiComponentsPresentationAndExistingFriendApi() {
         val workspaceSource = File(
@@ -39,7 +39,7 @@ class ToolbarWorkspaceContractTest {
         ).readText()
 
         assertTrue(workspaceSource.contains("FloatingWorkspaceTopAppBar("))
-        assertTrue(workspaceSource.contains("Color.Transparent"))
+        assertTrue(workspaceSource.contains("background(MaterialTheme.colorScheme.surface)"))
         assertFalse(workspaceSource.contains("Spacer(Modifier.height(30.dp))"))
         assertFalse(workspaceSource.contains("Animatable"))
         assertFalse(workspaceSource.contains("graphicsLayer"))

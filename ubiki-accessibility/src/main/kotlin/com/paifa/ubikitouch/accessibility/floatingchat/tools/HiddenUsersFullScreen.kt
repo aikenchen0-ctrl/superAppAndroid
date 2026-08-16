@@ -1,15 +1,11 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.tools
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -18,7 +14,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -31,26 +26,18 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import kotlinx.coroutines.launch
-
-private const val HiddenUsersAnimationDurationMillis = 260
 
 /** 隐藏用户的高性能分页，分别查看已隐藏用户和管理参与者显示状态。 */
 internal enum class HiddenUsersFullScreenTab(val label: String) {
@@ -78,24 +65,9 @@ internal fun HiddenUsersFullScreen(
 ) {
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { HiddenUsersFullScreenTab.entries.size })
-    var pageHeightPx by remember { mutableFloatStateOf(0f) }
-    var entered by remember { mutableStateOf(false) }
-    val translationY = remember { Animatable(0f) }
     val uniqueParticipants = remember(participants) { participants.distinctBy { it.id } }
     val hiddenParticipants = remember(uniqueParticipants, hiddenParticipantIds) {
         uniqueParticipants.filter { participant -> participant.id in hiddenParticipantIds }
-    }
-
-    LaunchedEffect(pageHeightPx) {
-        if (pageHeightPx > 0f && !entered) {
-            translationY.snapTo(pageHeightPx)
-            translationY.animateTo(0f, tween(HiddenUsersAnimationDurationMillis))
-            entered = true
-        }
-    }
-    fun close() = scope.launch {
-        translationY.animateTo(pageHeightPx, tween(HiddenUsersAnimationDurationMillis))
-        onBack()
     }
 
     // 复用已有 accessibility overlay 根视图，不创建 Dialog 或新 Window，规避 BadTokenException。
@@ -103,17 +75,10 @@ internal fun HiddenUsersFullScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
-            .onSizeChanged { pageHeightPx = it.height.toFloat() }
-            .graphicsLayer { this.translationY = translationY.value }
     ) {
-        Spacer(Modifier.height(30.dp))
-        TopAppBar(
-            title = { Text("隐藏用户", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Normal) },
-            navigationIcon = {
-                IconButton(onClick = ::close) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            },
+        FloatingWorkspaceTopAppBar(
+            title = "隐藏用户",
+            onBack = onBack,
             actions = {
                 IconButton(onClick = { scope.launch { pagerState.animateScrollToPage(HiddenUsersFullScreenTab.Hidden.ordinal) } }) {
                     Icon(Icons.Filled.Refresh, contentDescription = "查看已隐藏用户")
@@ -129,7 +94,7 @@ internal fun HiddenUsersFullScreen(
                 )
             }
         }
-        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) { page ->
             when (HiddenUsersFullScreenTab.entries[page]) {
                 HiddenUsersFullScreenTab.Hidden -> HiddenUserListPage(
                     title = "已隐藏用户 (${hiddenParticipants.size})",

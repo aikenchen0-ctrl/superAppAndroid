@@ -176,7 +176,7 @@ internal fun LeftSidebarFullScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val pager = rememberPagerState { LeftSidebarTab.entries.size }
 
-    Column(Modifier.fillMaxSize().background(Color.Transparent)) {
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         // UI：左侧全部入口复用 UI组件 的全屏 toolbar；状态区不再使用独立空白占位。
         // 测试流程：从右侧左侧全部入口打开，切换分页后点击左上返回，确认向顶部退出。
         FloatingWorkspaceTopAppBar(

@@ -62,7 +62,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FlashlightOff
 import androidx.compose.material.icons.filled.FlashlightOn
@@ -76,7 +75,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -102,6 +100,7 @@ import androidx.core.content.ContextCompat
 import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.LifecycleOwner
 import com.paifa.ubikitouch.accessibility.FloatingChatMediaPickerBridge
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.core.model.FloatingChatPrototype
 import com.paifa.ubikitouch.core.model.FloatingChatThumbnailOrientation
 import java.io.File
@@ -184,6 +183,13 @@ class FloatingChatCameraActivity : ComponentActivity() {
         }
         return FrameLayout(this).apply {
             setBackgroundColor(android.graphics.Color.BLACK)
+            addView(
+                floatingWorkspaceSurfaceBackdrop(),
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            )
             addView(previewView)
             addView(
                 ComposeView(this@FloatingChatCameraActivity).apply {
@@ -215,6 +221,21 @@ class FloatingChatCameraActivity : ComponentActivity() {
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
             )
+        }
+    }
+
+    /**
+     * UI：相机预览尚未出帧时以 M3 surface 填满全屏悬浮工作区，避免底层应用透出。
+     * 测试流程：从工具栏扫一扫进入，在相机初始化前确认页面显示 surface，出帧后预览仍可完整显示。
+     */
+    private fun floatingWorkspaceSurfaceBackdrop(): ComposeView {
+        return ComposeView(this).apply {
+            setContent {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.surface
+                ) {}
+            }
         }
     }
 
@@ -565,7 +586,6 @@ private data class CapturedMediaMeta(
     val aspectRatio: Float?
 )
 
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun CameraScanOverlay(
     onClose: () -> Unit,
@@ -584,30 +604,15 @@ private fun CameraScanOverlay(
     )
 
     Box(modifier = Modifier.fillMaxSize()) {
-            Surface(
+            // UI：扫描工具栏复用全屏工作区组件，30dp 顶部安全区由 AppBar Insets 统一承担。
+            // 测试流程：从聊天顶部扫一扫进入，点击左上返回后确认相机释放并回到聊天根。
+            FloatingWorkspaceTopAppBar(
+                title = "扫一扫",
+                onBack = onClose,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .fillMaxWidth(),
-                tonalElevation = 3.dp
-            ) {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = "扫一扫",
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Normal
-                        )
-                    },
-                    navigationIcon = {
-                IconButton(onClick = onClose) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "返回",
-                    )
-                }
-                    }
-                )
-            }
+                    .fillMaxWidth()
+            )
 
             Box(
                 modifier = Modifier.align(Alignment.Center),

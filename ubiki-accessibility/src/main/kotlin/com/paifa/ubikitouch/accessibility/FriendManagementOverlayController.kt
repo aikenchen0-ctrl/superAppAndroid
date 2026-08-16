@@ -140,8 +140,8 @@ internal fun FriendManagementFullscreenScreen(onBack: () -> Unit) {
     val pager = rememberPagerState { FriendManagementTab.entries.size }
     var refreshToken by androidx.compose.runtime.remember { mutableIntStateOf(0) }
     val snapshot = FloatingChatFriendManagementBridge.snapshot
-    Column(Modifier.fillMaxSize().background(Color.Transparent)) {
-        // UI：好友管理复用 UI组件 的透明 M3 工具栏，顶部 30dp 由工具栏 Insets 承载。
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+        // UI：好友管理复用 UI组件 的 surface M3 工具栏，顶部 30dp 由工具栏 Insets 承载。
         // 测试流程：从右侧打开好友管理，刷新后切换分页，再从左上返回确认根动画关闭。
         FloatingWorkspaceTopAppBar(
             title = "好友管理",

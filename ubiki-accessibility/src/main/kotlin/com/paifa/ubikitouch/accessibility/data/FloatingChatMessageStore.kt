@@ -211,12 +211,30 @@ internal class FloatingChatMessageStore(
     }
 
     fun upsertMomentPost(post: LocalMomentPost) {
-        database.writableDatabase.insertWithOnConflict(
-            FloatingChatDatabaseContract.tableMomentPosts,
-            null,
-            post.toContentValues(),
-            SQLiteDatabase.CONFLICT_REPLACE
-        )
+        database.writableDatabase.transaction {
+            val storageKey = momentPostStorageKey(
+                accountId = post.accountId,
+                postId = post.postId
+            )
+
+            // V1-V9 used the runtime post id as the SQLite primary key. Remove a
+            // legacy row only when its account is known to match; an empty account
+            // is intentionally retained because it cannot be safely attributed.
+            if (post.accountId.isNotBlank()) {
+                delete(
+                    FloatingChatDatabaseContract.tableMomentPosts,
+                    "post_id = ? AND account_id = ?",
+                    arrayOf(post.postId, post.accountId)
+                )
+            }
+
+            insertWithOnConflict(
+                FloatingChatDatabaseContract.tableMomentPosts,
+                null,
+                post.toContentValues().apply { put("post_id", storageKey) },
+                SQLiteDatabase.CONFLICT_REPLACE
+            )
+        }
     }
 
     fun momentPosts(limit: Int = 120): List<LocalMomentPost> {
@@ -649,6 +667,7 @@ private fun LocalMomentPost.toContentValues(): ContentValues {
         put("post_id", postId)
         put("account_id", accountId)
         put("author", author)
+        put("author_wxid", authorWxId)
         put("content", content)
         put("display_time", displayTime)
         put("avatar_text", avatarText)
@@ -663,10 +682,44 @@ private fun LocalMomentPost.toContentValues(): ContentValues {
         mediaColor?.let { put("media_color", it) } ?: putNull("media_color")
         put("media_label", mediaLabel)
         put("link_title", linkTitle)
+        put("link_url", linkUrl)
         put("source_label", sourceLabel)
+        circleId?.let { put("circle_id", it) } ?: putNull("circle_id")
+        publishTime?.let { put("publish_time", it) } ?: putNull("publish_time")
         put("liked_by", encodeTextList(likedBy))
         put("comments_json", encodeMomentComments(comments))
         put("created_at", createdAt)
+    }
+}
+
+private const val momentPostStoragePrefix = "account-scope:"
+
+/**
+ * 将朋友圈运行时 id 按微信账号划分命名空间，避免不同账号的 circleId 互相覆盖。
+ * 运行时仍使用 AppMomentPost.id；这里只改变 SQLite 的物理主键。
+ */
+private fun momentPostStorageKey(accountId: String, postId: String): String {
+    if (accountId.isBlank()) return postId
+    // Length-prefixing keeps the key reversible even when an id contains ':'.
+    val scopedPayload = accountId + postId
+    return "$momentPostStoragePrefix${accountId.length}:$scopedPayload"
+}
+
+/**
+ * 从 SQLite 物理主键还原原始运行时 postId；旧版本的 raw key 原样返回。
+ */
+private fun decodeMomentPostStorageKey(storageKey: String): String {
+    if (!storageKey.startsWith(momentPostStoragePrefix)) return storageKey
+    val lengthStart = momentPostStoragePrefix.length
+    val separator = storageKey.indexOf(':', startIndex = lengthStart)
+    if (separator <= lengthStart) return storageKey
+    val accountLength = storageKey.substring(lengthStart, separator).toIntOrNull()
+        ?: return storageKey
+    val postIdStart = separator + 1 + accountLength
+    return if (accountLength >= 0 && postIdStart <= storageKey.length) {
+        storageKey.substring(postIdStart)
+    } else {
+        storageKey
     }
 }
 
@@ -764,9 +817,10 @@ private fun Cursor.toLocalChatMessageFileRef(): LocalChatMessageFileRef {
 
 private fun Cursor.toLocalMomentPost(): LocalMomentPost {
     return LocalMomentPost(
-        postId = getString(columnIndex("post_id")),
+        postId = decodeMomentPostStorageKey(getString(columnIndex("post_id"))),
         accountId = getString(columnIndex("account_id")),
         author = getString(columnIndex("author")),
+        authorWxId = getNullableString("author_wxid"),
         content = getString(columnIndex("content")),
         displayTime = getString(columnIndex("display_time")),
         avatarText = getString(columnIndex("avatar_text")),
@@ -781,7 +835,10 @@ private fun Cursor.toLocalMomentPost(): LocalMomentPost {
         mediaColor = getNullableLong("media_color"),
         mediaLabel = getNullableString("media_label"),
         linkTitle = getNullableString("link_title"),
+        linkUrl = getNullableString("link_url"),
         sourceLabel = getNullableString("source_label"),
+        circleId = getNullableLong("circle_id"),
+        publishTime = getNullableLong("publish_time"),
         likedBy = decodeTextList(getNullableString("liked_by")),
         comments = decodeMomentComments(getNullableString("comments_json")),
         createdAt = getLong(columnIndex("created_at"))
@@ -860,17 +917,35 @@ private fun decodeTextList(payload: String?): List<String> {
 
 private fun encodeMomentComments(comments: List<LocalMomentComment>): String {
     return comments.joinToString("\n") { comment ->
-        "${escapePayload(comment.author)}\t${escapePayload(comment.text)}"
+        listOf(
+            escapePayload(comment.author),
+            escapePayload(comment.text),
+            comment.id?.toString().orEmpty(),
+            escapePayload(comment.authorWxId.orEmpty()),
+            escapePayload(comment.replyTo.orEmpty()),
+            comment.replyCommentId?.toString().orEmpty()
+        ).joinToString("\t")
     }
 }
 
 private fun decodeMomentComments(payload: String?): List<LocalMomentComment> {
     if (payload.isNullOrEmpty()) return emptyList()
     return payload.lines().mapNotNull { line ->
-        val parts = line.split('\t', limit = 2)
+        val parts = line.split('\t', limit = 6)
         val author = parts.getOrNull(0)?.let(::unescapePayload)
         val text = parts.getOrNull(1)?.let(::unescapePayload)
-        if (author.isNullOrBlank() || text.isNullOrBlank()) null else LocalMomentComment(author, text)
+        if (author.isNullOrBlank() || text.isNullOrBlank()) {
+            null
+        } else {
+            LocalMomentComment(
+                author = author,
+                text = text,
+                id = parts.getOrNull(2)?.toLongOrNull(),
+                authorWxId = parts.getOrNull(3)?.let(::unescapePayload)?.takeIf(String::isNotBlank),
+                replyTo = parts.getOrNull(4)?.let(::unescapePayload)?.takeIf(String::isNotBlank),
+                replyCommentId = parts.getOrNull(5)?.toLongOrNull()
+            )
+        }
     }
 }
 

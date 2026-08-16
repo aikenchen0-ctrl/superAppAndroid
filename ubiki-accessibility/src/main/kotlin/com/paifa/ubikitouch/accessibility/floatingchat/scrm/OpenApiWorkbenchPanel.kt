@@ -20,6 +20,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -171,7 +172,7 @@ internal fun OpenApiWorkbenchPanel(manager: ScrmSettingsManager, onClose: () -> 
         OpenApiRequestEditor(editor!!, manager, onClose = { editor = null }) { rows -> result = rows; editor = null }
         return
     }
-    Column(Modifier.fillMaxSize().background(Color.Transparent)) {
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         // UI：OpenAPI 复用 UI组件 的 M3 toolbar，30dp 状态区由共享组件内嵌。
         // 测试流程：打开 OpenAPI，刷新或查看环境后点击左上返回，确认页面向顶部退出。
         FloatingWorkspaceTopAppBar(
@@ -182,7 +183,11 @@ internal fun OpenApiWorkbenchPanel(manager: ScrmSettingsManager, onClose: () -> 
                 TextButton(onClick = { showEnvironment = true }) { Text("环境") }
             }
         )
-        LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        LazyColumn(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
             openApiSections.forEach { section -> item(section.title) { OpenApiGroupedSection(section) { editor = it } } }
             if (result.isNotEmpty()) item("响应") { OpenApiResponseSection(result) }
         }
@@ -227,7 +232,7 @@ internal fun OpenApiWorkbenchPanel(manager: ScrmSettingsManager, onClose: () -> 
 @Composable private fun OpenApiRequestEditor(action: OpenApiAction, manager: ScrmSettingsManager, onClose: () -> Unit, onRun: (List<Pair<String, String>>) -> Unit) {
     var path by remember { mutableStateOf(action.path) }; var query by remember { mutableStateOf("") }; var body by remember { mutableStateOf("{}") }; var confirm by remember { mutableStateOf(false) }; var error by remember { mutableStateOf<String?>(null) }; val scope = rememberCoroutineScope()
     LaunchedEffect(action.path) { runCatching { withContext(Dispatchers.IO) { manager.loadSelectedSessionOrBootstrap() } }.onSuccess { session -> query = "deviceUuid=${session.deviceUuid}&weChatId=${session.weChatId}"; body = "{\n  \"deviceUuid\": \"${session.deviceUuid}\",\n  \"weChatId\": \"${session.weChatId}\"\n}" }.onFailure { error = it.message } }
-    Column(Modifier.fillMaxSize().background(Color.Transparent)) {
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         FloatingWorkspaceTopAppBar(
             title = action.title,
             onBack = onClose,
@@ -238,7 +243,11 @@ internal fun OpenApiWorkbenchPanel(manager: ScrmSettingsManager, onClose: () -> 
                 }) { Text("调用") }
             }
         )
-        LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        LazyColumn(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
             item { Text("${action.method}\n${action.subtitle}", fontSize = 13.sp, color = Color(0xFF6E6E73)) }
             item { OpenApiEditorCard("接口", "可以把 path 中的 demo ID 改成真实 wxid、群 ID 或素材 ID。") { OutlinedTextField(path, { path = it }, Modifier.fillMaxWidth(), label = { Text("/openapi/v1/...") }) } }
             item { OpenApiEditorCard("Query", "格式：deviceUuid=xxx&weChatId=xxx。没有参数可留空。") { OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().height(110.dp), label = { Text("Query") }) } }

@@ -93,7 +93,7 @@ internal fun SideEffectFullScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState { 2 }
     fun update(next: SideEffectSettings) { settings = next; store.save(next) }
-    Column(Modifier.fillMaxSize().background(Color.Transparent)) {
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         // UI：右侧边缘特效复用 UI组件 工具栏和全屏工作区坐标系。
         // 测试流程：点击边缘特效确认自下向上进入，点击左上返回确认向顶部退出。
         FloatingWorkspaceTopAppBar(title = "侧边特效", onBack = onBack)
@@ -102,7 +102,7 @@ internal fun SideEffectFullScreen(onBack: () -> Unit) {
                 Tab(selected = pagerState.currentPage == index, onClick = { scope.launch { pagerState.animateScrollToPage(index) } }, text = { Text(title, fontWeight = FontWeight.Normal) })
             }
         }
-        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) { page ->
             if (page == 0) SideEffectTemplatePage(settings, ::update) else SideEffectColorPage(settings, ::update)
         }
     }

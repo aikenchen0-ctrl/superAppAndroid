@@ -2,6 +2,7 @@
 
 package com.paifa.ubikitouch.accessibility
 
+import android.net.Uri
 import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.accessibility.floatingchat.account.*
 import com.paifa.ubikitouch.accessibility.floatingchat.input.*
@@ -61,7 +62,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.shell.FloatingChatOverlay
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.FloatingChatPreviewChromeEffects
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.floatingChatFrostedBackdrop
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.floatingChatOverlayGestureBinding
-import com.paifa.ubikitouch.accessibility.floatingchat.shell.isCenteredToolFeaturePanel
+import com.paifa.ubikitouch.accessibility.floatingchat.shell.isFullscreenWorkspace
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.isBottomComposerDrawer
 import com.paifa.ubikitouch.accessibility.floatingchat.shell.rememberFloatingChatMediaOverlayState
 import android.content.Context
@@ -430,7 +431,7 @@ internal fun FloatingChatWorkspaceHeader(
     onScanClick: () -> Unit,
     onAddFriendClick: () -> Unit
 ) {
-    // 未回消息总览、单账号会话与普通会话均复用 UI组件 的透明 M3 工具栏。
+    // 未回消息总览、单账号会话与普通会话均复用 UI组件 的 surface M3 工具栏。
     // 测试流程：从全部未回消息或具体账号页面打开后确认 30dp 位于 AppBar 内，点击搜索/扫码继续进入同一根工作区。
     FloatingWorkspaceTopAppBar(
         title = state.title,
@@ -474,10 +475,10 @@ internal fun FloatingChatWorkspaceHeader(
 }
 
 /**
- * UI：未回消息总览和账号未回消息以透明工作区承载，严格复用 UI组件 的根背景语义。
- * 测试流程：分别进入两类未回消息页，确认宿主应用仍可透过页面背景自然衔接；普通会话保留用户配置的磨砂背景。
+ * UI：未回消息总览和账号未回消息使用 Material 3 surface 根，避免全屏悬浮页透出底层应用。
+ * 测试流程：分别进入两类未回消息页，确认根背景为 surface；普通会话仍使用用户配置的磨砂背景。
  */
-internal fun floatingChatRouteUsesTransparentWorkspaceRoot(route: ChatNavigationRoute): Boolean {
+internal fun floatingChatRouteUsesSurfaceWorkspaceRoot(route: ChatNavigationRoute): Boolean {
     return route == ChatNavigationRoute.AllAccountsUnread ||
         route == ChatNavigationRoute.SingleAccountUnread
 }
@@ -530,6 +531,8 @@ internal fun FloatingChatOverlay(
     var bubbleAppearance by remember { mutableStateOf(BubbleAppearance.TwoD) }
     var inputText by remember { mutableStateOf("") }
     var inputFocused by remember { mutableStateOf(false) }
+    var voiceInputMode by remember { mutableStateOf(false) }
+    var pendingVoiceRecording by remember { mutableStateOf<PendingVoiceRecording?>(null) }
     var sendNameEnabledByAccountId by remember { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
     var bottomPanelMode by remember { mutableStateOf(BottomPanelMode.None) }
     var locationIsLive by remember { mutableStateOf(false) }
@@ -625,6 +628,8 @@ internal fun FloatingChatOverlay(
     var favoriteLongPressAnchorBounds by remember { mutableStateOf<Rect?>(null) }
     var favoriteMultiSelectMode by remember { mutableStateOf(false) }
     var contactEditorTarget by remember { mutableStateOf<ContactEditorTarget?>(null) }
+    var groupInfoWorkspaceTarget by remember { mutableStateOf<FloatingChatContact?>(null) }
+    var displayedGroupInfoWorkspaceTarget by remember { mutableStateOf<FloatingChatContact?>(null) }
     var groupMemberAddFriendTargetId by remember { mutableStateOf<String?>(null) }
     var groupMemberAddFriendLoading by remember { mutableStateOf(false) }
     var groupMemberAddFriendStatus by remember { mutableStateOf<String?>(null) }
@@ -854,6 +859,27 @@ internal fun FloatingChatOverlay(
             ),
             profiles = contactProfileList
         )
+    }
+    // UI：群信息退出时继续保留正在显示的目标，避免切到私聊后退出内容提前消失。
+    // 测试流程：群成员详情点击“发消息”，确认群信息随根视图退出动画完成后才释放目标。
+    LaunchedEffect(bottomPanelMode, groupInfoWorkspaceTarget, displayConversation, selectedThread) {
+        if (bottomPanelMode == BottomPanelMode.GroupInfo) {
+            displayedGroupInfoWorkspaceTarget = groupInfoWorkspaceTarget
+                ?: groupInfoTargetForThread(displayConversation, selectedThread)
+        }
+    }
+    LaunchedEffect(
+        bottomPanelVisibility.currentState,
+        bottomPanelVisibility.targetState,
+        displayedBottomPanelMode
+    ) {
+        if (
+            displayedBottomPanelMode == BottomPanelMode.GroupInfo &&
+            !bottomPanelVisibility.currentState &&
+            !bottomPanelVisibility.targetState
+        ) {
+            displayedGroupInfoWorkspaceTarget = null
+        }
     }
     val accountScopedDisplayConversations = remember(
         homeOverviewVisible,
@@ -1401,12 +1427,17 @@ internal fun FloatingChatOverlay(
                 onBackGestureEnd = onBackGestureEnd,
                 onBackGestureCancel = onBackGestureCancel
             )
-            .floatingChatFrostedBackdrop(
-                enabled = frostedBackgroundEnabled &&
-                    !floatingChatRouteUsesTransparentWorkspaceRoot(chatNavigationState.route),
-                opacityPercent = backgroundOpacityPercent,
-                blurRadiusDp = blurRadiusDp,
-                backgroundColorRgb = backgroundColorRgb
+            .then(
+                if (floatingChatRouteUsesSurfaceWorkspaceRoot(chatNavigationState.route)) {
+                    Modifier.background(MaterialTheme.colorScheme.surface)
+                } else {
+                    Modifier.floatingChatFrostedBackdrop(
+                        enabled = frostedBackgroundEnabled,
+                        opacityPercent = backgroundOpacityPercent,
+                        blurRadiusDp = blurRadiusDp,
+                        backgroundColorRgb = backgroundColorRgb
+                    )
+                }
             ),
         topContent = {
             FloatingChatWorkspaceHeader(
@@ -1475,13 +1506,19 @@ internal fun FloatingChatOverlay(
             // 复用既有 GroupInfoHost，避免新增 Dialog、Activity 或 Window 而触发 BadTokenException。
             onGroupInfoClick = {
                 groupInfoTargetForThread(displayConversation, selectedThread)?.let { group ->
-                    contactEditorTarget = ContactEditorTarget.Group(group)
+                    groupInfoWorkspaceTarget = group
+                    displayedGroupInfoWorkspaceTarget = group
+                    contactEditorTarget = null
+                    bottomPanelMode = BottomPanelMode.GroupInfo
                 } ?: Toast.makeText(context, "请先进入群聊后查看群信息", Toast.LENGTH_SHORT).show()
             },
             bubbleAppearance = bubbleAppearance,
             onBubbleAppearanceToggle = { bubbleAppearance = bubbleAppearance.toggle() },
             onGroupAvatarLongClick = { group ->
-                contactEditorTarget = ContactEditorTarget.Group(group)
+                groupInfoWorkspaceTarget = group
+                displayedGroupInfoWorkspaceTarget = group
+                contactEditorTarget = null
+                bottomPanelMode = BottomPanelMode.GroupInfo
             },
             onContactAvatarLongClick = { contact ->
                 contactEditorTarget = ContactEditorTarget.User(contact)
@@ -1600,7 +1637,11 @@ internal fun FloatingChatOverlay(
         )
         },
         bottomContent = {
-        if (bottomPanelMode != BottomPanelMode.GroupInvite &&
+        val isGroupInfoWorkspaceVisible = displayedBottomPanelMode == BottomPanelMode.GroupInfo &&
+            (bottomPanelVisibility.currentState || bottomPanelVisibility.targetState)
+        if (!isGroupInfoWorkspaceVisible &&
+            bottomPanelMode != BottomPanelMode.GroupInvite &&
+            bottomPanelMode != BottomPanelMode.GroupInfo &&
             bottomPanelMode != BottomPanelMode.QuickPhrase &&
             bottomPanelMode != BottomPanelMode.ToolbarSearch &&
             bottomPanelMode != BottomPanelMode.ToolbarScan &&
@@ -1609,7 +1650,7 @@ internal fun FloatingChatOverlay(
             bottomPanelMode != BottomPanelMode.SideEffect &&
             bottomPanelMode != BottomPanelMode.CouponWallet &&
             bottomPanelMode != BottomPanelMode.RedPacket &&
-            bottomInputBarVisibleForCenteredToolPanel(bottomPanelMode.isCenteredToolFeaturePanel()) &&
+            bottomInputBarVisibleForFullscreenWorkspace(bottomPanelMode.isFullscreenWorkspace()) &&
             !bottomPanelMode.isBottomComposerDrawer()
         ) {
             Column(
@@ -1644,8 +1685,13 @@ internal fun FloatingChatOverlay(
                     },
                     inputFocused = inputFocused,
                     onInputFocusedChange = { inputFocused = it },
+                    voiceInputMode = voiceInputMode,
+                    onVoiceInputModeChange = { voiceInputMode = it },
+                    voicePermissionRequestToken = voicePermissionRequestToken,
+                    onRecordingReady = { pendingVoiceRecording = it },
                     panelMode = bottomPanelMode,
                     onPanelModeChange = { nextMode ->
+                        if (nextMode != BottomPanelMode.None) voiceInputMode = false
                         if (nextMode == BottomPanelMode.Emoji || nextMode == BottomPanelMode.More) {
                             keyboardController?.hide()
                             focusManager.clearFocus()
@@ -1678,22 +1724,60 @@ internal fun FloatingChatOverlay(
                 }) + fadeOut()
             ) {
             Box(
-                modifier = if (displayedPanelIsBottomDrawer) Modifier else Modifier.fillMaxSize()
+                modifier = if (displayedPanelIsBottomDrawer) Modifier else Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)
             ) {
-                if (displayedBottomPanelMode.isCenteredToolFeaturePanel()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(OverlayTokens.centerPanelScrim)
-                            .pointerInput(displayedBottomPanelMode) {
-                                detectTapGestures(onTap = {
-                                    if (displayedBottomPanelMode == BottomPanelMode.AiVoice) aiVoiceRuntime?.stop()
-                                    bottomPanelMode = BottomPanelMode.None
-                                })
-                            }
-                    )
-                }
-                 if (displayedBottomPanelMode == BottomPanelMode.GroupInvite) {
+                 // UI：群信息由统一的全屏 panelContent 承载，复用 UI组件 的进出场和 surface 根。
+                 // 接口：ContactEditOverlay 内继续委托 GroupInfoHost 执行现有群资料与成员 SCRM 请求。
+                 // 测试流程：从右侧“群信息”或群头像长按打开，点击工具栏返回后确认回到聊天根。
+                 if (displayedBottomPanelMode == BottomPanelMode.GroupInfo) {
+                     val group = displayedGroupInfoWorkspaceTarget ?: groupInfoWorkspaceTarget ?: groupInfoTargetForThread(
+                         displayConversation,
+                         selectedThread
+                     )
+                     group?.let { target ->
+                         ContactEditOverlay(
+                             target = ContactEditorTarget.Group(target),
+                             accountId = selectedAccount.id,
+                             groupProfiles = groupProfiles,
+                             visibleMessages = visibleMessagesForThread(
+                                 conversation = displayConversation,
+                                 selection = selectedThread,
+                                 selectedAccountId = selectedAccount.id
+                             ),
+                             contacts = displayConversation.contacts,
+                             onGroupProfileChange = { profile ->
+                                 profilePersistenceActions.updateGroupProfile(profile)
+                             },
+                             contactProfiles = contactProfiles,
+                             onContactProfileChange = { profile ->
+                                 profilePersistenceActions.updateContactProfile(profile)
+                             },
+                             onDeleteFriend = { contact ->
+                                 contactRemoteTaskActions.deleteFriendFromProfile(contact)
+                             },
+                             groupMemberAddFriendTargetId = groupMemberAddFriendTargetId,
+                             groupMemberAddFriendLoading = groupMemberAddFriendLoading,
+                             groupMemberAddFriendStatus = groupMemberAddFriendStatus,
+                             groupMemberAddFriendError = groupMemberAddFriendError,
+                             onOpenPrivateChat = { contact ->
+                                 chatNavigationActions.openChatThread(
+                                     ChatThreadSelection.Private(contact.id)
+                                 )
+                                 groupInfoWorkspaceTarget = null
+                                 bottomPanelMode = BottomPanelMode.None
+                             },
+                             onAddFriendFromGroupMember = { member ->
+                                 contactRemoteTaskActions.addFriendFromGroupMember(member)
+                             },
+                             onDismiss = {
+                                 groupInfoWorkspaceTarget = null
+                                 bottomPanelMode = BottomPanelMode.None
+                             },
+                             useFullScreenWorkspace = true,
+                             modifier = Modifier.fillMaxSize()
+                         )
+                     }
+                 } else if (displayedBottomPanelMode == BottomPanelMode.GroupInvite) {
                     GroupInvitationFullScreen(
                         route = scrmFloatingAccountRouteForContactId(selectedAccount.id),
                         onBack = { bottomPanelMode = BottomPanelMode.None }
@@ -2690,14 +2774,7 @@ internal fun FloatingChatOverlay(
                 },
                 onSendAccountCard = { accountId -> toolMessageActions.sendAccountCard(accountId) },
                 onSendGroupInvite = { groupId -> toolMessageActions.sendGroupInvite(groupId) },
-                modifier = if (displayedBottomPanelMode.isCenteredToolFeaturePanel()) {
-                    Modifier
-                        .align(Alignment.Center)
-                        .padding(horizontal = 18.dp)
-                } else {
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                },
+                modifier = Modifier.align(Alignment.BottomCenter),
                 composerHeader = if (displayedBottomPanelMode.isBottomComposerDrawer()) {
                     {
                         BottomInputBar(
@@ -2717,8 +2794,13 @@ internal fun FloatingChatOverlay(
                             },
                             inputFocused = inputFocused,
                             onInputFocusedChange = { inputFocused = it },
+                            voiceInputMode = voiceInputMode,
+                            onVoiceInputModeChange = { voiceInputMode = it },
+                            voicePermissionRequestToken = voicePermissionRequestToken,
+                            onRecordingReady = { pendingVoiceRecording = it },
                             panelMode = bottomPanelMode,
                             onPanelModeChange = { nextMode ->
+                                if (nextMode != BottomPanelMode.None) voiceInputMode = false
                                 if (nextMode == BottomPanelMode.Emoji || nextMode == BottomPanelMode.More) {
                                     keyboardController?.hide()
                                     focusManager.clearFocus()
@@ -2739,6 +2821,22 @@ internal fun FloatingChatOverlay(
         }
         },
         overlayContent = {
+        pendingVoiceRecording?.let { recording ->
+            VoiceSendConfirmationOverlay(
+                recording = recording,
+                onCancel = {
+                    recording.file.delete()
+                    pendingVoiceRecording = null
+                },
+                onConfirm = {
+                    inputMessageActions.sendVoiceMessage(
+                        Uri.fromFile(recording.file).toString(),
+                        recording.durationMs
+                    )
+                    pendingVoiceRecording = null
+                }
+            )
+        }
         FloatingChatExpandedBottomGestureBar(
             onGesture = currentOnBottomGesture,
             modifier = Modifier

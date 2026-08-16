@@ -114,7 +114,7 @@ internal fun FavoriteLibraryScreen(context: android.content.Context, onBack: () 
     Column(
         Modifier
             .fillMaxSize()
-            .background(Color.Transparent)
+            .background(MaterialTheme.colorScheme.surface)
             .navigationBarsPadding()
     ) {
         // 状态区由共享 AppBar 内嵌承载，避免独立 30dp 占位造成切换跳变。
@@ -146,7 +146,7 @@ internal fun FavoriteLibraryScreen(context: android.content.Context, onBack: () 
         }
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.weight(1f).fillMaxWidth()
         ) { page ->
             FavoriteLibraryPage(
                 items = savedItems,

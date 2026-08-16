@@ -1,0 +1,768 @@
+/openapi/v1/accounts/{accountId}/automation-settings
+读取指定微信账号的自动化设置。
+
+/openapi/v1/accounts/{accountId}/automation-settings
+更新指定微信账号的自动化设置。
+
+/openapi/v1/accounts/{accountId}/automation-settings/lucky-money-groups
+读取自动抢红包可选群聊，只返回群 ID 和显示名。
+
+/openapi/v1/accounts/{accountId}/automation-settings/lucky-money-actions
+读取最近红包领取动作的脱敏状态。
+
+/openapi/v1/finder/history
+读取提及、用户页和评论历史的一次聚合快照。
+
+/openapi/v1/finder/history/export
+读取服务端已审计、已脱敏的 Finder 历史导出数据。
+
+/openapi/v1/group-invitations
+读取指定微信账号的入群邀请审批记录。
+
+/openapi/v1/location-environment-profiles
+读取当前租户可用的位置环境画像摘要。
+
+/openapi/v1/location-environment-profiles/{profileId}
+读取单个位置环境画像摘要。
+
+/openapi/v1/location-environment-profiles/{profileId}
+修改画像名称、城市和具体地点；采集载荷与坐标系保持不变。
+
+/openapi/v1/location-environment-profiles/{profileId}
+兼容删除按钮：保留历史并把画像软停用。
+
+/openapi/v1/location-environment-profiles/{profileId}/details
+读取单个位置环境画像的可编辑管理明细。
+
+/openapi/v1/location-environment-profiles/import
+兼容旧客户端：以 JSON Body 校验并导入采集文本。
+
+/openapi/v1/location-environment-profiles/upload
+上传原版 LocationSpoofer JSON 数组并持久化为画像。
+
+/openapi/v1/location-environment-profiles/{profileId}/replace
+替换既有画像的原始 LocationSpoofer 文件，并原子重建全部派生字段。
+
+/openapi/v1/location-environment-profiles/{profileId}/download
+下载未经转换的原始 JSON 数组，供 LocationSpoofer 直接导入。
+
+/openapi/v1/location-environment-profiles/{profileId}/enabled
+启用或停用一个位置环境画像。
+
+/openapi/v1/location-environment-profiles/{profileId}/permanent
+永久删除画像；与兼容 DELETE 软停用接口分离，避免旧客户端行为变化。
+
+/openapi/v1/call-recordings/{id}/access-token
+为通话录音签发短期播放 token。
+
+/openapi/v1/messages/{messageId}/media/access-token
+按稳定消息、媒体或扩展 ID 签发聊天媒体短期访问令牌。 请求不接收 URL、文件路径、CDN Key 或微信本地消息标识。
+
+/openapi/v1/devices/{deviceUuid}/screenshots/{taskId}/access-token
+按设备和截图任务号签发短期预览令牌。 调用方只提交稳定身份，不提交永久 URL、上传路径或物理路径。
+
+/openapi/v1/wechat-login/{sessionId}/qr-code/access-token
+按微信登录会话号签发二维码短期预览令牌。 令牌有效期不会超过二维码会话剩余有效期。
+
+/openapi/v1/me
+查看当前 API Key 或 JWT 对应的网站用户资料、角色和权限。
+
+/openapi/v1/devices/{deviceUuid}/configuration
+读取单台设备在服务端保存的配置目标态覆盖层。 需要敏感设备配置权限；host、port、fileUpUrl 只返回脱敏键名，不返回原值。
+
+/openapi/v1/runtime-config
+读取指定设备的服务端运行态期望值和 Android 最近实际快照。 期望值由设备覆盖层叠加全局默认值得到，不返回代理凭据、地址密码或其它内部配置。
+
+/openapi/v1/runtime-config
+以补丁语义修改运行态权限/能力配置，并定向推送到指定设备。 未提交的键继续继承设备覆盖层或全局默认值；写入统一进入设备 custom_configs 目标态。
+
+/openapi/v1/guide
+返回一页式 OpenAPI 对接指南。 面向程序员、Postman/Apifox 使用者和 AI 助手，优先说明最短闭环、鉴权、P0 顺序、语音/媒体和 taskId 回包查询。 详细字段仍以 Swagger JSON 为准。
+
+/openapi/v1/devices
+列出当前用户可访问的设备。
+
+/openapi/v1/wechat-accounts
+列出当前用户可访问的微信账号。
+
+/openapi/v1/quick-start
+OpenAPI 快速启动。 第三方系统首次接入时先调用本接口，服务端会按当前 API Key 对应的网站用户权限， 返回可访问设备/微信号预览、推荐 deviceUuid/weChatId、能力自检地址、顺序测试地址和第一条可复制 curl。
+
+/openapi/v1/capabilities
+查询 OpenAPI 当前设备/微信号的常用能力是否可测。 外部系统在调用加好友、标签、朋友圈、群管理、语音、文件、卡片等写接口前， 应先调用本接口确认“权限、资产、Settings 分项开关、Android 运行态快照”是否同时满足。
+
+/openapi/v1/test-plan
+生成 OpenAPI 顺序测试清单。 该接口复用 /openapi/v1/capabilities 的同一套权限、资产、Settings 和 Android 快照判断， 再按 P0/P1/资金风险顺序输出“现在该测什么、怎么测、卡在哪里”。
+
+/openapi/v1/tasks/{taskId}
+按 taskId 查询 Android 异步任务结果。 写接口返回 taskId 后，外部系统不需要依赖网页“最近任务结果”气泡，可轮询本接口获取最终回包。 结果以数据库为权威，并且只对原始 openApiKeyId/userId 归属可见。
+
+/openapi/v1/tasks/recent
+查询最近 Android 异步任务结果。 用于外部系统排查“已下发但业务最终失败/超时”的场景；结果按 receivedAt 倒序返回。
+
+/openapi/v1/devices/restart-wechat
+重启目标设备上的微信进程。 这是 PhoneAction.RestartWx 的 OpenAPI 薄封装；服务端先校验设备归属、重启微信权限和审计，再下发到 Android。
+
+/openapi/v1/devices/screenshot
+请求目标 Android 设备上传当前屏幕截图。 截图属于设备敏感画面；下发与后续预览分别复用现有截图权限和短期媒体 token 边界。
+
+/openapi/v1/phone/state
+请求目标 Android 设备上报手机状态。
+
+/openapi/v1/devices/forbidden-words
+下发目标设备的微信违禁词完整列表。 空数组表示清空；服务端先保存权威策略，再下发 Android。
+
+/openapi/v1/phone/sms/send
+通过目标 Android 设备发送手机短信。 号码和正文会进入现有敏感内容检查；日志、审计和任务摘要不保存明文。
+
+/openapi/v1/phone/sms/sync
+请求目标 Android 设备同步手机短信历史。
+
+/openapi/v1/phone/call-logs/sync
+请求目标 Android 设备同步手机通话记录。
+
+/openapi/v1/phone/sms
+读取已同步并按当前权限脱敏的手机短信记录。
+
+/openapi/v1/phone/call-logs
+读取已同步并按当前权限脱敏的手机通话记录。
+
+/openapi/v1/wechat-login/start
+发起微信网页登录/扫码登录。 该入口不要求设备已有在线微信号，但要求设备在线、用户有设备权限，并通过服务端统一登录环境预检。 useProxy/useLocationSpoof/useTabletSpoof 为 true/false 时会验证当前连接的新鲜启用/关闭终态；显式 null 表示保持现状并跳过该项检查。 旧调用方省略字段仍默认 true。Start 本身不应用代理、定位或平板画像；代理和定位都为 true 时还会验证同城。 trafficObserved 是微信启动后的遥测，不是首次 Start 前置条件。 预检失败时不会创建会话或触碰微信页面，调用方应展示 data.failureCode/failureCodes 后停止重试。
+
+/openapi/v1/wechat-login/{sessionId}/cancel
+取消微信网页登录/扫码登录会话。 取消前会复用服务层的设备归属、网页登录取消权限和 Android 通道校验。
+
+/openapi/v1/wechat-login/{sessionId}
+查询单个微信网页登录会话。 只允许查询当前 API Key 用户有权访问设备上的登录会话。
+
+/openapi/v1/wechat-login/active
+查询设备当前未终态微信网页登录会话。 用于外部系统轮询“是否已有二维码/是否已登录/是否失败”。
+
+/openapi/v1/messages/text
+发送普通文本消息。 这是 OpenAPI 第一条写链路：API Key 身份 -> 敏感词检查 -> 设备/微信资产范围 -> message.send 权限 -> Android TalkToFriendTask。
+
+/openapi/v1/messages/image
+发送图片消息。 图片属于基础聊天能力，OpenAPI 只做身份、资产、敏感内容和 message.send 权限校验，真正下发继续复用现有 TalkToFriendTask 图片链。
+
+/openapi/v1/media
+上传 OpenAPI 通用媒体文件。 用于图片、视频、普通文件、卡片缩略图、朋友圈素材和视频号素材。返回的 fileUrl 必须能被手机访问， 可直接传给发送图片/视频/文件、网页卡片 thumb、朋友圈 images/videos 或视频号 mediaUrls。 mediaType 推荐放在查询参数中；兼容 multipart 同名字段，两处同时提交必须一致，均省略时按 file 处理。
+
+/openapi/v1/media/voice/environment
+检查语音上传/转码运行环境。 该接口不写文件、不下发 Android，只确认 ffmpeg、ffprobe 与 AMR-NB 编码器是否可用。
+
+/openapi/v1/media/voice
+上传语音素材并统一转换为微信语音发送更稳的 AMR 文件，同时生成网页可播放 MP3 预览。 外部 AI 语音服务可上传 mp3/m4a/wav/aac/amr；服务端返回手机可访问的 voiceUrl 和网页可播放 previewUrl， 随后可直接传给 /openapi/v1/messages/voice 或 /openapi/v1/messages/batch-by-filter。
+
+/openapi/v1/messages/video
+发送视频消息。 外部系统传手机可访问 videoUrl，服务端按 TalkToFriendTask Video=4 下发。
+
+/openapi/v1/messages/voice
+发送语音消息。 外部 AI 语音服务可直接传手机可访问 voiceUrl；服务端会追加 duration 参数并按 type=3 下发。
+
+/openapi/v1/messages/file
+发送文件消息。 请求体会被归一为现有网页端同款 JSON：{ name, url }，协议 ContentType 使用 File=8。
+
+/openapi/v1/messages/emoji
+发送收藏表情。 md5 来自已同步/已收藏表情资源，服务端按 Emoji=14 下发。
+
+/openapi/v1/messages/quote
+发送引用消息。 quoteMsgSvrId 必须来自同一会话已同步消息，服务端按 QuoteMsg=22 下发。
+
+/openapi/v1/messages/{messageId}/revoke
+撤回一条自己发送的已同步消息。 路由参数是 SCRM 服务端 messageId，不是微信 MsgSvrId。服务端会解析消息归属、原会话和 MsgSvrId， 只允许撤回当前设备在线微信自己发送且尚未撤回的消息。
+
+/openapi/v1/messages/{messageId}/forward
+转发一条已同步消息到一个好友或群聊。 源消息由服务端 messageId 确定，调用方不需要也不能手填原会话和 MsgSvrId。
+
+/openapi/v1/messages/forward
+转发同一原会话中的多条已同步消息。 单次最多 50 条源消息、20 个目标会话。所有源消息必须属于当前设备在线微信并来自同一原会话， 所有目标必须是当前微信账号已同步的好友或群聊。
+
+/openapi/v1/messages/{messageId}/pull-original
+请求 Android 按已同步消息补回原始正文或 XML。 该接口不会在同步响应中返回原文；下发成功后等待 Android 异步回包落库，再通过有权限的聊天读取接口查看。
+
+/openapi/v1/messages/{messageId}/pull-detail
+请求 Android 按服务端消息 ID 补回微信笔记或媒体详情。 调用方不提交 talker、本地 MsgId、MsgSvrId、md5 或 CDN 参数；服务端从可信消息快照解析。
+
+/openapi/v1/messages/{messageId}/emoji-detail
+按服务端稳定消息 ID 拉取收藏表情详情并自动补图。 请求体只提交设备和微信账号；服务端从可信消息正文、媒体和扩展快照解析 MD5、MsgSvrId 与会话， 1273 返回后会自动衔接 CDN 下载并等待 1271 回填媒体。
+
+/openapi/v1/messages/{messageId}/media/download
+按服务端稳定消息和媒体记录 ID 请求 Android 下载微信 CDN 原文件。 调用方不提交 CDN URL、Key、FileId、MsgSvrId 或文件类型；这些字段只在服务端解析并下发。
+
+/openapi/v1/messages/sync/ids
+请求 Android 同步指定时间窗内的聊天 MsgSvrId 快照。
+
+/openapi/v1/messages/sync/history
+请求 Android 同步历史聊天消息。
+
+/openapi/v1/messages/sync/read-state
+请求 Android 同步指定会话的已读状态。
+
+/openapi/v1/messages/sync/unread-list
+请求 Android 同步当前微信账号的未读会话列表。
+
+/openapi/v1/messages/sync/conversation-unread
+请求 Android 同步指定会话的未读数。
+
+/openapi/v1/messages/clear-all
+清空目标微信客户端的本地聊天记录。 不会删除 SCRM 服务端已落库消息；调用方必须显式确认。
+
+/openapi/v1/messages/{messageId}/voice-trans-text
+请求 Android 对一条已同步语音消息执行微信语音转文字。 只接受 messageType=3 的未撤回语音消息，结果由异步任务回包和聊天记录更新提供。
+
+/openapi/v1/messages/card-templates
+生成三类聊天卡片的可复制模板。 该接口只生成网页卡片、公众号文章卡片和小程序卡片的 payload/curl，不下发 Android。 用于第三方程序员、AI 助手或网页用户先拿到“能照着填”的模板，减少手写 JSON 出错。
+
+/openapi/v1/messages/link-card
+发送网页/公众号文章卡片。 底层走 Link(type=6)，payload 与网页 IM 卡片面板保持一致。
+
+/openapi/v1/messages/official-article-card
+发送网页/公众号文章卡片。 底层走 Link(type=6)，payload 与网页 IM 卡片面板保持一致。
+
+/openapi/v1/messages/note-card
+发送微信笔记卡片。 底层走 Link(type=6)，AppMsg 内部使用 type=24；recordItem 有值时用于完整笔记详情。
+
+/openapi/v1/messages/weapp-card
+发送小程序卡片。 底层走 WeApp(type=13)，payload 与网页 IM 小程序卡片面板保持一致。
+
+/openapi/v1/messages/batch-by-filter
+按联系人筛选条件批量发送私聊消息。 面向外部 API 的“标签/画像分层 -> 批量私聊”场景；第一版开放 text、voice、link-card、official-article-card、note-card、weapp-card。 不支持群聊会话，避免一次请求误影响群内大量成员。
+
+/openapi/v1/messages/batch
+按明确会话列表批量发送聊天消息。 该接口不走微信原生群发助手；底层走 SmRun 私有 BatchChatMessageTask，由 Android 逐个拆成普通聊天。 第一版用于明确 wxid/chatroomId 的小范围批量聊天，支持 text、voice、link-card、official-article-card、note-card、weapp-card。
+
+/openapi/v1/mass-send/text
+通过微信原生群发助手发送文本。 该语义不同于 /messages/batch；好友目标走群发助手，群聊目标沿用现有群发服务链。
+
+/openapi/v1/mass-send/history/sync
+请求手机同步微信群发助手历史。 下发成功只表示同步任务已接受，历史需等待 Android 回包落库后再查询。
+
+/openapi/v1/mass-send/history/query
+读取当前 API Key 可访问微信账号的群发助手历史。 结果继续使用现有字段权限脱敏，不返回调用方无权查看的正文或真实 wxid。
+
+/openapi/v1/payments/lucky-money
+发送微信红包。 身份、资产、敏感词、权限、运行态配置和审计全部通过后才下发；支付密码只透传给现有设备下发服务，不落库不写日志。 必须提交 Idempotency-Key；相同业务请求重试复用原键，修改支付密码后使用新键。
+
+/openapi/v1/payments/remittance
+执行微信转账。 单聊转账只填 friendId；群内转账必须 friendId=收款群成员 wxid、roomId=群聊 chatroom id。 必须提交 Idempotency-Key；网络超时后先查询原 taskId，不得换键自动重发。
+
+/openapi/v1/payments/wallet-balance
+查询微信零钱。 OpenAPI 只要求 deviceUuid/weChatId；钱包结果由 Android 异步回包，不在接口中暴露额外账号敏感字段。
+
+/openapi/v1/payments/red-packets/detail-by-message
+按聊天消息查询红包详情。 外部系统只传 messageId；服务端权限通过后才从内部消息原文临时解析红包查询链接。
+
+/openapi/v1/payments/red-packets/status-by-message
+按聊天消息查询红包状态。 与详情查询共用同一套 messageId 安全入口，不向外部暴露 hbUrl/nativeUrl。
+
+/openapi/v1/payments/lucky-money/take-by-message
+按聊天消息领取红包。 外部系统只传 messageId；msgKey/nativeUrl 只在权限通过后临时解析并下发，不返回给网页或 OpenAPI 调用方。 必须提交 Idempotency-Key；同一红包的相同领取意图重试必须复用原键。
+
+/openapi/v1/payments/transfers/take-by-message
+按聊天消息收取或拒收转账。 外部系统只传 messageId；TransferId/交易号只在权限通过后临时解析并下发。 必须提交 Idempotency-Key；收取与拒收是不同业务意图，必须分别使用新键。
+
+/openapi/v1/wechat-tools/logout
+让目标设备上的当前微信账号退出登录。 该操作会改变手机微信登录状态，不会软删除 SCRM 账号或业务历史。
+
+/openapi/v1/wechat-tools/qrcode/personal
+拉取当前设备登录微信的个人二维码。 该接口只下发只读二维码任务，不执行加好友、入群或账号变更。
+
+/openapi/v1/wechat-tools/emoji-detail
+按当前微信已知收藏表情 MD5 拉取详情。 该工具入口不绑定聊天消息；按消息补图应优先使用稳定 messageId 接口。
+
+/openapi/v1/wechat-tools/a8key
+请求微信执行 GetA8Key。 原始 URL 只用于当前任务下发；审计不保存 URL、userName 或 MsgSvrId 明文。
+
+/openapi/v1/moments
+发布朋友圈。 OpenAPI 只负责外部身份、资产范围、敏感内容和朋友圈发布权限；最终下发继续复用 ServerDeviceCommandService.PostMomentAsync。
+
+/openapi/v1/moments/template
+组装朋友圈发布模板。 该接口不会下发 Android 任务，只把 OpenAPI 简化字段转换成现有 MomentPostRequestDto， 方便外部系统先预览 payload，再调用 /openapi/v1/moments 发布或保存成素材。
+
+/openapi/v1/moments/sync
+同步朋友圈时间线。 这是只读同步入口，OpenAPI 仍校验 API Key 身份、设备/微信资产和 moment.sync 权限。
+
+/openapi/v1/moments/messages/sync
+同步朋友圈互动消息中心。 该接口只下发只读同步任务，不会点赞、评论或删除。
+
+/openapi/v1/moments/friend/pull
+拉取指定好友的朋友圈。 推荐使用 contactId 安全寻址；真实 wxid 只在服务端解析后下发，不会反向写入响应。
+
+/openapi/v1/moments/detail
+拉取单条朋友圈详情。 用于外部系统在拿到 snsId 后补齐评论、点赞、大图等详情。
+
+/openapi/v1/moments/delete
+删除自己发布的朋友圈动态。 该操作具有破坏性，必须同时通过朋友圈归属、moment.delete、设备运行态和审计门禁。
+
+/openapi/v1/moments/like
+点赞或取消点赞朋友圈。 这是真实微信写动作，OpenAPI 只做薄封装，权限、Settings、频控仍由现有服务链处理。
+
+/openapi/v1/moments/sticky
+修改当前账号自己发布朋友圈的置顶状态。
+
+/openapi/v1/moments/visibility
+修改当前账号自己发布朋友圈的可见范围。
+
+/openapi/v1/moments/comments
+评论或回复朋友圈。 评论正文会经过敏感内容检查；底层继续复用现有朋友圈评论任务。
+
+/openapi/v1/moments/comments/delete
+删除朋友圈评论。 只允许删除微信已确认的评论 ID，避免把本地临时评论误传到底层任务。
+
+/openapi/v1/moments/interactions
+分页读取当前设备账号的朋友圈互动通知。 该接口只读取服务端持久化快照，不触发手机同步、已读或清理；返回字段按当前 API Key 权限脱敏。
+
+/openapi/v1/moments/interactions/unread-count
+读取当前设备账号的朋友圈互动未读数。
+
+/openapi/v1/moments/interactions/read
+按服务端互动通知 ID 标记微信朋友圈消息中心记录已读。 服务端反查真实 circleId/commentId，并使用原子 attempt 防止重复下发。
+
+/openapi/v1/moments/interactions/clear
+按服务端互动通知 ID 清理微信朋友圈消息中心记录。 只允许评论级安全清理；无真实评论 ID、圈级和全局范围请求都会被拒绝。
+
+/openapi/v1/finder/mentions
+拉取视频号提及/互动线索。 OpenAPI 只负责身份、资产和 FinderRead 权限，真实下发复用 SphGetMentionAsync。
+
+/openapi/v1/finder/user-page
+拉取视频号用户页；sphUserName 为空时刷新当前微信自己的视频号身份。
+
+/openapi/v1/finder/comments/list
+拉取视频号评论列表。
+
+/openapi/v1/finder/posts
+发布视频号。 当前只开放带媒体发布，避免空 medias 被误下发到 Android Finder 发布链。
+
+/openapi/v1/finder/posts/template
+组装视频号发布模板。 该接口不会下发 Android 任务，只把 OpenAPI 入参归一化并做权限、设备、敏感内容和媒体后缀预检， 方便外部系统先确认 payload，再调用 /openapi/v1/finder/posts 真正发布。
+
+/openapi/v1/finder/comments
+评论视频号。
+
+/openapi/v1/finder/likes
+视频号点赞或取消点赞。 手机必须先打开目标作品，让 Android 捕获同微信号、同 Feed 的短时页面上下文；结果未知时先刷新作品状态，不要自动重试。
+
+/openapi/v1/finder/favorites
+喜欢或取消喜欢手机当前打开的视频号作品。
+
+/openapi/v1/finder/follows
+关注或取消关注手机当前打开视频号作品的作者。
+
+/openapi/v1/finder/watches
+累计当前视频号作品的本地真实播放时长。 手机必须先打开目标普通作品；成功结果为 watched_local，不代表微信服务端已对指定 Feed 单独计数。
+
+/openapi/v1/finder/playback
+读取、播放、暂停或切换手机当前视频号普通作品。 手机必须先打开同微信号、同 Feed 的作品；返回的是 Android 本地播放器状态，不代表微信服务端观看计数。
+
+/openapi/v1/finder/downloads
+导出手机当前普通视频号作品的完整缓存。 视频正文只写入手机系统视频库；SCRM 只返回文件名、长度、SHA-256、容器和编码摘要。
+
+/openapi/v1/finder/navigation
+进入视频号首页，或在微信原生搜索页提交关键词。 微信 8.0.69 支持首页和搜索；微信 8.0.76/3141 当前只开放首页。结果未知时调用方不得自动重试。
+
+/openapi/v1/finder/comments/delete
+删除当前微信账号自己发布的视频号评论。 手机必须停留在视频号页面；结果未知时先刷新评论状态，不要自动重试。
+
+/openapi/v1/moments/materials
+查询 OpenAPI 当前用户创建的朋友圈素材列表。 只返回摘要和 hash，不返回正文、评论原文或附件 URL；素材创建人必须与当前 API Key 映射用户一致。
+
+/openapi/v1/moments/materials
+创建朋友圈素材。 外部系统可用本接口沉淀图文、网页、公众号文章或小程序朋友圈模板，再创建自动批量计划。
+
+/openapi/v1/moments/materials/{materialId}
+查询单个朋友圈素材摘要。
+
+/openapi/v1/moments/materials/{materialId}
+更新朋友圈素材。 更新只影响后续新建计划，已创建计划仍使用创建时的素材版本快照。
+
+/openapi/v1/moments/materials/{materialId}/detail
+查询单个朋友圈素材详情。 详情包含可编辑模板原文，只允许素材创建人读取。
+
+/openapi/v1/moments/materials/{materialId}/copy
+复制朋友圈素材。
+
+/openapi/v1/moments/materials/{materialId}/archive
+归档朋友圈素材。 归档后不能再创建新计划，但不会影响已经创建的计划和素材版本快照。
+
+/openapi/v1/moments/batch/render-preview
+创建朋友圈批量计划渲染预览。 只读预览，不创建计划、不落库、不下发 Android 任务；用于外部系统拿到 previewSignature 后再创建计划。
+
+/openapi/v1/moments/batch/plans
+创建朋友圈批量/定时计划。 只创建 SCRM 计划和计划项；真正下发仍由调度器逐条走 MomentPostDispatchService 的账号、权限、敏感词和频控边界。
+
+/openapi/v1/moments/batch/plans
+查询朋友圈批量计划列表。 返回计划摘要和状态统计，不返回素材正文、评论原文或附件 URL。
+
+/openapi/v1/moments/batch/plans/{planId}
+查询单个朋友圈批量计划和计划项状态。
+
+/openapi/v1/moments/batch/plans/{planId}/pause
+暂停朋友圈批量计划。
+
+/openapi/v1/moments/batch/plans/{planId}/resume
+恢复朋友圈批量计划。
+
+/openapi/v1/moments/batch/plans/{planId}/cancel
+取消朋友圈批量计划。
+
+/openapi/v1/moments/batch/plans/{planId}/items/{itemId}/retry
+重试单个朋友圈批量计划项。 只允许服务端判定为可重试的失败项；调用方不要对结果未知项自动重试。
+
+/openapi/v1/moments/batch/plans/{planId}/items/{itemId}/manual-confirm-not-published
+人工确认结果未知的计划项未在手机端发布，然后重新排队。 必须先在手机微信中人工核验，且必须填写原因；该入口不会立即下发发圈任务。
+
+/openapi/v1/moments/batch/plans/{planId}/items/{itemId}/manual-confirm-published
+人工确认计划项已在手机端发布，并绑定真实 CircleId。 该入口不会直接确认自动评论；有自动评论时仍需同步朋友圈互动结果。
+
+/openapi/v1/moments/batch/plans/{planId}/items/{itemId}/trigger-now
+将待执行计划项调整为立即触发，等待调度器下一轮领取。
+
+/openapi/v1/moments/batch/plans/{planId}/sync-moments
+为计划中等待校准的项目触发朋友圈本体同步。
+
+/openapi/v1/moments/batch/plans/{planId}/sync-comments
+为计划中等待校准的项目触发朋友圈互动消息同步。
+
+/openapi/v1/moments/batch/plans/{planId}/sync-pending
+按朋友圈本体、互动消息顺序触发一轮待确认项同步。
+
+/openapi/v1/moments/batch/plans/{planId}/items/{itemId}/pull-detail
+按计划项稳定 ID 拉取对应朋友圈详情。
+
+/openapi/v1/contact-labels
+读取当前 API Key 可访问微信账号的联系人标签字典。 这是只读接口，只读取 ContactTags 快照；如需让手机重新同步，请调用 sync 接口。
+
+/openapi/v1/contact-labels
+创建或重命名联系人标签，也可通过 addList/delList 调整标签成员。
+
+/openapi/v1/contact-labels/sync
+请求手机端同步联系人标签字典。 该接口只下发同步任务，实际标签列表由 Android 后续 ContactLabelInfoNotice 回写。
+
+/openapi/v1/contact-labels/{labelId}
+删除联系人标签。
+
+/openapi/v1/contacts/labels
+设置单个好友的完整标签 ID 集合。 该接口是替换语义：传入的 labelIds 会成为该好友的新完整标签集合。
+
+/openapi/v1/contacts/labels/batch
+批量给好友设置标签。 默认 mergeExisting=true：服务端先读取每个好友当前标签，再合并本次标签后逐个下发，避免批量打来源标签时覆盖 VIP、等级等已有标签。 mergeExisting=false 表示替换为传入标签集合，适合确实要重置完整标签集合的场景。
+
+/openapi/v1/contacts/labels/batch-by-filter
+按联系人筛选条件批量给好友设置标签。 适合外部系统直接按来源渠道、客户等级、画像 Key 或已有标签做人群分层， 不必先调用 /contacts/wxids 再把 wxid 数组回传给服务端。
+
+/openapi/v1/contacts/page
+按 offset 分页读取联系人管理列表。 `weChatId` 为空时读取当前身份可访问的全部微信账号；`blockedOnly=true` 时只读取我侧黑名单 tombstone。 返回值适合虚拟列表按稳定主键翻页，敏感字段仍按当前身份权限裁剪。
+
+/openapi/v1/contacts
+分页读取联系人/好友 wxid 列表。 只返回 OpenAPI 业务所需的路由字段、标签和展示摘要，不返回手机号、邮箱、签名、描述等敏感资料。
+
+/openapi/v1/contacts/wxids
+直接读取好友 wxid 数组。 筛选参数与 GET /contacts 保持一致，适合外部系统拿到 wxid 后批量打标签、拉群或发送消息。
+
+/openapi/v1/contacts/{contactId}/detail
+读取单个联系人资料页聚合详情。 只读 SCRM 已落库快照：联系人摘要、客户画像、标签、共同群聊和关系审计； 不下发 Android 任务，不刷新微信资料，不修改微信好友资料。
+
+/openapi/v1/contacts/{contactId}/customer-profile
+读取单个联系人客户画像。 只读取 SCRM 自有画像表，不读取、不修改微信好友资料。
+
+/openapi/v1/contacts/{contactId}/customer-profile
+保存单个联系人客户画像。 只写 SCRM 自有数据库；不会下发 Android 任务，也不会修改微信好友资料。
+
+/openapi/v1/contacts/customer-profile-drafts
+保存加好友前置客户画像草稿。 不下发微信任务；如果目标已能匹配到联系人，会立即应用到联系人客户画像。
+
+/openapi/v1/enterprise/users/sync
+请求 Android 同步企微用户列表。 结果由 QwUserPUshNotice 异步上报并按当前微信账号归属落库。
+
+/openapi/v1/enterprise/business-contacts/sync
+请求 Android 同步企业/业务联系人列表。 结果由 BizContactPushNotice 异步上报并按当前微信账号归属落库。
+
+/openapi/v1/enterprise/conversations/sync
+请求 Android 同步企微会话列表。 结果由 QwConversPushNotice 分页异步上报并按当前微信账号归属落库。
+
+/openapi/v1/contacts/sync
+请求手机端同步好友列表。 该接口只下发同步任务，实际联系人快照由 Android 后续回写。
+
+/openapi/v1/friends/detection/start
+启动好友检测或清粉任务。 网页固定使用 onlyCheck=true；第三方使用删除模式时必须显式确认并具备删除好友权限。
+
+/openapi/v1/friends/detection/stop
+停止指定 taskId 的好友检测任务。
+
+/openapi/v1/friends/detection/result-sync
+请求 Android 回传好友检测最终结果并写入检测历史。
+
+/openapi/v1/friends/detection/logs
+分页读取已落库的好友检测历史。 只返回解析后的结构化摘要；真实微信标识继续按当前用户权限脱敏。
+
+/openapi/v1/friends
+按场景添加好友。 复用现有 AddFriendWithSceneAsync；VerifyImageUrl 是 SmRun 私有扩展，Android 下载后映射到 62306 本地广播 tK106.prM22。
+
+/openapi/v1/friends/permission-intents/{intentId}
+查询好友通过后权限自动校准意图。 Unknown 表示手机端可能已执行，调用方必须人工校准，禁止自动重发。
+
+/openapi/v1/friends/permission-intents/{intentId}
+取消尚未执行的好友权限自动校准意图。 操作幂等；Preparing/Pending 会转为 Cancelled，其它状态原样返回。
+
+/openapi/v1/friends/find
+搜索微信联系人。 这是加好友前置入口，不直接改变好友关系；仍要求 API Key 用户具备主动加好友权限，避免外部系统绕过网页权限扫描联系人。
+
+/openapi/v1/friends/in-chatroom
+从群成员添加好友。 先校验当前微信拥有该群，并确认目标成员来自该群最近成员快照，再下发 AddFriendInChatRoomTask。
+
+/openapi/v1/friends/by-phone
+按手机号添加好友。 服务端会把 phones 归一化去重后交给现有逐条下发链路；手机号原文不会写入审计日志。
+
+/openapi/v1/friends/from-phonebook
+从手机通讯录添加好友。 count/index/reset 只控制 Android 通讯录扫描窗口，真实下发仍由好友真实变更门禁和频控兜底。
+
+/openapi/v1/friends/name-card
+通过名片消息添加好友。 msgSvrId 必须属于当前微信账号已同步到 SCRM 的个人名片消息，避免跨账号或错会话下发。
+
+/openapi/v1/friends/verify
+重新发送好友验证。 用于已知目标 wxid 的再次验证；如果目标已经是好友，请改用普通聊天或好友资料入口。
+
+/openapi/v1/friend-requests
+读取已同步到服务端的好友申请列表。 这里只读 FriendRequests 表；如果列表为空或不新，请先调用 friend-requests/pull 让手机端重新拉取。
+
+/openapi/v1/friend-requests/pull
+请求手机端拉取好友申请历史。 该接口只下发 PullFriendAddReqListTask，最终列表需要等待 Android 回包后再读 friend-requests。
+
+/openapi/v1/friend-requests/handle
+通过或拒绝好友申请。 处理动作会真实改变微信好友关系，因此必须走好友真实变更门禁、权限、敏感词和审计。
+
+/openapi/v1/friends/{friendId}
+删除好友。
+
+/openapi/v1/friends/permissions
+设置好友朋友圈权限。 用于外部系统按客户来源、客户等级等策略调整“仅聊天 / 不看他朋友圈 / 不让他看我朋友圈”。
+
+/openapi/v1/contacts/{contactId}/friend
+按联系人稳定 ID 删除好友。 friendId 仅用于可选一致性校验；网页 wxid 已脱敏时只提交 contactId。
+
+/openapi/v1/friends/refresh-info
+刷新单个好友资料。 只下发查询任务；Android 回包落库后，再读取联系人详情或联系人列表。
+
+/openapi/v1/friends/permissions/batch
+批量设置好友朋友圈权限。 适合外部系统已经拿到一组好友 wxid 后，统一设置“普通 / 不看他 / 不让他看我 / 仅聊天”。 每个好友仍逐个下发 Android 任务，调用方应按 items[].taskResultUrl 查询最终回包。
+
+/openapi/v1/friends/permissions/batch-by-filter
+按联系人筛选条件批量设置好友朋友圈权限。 适合按微信标签、SCRM 客户等级、来源渠道或画像 Key 批量调整朋友圈可见关系， 例如把某个来源的人群设置为“不让他看我朋友圈”，再用朋友圈标签可见发布专属报价。
+
+/openapi/v1/friends/profile
+修改好友备注、描述和电话。 这是微信联系人真实资料变更，继续走好友真实变更门禁、敏感词和频控。
+
+/openapi/v1/chatrooms
+分页读取当前微信账号的群列表。 只读读取 Groups 快照；如需手机重新同步，请调用 chatrooms/sync。
+
+/openapi/v1/chatrooms
+创建新群。 复用现有 ChatRoomActionTask action=8，并继续走群真实变更权限、设备安全态和频控。
+
+/openapi/v1/chatrooms/{chatRoomId}/members
+分页读取指定群聊的成员列表。 只读读取 GroupMembers 快照；成员为空或昵称异常时，请先调用 chatrooms/refresh。
+
+/openapi/v1/contacts/{friendId}/common-chatrooms
+分页读取指定好友与当前微信账号的共同群聊。 共同群聊是 SCRM 从 Groups + GroupMembers 快照派生出来的只读结果，不是 62306 联系人 proto 字段。 若结果为空，请先调用 chatrooms/sync 或 chatrooms/refresh 让手机端回写最新群成员快照。
+
+/openapi/v1/chatrooms/sync
+请求手机端同步群列表。 该接口只下发同步任务，群列表和成员最终由 Android 群资料通知回写。
+
+/openapi/v1/chatrooms/refresh
+请求手机端刷新单个群资料和群成员。
+
+/openapi/v1/chatrooms/members/invite
+邀请成员进群。 复用现有 ChatRoomActionTask action=2，并继续走群真实变更权限、设备安全态和频控。
+
+/openapi/v1/chatrooms/members/invite-by-filter
+按联系人筛选条件邀请好友进群。 用于“标签/画像分层 -> 拉入指定群”的 OpenAPI 场景；只增加筛选入口， 底层仍复用 ChatRoomActionTask action=2 和群真实变更门禁。
+
+/openapi/v1/chatrooms/members/kick
+从群聊踢出成员。 复用现有 ChatRoomActionTask action=3，并继续走群真实变更权限、设备安全态和频控。
+
+/openapi/v1/chatrooms/members/kick-by-filter
+按联系人筛选条件从群聊踢出成员。 用于“标签/画像分层 -> 从指定群移除”的 OpenAPI 场景；只增加筛选入口， 底层仍复用 ChatRoomActionTask action=3 和群真实变更门禁。
+
+/openapi/v1/chatrooms/by-filter
+按联系人筛选条件创建新群。 用于“标签/画像分层 -> 自动建群”的 OpenAPI 场景；只增加筛选入口， 底层仍复用 ChatRoomActionTask action=8 和群真实变更门禁。
+
+/openapi/v1/chatrooms/rename
+修改群名称。 复用现有 ChatRoomActionTask action=0。
+
+/openapi/v1/chatrooms/notice
+修改群公告。 复用现有 ChatRoomActionTask action=1；notice 允许为空，用于清空群公告。
+
+/openapi/v1/chatrooms/self-display-name
+修改当前微信账号在指定群内的昵称。
+
+/openapi/v1/chatrooms/save-to-phonebook
+保存群聊到微信通讯录或取消保存。
+
+/openapi/v1/chatrooms/new-message-notify
+开启或关闭指定群的新消息通知。
+
+/openapi/v1/chatrooms/remark
+设置或清空群备注。
+
+/openapi/v1/chatrooms/top
+置顶群聊或取消置顶。
+
+/openapi/v1/chatrooms/verify
+开启或关闭入群验证。
+
+/openapi/v1/chatrooms/transfer-owner
+转让群主给当前群内的一个成员。
+
+/openapi/v1/chatrooms/managers/add
+添加群管理员。
+
+/openapi/v1/chatrooms/managers/remove
+移除群管理员。
+
+/openapi/v1/chatrooms/exit
+退出群聊。 复用现有 ChatRoomActionTask action=7。
+
+/openapi/v1/chatrooms/qrcode
+拉取群二维码。 成功结果可能携带二维码链接；该能力走微信二维码拉取独立权限。
+
+/openapi/v1/chatrooms/join-by-qr
+通过群二维码入群。 复用现有 JoinGroupByQrTask，并走 group.join_by_qr 独立权限。
+
+/openapi/v1/chatrooms/invites/pull
+请求手机刷新入群邀请审批列表。 同步返回只表示命令是否写入连接；列表最终由 Android 通知回写，再读取 /group-invitations。
+
+/openapi/v1/chatrooms/invites/agree
+同意自己入群邀请。 对应 62306 AgreeJoinChatRoomTask(1229)，必须由调用方提供邀请消息中的 talker、msgSvrId 和原始内容。
+
+/openapi/v1/chatrooms/invites/approve
+审批他人入群邀请。 对应 62306 ChatRoomInviteApproveTask(1221)，与“同意自己入群”的 AgreeJoinChatRoomTask 不是同一条协议。
+
+/openapi/v1/chatrooms/jielong
+在指定微信群发送或续接群接龙。
+
+/openapi/v1/messages/changes
+按账号内数据库提交序列读取聊天变化。 首次传 afterSequence=0；连续翻页时固定复用首个响应的 headSequence 作为 untilSequence。
+
+/openapi/v1/chat/bootstrap
+读取账号最近会话和查询前取得的可靠增量水位。 客户端必须先提交本响应，再从 baselineSequence 接续 HTTP Cursor/WSS。
+
+/openapi/v1/chat/history
+按会话读取有限历史；聊天实时恢复只加载当前需要的窗口。
+
+/openapi/v1/devices/{deviceUuid}/delete
+删除 SCRM 设备记录，并在设备在线时先通知 Android 主动断开。 PostDeleteDeviceNotice(1097) 没有任务回执；通知失败不阻止删除离线设备记录。
+
+/openapi/v1/devices/{deviceUuid}/app-upgrade
+向在线 Android 设备下发服务端已验证的 SmRun 发布物。 响应携带 taskId；客户端通过任务结果接口读取下载、安装和 Hook 刷新阶段。 同一设备已有未终结升级时返回 HTTP 409；仅同一 owner 返回可查询 taskId，跨 owner 不公开任务号。
+
+/openapi/v1/devices/{deviceUuid}/app-upgrade/{taskId}/reconcile-not-installed
+管理员核对设备后，关闭 unknown 安装任务或超过等待窗口的旧处理任务。 两个决定必须二选一；该动作只关闭原任务，不自动重试安装。
+
+/openapi/v1/devices/{deviceUuid}/app-upgrade/latest
+管理员读取设备最近一次 SmRun 升级任务的 durable 安全摘要。
+
+/openapi/v1/devices/app-upgrades/latest
+管理员一次读取全部已归属设备的最近 SmRun 升级安全摘要。 用于页面首次进入、主动刷新和明确 resync，不作为固定间隔轮询接口。
+
+/openapi/v1/devices/{deviceUuid}/phone-actions
+执行白名单内的手机管理动作。 网页登录点击、输入、截图和滑动必须走登录会话专用接口，不在本入口开放。
+
+/openapi/v1/devices/{deviceUuid}/wechat-accounts/refresh
+请求在线 Android 回传当前微信账号快照。 该入口不要求预先提交 weChatId；3050 正是用于发现或校准设备当前账号，最终数据以后续 3051 回包为准。
+
+/openapi/v1/moments/timeline
+游标分页读取当前设备账号已持久化的朋友圈时间线。
+
+/openapi/v1/finder/results
+读取 Finder 提及、用户页和评论列表的已持久化结果。
+
+/openapi/v1/moments/{snsId}/copy-finder-material
+从服务端已同步的朋友圈原始记录创建视频号动态或直播素材草稿。 请求不接收原始 XML/JSON；服务端按设备、微信账号和 snsId 读取原始记录。
+
+/openapi/v1/devices/{deviceUuid}/configuration/apply
+保存并向授权 Android 设备下发一批完整设备配置。 设备离线时仍持久化目标态，并在下次 HTTP 登录或 TCP 重连时自动重放；平板伪装和位置配置必须按完整批次提交。
+
+/openapi/v1/devices/{deviceUuid}/wechat-login-environment/configuration
+把网页登录所选定位与折叠机画像合并为一个 SetConfigTask。 Android 可据此只重启一次微信，并在新进程同时验收定位和设备画像。
+
+/openapi/v1/devices/{deviceUuid}/runtime-config/refresh
+请求授权 Android 设备重新上报一次脱敏运行配置快照。 底层诊断号不进入通用任务结果缓存；调用方应轮询 snapshot，并比较 receivedAt 是否越过 baseline。
+
+/openapi/v1/devices/{deviceUuid}/runtime-config/snapshot
+读取授权设备最近一次上报的脱敏运行配置快照。 字符串值仍受快照服务白名单约束，不返回主机、上传地址、代理凭据或底层配置。
+
+/openapi/v1/devices/{deviceUuid}/proxy/profiles
+列出当前 API Key 可用于授权设备的脱敏代理档案。
+
+/openapi/v1/devices/{deviceUuid}/proxy/status
+读取授权设备的最近代理状态。
+
+/openapi/v1/devices/{deviceUuid}/proxy/apply
+把已有代理档案应用到授权设备。
+
+/openapi/v1/devices/{deviceUuid}/proxy/stop
+停止授权设备的微信代理，并禁止断线后自动恢复。
+
+/openapi/v1/devices/{deviceUuid}/location-spoof
+对授权设备启用、切换或关闭微信虚拟定位。
+
+/openapi/v1/devices/{deviceUuid}/location-spoof
+读取授权设备最后上报的虚拟定位配置、镜像诊断和微信进程双阶段回执。
+
+/openapi/v1/devices/{deviceUuid}/location-environment-profile
+把服务端保存的 LocationSpoofer 画像应用到授权设备。 网页只提交画像 ID；压缩分片由服务端生成，环境明细不会返回浏览器。
+
+/openapi/v1/devices/{deviceUuid}/location-query
+请求微信返回一次当前位置，结果通过任务结果接口异步读取。
+
+/openapi/v1/devices/{deviceUuid}/poi-query
+请求微信查询指定坐标附近的 POI，结果通过任务结果接口异步读取。 scene 只允许产品内固定场景，避免调用方通过随机场景绕过同坐标查询冷却。
+
+/openapi/v1/realtime/info
+读取单连接实时 WSS 的接入路径、capability、控制帧和可靠恢复规则。
+
+/openapi/v1/realtime/token
+使用长期 API Key 或网页登录 JWT 换取仅用于实时 WSS 握手的短期 JWT。
+
+/openapi/v1/wechat-accounts/{wxid}/soft-delete
+软删除 SCRM 微信账号记录。 该操作不等于手机微信退出登录，也不会删除聊天、朋友圈或支付历史。
+
+/openapi/v1/proxy/profiles
+获取不含配置原文和密文的配置列表。
+
+/openapi/v1/proxy/profiles
+新增或修改代理配置。
+
+/openapi/v1/proxy/profiles/{profileId}
+删除未被设备绑定的代理配置。
+
+/openapi/v1/proxy/assignments
+读取设备绑定和最近脱敏状态。
+
+/openapi/v1/proxy/apply
+把配置绑定并下发到指定设备。
+
+/openapi/v1/proxy/stop
+关闭指定设备代理并禁止重连恢复。
+
+/openapi/v1/audits/sensitive-media-access
+分页查询敏感媒体访问审计。
+
+/openapi/v1/wechat-login/{sessionId}/ui-control
+对正在登录的微信界面执行辅助 UI 操作。 用于网页侧完成“刷新截图、点登录、选择作为平板使用、拼图拖动和语义确认”等最小闭环。
+
+/openapi/v1/wechat-login/{sessionId}/credential-capability
+为当前微信登录字段签发一次性页面许可。
+
+/openapi/v1/wechat-login/{sessionId}/credential
+向当前微信手机号登录页提交一次性语义凭据。 该入口不复用通用 UiText；Android 必须再次核对当前登录运行时、Activity 和目标字段。 当会话模式为 `sms_code` 且字段为 `phone` 时，服务端只接受中国大陆 11 位手机号；可携带空格、短横线、括号、`+86` 或 `0086`，下发前会统一规范化。
+
+/openapi/v1/wechat-login/device-ui-control
+对指定设备执行网页登录辅助 UI 操作。 这个入口不要求已有登录会话，只用于登录前先重启微信或刷新截图；登录流程仍建议先创建会话再继续点击/输入。
+
+/openapi/v1/wechat-login/{sessionId}/sms-instruction
+读取当前登录 challenge 的短期短信发送指令。
+
+/openapi/v1/wechat-login/protection
+查询指定设备当前网页登录保护窗口。
+

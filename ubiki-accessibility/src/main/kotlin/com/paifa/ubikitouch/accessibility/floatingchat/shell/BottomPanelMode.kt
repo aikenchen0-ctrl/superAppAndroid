@@ -25,6 +25,9 @@ internal enum class BottomPanelMode {
     ContactRelations,
     LeftSidebar,
     FriendManagement,
+    FavoriteLibrary,
+    FinderPublish,
+    MaterialLibrary,
     OpenApiWorkbench,
     BackgroundRemoval,
     MiniProgram,
@@ -36,6 +39,7 @@ internal enum class BottomPanelMode {
     Gift,
     QuickPhrase,
     Card,
+    GroupInfo,
     GroupInvite,
     Relay,
     SideEffect,
@@ -57,39 +61,18 @@ internal enum class BottomPanelMode {
     More
 }
 
-internal fun BottomPanelMode.isCenteredToolFeaturePanel(): Boolean {
-    return this == BottomPanelMode.Assistant ||
-        this == BottomPanelMode.AiVoice ||
-        this == BottomPanelMode.VoiceCall ||
-        this == BottomPanelMode.VideoCall ||
-        this == BottomPanelMode.Contacts ||
-        this == BottomPanelMode.AccountDevice ||
-        this == BottomPanelMode.CustomerProfile ||
-        this == BottomPanelMode.HiddenUsers ||
-        this == BottomPanelMode.SendName ||
-        this == BottomPanelMode.VideoShort ||
-        this == BottomPanelMode.ChannelsVideo ||
-        this == BottomPanelMode.ChannelsLive ||
-        this == BottomPanelMode.WebLink ||
-        this == BottomPanelMode.Article ||
-        this == BottomPanelMode.Music ||
-        this == BottomPanelMode.Voice ||
-        this == BottomPanelMode.Gallery ||
-        this == BottomPanelMode.QuickPhrase ||
-        this == BottomPanelMode.Card ||
-        this == BottomPanelMode.GroupInvite ||
-        this == BottomPanelMode.Moments ||
-        this == BottomPanelMode.Finder ||
-        this == BottomPanelMode.MomentMaterials ||
-        this == BottomPanelMode.Favorite ||
-        this == BottomPanelMode.FileDocument ||
-        this == BottomPanelMode.SplitBill ||
-        this == BottomPanelMode.Location ||
-        this == BottomPanelMode.ScrmEmoji ||
-        this == BottomPanelMode.ScrmWeAppCard ||
-        this == BottomPanelMode.ScrmCardTemplates ||
-        this == BottomPanelMode.ScrmBatchSend ||
-        this == BottomPanelMode.ScrmOperations
+/**
+ * 右侧功能与工具栏入口统一复用聊天根的全屏工作区，避免以独立 Window 打开时出现 BadTokenException。
+ * 测试流程：打开任意功能入口，确认 surface 根覆盖完整悬浮区域；只有表情和更多保留为输入区小面板。
+ */
+internal fun BottomPanelMode.isFullscreenWorkspace(): Boolean {
+    return when (this) {
+        BottomPanelMode.None,
+        BottomPanelMode.Home,
+        BottomPanelMode.Emoji,
+        BottomPanelMode.More -> false
+        else -> true
+    }
 }
 
 internal fun BottomPanelMode.isBottomComposerDrawer(): Boolean {

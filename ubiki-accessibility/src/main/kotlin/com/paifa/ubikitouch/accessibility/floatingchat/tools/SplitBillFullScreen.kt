@@ -1,9 +1,5 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.tools
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutLinearInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -36,9 +32,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -46,8 +40,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -55,12 +47,10 @@ import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorksp
 import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
 
 private const val DefaultSplitBillAmount = "320.00"
-private const val SplitBillAnimationDurationMillis = 240
 
 /** SCRM 群成员与账号使用不同 ID 命名空间，需同时比较记录中的原始微信号。 */
 internal fun splitBillMemberIsCurrentAccount(
@@ -101,73 +91,18 @@ internal fun SplitBillFullScreen(
 ) {
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { 2 })
-    var pageHeightPx by remember { mutableFloatStateOf(0f) }
-    val pageTranslationY = remember { Animatable(0f) }
-    val pageAlpha = remember { Animatable(0f) }
-    var entered by remember { mutableStateOf(false) }
-    var exiting by remember { mutableStateOf(false) }
     var amount by remember { mutableStateOf("") }
     var selectedMemberIds by remember(members) {
         mutableStateOf<Set<String>>(members.mapTo(linkedSetOf()) { it.id })
     }
     var validationMessage by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(pageHeightPx) {
-        if (pageHeightPx > 0f && !entered) {
-            pageTranslationY.snapTo(pageHeightPx * splitBillEnterOffsetDirection())
-            pageAlpha.snapTo(0f)
-            coroutineScope {
-                launch {
-                    pageTranslationY.animateTo(
-                        0f,
-                        tween(
-                            durationMillis = SplitBillAnimationDurationMillis,
-                            easing = LinearOutSlowInEasing
-                        )
-                    )
-                }
-                launch {
-                    pageAlpha.animateTo(
-                        1f,
-                        tween(
-                            durationMillis = SplitBillAnimationDurationMillis,
-                            easing = LinearOutSlowInEasing
-                        )
-                    )
-                }
-            }
-            entered = true
-        }
-    }
+    var isClosing by remember { mutableStateOf(false) }
 
-    fun closeWithExitAnimation() {
-        if (exiting) return
-        exiting = true
-        scope.launch {
-            coroutineScope {
-                if (pageHeightPx > 0f) {
-                    launch {
-                        pageTranslationY.animateTo(
-                            pageHeightPx * splitBillExitOffsetDirection(),
-                            tween(
-                                durationMillis = SplitBillAnimationDurationMillis,
-                                easing = FastOutLinearInEasing
-                            )
-                        )
-                    }
-                }
-                launch {
-                    pageAlpha.animateTo(
-                        0f,
-                        tween(
-                            durationMillis = SplitBillAnimationDurationMillis,
-                            easing = FastOutLinearInEasing
-                        )
-                    )
-                }
-            }
-            onBack()
-        }
+    fun close() {
+        if (isClosing) return
+        isClosing = true
+        onBack()
     }
 
     fun submitSplitBill() {
@@ -187,22 +122,17 @@ internal fun SplitBillFullScreen(
             return
         }
         onSubmit(finalAmount, selectedMembers)
-        closeWithExitAnimation()
+        close()
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Transparent)
-            .onSizeChanged { pageHeightPx = it.height.toFloat() }
-            .graphicsLayer {
-                translationY = pageTranslationY.value
-                this.alpha = pageAlpha.value
-            }
+            .background(MaterialTheme.colorScheme.surface)
     ) {
         FloatingWorkspaceTopAppBar(
             title = "AA收款",
-            onBack = ::closeWithExitAnimation
+            onBack = ::close
         )
         PrimaryTabRow(
             selectedTabIndex = pagerState.currentPage,
@@ -216,7 +146,7 @@ internal fun SplitBillFullScreen(
                 )
             }
         }
-        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) { page ->
             if (page == 0) {
                 SplitBillComposePage(
                     isGroupConversation = isGroupConversation,

@@ -101,12 +101,28 @@ internal interface ScrmTaskApi {
 }
 
 internal interface ScrmPaymentApi {
-    fun sendLuckyMoney(request: ScrmSendLuckyMoneyRequest, idempotencyKey: String): ScrmTaskSubmissionResult
-    fun takeLuckyMoney(request: ScrmTakeLuckyMoneyByMessageRequest, idempotencyKey: String): ScrmTaskSubmissionResult
+    fun sendLuckyMoney(
+        request: ScrmSendLuckyMoneyRequest,
+        idempotencyKey: String
+    ): ScrmTaskSubmissionResult
+
+    fun takeLuckyMoney(
+        request: ScrmTakeLuckyMoneyByMessageRequest,
+        idempotencyKey: String
+    ): ScrmTaskSubmissionResult
+
     fun getRedPacketDetail(request: ScrmRedPacketQueryByMessageRequest): ScrmTaskSubmissionResult
     fun getRedPacketStatus(request: ScrmRedPacketQueryByMessageRequest): ScrmTaskSubmissionResult
-    fun sendRemittance(request: ScrmSendRemittanceRequest, idempotencyKey: String): ScrmTaskSubmissionResult
-    fun takeTransfer(request: ScrmTakeTransferByMessageRequest, idempotencyKey: String): ScrmTaskSubmissionResult
+    fun sendRemittance(
+        request: ScrmSendRemittanceRequest,
+        idempotencyKey: String
+    ): ScrmTaskSubmissionResult
+
+    fun takeTransfer(
+        request: ScrmTakeTransferByMessageRequest,
+        idempotencyKey: String
+    ): ScrmTaskSubmissionResult
+
     fun getWalletBalance(request: ScrmWalletBalanceRequest): ScrmTaskSubmissionResult
 }
 
@@ -139,15 +155,22 @@ internal interface ScrmMomentApi {
         materialId: Long,
         request: ScrmMomentMaterialUpdateRequest
     ): ScrmMomentMaterialDetail
-    fun getMomentMaterialDetail(materialId: Long, tenantId: String? = null): ScrmMomentMaterialDetail
+
+    fun getMomentMaterialDetail(
+        materialId: Long,
+        tenantId: String? = null
+    ): ScrmMomentMaterialDetail
+
     fun copyMomentMaterial(
         materialId: Long,
         request: ScrmMomentMaterialCopyRequest
     ): ScrmMomentMaterial
+
     fun copyMomentToFinderMaterial(
         snsId: Long,
         request: ScrmMomentCopyFinderMaterialRequest
     ): ScrmMomentCopyFinderMaterialResult
+
     fun archiveMomentMaterial(
         materialId: Long,
         request: ScrmMomentMaterialControlRequest
@@ -162,17 +185,21 @@ internal interface ScrmContactApi {
         commonChatRoomLimit: Int = 20,
         relationLogLimit: Int = 20
     ): ScrmContactDetail
+
     fun getCommonChatRooms(
         friendId: String,
         query: ScrmCommonChatRoomQuery = ScrmCommonChatRoomQuery()
     ): ScrmCommonChatRoomPage
+
     fun getContactLabels(
         weChatId: String? = null,
         includeDeleted: Boolean = false
     ): List<ScrmContactLabel>
+
     fun getContactWxids(
         query: ScrmContactWxidQuery = ScrmContactWxidQuery()
     ): ScrmContactWxidList
+
     fun saveCustomerProfile(
         contactId: Int,
         request: ScrmSaveCustomerProfileRequest
@@ -206,11 +233,13 @@ internal interface ScrmContactApi {
         deviceUuid: String,
         weChatId: String
     ): ScrmTaskSubmissionResult
+
     fun getFriendRequests(
         weChatId: String? = null,
         count: Int = 50,
         pendingOnly: Boolean = false
     ): List<ScrmFriendRequest>
+
     fun pullFriendRequests(request: ScrmPullFriendRequestsRequest): ScrmTaskSubmissionResult
     fun handleFriendRequest(request: ScrmHandleFriendRequestRequest): ScrmTaskSubmissionResult
 }
@@ -222,6 +251,7 @@ internal interface ScrmChatRoomApi {
         chatRoomId: String,
         query: ScrmChatRoomMemberQuery = ScrmChatRoomMemberQuery()
     ): ScrmChatRoomMemberPage
+
     fun createChatRoom(request: ScrmCreateChatRoomRequest): ScrmTaskSubmissionResult
     fun syncChatRooms(request: ScrmSyncChatRoomsRequest): ScrmTaskSubmissionResult
     fun refreshChatRoom(request: ScrmRefreshChatRoomRequest): ScrmTaskSubmissionResult
@@ -261,7 +291,14 @@ internal class ScrmApiClient(
         query: Map<String, String?>,
         body: String?
     ): JsonElement {
-        require(method in setOf("GET", "POST", "PUT", "DELETE")) { "不支持的 OpenAPI 方法: $method" }
+        require(
+            method in setOf(
+                "GET",
+                "POST",
+                "PUT",
+                "DELETE"
+            )
+        ) { "不支持的 OpenAPI 方法: $method" }
         require(path.startsWith("/openapi/v1/") || path.startsWith("/openapi/docs/")) {
             "OpenAPI 路径必须以 /openapi/v1/ 或 /openapi/docs/ 开头"
         }
@@ -277,6 +314,7 @@ internal class ScrmApiClient(
             urlOverride = config.openApiEndpoint(path, query)
         )
     }
+
     override fun getMe(): ScrmMe = get("me")
 
     override fun getDevices(): List<ScrmDevice> = get("devices")
@@ -1525,7 +1563,8 @@ internal class ScrmApiClient(
     }
 
     private fun JsonObject.firstLabelNames(vararg keys: String): List<String> {
-        val values = keys.firstNotNullOfOrNull { key -> this[key] as? JsonArray } ?: return emptyList()
+        val values =
+            keys.firstNotNullOfOrNull { key -> this[key] as? JsonArray } ?: return emptyList()
         return values.mapNotNull { value ->
             (value as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }
                 ?: (value as? JsonObject)?.firstStringValue("name", "labelName", "value")
@@ -1730,7 +1769,7 @@ internal class ScrmApiClient(
         output.writeAscii("--$boundary\r\n")
         output.writeAscii(
             "Content-Disposition: form-data; name=\"file\"; " +
-                "filename=\"${request.fileName.multipartQuoted()}\"\r\n"
+                    "filename=\"${request.fileName.multipartQuoted()}\"\r\n"
         )
         output.writeAscii("Content-Type: ${request.contentType}\r\n\r\n")
         output.write(request.bytes)
@@ -1752,6 +1791,7 @@ internal class ScrmApiClient(
                 message = message,
                 retryAfterSeconds = response.header("Retry-After")?.trim()?.toLongOrNull()
             )
+
             in 500..599 -> throw ScrmServerException(response.statusCode, message)
             else -> throw ScrmRequestException(response.statusCode, message)
         }

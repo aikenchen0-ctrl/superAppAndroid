@@ -1,7 +1,5 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.scrm
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,7 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -19,7 +16,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
@@ -35,21 +31,18 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.accessibility.scrm.ScrmContact
 import com.paifa.ubikitouch.accessibility.scrm.ScrmContactManagementApi
 import com.paifa.ubikitouch.accessibility.scrm.ScrmContactQuery
@@ -59,8 +52,6 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmSettingsManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-private const val CustomerProfileAnimationDurationMillis = 260
 
 /** 客户档案的高性能分页，分别承载档案、标签记录和编辑页面。 */
 internal enum class CustomerProfileFullScreenTab(val label: String) {
@@ -104,9 +95,6 @@ internal fun CustomerProfileFullScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var reloadKey by remember { mutableStateOf(0) }
     val pagerState = rememberPagerState(pageCount = { CustomerProfileFullScreenTab.entries.size })
-    var pageHeightPx by remember { mutableFloatStateOf(0f) }
-    var entered by remember { mutableStateOf(false) }
-    val translationY = remember { Animatable(0f) }
 
     /** 读取联系人及当前客户档案，保持与 iOS 的档案查看流程一致。 */
     fun loadData(preferredContactId: Int? = selectedContact?.id) {
@@ -194,34 +182,16 @@ internal fun CustomerProfileFullScreen(
     }
 
     LaunchedEffect(reloadKey) { loadData() }
-    LaunchedEffect(pageHeightPx) {
-        if (pageHeightPx > 0f && !entered) {
-            translationY.snapTo(pageHeightPx)
-            translationY.animateTo(0f, tween(CustomerProfileAnimationDurationMillis))
-            entered = true
-        }
-    }
-    fun close() = scope.launch {
-        translationY.animateTo(pageHeightPx, tween(CustomerProfileAnimationDurationMillis))
-        onBack()
-    }
 
     // 复用现有 accessibility overlay 根视图，不附加 Dialog 或新 Window，规避 BadTokenException。
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
-            .onSizeChanged { pageHeightPx = it.height.toFloat() }
-            .graphicsLayer { this.translationY = translationY.value }
     ) {
-        Spacer(Modifier.height(30.dp))
-        TopAppBar(
-            title = { Text("客户档案", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Normal) },
-            navigationIcon = {
-                IconButton(onClick = ::close) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            },
+        FloatingWorkspaceTopAppBar(
+            title = "客户档案",
+            onBack = onBack,
             actions = {
                 IconButton(onClick = { reloadKey += 1 }, enabled = !loading) {
                     Icon(Icons.Filled.Refresh, contentDescription = "刷新客户档案")
@@ -238,7 +208,7 @@ internal fun CustomerProfileFullScreen(
             }
         }
         CustomerProfileStatus(loading, error ?: status, error != null)
-        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) { page ->
             when (CustomerProfileFullScreenTab.entries[page]) {
                 CustomerProfileFullScreenTab.Profile -> CustomerProfilePage(
                     contacts = contacts,

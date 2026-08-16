@@ -246,7 +246,9 @@ internal data class ScrmMomentPostPayload(
     val comment: String? = null,
     val sendSlow: Boolean = false,
     val extComment: List<String>? = null,
-    val notiUsers: List<String>? = null
+    val notiUsers: List<String>? = null,
+    val visible: ScrmMomentVisibilityPayload? = null,
+    val poi: ScrmMomentPoi? = null
 ) {
     init {
         require(clientRequestId == null || clientRequestId.isNotBlank()) {
@@ -264,6 +266,78 @@ internal data class ScrmMomentPostPayload(
     }
 }
 
+/** iOS 朋友圈发布请求中的位置对象，字段名与 OpenAPI moments 接口保持一致。 */
+@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+internal data class ScrmMomentPoi(
+    val name: String? = null,
+    val city: String? = null,
+    val address: String? = null,
+    @EncodeDefault
+    val lat: Double = 0.0,
+    @EncodeDefault
+    val lng: Double = 0.0,
+    @EncodeDefault
+    val poiId: String = ""
+) {
+    init {
+        require(name == null || name.isNotBlank()) { "poi name cannot be blank" }
+        require(city == null || city.isNotBlank()) { "poi city cannot be blank" }
+        require(address == null || address.isNotBlank()) { "poi address cannot be blank" }
+    }
+}
+
+/** iOS payload.visible 的数值枚举及其可选好友列表。 */
+@Serializable
+internal data class ScrmMomentVisibilityPayload(
+    val type: Int,
+    val friends: List<String>? = null
+) {
+    init {
+        require(type in 0..3) { "unsupported moment visibility type" }
+        require(friends == null || friends.all { it.isNotBlank() }) {
+            "moment visibility friends cannot contain blank values"
+        }
+    }
+}
+
+/**
+ * 朋友圈发表页使用的真实请求选项。公开、私密、部分可见和不给谁看均映射到 iOS 的 API 值。
+ * 测试流程：在发表页切换范围、选择好友、填写提醒和位置，确认请求 JSON 同时包含顶层及 payload 字段。
+ */
+internal enum class ScrmMomentVisibility(
+    val label: String,
+    val apiValue: String,
+    val payloadType: Int
+) {
+    Public("公开", "public", 0),
+    Private("私密", "private", 1),
+    PartVisible("部分可见", "partVisible", 2),
+    NotVisible("不给谁看", "notVisible", 3)
+}
+
+internal data class ScrmMomentPublishOptions(
+    val visibility: ScrmMomentVisibility = ScrmMomentVisibility.Public,
+    val selectedFriendWxids: List<String> = emptyList(),
+    val remindWxids: List<String> = emptyList(),
+    val poi: ScrmMomentPoi? = null
+) {
+    init {
+        require(selectedFriendWxids.all { it.isNotBlank() }) {
+            "selectedFriendWxids cannot contain blank values"
+        }
+        require(remindWxids.all { it.isNotBlank() }) {
+            "remindWxids cannot contain blank values"
+        }
+    }
+
+    val normalizedSelectedFriendWxids: List<String>
+        get() = selectedFriendWxids.distinct()
+
+    val normalizedRemindWxids: List<String>
+        get() = remindWxids.distinct()
+}
+
 @Serializable
 internal data class ScrmPostMomentRequest(
     val payload: ScrmMomentPostPayload? = null,
@@ -273,6 +347,11 @@ internal data class ScrmPostMomentRequest(
     val attachments: List<String>? = null,
     val comment: String? = null,
     val sendSlow: Boolean = false,
+    val notiUsers: List<String>? = null,
+    val visibleType: String? = null,
+    val friendWxids: List<String>? = null,
+    val invisibleFriendWxids: List<String>? = null,
+    val poi: ScrmMomentPoi? = null,
     val deviceUuid: String,
     val weChatId: String
 ) {
@@ -290,6 +369,18 @@ internal data class ScrmPostMomentRequest(
             "attachments cannot contain blank values"
         }
         require(comment == null || comment.isNotBlank()) { "comment cannot be blank" }
+        require(notiUsers == null || notiUsers.all { it.isNotBlank() }) {
+            "notiUsers cannot contain blank values"
+        }
+        require(visibleType == null || visibleType in setOf("public", "private", "partVisible", "notVisible")) {
+            "unsupported moment visibility value"
+        }
+        require(friendWxids == null || friendWxids.all { it.isNotBlank() }) {
+            "friendWxids cannot contain blank values"
+        }
+        require(invisibleFriendWxids == null || invisibleFriendWxids.all { it.isNotBlank() }) {
+            "invisibleFriendWxids cannot contain blank values"
+        }
         require(
             !content.isNullOrBlank() ||
                 !attachments.isNullOrEmpty() ||

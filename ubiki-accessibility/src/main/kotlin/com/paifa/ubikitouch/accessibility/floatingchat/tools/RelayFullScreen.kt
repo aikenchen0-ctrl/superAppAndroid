@@ -1,23 +1,18 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.tools
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -30,21 +25,17 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import kotlinx.coroutines.launch
 
@@ -54,8 +45,6 @@ internal data class RelayDraft(
     val content: String,
     val msgSvrId: Long = 0L
 )
-
-private const val RelayAnimationDurationMillis = 260
 
 /**
  * iOS 群接龙编辑器的 Android Material 3 全屏实现。
@@ -73,34 +62,11 @@ internal fun RelayFullScreen(
 ) {
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState { 2 }
-    var pageHeightPx by remember { mutableFloatStateOf(0f) }
-    var entered by remember { mutableStateOf(false) }
-    val translationY = remember { Animatable(0f) }
-    LaunchedEffect(pageHeightPx) {
-        if (pageHeightPx > 0f && !entered) {
-            translationY.snapTo(pageHeightPx)
-            translationY.animateTo(0f, tween(RelayAnimationDurationMillis))
-            entered = true
-        }
-    }
-    fun close() = scope.launch {
-        if (pageHeightPx > 0f) translationY.animateTo(pageHeightPx, tween(RelayAnimationDurationMillis))
-        onBack()
-    }
 
-    Column(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)
-            .onSizeChanged { pageHeightPx = it.height.toFloat() }
-            .graphicsLayer { this.translationY = translationY.value }
-    ) {
-        Spacer(Modifier.height(30.dp))
-        TopAppBar(
-            title = { Text("群接龙", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Normal) },
-            navigationIcon = {
-                androidx.compose.material3.IconButton(onClick = ::close) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            }
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+        FloatingWorkspaceTopAppBar(
+            title = "群接龙",
+            onBack = onBack
         )
         PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
             listOf("新接龙", "续接接龙").forEachIndexed { index, title ->
@@ -111,7 +77,7 @@ internal fun RelayFullScreen(
                 )
             }
         }
-        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) { page ->
             if (page == 0) {
                 RelayDraftPage(onSubmit = onSubmit)
             } else {
