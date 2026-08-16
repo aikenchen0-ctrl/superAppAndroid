@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.paifa.ubikitouch.accessibility.FloatingChatVoicePermissionBridge
 import java.io.File
@@ -153,26 +154,19 @@ internal fun HoldToRecordVoiceBox(
             Row(
                 modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
             ) {
-                if (recording) {
-                    Text(
-                        "取消发送",
-                        modifier = Modifier.weight(0.32f),
-                        color = if (cancelTarget) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                }
                 Icon(Icons.Filled.Mic, contentDescription = "按住说话", modifier = Modifier.size(20.dp))
                 Text(
                     text = when {
                         recording && cancelTarget -> "松手取消"
-                        recording -> "正在录音 ${elapsedMs / 1000}s，松手确认"
+                        recording -> "录音 ${elapsedMs / 1000}s"
                         else -> status
                     },
-                    modifier = if (recording) Modifier.weight(0.68f) else Modifier,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
@@ -185,7 +179,9 @@ private data class VoiceRecordSession(val recorder: MediaRecorder, val file: Fil
 @Composable
 internal fun VoiceSendConfirmationOverlay(
     recording: PendingVoiceRecording,
+    statusMessage: String? = null,
     onCancel: () -> Unit,
+    onTranscribe: () -> Unit,
     onConfirm: () -> Unit
 ) {
     Box(
@@ -205,9 +201,26 @@ internal fun VoiceSendConfirmationOverlay(
             ) {
                 Text("发送语音？", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge)
                 Text("录音时长 ${recording.durationMs / 1000}s，是否发送到当前会话？", style = MaterialTheme.typography.bodyMedium)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onCancel) { Text("取消发送") }
-                    Button(onClick = onConfirm) { Text("发送") }
+                statusMessage?.takeIf { it.isNotBlank() }?.let { message ->
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onCancel) { Text("取消") }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(onClick = onTranscribe) { Text("转文字") }
+                        Button(onClick = onConfirm) { Text("发送") }
+                    }
                 }
             }
         }

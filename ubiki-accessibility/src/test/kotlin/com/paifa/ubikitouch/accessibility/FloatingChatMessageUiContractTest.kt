@@ -1389,8 +1389,12 @@ class FloatingChatMessageUiContractTest {
         assertEquals(false, resourceUrlTextUsesImModuleShadow())
         assertEquals(false, chipTextUsesImModuleShadow())
         assertEquals(false, inlineCardTextUsesImModuleShadow())
-        assertEquals("你好，晚点联系", chatBubbleDisplayText("{\"content\":\"你好，晚点联系\",\"senderWxid\":\"wxid_demo\"}"))
-        assertEquals("消息", chatBubbleDisplayText("{\"senderWxid\":\"wxid_demo\"}"))
+        val readableResponseBody = "{\"content\":\"你好，晚点联系\",\"senderWxid\":\"wxid_demo\"}"
+        assertEquals("你好，晚点联系", chatBubbleDisplayText(readableResponseBody))
+        assertEquals(false, chatBubbleDisplayContent(readableResponseBody).usesRawResponseBody)
+        val unrenderableResponseBody = "  {\"senderWxid\":\"wxid_demo\"}\n"
+        assertEquals(unrenderableResponseBody, chatBubbleDisplayText(unrenderableResponseBody))
+        assertEquals(true, chatBubbleDisplayContent(unrenderableResponseBody).usesRawResponseBody)
         assertEquals("林晓晓", chatBubbleDisplaySenderName(false, "wxid_demo", "林晓晓"))
         assertEquals("我", chatBubbleDisplaySenderName(true, "wxid_account", null))
         assertEquals(true, systemPromptMessageUsesTextOnly())

@@ -233,6 +233,21 @@ private fun scrmFloatingMappedMessage(
             extension.value.takeIf { extension.key.lowercase() in ScrmMediaUrlKeys && it.isNotBlank() }
         }
     val thumbnailUrl = mediaUrl ?: scrmFloatingMessageThumbnailUrl(remote.content)
+    // WeChat messageType=14/47 stores its only downloadable media address in resBody.Thumb.
+    // Preserve it as the resource URL as well, so the same image is used by the bubble and preview flows.
+    val resourceUrl = mediaUrl
+        ?: scrmFloatingMessageUrl(remote.content)
+        ?: thumbnailUrl.takeIf { type == FloatingChatMessageType.StickerGif }
+    val detail = scrmFloatingMessageDetail(type, remote.content, remote.voiceText)
+    scrmFloatingStickerDebugLog(
+        remote = remote,
+        resolvedType = type,
+        text = text,
+        detail = detail,
+        mediaUrl = mediaUrl,
+        thumbnailUrl = thumbnailUrl,
+        resourceUrl = resourceUrl
+    )
     return FloatingChatMessage(
         id = id,
         type = type,
@@ -244,8 +259,8 @@ private fun scrmFloatingMappedMessage(
         connectionTarget = connectionTarget,
         connectionTargetId = connectionTargetId,
         threadContactId = threadContactId,
-        detail = scrmFloatingMessageDetail(type, remote.content, remote.voiceText),
-        resourceUrl = mediaUrl ?: scrmFloatingMessageUrl(remote.content),
+        detail = detail,
+        resourceUrl = resourceUrl,
         thumbnailUrl = thumbnailUrl,
         fileName = remote.media.firstOrNull()?.fileExtension?.takeIf { it.isNotBlank() },
         fileSizeLabel = remote.media.firstOrNull()?.fileSize?.takeIf { it > 0L }?.let(::scrmFormatFileSize),
@@ -257,6 +272,12 @@ private fun scrmFloatingMappedMessage(
 
 /** Maps WeChat messageType values used by iOS to the Android read-only renderer. */
 private fun scrmFloatingMessageType(messageType: Int, content: String): FloatingChatMessageType {
+    // Some history/change payloads omit the outer WeChat type or flatten it to text,
+    // but retain the original sticker body. Md5 plus Thumb is the stable image-sticker
+    // signature and must not be presented as JSON text.
+    if (messageType in ScrmStickerFallbackMessageTypes && scrmFloatingStickerPayload(content)) {
+        return FloatingChatMessageType.StickerGif
+    }
     val lower = content.lowercase()
     return when (messageType) {
         // Full WeChat outer types are required. Do not infer Finder messages from appmsg internals.
@@ -267,7 +288,9 @@ private fun scrmFloatingMessageType(messageType: Int, content: String): Floating
         34 -> FloatingChatMessageType.Voice
         37, 42 -> FloatingChatMessageType.ContactLink
         43, 62 -> FloatingChatMessageType.VideoPreview
-        47 -> FloatingChatMessageType.StickerGif
+        // SCRM sends saved/favorite emoji through the WeChat Emoji=14 message type.
+        // Its resBody carries Md5/Thumb, so route it through the image sticker renderer.
+        14, 47 -> FloatingChatMessageType.StickerGif
         48 -> FloatingChatMessageType.Location
         49 -> when {
             "<type>33</type>" in lower || "<type>36</type>" in lower -> FloatingChatMessageType.MiniProgramLink
@@ -326,6 +349,46 @@ private fun scrmFloatingMessageDetail(
 
 private val ScrmMediaUrlKeys = setOf("url", "mediaurl", "downloadurl", "fileurl", "imageurl", "videourl", "voiceurl", "path")
 private val ScrmStickerThumbnailKeys = setOf("thumb", "thumbnail", "thumbnailurl", "thumburl")
+private val ScrmStickerMd5Keys = setOf("md5", "emoticonmd5")
+private val ScrmStickerFallbackMessageTypes = setOf(0, 1)
+private const val ScrmStickerDebugHost = "vweixinf.tc.qq.com"
+private const val ScrmStickerDebugTag = "[ScrmStickerDebug]"
+
+/** 仅诊断腾讯图片表情包：输出原始 body、路由类型和最终媒体字段，方便定位渲染链路。 */
+private fun scrmFloatingStickerDebugLog(
+    remote: ScrmChatMessage,
+    resolvedType: FloatingChatMessageType,
+    text: String,
+    detail: String?,
+    mediaUrl: String?,
+    thumbnailUrl: String?,
+    resourceUrl: String?
+) {
+    val rawContent = remote.content
+    if (!rawContent.contains(ScrmStickerDebugHost, ignoreCase = true)) return
+    println(
+        buildString {
+            appendLine("$ScrmStickerDebugTag matchedHost=$ScrmStickerDebugHost")
+            appendLine(
+                "messageId=${remote.messageId} messageServerId=${remote.messageServerId} " +
+                    "conversationId=${remote.conversationId} chatType=${remote.chatType} " +
+                    "messageType=${remote.messageType} direction=${remote.direction}"
+            )
+            appendLine("senderWxid=${remote.senderWxid} receiverWxid=${remote.receiverWxid}")
+            appendLine("rawContentLength=${rawContent.length}")
+            appendLine("rawContent=$rawContent")
+            appendLine("media=${remote.media}")
+            appendLine("extensions=${remote.extensions}")
+            appendLine("stickerPayload=${scrmFloatingStickerPayload(rawContent)}")
+            appendLine("resolvedType=${resolvedType.name}")
+            appendLine("text=$text")
+            appendLine("detail=${detail.orEmpty()}")
+            appendLine("mediaUrl=${mediaUrl.orEmpty()}")
+            appendLine("thumbnailUrl=${thumbnailUrl.orEmpty()}")
+            appendLine("resourceUrl=${resourceUrl.orEmpty()}")
+        }
+    )
+}
 
 private fun scrmFormatFileSize(size: Long): String {
     return when {
@@ -336,10 +399,7 @@ private fun scrmFormatFileSize(size: Long): String {
 }
 
 private fun scrmFloatingJsonText(content: String): String? {
-    val start = content.indexOfFirst { it == '{' || it == '[' }
-    if (start < 0) return null
-    val element = runCatching { ScrmMessageJson.parseToJsonElement(content.substring(start)) }.getOrNull() ?: return null
-    return element.scrmTextValue()
+    return scrmFloatingJsonElement(content)?.scrmTextValue()
 }
 
 private fun JsonElement.scrmTextValue(): String? {
@@ -385,9 +445,7 @@ private fun JsonElement.scrmFinderUserNameValue(): String? {
 }
 
 private fun scrmFloatingMessageUrl(content: String): String? {
-    val start = content.indexOfFirst { it == '{' || it == '[' }
-    if (start < 0) return null
-    val element = runCatching { ScrmMessageJson.parseToJsonElement(content.substring(start)) }.getOrNull() as? JsonObject
+    val element = scrmFloatingJsonElement(content) as? JsonObject
         ?: return null
     return listOf("url", "mediaUrl", "downloadUrl", "fileUrl", "imageUrl", "videoUrl", "voiceUrl", "Url")
         .firstNotNullOfOrNull { key -> element[key]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } }
@@ -395,12 +453,75 @@ private fun scrmFloatingMessageUrl(content: String): String? {
 
 /** Extracts the WeChat sticker preview URL without treating the JSON as visible message text. */
 private fun scrmFloatingMessageThumbnailUrl(content: String): String? {
+    return scrmFloatingJsonElement(content)?.let { element ->
+        scrmFloatingJsonUrlValue(element, ScrmStickerThumbnailKeys)
+    }
+}
+
+private fun scrmFloatingStickerPayload(content: String): Boolean {
+    val element = scrmFloatingJsonElement(content) ?: return false
+    return scrmFloatingJsonUrlValue(element, ScrmStickerThumbnailKeys) != null &&
+        scrmFloatingJsonStringValue(element, ScrmStickerMd5Keys) != null
+}
+
+/**
+ * Extracts the first complete JSON object/array from a response body.
+ * Some copied WeChat bodies append the Thumb URL after the JSON, so parsing the
+ * entire suffix would reject an otherwise valid sticker payload.
+ */
+private fun scrmFloatingJsonElement(content: String): JsonElement? {
     val start = content.indexOfFirst { it == '{' || it == '[' }
     if (start < 0) return null
-    val element = runCatching {
-        ScrmMessageJson.parseToJsonElement(content.substring(start))
-    }.getOrNull() ?: return null
-    return scrmFloatingJsonUrlValue(element, ScrmStickerThumbnailKeys)
+
+    var depth = 0
+    var inString = false
+    var escaped = false
+    for (index in start until content.length) {
+        when (val character = content[index]) {
+            '"' -> {
+                if (!escaped) inString = !inString
+                escaped = false
+            }
+            '\\' -> {
+                if (inString) escaped = !escaped else escaped = false
+            }
+            else -> {
+                if (inString) {
+                    escaped = false
+                    continue
+                }
+                when (character) {
+                    '{', '[' -> depth++
+                    '}', ']' -> {
+                        depth--
+                        if (depth == 0) {
+                            val json = content.substring(start, index + 1)
+                            return runCatching { ScrmMessageJson.parseToJsonElement(json) }.getOrNull()
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return null
+}
+
+private fun scrmFloatingJsonStringValue(element: JsonElement, keys: Set<String>): String? {
+    if (element is JsonObject) {
+        element.entries.firstNotNullOfOrNull { (key, value) ->
+            (value as? JsonPrimitive)?.contentOrNull
+                ?.takeIf { key.lowercase() in keys && it.isNotBlank() }
+        }?.let { return it }
+        element.values.firstNotNullOfOrNull { child ->
+            scrmFloatingJsonStringValue(child, keys)
+        }?.let { return it }
+    }
+    if (element is JsonArray) {
+        element.firstNotNullOfOrNull { child ->
+            scrmFloatingJsonStringValue(child, keys)
+        }?.let { return it }
+    }
+    return null
 }
 
 private fun scrmFloatingJsonUrlValue(element: JsonElement, keys: Set<String>): String? {

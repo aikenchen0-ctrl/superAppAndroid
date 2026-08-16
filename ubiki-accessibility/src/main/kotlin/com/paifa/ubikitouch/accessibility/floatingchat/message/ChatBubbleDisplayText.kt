@@ -13,25 +13,40 @@ private val ChatContainerKeys = listOf("data", "payload", "body", "result")
 
 // TODO(SCRM): populate senderName with the resolved nickname before mapping remote messages.
 
-internal fun chatBubbleDisplayText(rawText: String): String {
-    val trimmed = rawText.trim()
-    if (trimmed.isEmpty()) return "消息"
+internal data class ChatBubbleDisplayContent(
+    val text: String,
+    val usesRawResponseBody: Boolean
+)
 
+internal fun chatBubbleDisplayText(rawText: String): String = chatBubbleDisplayContent(rawText).text
+
+internal fun chatBubbleDisplayContent(rawText: String): ChatBubbleDisplayContent {
+    val trimmed = rawText.trim()
+    if (trimmed.isEmpty()) return ChatBubbleDisplayContent(text = "消息", usesRawResponseBody = false)
+
+    // Nonempty response bodies must remain visible when no readable field can be extracted.
     val jsonStart = listOf(trimmed.indexOf('{'), trimmed.indexOf('['))
         .filter { index -> index >= 0 }
         .minOrNull()
     if (jsonStart == null) {
-        return trimmed.takeUnless(::isTechnicalChatValue) ?: "消息"
+        return ChatBubbleDisplayContent(
+            text = rawText,
+            usesRawResponseBody = isTechnicalChatValue(trimmed)
+        )
     }
 
     val element = runCatching {
         ChatBubbleJson.parseToJsonElement(trimmed.substring(jsonStart))
-    }.getOrNull() ?: return trimmed.takeUnless(::isTechnicalChatValue) ?: "消息"
+    }.getOrNull() ?: return ChatBubbleDisplayContent(text = rawText, usesRawResponseBody = true)
 
-    return element.chatTextValue()
+    val extractedText = element.chatTextValue()
         ?.trim()
         ?.takeUnless(::isTechnicalChatValue)
-        ?: "消息"
+    return if (extractedText != null) {
+        ChatBubbleDisplayContent(text = extractedText, usesRawResponseBody = false)
+    } else {
+        ChatBubbleDisplayContent(text = rawText, usesRawResponseBody = true)
+    }
 }
 
 internal fun chatBubbleDisplaySenderName(

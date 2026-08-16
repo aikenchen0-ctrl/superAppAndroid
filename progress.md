@@ -78,3 +78,10 @@
 - 最终定向回归通过：朋友圈工作区、iOS 行为映射、素材库页面、账号隔离、数据库迁移、SCRM 请求体与共享 surface 工作区契约均已执行；新增 `notVisible` 真实 HTTP JSON 断言也包含在最终运行中。
 - `:ubiki-accessibility:compileDebugKotlin` 返回 `BUILD SUCCESSFUL`；仅保留既有 Compose 图标弃用警告。
 - 朋友圈目录未发现 `AlertDialog`/`Dialog` 或自动重发实现；`git diff --check` 未发现空白错误。接口文档的范围值与 iOS 实际请求不一致时，Android 保持与 iOS 的 `partVisible`/`notVisible` 实现一致。
+
+## 2026-08-16：消息选项按 messageId 转文字
+
+- 已接手上一轮录音确认层与消息操作测试改动，确认最新需求覆盖“本地录音确认层转文字”：真实入口改为点击已同步语音消息后的消息选项。
+- 已完成只读链路审计：接口与 HTTP 实现存在，缺口位于消息操作回调、任务轮询、聊天刷新和转写结果覆盖旧缓存；下一步先运行新增契约测试确认红灯。
+- `MessageStandardActionsTest` 已按预期红灯：仅缺失 `MessageLongPressAction.Transcribe` 与 `messageLongPressActionsFor`，Gradle 配置和生产源码编译均正常，确认进入最小实现阶段。
+- 已补充无效 `0/负数 messageId` 和 action 回调关闭菜单契约；第二次红灯同时确认缺少筛选函数、枚举值和 `onTranscribeMessage` 构造参数，失败原因与预期一致。

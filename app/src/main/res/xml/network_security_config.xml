@@ -4,4 +4,8 @@
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">112.74.164.233</domain>
     </domain-config>
+    <!-- WeChat sticker Thumb URLs currently resolve only over HTTP. Keep the exception host-scoped. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">vweixinf.tc.qq.com</domain>
+    </domain-config>
 </network-security-config>

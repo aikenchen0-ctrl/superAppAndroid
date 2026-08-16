@@ -45,6 +45,33 @@ fun rememberAsyncImageThumbnailBitmap(
     uriText: String?,
     maxSizePx: Int = REAL_MEDIA_DECODE_MAX_SIZE_PX,
     cacheNamespace: String = IMAGE_THUMBNAIL_CACHE_NAMESPACE
+): Bitmap? = rememberAsyncImageThumbnailBitmapWithConfig(
+    context = context,
+    uriText = uriText,
+    maxSizePx = maxSizePx,
+    cacheNamespace = cacheNamespace,
+    preferredConfig = Bitmap.Config.RGB_565
+)
+
+@Composable
+internal fun rememberAsyncStickerThumbnailBitmap(message: FloatingChatMessage): Bitmap? {
+    val context = LocalContext.current
+    return rememberAsyncImageThumbnailBitmapWithConfig(
+        context = context,
+        uriText = message.thumbnailUrl ?: message.resourceUrl,
+        maxSizePx = REAL_MEDIA_DECODE_MAX_SIZE_PX,
+        cacheNamespace = STICKER_THUMBNAIL_CACHE_NAMESPACE,
+        preferredConfig = Bitmap.Config.ARGB_8888
+    )
+}
+
+@Composable
+private fun rememberAsyncImageThumbnailBitmapWithConfig(
+    context: Context,
+    uriText: String?,
+    maxSizePx: Int,
+    cacheNamespace: String,
+    preferredConfig: Bitmap.Config
 ): Bitmap? {
     val cacheKey = imageThumbnailCacheKey(uriText, cacheNamespace)
     return produceState(
@@ -52,7 +79,8 @@ fun rememberAsyncImageThumbnailBitmap(
         context,
         uriText,
         maxSizePx,
-        cacheNamespace
+        cacheNamespace,
+        preferredConfig
     ) {
         if (value != null || cacheKey == null) return@produceState
         val inFlightKey = "$cacheKey@$maxSizePx"
@@ -63,7 +91,8 @@ fun rememberAsyncImageThumbnailBitmap(
                     context = context.applicationContext,
                     uriText = uriText,
                     maxSizePx = maxSizePx,
-                    cacheNamespace = cacheNamespace
+                    cacheNamespace = cacheNamespace,
+                    preferredConfig = preferredConfig
                 )
             }.let { candidate ->
                 inFlightImageLoads.putIfAbsent(inFlightKey, candidate)?.also {
@@ -108,7 +137,8 @@ internal fun loadImageThumbnailBitmap(
     context: Context,
     uriText: String?,
     maxSizePx: Int = REAL_MEDIA_DECODE_MAX_SIZE_PX,
-    cacheNamespace: String = IMAGE_THUMBNAIL_CACHE_NAMESPACE
+    cacheNamespace: String = IMAGE_THUMBNAIL_CACHE_NAMESPACE,
+    preferredConfig: Bitmap.Config = Bitmap.Config.RGB_565
 ): Bitmap? {
     val cacheKey = imageThumbnailCacheKey(uriText, cacheNamespace) ?: return null
     val resolvedUriText = normalizedRemoteImageUri(uriText) ?: return null
@@ -127,7 +157,8 @@ internal fun loadImageThumbnailBitmap(
             loadPersistentRemoteImageBitmap(
                 context = context,
                 cacheKey = cacheKey,
-                maxSizePx = maxSizePx
+                maxSizePx = maxSizePx,
+                preferredConfig = preferredConfig
             )?.let { cached ->
                 Log.i(AVATAR_DIAGNOSTICS_TAG, "persistent avatar cache hit host=${uri.host.orEmpty()}")
                 return@getOrPut cached
@@ -135,10 +166,15 @@ internal fun loadImageThumbnailBitmap(
         }
         val bitmap = runCatching {
             when {
-                remoteImage -> decodeRemoteImageBitmap(resolvedUriText, maxSizePx)
+                remoteImage -> decodeRemoteImageBitmap(
+                    uriText = resolvedUriText,
+                    maxSizePx = maxSizePx,
+                    preferredConfig = preferredConfig
+                )
                 uri.scheme == "file" -> decodeFileBitmapRespectingExif(
                     path = uri.path,
-                    maxSizePx = maxSizePx
+                    maxSizePx = maxSizePx,
+                    preferredConfig = preferredConfig
                 )
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.P -> {
                     val source = ImageDecoder.createSource(context.contentResolver, uri)
@@ -196,7 +232,8 @@ private fun cacheFileDigest(value: String): String {
 private fun loadPersistentRemoteImageBitmap(
     context: Context,
     cacheKey: String,
-    maxSizePx: Int
+    maxSizePx: Int,
+    preferredConfig: Bitmap.Config
 ): Bitmap? {
     val file = persistentRemoteImageFile(context, cacheKey)
     if (!file.isFile || file.length() <= 0L) return null
@@ -211,7 +248,7 @@ private fun loadPersistentRemoteImageBitmap(
                 height = bounds.outHeight,
                 maxSize = maxSizePx
             )
-            inPreferredConfig = Bitmap.Config.RGB_565
+            inPreferredConfig = preferredConfig
         }
     )
 }
@@ -232,7 +269,11 @@ private fun persistRemoteImageBitmap(context: Context, cacheKey: String, bitmap:
     }
 }
 
-private fun decodeRemoteImageBitmap(uriText: String, maxSizePx: Int): Bitmap? {
+private fun decodeRemoteImageBitmap(
+    uriText: String,
+    maxSizePx: Int,
+    preferredConfig: Bitmap.Config
+): Bitmap? {
     return RemoteImageLoadSemaphore.withPermit {
         val connection = URL(uriText).openConnection().apply {
             connectTimeout = remoteImageConnectTimeoutMillis()
@@ -259,7 +300,7 @@ private fun decodeRemoteImageBitmap(uriText: String, maxSizePx: Int): Bitmap? {
                         height = bounds.outHeight,
                         maxSize = maxSizePx
                     )
-                    inPreferredConfig = Bitmap.Config.RGB_565
+                    inPreferredConfig = preferredConfig
                     inDither = true
                 }
             )
@@ -350,7 +391,8 @@ private fun InputStream.readAtMostBytes(maxBytes: Int): ByteArray? {
 
 private fun decodeFileBitmapRespectingExif(
     path: String?,
-    maxSizePx: Int = REAL_MEDIA_DECODE_MAX_SIZE_PX
+    maxSizePx: Int = REAL_MEDIA_DECODE_MAX_SIZE_PX,
+    preferredConfig: Bitmap.Config = Bitmap.Config.RGB_565
 ): Bitmap? {
     if (path.isNullOrBlank()) return null
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -363,6 +405,7 @@ private fun decodeFileBitmapRespectingExif(
                 height = bounds.outHeight,
                 maxSize = maxSizePx
             )
+            inPreferredConfig = preferredConfig
         }
     ) ?: return null
     val rotationDegrees = runCatching {
@@ -417,6 +460,7 @@ private const val LOG_TAG = "FloatingChatOverlay"
 private const val AVATAR_DIAGNOSTICS_TAG = "UbikiAvatar"
 private const val REAL_MEDIA_DECODE_MAX_SIZE_PX = 720
 private const val IMAGE_THUMBNAIL_CACHE_NAMESPACE = "image"
+private const val STICKER_THUMBNAIL_CACHE_NAMESPACE = "sticker"
 private const val DEFAULT_REMOTE_IMAGE_BUFFER_BYTES = 8 * 1024
 private const val MIN_BITMAP_MEMORY_CACHE_BYTES = 8 * 1024 * 1024
 private const val MAX_BITMAP_MEMORY_CACHE_BYTES = 32 * 1024 * 1024

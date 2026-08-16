@@ -16,6 +16,7 @@ import android.util.Log
 import android.view.MotionEvent
 import android.view.Surface
 import android.view.TextureView
+import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -98,9 +99,9 @@ import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.exifinterface.media.ExifInterface
-import androidx.lifecycle.LifecycleOwner
 import com.paifa.ubikitouch.accessibility.FloatingChatMediaPickerBridge
 import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceMotion
 import com.paifa.ubikitouch.core.model.FloatingChatPrototype
 import com.paifa.ubikitouch.core.model.FloatingChatThumbnailOrientation
 import java.io.File
@@ -117,6 +118,7 @@ class FloatingChatCameraActivity : ComponentActivity() {
         intent.getBooleanExtra(FloatingChatMediaPickerBridge.EXTRA_SCAN_MODE, false)
     }
     private var camera: Camera? = null
+    private var cameraProvider: ProcessCameraProvider? = null
     private var imageCapture: ImageCapture? = null
     private var videoCapture: VideoCapture<Recorder>? = null
     private var activeRecording: Recording? = null
@@ -124,7 +126,10 @@ class FloatingChatCameraActivity : ComponentActivity() {
     private var capturedMedia by mutableStateOf<CapturedMedia?>(null)
     private var recording by mutableStateOf(false)
     private var recordingProgress by mutableStateOf(0f)
+    private var cameraError by mutableStateOf<String?>(null)
     private var recordingStartingAtMs = 0L
+    private var cameraRoot: FrameLayout? = null
+    private var finishingCapture = false
     private val recordingProgressRunnable = object : Runnable {
         override fun run() {
             updateRecordingProgress()
@@ -141,11 +146,12 @@ class FloatingChatCameraActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         window.statusBarColor = android.graphics.Color.BLACK
         window.navigationBarColor = android.graphics.Color.BLACK
+        cameraRoot = cameraContentView()
+        setContentView(cameraRoot)
+        cameraRoot?.let { root -> root.post { animateCameraEntrance(root) } }
         if (!hasPermissions()) {
             ActivityCompat.requestPermissions(this, requiredPermissions(), REQUEST_CAMERA_PERMISSIONS)
-        }
-        setContentView(cameraContentView())
-        if (hasPermissions()) {
+        } else {
             bindCamera()
         }
     }
@@ -168,14 +174,35 @@ class FloatingChatCameraActivity : ComponentActivity() {
         mainHandler.removeCallbacks(maxRecordingStopRunnable)
         mainHandler.removeCallbacks(recordingProgressRunnable)
         activeRecording?.close()
+        cameraProvider?.unbindAll()
+        cameraProvider = null
+        camera = null
+        imageCapture = null
+        videoCapture = null
         cameraExecutor.shutdown()
         FloatingChatMediaPickerBridge.notifyPickerClosed()
         super.onDestroy()
     }
 
+    /** UI：扫码页复用 UI组件 工作区的实体 View 入场动画，从屏幕底部滑入。 */
+    private fun animateCameraEntrance(root: View) {
+        root.translationY = FloatingWorkspaceMotion.enterTranslationY(
+            root.height.coerceAtLeast(resources.displayMetrics.heightPixels)
+        )
+        root.alpha = 0f
+        root.animate()
+            .translationY(0f)
+            .alpha(1f)
+            .setDuration(CAMERA_WORKSPACE_ANIMATION_MS)
+            .start()
+    }
+
     private fun cameraContentView(): FrameLayout {
         previewView = PreviewView(this).apply {
             scaleType = PreviewView.ScaleType.FILL_CENTER
+            // Compose controls must remain above the camera preview. COMPATIBLE uses
+            // a TextureView instead of a SurfaceView, avoiding z-order overlap.
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
             layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
@@ -196,6 +223,7 @@ class FloatingChatCameraActivity : ComponentActivity() {
                     setContent {
                         if (scanMode) {
                             CameraScanOverlay(
+                                cameraError = cameraError,
                                 onClose = ::finishCapture,
                                 onFlashlightChanged = { enabled ->
                                     camera?.cameraControl?.enableTorch(enabled)
@@ -206,6 +234,7 @@ class FloatingChatCameraActivity : ComponentActivity() {
                                 capturedMedia = capturedMedia,
                                 recording = recording,
                                 recordingProgress = recordingProgress,
+                                cameraError = cameraError,
                                 onClose = ::finishCapture,
                                 onCaptureTap = ::capturePhoto,
                                 onRecordStart = ::startRecording,
@@ -242,15 +271,17 @@ class FloatingChatCameraActivity : ComponentActivity() {
     private fun bindCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
         cameraProviderFuture.addListener({
-            val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
-            val preview = Preview.Builder().build().also { preview ->
-                preview.setSurfaceProvider(previewView.surfaceProvider)
-            }
+            if (isFinishing || isDestroyed) return@addListener
             runCatching {
-                cameraProvider.unbindAll()
+                val provider = cameraProviderFuture.get()
+                val preview = Preview.Builder().build().also { preview ->
+                    preview.setSurfaceProvider(previewView.surfaceProvider)
+                }
+                provider.unbindAll()
+                cameraProvider = provider
                 if (scanMode) {
-                    camera = cameraProvider.bindToLifecycle(
-                        this as LifecycleOwner,
+                    camera = provider.bindToLifecycle(
+                        this,
                         CameraSelector.DEFAULT_BACK_CAMERA,
                         preview
                     )
@@ -264,16 +295,18 @@ class FloatingChatCameraActivity : ComponentActivity() {
                         .build()
                     videoCapture = VideoCapture.withOutput(recorder)
                         .apply { targetRotation = displayRotation() }
-                    camera = cameraProvider.bindToLifecycle(
-                        this as LifecycleOwner,
+                    camera = provider.bindToLifecycle(
+                        this,
                         CameraSelector.DEFAULT_BACK_CAMERA,
                         preview,
                         imageCapture,
                         videoCapture
                     )
                 }
-            }.onFailure {
-                Toast.makeText(this, "相机启动失败", Toast.LENGTH_SHORT).show()
+                cameraError = null
+            }.onFailure { error ->
+                Log.e(TAG, "CameraX failed to initialize", error)
+                cameraError = "相机启动失败，请返回后重试"
             }
         }, ContextCompat.getMainExecutor(this))
     }
@@ -390,8 +423,25 @@ class FloatingChatCameraActivity : ComponentActivity() {
     }
 
     private fun finishCapture() {
+        if (finishingCapture) return
+        finishingCapture = true
         FloatingChatMediaPickerBridge.notifyPickerClosed()
-        finish()
+        val root = cameraRoot
+        if (root == null || !root.isLaidOut) {
+            finish()
+            return
+        }
+        root.animate()
+            .translationY(FloatingWorkspaceMotion.exitTranslationY(root.height))
+            .alpha(0f)
+            .setDuration(CAMERA_WORKSPACE_ANIMATION_MS)
+            .withEndAction { finish() }
+            .start()
+    }
+
+    @Deprecated("Use OnBackPressedDispatcher in new screens")
+    override fun onBackPressed() {
+        finishCapture()
     }
 
     private fun captureDir(): File {
@@ -561,6 +611,7 @@ class FloatingChatCameraActivity : ComponentActivity() {
     }
 
     private companion object {
+        const val CAMERA_WORKSPACE_ANIMATION_MS = 280L
         const val REQUEST_CAMERA_PERMISSIONS = 9101
         const val CAMERA_VIDEO_MAX_DURATION_MS = 15_000L
         const val RECORDING_PROGRESS_FRAME_MS = 32L
@@ -588,6 +639,7 @@ private data class CapturedMediaMeta(
 
 @Composable
 private fun CameraScanOverlay(
+    cameraError: String?,
     onClose: () -> Unit,
     onFlashlightChanged: (Boolean) -> Unit
 ) {
@@ -622,6 +674,23 @@ private fun CameraScanOverlay(
                     scanProgress = scanProgress,
                     modifier = Modifier.size(264.dp)
                 )
+            }
+
+            cameraError?.let { message ->
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(top = 340.dp),
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = message,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        fontWeight = FontWeight.Normal
+                    )
+                }
             }
 
             Surface(
@@ -714,6 +783,7 @@ private fun CameraOverlay(
     capturedMedia: CapturedMedia?,
     recording: Boolean,
     recordingProgress: Float,
+    cameraError: String?,
     onClose: () -> Unit,
     onCaptureTap: () -> Unit,
     onRecordStart: () -> Unit,
@@ -729,6 +799,23 @@ private fun CameraOverlay(
                 .padding(14.dp)
         ) {
             Icon(Icons.Filled.Close, contentDescription = "关闭", tint = Color.White)
+        }
+
+        cameraError?.let { message ->
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 72.dp),
+                color = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+            ) {
+                Text(
+                    text = message,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    fontWeight = FontWeight.Normal
+                )
+            }
         }
 
         if (capturedMedia == null) {

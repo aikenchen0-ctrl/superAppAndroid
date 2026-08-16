@@ -2,11 +2,13 @@ package com.paifa.ubikitouch.accessibility
 
 import com.paifa.ubikitouch.accessibility.scrm.ScrmDevice
 import com.paifa.ubikitouch.accessibility.scrm.ScrmContact
+import com.paifa.ubikitouch.accessibility.scrm.ScrmChatMessage
 import com.paifa.ubikitouch.accessibility.scrm.ScrmFloatingAccountConversation
 import com.paifa.ubikitouch.accessibility.scrm.ScrmFloatingAccountRoute
 import com.paifa.ubikitouch.accessibility.scrm.ScrmChatRoom
 import com.paifa.ubikitouch.accessibility.scrm.ScrmWechatAccount
 import com.paifa.ubikitouch.core.model.FloatingChatPrototype
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -143,6 +145,33 @@ class FloatingChatOverlayControllerContractTest {
             listOf("friend-new"),
             merged.single { account -> account.weChatId == "wxid_1" }.contacts.mapNotNull { contact -> contact.wxid }
         )
+    }
+
+    /**
+     * 测试流程：缓存中先放入已同步语音和一条本地消息，再接收同 messageId 的转写更新。
+     * 新对象应原位替换旧语音，同时保留无服务端 ID 的本地消息。
+     */
+    @Test
+    fun scrmReadOnlyMessageMergeReplacesMatchingRemoteMessageInPlace() {
+        val cachedVoice = ScrmChatMessage(
+            messageId = 71L,
+            messageType = 34,
+            content = "{\"text\":\"原始语音\"}"
+        )
+        val localMessage = ScrmChatMessage(
+            clientMessageId = "local-message-1",
+            content = "本地待发送消息"
+        )
+        val transcribedVoice = cachedVoice.copy(
+            voiceText = Json.parseToJsonElement("{\"text\":\"转写结果\"}")
+        )
+
+        val merged = scrmMergeReadOnlyMessages(
+            existing = listOf(cachedVoice, localMessage),
+            incoming = transcribedVoice
+        )
+
+        assertEquals(listOf(transcribedVoice, localMessage), merged)
     }
 
     @Test

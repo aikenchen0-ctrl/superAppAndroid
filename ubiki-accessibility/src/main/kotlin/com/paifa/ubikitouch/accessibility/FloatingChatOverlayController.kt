@@ -2094,7 +2094,7 @@ internal fun mergeScrmAccountConversationCache(
     return conversationsByRoute.values.toList()
 }
 
-private fun scrmMergeReadOnlyMessages(
+internal fun scrmMergeReadOnlyMessages(
     existing: List<ScrmChatMessage>,
     incoming: ScrmChatMessage
 ): List<ScrmChatMessage> {

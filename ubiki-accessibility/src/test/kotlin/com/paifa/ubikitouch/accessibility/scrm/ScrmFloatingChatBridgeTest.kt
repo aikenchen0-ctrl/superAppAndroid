@@ -1,15 +1,19 @@
 package com.paifa.ubikitouch.accessibility.scrm
 
+import java.io.ByteArrayOutputStream
+import java.io.PrintStream
 import com.paifa.ubikitouch.core.model.FloatingChatPrototype
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.accountScopedConversations
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.homeUnreadDemoThreadSummaries
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.homeUnreadThreadSummaries
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
 import com.paifa.ubikitouch.accessibility.floatingchat.media.normalizedRemoteImageUri
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ScrmFloatingChatBridgeTest {
@@ -94,6 +98,45 @@ class ScrmFloatingChatBridgeTest {
         assertEquals(listOf("[图片]", "[语音]", "[表情]", "[位置]", "[语音通话]"), conversation.messages.map { it.text })
     }
 
+    /**
+     * 测试流程：发送收藏表情接口按协议使用 Emoji=14，下发的 resBody 仍为 Md5/Thumb/Size。
+     * 必须进入图片表情渲染器，并把 Thumb 同时作为缩略图和可下载资源地址。
+     */
+    @Test
+    fun floatingChatMapsEmojiMessageType14ToStickerMedia() {
+        val thumb = "http://vweixinf.tc.qq.com/110/20401/stodownload?m=emoji14&filekey=sticker"
+        val conversation = scrmFloatingChatConversation(
+            base = FloatingChatPrototype.sampleConversation(),
+            contacts = emptyList(),
+            accountConversations = listOf(
+                ScrmFloatingAccountConversation(
+                    deviceUuid = "device-1",
+                    weChatId = "wxid_account",
+                    contacts = emptyList(),
+                    messagesByConversation = mapOf(
+                        "wxid_friend" to listOf(
+                            ScrmChatMessage(
+                                messageId = 6,
+                                messageType = 14,
+                                content = "{\"Md5\":\"emoji-md5\",\"Thumb\":\"$thumb\",\"Size\":23770}"
+                            )
+                        )
+                    )
+                )
+            ),
+            accounts = listOf(ScrmWechatAccount("wxid_account", "Account", "device-1")),
+            devices = listOf(device("device-1", "wxid_account", online = true)),
+            selectedDeviceUuid = "device-1",
+            selectedWeChatId = "wxid_account"
+        )
+
+        val message = conversation.messages.single()
+        assertEquals("StickerGif", message.type.name)
+        assertEquals("[表情]", message.text)
+        assertEquals(thumb, message.thumbnailUrl)
+        assertEquals(thumb, message.resourceUrl)
+    }
+
     @Test
     fun floatingChatExtractsStickerThumbForChatRenderingButKeepsPreviewTextAsPlaceholder() {
         val thumb = "http://vweixinf.tc.qq.com/sticker/thumb.png"
@@ -124,6 +167,206 @@ class ScrmFloatingChatBridgeTest {
 
         assertEquals("[表情]", conversation.messages.single().text)
         assertEquals(thumb, conversation.messages.single().thumbnailUrl)
+    }
+
+    /**
+     * 测试流程：从历史消息接口返回的 resBody 中读取图片表情包，检查真实 Thumb 下载地址
+     * 同时进入缩略图和媒体资源字段，聊天气泡、全屏预览和媒体操作均可复用该地址。
+     */
+    @Test
+    fun floatingChatMapsWeChatStickerResBodyThumbAsRenderableMedia() {
+        val thumb = "http://vweixinf.tc.qq.com/110/20401/stodownload?m=1c3c326f0d065a84dd2c7ac9638910bb&filekey=3043020101042f302d02016e040253480420316333633332366630643036356138346464326337616339363338393130626202025cda040d00000004627466730000000131&hy=SH&storeid=323032323033333030383431343130303065346437643833346434336661343736366234306230303030303036653031303034666231&ef=1&bizid=1022"
+        val output = ByteArrayOutputStream()
+        val originalOut = System.out
+        val conversation = try {
+            System.setOut(PrintStream(output, true, Charsets.UTF_8.name()))
+            scrmFloatingChatConversation(
+            base = FloatingChatPrototype.sampleConversation(),
+            contacts = emptyList(),
+            accountConversations = listOf(
+                ScrmFloatingAccountConversation(
+                    deviceUuid = "device-1",
+                    weChatId = "wxid_account",
+                    contacts = emptyList(),
+                    messagesByConversation = mapOf(
+                        "wxid_friend" to listOf(
+                            ScrmChatMessage(
+                                messageId = 9,
+                                messageType = 47,
+                                content = "{\"Md5\":\"1c3c326f0d065a84dd2c7ac9638910bb\",\"Thumb\":\"$thumb\",\"Size\":23770}"
+                            )
+                        )
+                    )
+                )
+            ),
+            accounts = listOf(ScrmWechatAccount("wxid_account", "Account", "device-1")),
+            devices = listOf(device("device-1", "wxid_account", online = true)),
+            selectedDeviceUuid = "device-1",
+            selectedWeChatId = "wxid_account"
+            )
+        } finally {
+            System.setOut(originalOut)
+        }
+
+        val message = conversation.messages.single()
+        assertEquals("StickerGif", message.type.name)
+        assertEquals("[表情]", message.text)
+        assertEquals(thumb, message.thumbnailUrl)
+        assertEquals(thumb, message.resourceUrl)
+        val debugOutput = output.toString(Charsets.UTF_8.name())
+        assertTrue(debugOutput.contains("vweixinf.tc.qq.com"))
+        assertTrue(debugOutput.contains("messageType=47"))
+        assertTrue(debugOutput.contains("resolvedType=StickerGif"))
+        assertTrue(debugOutput.contains("thumbnailUrl=$thumb"))
+    }
+
+    /**
+     * 测试流程：历史接口遗漏外层 messageType 时，仍返回图片表情包的 Md5/Thumb/Size body。
+     * 聊天界面必须识别为 StickerGif，不能把原始 JSON 当成普通文本气泡。
+     */
+    @Test
+    fun floatingChatInfersStickerGifFromMd5AndThumbWhenOuterMessageTypeIsMissing() {
+        val thumb = "http://vweixinf.tc.qq.com/sticker/fallback-thumb.png"
+        val conversation = scrmFloatingChatConversation(
+            base = FloatingChatPrototype.sampleConversation(),
+            contacts = emptyList(),
+            accountConversations = listOf(
+                ScrmFloatingAccountConversation(
+                    deviceUuid = "device-1",
+                    weChatId = "wxid_account",
+                    contacts = emptyList(),
+                    messagesByConversation = mapOf(
+                        "wxid_friend" to listOf(
+                            ScrmChatMessage(
+                                messageId = 10,
+                                messageType = 0,
+                                content = "{\"Md5\":\"1c3c326f0d065a84dd2c7ac9638910bb\",\"Thumb\":\"$thumb\",\"Size\":23770}"
+                            )
+                        )
+                    )
+                )
+            ),
+            accounts = listOf(ScrmWechatAccount("wxid_account", "Account", "device-1")),
+            devices = listOf(device("device-1", "wxid_account", online = true)),
+            selectedDeviceUuid = "device-1",
+            selectedWeChatId = "wxid_account"
+        )
+
+        val message = conversation.messages.single()
+        assertEquals("StickerGif", message.type.name)
+        assertEquals("[表情]", message.text)
+        assertEquals(thumb, message.thumbnailUrl)
+        assertEquals(thumb, message.resourceUrl)
+    }
+
+    /**
+     * 测试流程：部分历史消息把图片表情包错误标记为普通文本 messageType=1，
+     * 但 resBody 仍含有 Md5 和 Thumb。聊天界面必须优先按表情包渲染，不能显示原始 JSON。
+     */
+    @Test
+    fun floatingChatInfersStickerGifFromMd5AndThumbWhenOuterMessageTypeIsText() {
+        val thumb = "http://vweixinf.tc.qq.com/sticker/text-type-thumb.png"
+        val conversation = scrmFloatingChatConversation(
+            base = FloatingChatPrototype.sampleConversation(),
+            contacts = emptyList(),
+            accountConversations = listOf(
+                ScrmFloatingAccountConversation(
+                    deviceUuid = "device-1",
+                    weChatId = "wxid_account",
+                    contacts = emptyList(),
+                    messagesByConversation = mapOf(
+                        "wxid_friend" to listOf(
+                            ScrmChatMessage(
+                                messageId = 12,
+                                messageType = 1,
+                                content = "{\"Md5\":\"1c3c326f0d065a84dd2c7ac9638910bb\",\"Thumb\":\"$thumb\",\"Size\":23770}"
+                            )
+                        )
+                    )
+                )
+            ),
+            accounts = listOf(ScrmWechatAccount("wxid_account", "Account", "device-1")),
+            devices = listOf(device("device-1", "wxid_account", online = true)),
+            selectedDeviceUuid = "device-1",
+            selectedWeChatId = "wxid_account"
+        )
+
+        val message = conversation.messages.single()
+        assertEquals("StickerGif", message.type.name)
+        assertEquals("[表情]", message.text)
+        assertEquals(thumb, message.thumbnailUrl)
+        assertEquals(thumb, message.resourceUrl)
+    }
+
+    @Test
+    fun floatingChatKeepsExplicitImageTypeWhenItsBodyAlsoContainsMd5AndThumb() {
+        val thumb = "http://vweixinf.tc.qq.com/image/thumbnail.png"
+        val conversation = scrmFloatingChatConversation(
+            base = FloatingChatPrototype.sampleConversation(),
+            contacts = emptyList(),
+            accountConversations = listOf(
+                ScrmFloatingAccountConversation(
+                    deviceUuid = "device-1",
+                    weChatId = "wxid_account",
+                    contacts = emptyList(),
+                    messagesByConversation = mapOf(
+                        "wxid_friend" to listOf(
+                            ScrmChatMessage(
+                                messageId = 11,
+                                messageType = 3,
+                                content = "{\"Md5\":\"image-md5\",\"Thumb\":\"$thumb\",\"Size\":23770}"
+                            )
+                        )
+                    )
+                )
+            ),
+            accounts = listOf(ScrmWechatAccount("wxid_account", "Account", "device-1")),
+            devices = listOf(device("device-1", "wxid_account", online = true)),
+            selectedDeviceUuid = "device-1",
+            selectedWeChatId = "wxid_account"
+        )
+
+        assertEquals("ImageThumbnail", conversation.messages.single().type.name)
+    }
+
+    /**
+     * 测试流程：复制消息得到的 resBody 可能是 JSON 后面拼接同一个 Thumb URL。
+     * 即使存在尾部 URL，桥接层仍需读取 JSON 内的 Thumb 并按图片表情包渲染。
+     */
+    @Test
+    fun floatingChatParsesStickerResBodyWhenCopiedBodyHasTrailingThumbUrl() {
+        val thumb = "http://vweixinf.tc.qq.com/sticker/copied-body-thumb.png"
+        val copiedBody = """{"Md5":"sticker-md5","Thumb":"$thumb","Size":23770} $thumb"""
+        val conversation = scrmFloatingChatConversation(
+            base = FloatingChatPrototype.sampleConversation(),
+            contacts = emptyList(),
+            accountConversations = listOf(
+                ScrmFloatingAccountConversation(
+                    deviceUuid = "device-1",
+                    weChatId = "wxid_account",
+                    contacts = emptyList(),
+                    messagesByConversation = mapOf(
+                        "wxid_friend" to listOf(
+                            ScrmChatMessage(
+                                messageId = 13,
+                                messageType = 1,
+                                content = copiedBody
+                            )
+                        )
+                    )
+                )
+            ),
+            accounts = listOf(ScrmWechatAccount("wxid_account", "Account", "device-1")),
+            devices = listOf(device("device-1", "wxid_account", online = true)),
+            selectedDeviceUuid = "device-1",
+            selectedWeChatId = "wxid_account"
+        )
+
+        val message = conversation.messages.single()
+        assertEquals("StickerGif", message.type.name)
+        assertEquals("[表情]", message.text)
+        assertEquals(thumb, message.thumbnailUrl)
+        assertEquals(thumb, message.resourceUrl)
     }
 
     @Test
@@ -200,6 +443,41 @@ class ScrmFloatingChatBridgeTest {
             conversation.messages.single().threadContactId
         )
         assertFalse(conversation.messages.single().fromMe)
+    }
+
+    /**
+     * 测试流程：同步一条同时含旧 content 与新 voiceText 的语音消息，检查气泡详情。
+     * 转文字完成后必须展示服务端 voiceText，不能继续显示旧 content。
+     */
+    @Test
+    fun floatingChatVoiceDetailPrefersTranscribedVoiceText() {
+        val conversation = scrmFloatingChatConversation(
+            base = FloatingChatPrototype.sampleConversation(),
+            contacts = emptyList(),
+            accountConversations = listOf(
+                ScrmFloatingAccountConversation(
+                    deviceUuid = "device-1",
+                    weChatId = "wxid_account",
+                    contacts = emptyList(),
+                    messagesByConversation = mapOf(
+                        "wxid_friend" to listOf(
+                            ScrmChatMessage(
+                                messageId = 71L,
+                                messageType = 34,
+                                content = "{\"text\":\"旧语音内容\"}",
+                                voiceText = Json.parseToJsonElement("{\"text\":\"后端转写文字\"}")
+                            )
+                        )
+                    )
+                )
+            ),
+            accounts = listOf(ScrmWechatAccount("wxid_account", "Account", "device-1")),
+            devices = listOf(device("device-1", "wxid_account", online = true)),
+            selectedDeviceUuid = "device-1",
+            selectedWeChatId = "wxid_account"
+        )
+
+        assertEquals("后端转写文字", conversation.messages.single().detail)
     }
 
     @Test

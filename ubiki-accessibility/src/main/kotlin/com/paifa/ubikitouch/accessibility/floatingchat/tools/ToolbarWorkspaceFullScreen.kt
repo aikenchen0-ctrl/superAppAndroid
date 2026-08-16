@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PersonAddAlt1
+import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
@@ -193,6 +194,16 @@ private fun ToolbarScanActions(
                     leadingContent = { Icon(Icons.Filled.PersonAddAlt1, contentDescription = null) },
                     headlineContent = { Text("添加好友", fontWeight = FontWeight.Normal) },
                     supportingContent = { Text("通过微信号或手机号发送申请", fontWeight = FontWeight.Normal) }
+                )
+            }
+        }
+        item {
+            Card(Modifier.fillMaxWidth()) {
+                ListItem(
+                    modifier = Modifier.clickable(onClick = onRequestScan),
+                    leadingContent = { Icon(Icons.Filled.GroupAdd, contentDescription = null) },
+                    headlineContent = { Text("扫码加群", fontWeight = FontWeight.Normal) },
+                    supportingContent = { Text("扫描群二维码加入群聊", fontWeight = FontWeight.Normal) }
                 )
             }
         }

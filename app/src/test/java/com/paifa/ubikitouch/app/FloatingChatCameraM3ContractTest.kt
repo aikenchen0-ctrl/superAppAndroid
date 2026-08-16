@@ -21,5 +21,13 @@ class FloatingChatCameraM3ContractTest {
         assertTrue(source.contains("MaterialTheme.colorScheme"))
         assertTrue(source.contains("floatingWorkspaceSurfaceBackdrop()"))
         assertTrue(source.contains("color = MaterialTheme.colorScheme.surface"))
+        assertTrue(source.contains("FloatingWorkspaceMotion.enterTranslationY"))
+        assertTrue(source.contains("FloatingWorkspaceMotion.exitTranslationY"))
+        assertTrue(source.contains("animateCameraEntrance"))
+        assertTrue(source.contains("CAMERA_WORKSPACE_ANIMATION_MS"))
+        assertTrue(source.contains("PreviewView.ImplementationMode.COMPATIBLE"))
+        assertTrue(source.contains("private var cameraProvider: ProcessCameraProvider? = null"))
+        assertTrue(source.contains("cameraProvider?.unbindAll()"))
+        assertTrue(source.contains("CameraX failed to initialize"))
     }
 }

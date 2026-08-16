@@ -10,6 +10,7 @@ import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 import com.paifa.ubikitouch.core.model.FloatingChatSendState
 
 internal fun FloatingChatMessage.longPressCopyText(): String {
+    if (type == FloatingChatMessageType.StickerGif) return "[表情]"
     return listOfNotNull(
         text.ifBlank { null },
         detail,

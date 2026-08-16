@@ -62,3 +62,16 @@
 - iOS 有位置时发送 `name/city/address/lat/lng/poiId` 全部字段。Android 的发表页将单一位置文本同步写入三个可读字段，并对默认 `lat/lng/poiId` 使用 `@EncodeDefault`，避免默认 JSON 配置将这些字段省略。
 - `partVisible` 与 `notVisible` 仍沿用 iOS 实际发送值；接口文档中出现的 `whoVisible/whoInvisible` 与 iOS 已接入值不一致，因此本轮以真实 iOS 请求为准并保留定向 JSON 契约。
 - 详情页与编辑页的内容列表已经使用 `weight(1f).fillMaxWidth()`，只需替换顶部承载，不改动 SCRM 请求逻辑。
+
+## 已同步语音消息转文字链路
+
+- 接口为 `POST /openapi/v1/messages/{messageId}/voice-trans-text`，其中 `messageId` 对应 SCRM 主键 `FloatingChatMessage.remoteMessageId`；`remoteMessageServerId` 是微信 `msgSvrId`，不能作为路径参数。
+- Android 已有 `ScrmMessageOperationApi.transcribeVoiceMessage` 和 HTTP 实现，但生产 UI 尚无调用点；旧的 SCRM 操作预览只组装请求且误用了 `remoteMessageServerId`。
+- 真实入口应放在消息点击后的首层 `MessageLongPressMenuOverlay`，并仅对已同步语音消息显示；本地待发送录音没有服务端消息 ID，确认层中的“转文字”是死入口，应移除。
+- 转写接口返回异步任务，必须轮询任务状态；任务完成后刷新聊天。刷新链还需确保同 ID 新消息替换缓存旧对象，并让 Voice 详情优先展示 `voiceText`，否则结果会被旧 content 遮住。
+- 消息操作已经拆分为 `MessageLongPressMenu`、`MessageLongPressActions` 与 `MessageInteractionOverlayHost`，新增行为应沿这三层传递，避免把业务请求塞进可组合菜单本身。
+- SCRM 层已有 `ScrmContactTaskRunner`、`ScrmMomentTaskRunner`、`PaymentTaskRunner` 等轮询范式，并统一使用 `resolveScrmTaskResult` 解释服务端终态；语音转写执行器应复用这套状态语义。
+- `FloatingChatOverlayUi` 已集中构造 `MessageLongPressActions`，适合作为 UI 与转写执行器的唯一连接点；`MessageLongPressMenuOverlay` 只负责按消息筛选和渲染操作，业务调用仍留在 action 回调中。
+- `ScrmSelectedSession` 当前显式暴露 read/contact/chatRoom/message/moment/task API，但缺少 `ScrmMessageOperationApi`。应把 message-operation API 作为具名依赖加入 session，由同一 `ScrmApiClient` 注入，避免运行时强制转换。
+- `FloatingChatOverlayController` 已持有唯一的 `refreshScrmConversationFromApi()` 刷新入口，并在展开、切换账号和发送任务处理后复用。转写终态刷新应由 Controller 以回调注入 Overlay，避免 UI 复制缓存合并或网络刷新逻辑。
+- 新增 `MessageLongPressAction` 不会破坏收藏列表操作分支，`FavoriteCollectionOverlayHost` 对非收藏专用操作已有显式 `else -> Unit`；主消息操作的 exhaustive `when` 则必须新增真实转写回调。

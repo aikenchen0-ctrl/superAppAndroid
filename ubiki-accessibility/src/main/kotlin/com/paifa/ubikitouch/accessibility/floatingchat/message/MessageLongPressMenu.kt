@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.Button
@@ -62,6 +63,7 @@ import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import kotlin.math.roundToInt
 
 internal enum class MessageLongPressAction(val label: String) {
+    Transcribe("转文字"),
     Listen("话外音"),
     Copy("复制"),
     Forward("转发"),
@@ -84,6 +86,20 @@ internal fun messageLongPressPrimaryActions(): List<MessageLongPressAction> {
         MessageLongPressAction.Zoom,
         MessageLongPressAction.Delete
     )
+}
+
+/**
+ * UI：点击已同步语音消息时，将“转文字”放在首层操作菜单；本地录音和其他消息不展示。
+ * 测试流程：依次点击已同步语音、本地语音和文本消息，仅第一种应在首位看到“转文字”。
+ */
+internal fun messageLongPressActionsFor(message: FloatingChatMessage): List<MessageLongPressAction> {
+    val canTranscribe = message.type == com.paifa.ubikitouch.core.model.FloatingChatMessageType.Voice &&
+        message.remoteMessageId?.let { it > 0L } == true
+    return if (canTranscribe) {
+        listOf(MessageLongPressAction.Transcribe) + messageLongPressPrimaryActions()
+    } else {
+        messageLongPressPrimaryActions()
+    }
 }
 
 internal fun messageLongPressUsesWechatFloatingPanel(): Boolean = true
@@ -148,7 +164,7 @@ internal fun MessageLongPressMenuOverlay(
         val clampedY = topPx.coerceIn(marginPx, (viewportHeightPx - menuHeightPx - marginPx).coerceAtLeast(marginPx))
 
         MessageLongPressMenu(
-            actions = messageLongPressPrimaryActions(),
+            actions = messageLongPressActionsFor(message),
             pointerOnTop = placeBelow,
             onAction = onAction,
             modifier = Modifier
@@ -493,6 +509,7 @@ private fun LongPressBarButton(
 
 private fun MessageLongPressAction.icon(): ImageVector {
     return when (this) {
+        MessageLongPressAction.Transcribe -> Icons.Filled.TextFields
         MessageLongPressAction.Listen -> Icons.Filled.VolumeUp
         MessageLongPressAction.Zoom -> Icons.Filled.ZoomIn
         MessageLongPressAction.Copy -> Icons.Filled.ContentCopy

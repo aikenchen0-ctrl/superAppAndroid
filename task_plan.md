@@ -16,6 +16,20 @@
 - [x] 验证：运行定向单测、Kotlin 编译和变更范围审查；遇到并发 Gradle 占用时等待后重试。
 - **状态：** complete
 
+## 本轮：已同步语音消息按 messageId 转文字
+
+- [x] 明确入口仅位于已同步语音消息的首层消息选项，本地待发送录音不具备 SCRM messageId。
+- [ ] 红灯验证消息感知操作列表、真实接口任务执行、刷新替换和 voiceText 展示契约。
+- [ ] 实现“转文字”操作、异步任务轮询、终态刷新与明确错误反馈，并移除待发送录音的无效入口。
+- [ ] 运行定向测试、模块 Kotlin 编译和 `git diff --check`，复核未误用微信 msgSvrId。
+
+### 本轮约束
+
+- 路径参数只能使用 `FloatingChatMessage.remoteMessageId`，禁止使用 `remoteMessageServerId`。
+- 仅 `Voice` 且 `remoteMessageId > 0` 的消息显示“转文字”。
+- 转写任务不得静默成功、吞错或自动重提；任务终态后刷新当前聊天以读取服务端 `voiceText`。
+- 保持共享悬浮根节点内的 Material 3 消息选项，不新增 Dialog，避免 BadTokenException。
+
 ## 当前轮次
 
 - [x] 审查共享宿主、未读路由与现有改动，确认透明根和受限尺寸的来源。

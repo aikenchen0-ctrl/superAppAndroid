@@ -25,16 +25,16 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachMoney
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Contacts
-import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.ManageAccounts
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Textsms
+import androidx.compose.material.icons.filled.VideoCall
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -96,25 +96,32 @@ internal fun MoreToolPanel(
     }
 }
 
+/**
+ * BottomNav 的“+”菜单只保留聊天发送场景需要的 12 个入口。
+ * 每项均由 [PanelToolButton] 统一渲染为 M3 图标 + 下方文字，点击后复用现有
+ * BottomPanelMode 路由；“签约”暂由现有 SCRM 运营工作区承载，避免新增悬浮窗口和
+ * BadToken 风险，后续接入正式签约接口时只需替换该目的地。
+ */
 private fun morePanelTools(): List<PanelTool> = listOf(
-    PanelTool(Icons.Filled.Mic, "\u8bed\u97f3\u8f93\u5165", BottomPanelMode.Voice),
-    PanelTool(Icons.Filled.SmartToy, "AI\u8bed\u97f3", opensAiVoice = true),
-    PanelTool(Icons.Filled.Textsms, "\u5feb\u6377\u8bdd\u672f", BottomPanelMode.QuickPhrase),
-    PanelTool(Icons.Filled.LocationOn, "\u4f4d\u7f6e", BottomPanelMode.Location),
+    PanelTool(Icons.Filled.Image, "相册", BottomPanelMode.Gallery),
+    PanelTool(Icons.Filled.VideoCall, "\u89c6\u9891\u901a\u8bdd", BottomPanelMode.VideoCall),
+    PanelTool(Icons.Filled.Call, "\u8bed\u97f3\u901a\u8bdd", BottomPanelMode.VoiceCall),
+    PanelTool(Icons.Filled.LocationOn, "\u5b9a\u4f4d", BottomPanelMode.Location),
     PanelTool(Icons.Filled.CardGiftcard, "\u7ea2\u5305", BottomPanelMode.RedPacket),
-    PanelTool(Icons.Filled.AttachMoney, "\u8f6c\u8d26", BottomPanelMode.Transfer),
-    PanelTool(Icons.Filled.Groups, "AA 收款", BottomPanelMode.SplitBill),
     PanelTool(Icons.Filled.CardGiftcard, "\u793c\u7269", BottomPanelMode.Gift),
+    PanelTool(Icons.Filled.AttachMoney, "\u8f6c\u8d26", BottomPanelMode.Transfer),
     PanelTool(Icons.Filled.Star, "\u6536\u85cf", BottomPanelMode.Favorite),
-    PanelTool(Icons.Filled.Star, "\u6536\u85cf\u8868\u60c5", BottomPanelMode.ScrmEmoji),
-    PanelTool(Icons.Filled.CardGiftcard, "\u5c0f\u7a0b\u5e8f\u5361\u7247", BottomPanelMode.ScrmWeAppCard),
-    PanelTool(Icons.Filled.Contacts, "\u5361\u7247\u6a21\u677f", BottomPanelMode.ScrmCardTemplates),
-    PanelTool(Icons.Filled.Textsms, "\u6279\u91cf\u53d1\u9001", BottomPanelMode.ScrmBatchSend),
-    PanelTool(Icons.Filled.ManageAccounts, "SCRM\u8fd0\u8425", BottomPanelMode.ScrmOperations),
+    PanelTool(Icons.Filled.ManageAccounts, "\u7b7e\u7ea6", BottomPanelMode.ScrmOperations),
     PanelTool(Icons.Filled.Contacts, "\u540d\u7247", BottomPanelMode.Card),
-    PanelTool(Icons.Filled.Collections, "\u670b\u53cb\u5708", BottomPanelMode.Moments),
+    PanelTool(Icons.Filled.Description, "\u6587\u4ef6", BottomPanelMode.FileDocument),
     PanelTool(Icons.Filled.Collections, "\u7d20\u6750", BottomPanelMode.MomentMaterials)
 )
+
+/** Visible labels in the BottomNav “+” menu, kept as a small UI contract for tests. */
+internal fun morePanelToolLabels(): List<String> = morePanelTools().map { it.label }
+
+/** Destination modes used by the BottomNav “+” menu, in visual order. */
+internal fun morePanelToolModes(): List<BottomPanelMode> = morePanelTools().mapNotNull { it.panelMode }
 
 internal fun moreToolPanelUsesUniqueDestinations(): Boolean {
     val destinations = morePanelTools().mapNotNull { it.panelMode }

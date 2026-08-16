@@ -2,7 +2,6 @@
 
 package com.paifa.ubikitouch.accessibility
 
-import android.net.Uri
 import com.paifa.ubikitouch.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.ubikitouch.accessibility.floatingchat.account.*
 import com.paifa.ubikitouch.accessibility.floatingchat.input.*
@@ -533,6 +532,7 @@ internal fun FloatingChatOverlay(
     var inputFocused by remember { mutableStateOf(false) }
     var voiceInputMode by remember { mutableStateOf(false) }
     var pendingVoiceRecording by remember { mutableStateOf<PendingVoiceRecording?>(null) }
+    var pendingVoiceTranscriptionError by remember { mutableStateOf<String?>(null) }
     var sendNameEnabledByAccountId by remember { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
     var bottomPanelMode by remember { mutableStateOf(BottomPanelMode.None) }
     var locationIsLive by remember { mutableStateOf(false) }
@@ -1688,7 +1688,10 @@ internal fun FloatingChatOverlay(
                     voiceInputMode = voiceInputMode,
                     onVoiceInputModeChange = { voiceInputMode = it },
                     voicePermissionRequestToken = voicePermissionRequestToken,
-                    onRecordingReady = { pendingVoiceRecording = it },
+                    onRecordingReady = {
+                        pendingVoiceTranscriptionError = null
+                        pendingVoiceRecording = it
+                    },
                     panelMode = bottomPanelMode,
                     onPanelModeChange = { nextMode ->
                         if (nextMode != BottomPanelMode.None) voiceInputMode = false
@@ -2797,7 +2800,10 @@ internal fun FloatingChatOverlay(
                             voiceInputMode = voiceInputMode,
                             onVoiceInputModeChange = { voiceInputMode = it },
                             voicePermissionRequestToken = voicePermissionRequestToken,
-                            onRecordingReady = { pendingVoiceRecording = it },
+                            onRecordingReady = {
+                                pendingVoiceTranscriptionError = null
+                                pendingVoiceRecording = it
+                            },
                             panelMode = bottomPanelMode,
                             onPanelModeChange = { nextMode ->
                                 if (nextMode != BottomPanelMode.None) voiceInputMode = false
@@ -2824,15 +2830,23 @@ internal fun FloatingChatOverlay(
         pendingVoiceRecording?.let { recording ->
             VoiceSendConfirmationOverlay(
                 recording = recording,
+                statusMessage = pendingVoiceTranscriptionError,
                 onCancel = {
                     recording.file.delete()
+                    pendingVoiceTranscriptionError = null
                     pendingVoiceRecording = null
+                },
+                // 本地待发送录音没有服务端 messageId，不能误调用仅支持已同步语音的转文字接口。
+                onTranscribe = {
+                    pendingVoiceTranscriptionError =
+                        "当前录音尚未发送。现有转文字接口仅支持已同步的语音消息，无法直接处理本地录音。"
                 },
                 onConfirm = {
                     inputMessageActions.sendVoiceMessage(
                         Uri.fromFile(recording.file).toString(),
                         recording.durationMs
                     )
+                    pendingVoiceTranscriptionError = null
                     pendingVoiceRecording = null
                 }
             )

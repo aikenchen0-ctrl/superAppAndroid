@@ -2,6 +2,7 @@ package com.paifa.ubikitouch.accessibility.floatingchat.message.renderers
 
 import androidx.compose.runtime.Composable
 import com.paifa.ubikitouch.accessibility.floatingchat.media.ImageThumbnailContent
+import com.paifa.ubikitouch.accessibility.floatingchat.media.StickerImageContent
 import com.paifa.ubikitouch.accessibility.floatingchat.media.VideoPreviewContent
 import com.paifa.ubikitouch.accessibility.floatingchat.message.StickerMessageCard
 import com.paifa.ubikitouch.core.model.FloatingChatMessageType
@@ -40,15 +41,7 @@ internal object MediaMessageRenderer : MessageRenderer {
                 environment.onContentBoundsChanged
             )
             FloatingChatMessageType.StickerGif -> if (message.thumbnailUrl != null || message.resourceUrl != null) {
-                ImageThumbnailContent(
-                    message.copy(type = FloatingChatMessageType.ImageThumbnail),
-                    environment.onPreviewMedia,
-                    environment.onOpenMediaActions,
-                    environment.onLongPressMessage,
-                    environment.multiSelectMode,
-                    environment.onToggleSelection,
-                    environment.onContentBoundsChanged
-                )
+                StickerImageContent(message)
             } else {
                 StickerMessageCard(message)
             }

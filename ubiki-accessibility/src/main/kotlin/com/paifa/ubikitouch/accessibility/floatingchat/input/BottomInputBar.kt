@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Mic
@@ -28,6 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -211,7 +213,7 @@ internal fun BottomInputBar(
                     }
                 )
                 BottomIcon(
-                    action = BottomInputAction.Voice,
+                    action = if (voiceInputMode) BottomInputAction.Text else BottomInputAction.Voice,
                     active = voiceInputMode,
                     onClick = {
                         onVoiceInputModeChange(!voiceInputMode)
@@ -253,7 +255,7 @@ internal fun BottomInputBar(
                             Icon(
                                 imageVector = Icons.Filled.Close,
                                 contentDescription = "\u6e05\u9664 AI \u751f\u6210\u5185\u5bb9",
-                                tint = OverlayTokens.accent,
+                                tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(BottomInputIconSizeDp.dp)
                             )
                         }
@@ -315,7 +317,7 @@ private fun QuotedComposerPreview(
                     text = "x",
                     size = 12.sp,
                     weight = FontWeight.Bold,
-                    color = OverlayTokens.panelPrimaryText,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1
                 )
             }
@@ -381,11 +383,7 @@ private fun BottomIcon(
     active: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
-    val iconTint = when {
-        action == BottomInputAction.Assistant -> OverlayTokens.accent
-        action == BottomInputAction.Send -> OverlayTokens.accent
-        else -> WechatInputIcon
-    }
+    val iconTint = MaterialTheme.colorScheme.onSurface
     CompactInteractiveSize {
         IconButton(
             onClick = { onClick?.invoke() },
@@ -420,14 +418,13 @@ private val WechatInputBackground = androidx.compose.ui.graphics.Color(0xFFFFFFF
 private val WechatInputFocus = androidx.compose.ui.graphics.Color(0xFF07C160)
 private val WechatInputText = androidx.compose.ui.graphics.Color(0xFF1F1F1F)
 private val WechatInputPlaceholder = androidx.compose.ui.graphics.Color(0xFFB2B2B2)
-private val WechatInputIcon = androidx.compose.ui.graphics.Color(0xFF303030)
 
 private fun bottomInputActionIcon(action: BottomInputAction): ImageVector {
     return when (action) {
         BottomInputAction.Home -> Icons.Filled.Home
         BottomInputAction.Emoji -> Icons.Filled.EmojiEmotions
         BottomInputAction.Voice -> Icons.Filled.Mic
-        BottomInputAction.Text -> Icons.AutoMirrored.Filled.Send
+        BottomInputAction.Text -> Icons.Filled.Edit
         BottomInputAction.Gift -> Icons.Filled.CardGiftcard
         BottomInputAction.More -> Icons.Filled.Add
         BottomInputAction.Assistant -> Icons.Filled.SmartToy

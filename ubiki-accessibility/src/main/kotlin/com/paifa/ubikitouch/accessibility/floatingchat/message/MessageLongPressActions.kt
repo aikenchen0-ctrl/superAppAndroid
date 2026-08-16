@@ -64,11 +64,16 @@ internal class MessageLongPressActions(
     private val onQuoteMessage: (FloatingChatMessage) -> Unit,
     private val onListenMessage: (FloatingChatMessage) -> Unit,
     private val onZoomMessage: (FloatingChatMessage) -> Unit,
+    private val onTranscribeMessage: (FloatingChatMessage) -> Unit,
     private val onScrmOperationRequested: (FloatingChatMessage) -> Unit,
     private val onCloseLongPressMenu: () -> Unit
 ) {
     fun performLongPressAction(message: FloatingChatMessage, action: MessageLongPressAction) {
         when (action) {
+            MessageLongPressAction.Transcribe -> {
+                // 接口：由悬浮聊天宿主使用消息的 SCRM remoteMessageId 提交真实语音转写任务。
+                onTranscribeMessage(message)
+            }
             MessageLongPressAction.Listen -> {
                 onListenMessage(message)
             }

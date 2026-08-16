@@ -39,14 +39,14 @@ import com.paifa.ubikitouch.core.model.FloatingChatMessagePresentation
 @Composable
 internal fun SimpleTextMessageContent(message: FloatingChatMessage, index: Int) {
     val isSystem = message.presentation == FloatingChatMessagePresentation.System
-    val displayText = remember(message.text) { chatBubbleDisplayText(message.text) }
+    val displayContent = remember(message.text) { chatBubbleDisplayContent(message.text) }
     TextLabel(
-        text = displayText,
+        text = displayContent.text,
         size = if (isSystem) 11.sp else 14.sp,
         weight = if (isSystem) FontWeight.Normal else FontWeight.Normal,
         color = if (isSystem) OverlayTokens.systemPromptText else OverlayTokens.imModuleBubbleText,
         lineHeight = if (isSystem) 15.sp else 20.sp,
-        maxLines = if (isSystem) 2 else if (index < 2) 3 else 4,
+        maxLines = if (displayContent.usesRawResponseBody) Int.MAX_VALUE else if (isSystem) 2 else if (index < 2) 3 else 4,
         shadow = OverlayTokens.imModuleTextShadow
     )
     message.detail?.takeIf { it.isNotBlank() }?.let { detail ->
@@ -65,9 +65,10 @@ internal fun SimpleTextMessageContent(message: FloatingChatMessage, index: Int) 
 
 @Composable
 internal fun MixedTextMessageContent(message: FloatingChatMessage) {
-    val text = remember(message.inlineTokens, message.text) {
+    val displayContent = remember(message.text) { chatBubbleDisplayContent(message.text) }
+    val text = remember(message.inlineTokens, displayContent) {
         if (message.inlineTokens.isEmpty()) {
-            AnnotatedString(chatBubbleDisplayText(message.text))
+            AnnotatedString(displayContent.text)
         } else {
             buildAnnotatedString {
                 message.inlineTokens.forEach { token ->
@@ -96,23 +97,24 @@ internal fun MixedTextMessageContent(message: FloatingChatMessage) {
         text = text,
         size = 11.sp,
         lineHeight = 15.sp,
-        maxLines = 5,
+        maxLines = if (message.inlineTokens.isEmpty() && displayContent.usesRawResponseBody) Int.MAX_VALUE else 5,
         shadow = OverlayTokens.imModuleTextShadow
     )
 }
 
 @Composable
 internal fun QuoteMessageContent(message: FloatingChatMessage) {
+    val displayContent = remember(message.text) { chatBubbleDisplayContent(message.text) }
     if (message.quoteAuthor.orEmpty().isNotBlank() || message.quoteText.orEmpty().isNotBlank()) {
         QuoteBlock(message)
     }
     TextLabel(
-        text = chatBubbleDisplayText(message.text),
+        text = displayContent.text,
         size = 14.sp,
         weight = FontWeight.Normal,
         color = OverlayTokens.imModuleBubbleText,
         lineHeight = 15.sp,
-        maxLines = 4,
+        maxLines = if (displayContent.usesRawResponseBody) Int.MAX_VALUE else 4,
         shadow = OverlayTokens.imModuleTextShadow
     )
 }

@@ -1,12 +1,32 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.message
 
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.MessageAsideRequestTracker
+import com.paifa.ubikitouch.core.model.FloatingChatMessage
+import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MessageStandardActionsTest {
+    @Test
+    fun stickerCopyDoesNotExposePayloadOrDownloadUrl() {
+        val message = FloatingChatMessage(
+            id = "sticker-1",
+            type = FloatingChatMessageType.StickerGif,
+            text = "{\"Md5\":\"1c3c326f0d065a84dd2c7ac9638910bb\",\"Thumb\":\"http://vweixinf.tc.qq.com/sticker.png\",\"Size\":23770}",
+            fromMe = false,
+            senderName = "张三",
+            time = "10:00",
+            detail = "GIF 贴纸",
+            resourceUrl = "http://vweixinf.tc.qq.com/sticker.png",
+            thumbnailUrl = "http://vweixinf.tc.qq.com/sticker.png"
+        )
+
+        assertEquals("[表情]", message.longPressCopyText())
+    }
+
     @Test
     fun primaryActionsFollowTheEightActionProductOrder() {
         assertEquals(
@@ -22,6 +42,76 @@ class MessageStandardActionsTest {
             ),
             messageLongPressPrimaryActions()
         )
+    }
+
+    @Test
+    fun onlySyncedVoiceMessagesExposeTranscribeInTheClickMenu() {
+        val syncedVoice = FloatingChatMessage(
+            id = "voice-1",
+            type = FloatingChatMessageType.Voice,
+            text = "[语音]",
+            fromMe = false,
+            senderName = "张三",
+            time = "10:00",
+            remoteMessageId = 71L
+        )
+
+        assertEquals(
+            MessageLongPressAction.Transcribe,
+            messageLongPressActionsFor(syncedVoice).first()
+        )
+        assertFalse(
+            messageLongPressActionsFor(syncedVoice.copy(remoteMessageId = null))
+                .contains(MessageLongPressAction.Transcribe)
+        )
+        assertFalse(
+            messageLongPressActionsFor(syncedVoice.copy(remoteMessageId = 0L))
+                .contains(MessageLongPressAction.Transcribe)
+        )
+        assertFalse(
+            messageLongPressActionsFor(syncedVoice.copy(remoteMessageId = -1L))
+                .contains(MessageLongPressAction.Transcribe)
+        )
+        assertFalse(
+            messageLongPressActionsFor(syncedVoice.copy(type = FloatingChatMessageType.Text))
+                .contains(MessageLongPressAction.Transcribe)
+        )
+    }
+
+    @Test
+    fun transcribeActionForwardsTheSelectedMessageAndClosesTheMenu() {
+        val message = FloatingChatMessage(
+            id = "voice-71",
+            type = FloatingChatMessageType.Voice,
+            text = "[语音]",
+            fromMe = false,
+            senderName = "张三",
+            time = "10:00",
+            remoteMessageId = 71L
+        )
+        var transcribeTarget: FloatingChatMessage? = null
+        var menuClosed = false
+        val actions = MessageLongPressActions(
+            favoriteMessageIds = mutableMapOf(),
+            hiddenMessageIds = mutableMapOf(),
+            selectedMessageIds = mutableMapOf(),
+            onCopyText = {},
+            onShowToast = {},
+            onBeginForward = {},
+            onFavoriteChanged = { _, _ -> },
+            onMultiSelectModeChanged = {},
+            onQuoteMessage = {},
+            onListenMessage = {},
+            onZoomMessage = {},
+            onTranscribeMessage = { transcribeTarget = it },
+            onScrmOperationRequested = {},
+            onCloseLongPressMenu = { menuClosed = true }
+        )
+
+        actions.performLongPressAction(message, MessageLongPressAction.Transcribe)
+
+        assertEquals(message, transcribeTarget)
+        assertTrue(menuClosed)
     }
 
     @Test
