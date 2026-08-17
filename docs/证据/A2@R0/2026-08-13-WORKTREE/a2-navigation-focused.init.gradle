@@ -1,6 +1,0 @@
-gradle.projectsEvaluated {
-    def accessibility = gradle.rootProject.findProject(':ubiki-accessibility')
-    accessibility.tasks.named('compileDebugUnitTestKotlin').configure { task ->
-        task.exclude('**/FinderContractsTest.kt')
-    }
-}
