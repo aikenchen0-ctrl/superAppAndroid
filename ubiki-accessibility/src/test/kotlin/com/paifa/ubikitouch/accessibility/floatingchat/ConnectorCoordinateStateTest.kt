@@ -202,12 +202,11 @@ class ConnectorCoordinateStateTest {
         )
 
         updateOffscreenConnectorEdges(
-            index = ConnectorOffscreenIndex(
-                beforeByIndex = listOf(setOf(activeKey)),
-                afterByIndex = listOf(setOf(activeKey))
-            ),
-            firstVisibleIndex = 0,
-            lastVisibleIndex = 0,
+            index = ConnectorOffscreenIndex.fromKeys(messageCount = 3) { index ->
+                activeKey.takeIf { index != 1 }
+            },
+            firstVisibleIndex = 1,
+            lastVisibleIndex = 1,
             destination = destination
         )
 

@@ -1,9 +1,26 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.message
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.dp
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatThreadSelection
 import com.paifa.ubikitouch.accessibility.floatingchat.aivoice.MessageAsideAnalysisState
 import com.paifa.ubikitouch.accessibility.scrm.PaymentReadback
@@ -11,9 +28,75 @@ import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 
 @Composable
+internal fun MessageRevokeConfirmationDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.32f))
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = {})
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        // Draw inside the attached accessibility overlay root. A platform Dialog would need
+        // an Activity window token and can throw WindowManager.BadTokenException here.
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .widthIn(max = 320.dp),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 6.dp,
+            shadowElevation = 6.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "确定撤销",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.headlineSmall
+                )
+                Text(
+                    text = "撤销后，此消息将从当前会话中撤回。",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text(
+                            text = "取消",
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                    TextButton(onClick = onConfirm) {
+                        Text(
+                            text = "确定",
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 internal fun MessageInteractionOverlayHost(
     paymentDetailMessage: FloatingChatMessage?,
     longPressMessage: FloatingChatMessage?,
+    revokeConfirmationMessage: FloatingChatMessage?,
     longPressAnchorBounds: Rect?,
     asideAnalysisState: MessageAsideAnalysisState?,
     textZoomMessage: FloatingChatMessage?,
@@ -29,6 +112,8 @@ internal fun MessageInteractionOverlayHost(
     onRefreshPaymentStatus: (FloatingChatMessage) -> Unit,
     onClaimPayment: (FloatingChatMessage) -> Unit,
     onLongPressMessageChanged: (FloatingChatMessage?) -> Unit,
+    onRevokeConfirmationDismissed: () -> Unit,
+    onRevokeConfirmed: (FloatingChatMessage) -> Unit,
     onAsideAnalysisDismissed: () -> Unit,
     onTextZoomDismissed: () -> Unit,
     onStartForwardingMessages: (List<FloatingChatMessage>) -> Unit,
@@ -58,6 +143,13 @@ internal fun MessageInteractionOverlayHost(
             messageBounds = longPressAnchorBounds,
             onDismiss = { onLongPressMessageChanged(null) },
             onAction = { action -> messageLongPressActions.performLongPressAction(message, action) },
+            modifier = modifier.fillMaxSize()
+        )
+    }
+    revokeConfirmationMessage?.let { message ->
+        MessageRevokeConfirmationDialog(
+            onDismiss = onRevokeConfirmationDismissed,
+            onConfirm = { onRevokeConfirmed(message) },
             modifier = modifier.fillMaxSize()
         )
     }

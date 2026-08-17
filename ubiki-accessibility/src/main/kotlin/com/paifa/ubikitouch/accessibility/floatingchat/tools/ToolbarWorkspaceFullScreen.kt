@@ -60,6 +60,7 @@ internal fun ToolbarWorkspaceFullScreen(
     onBack: () -> Unit,
     onRequestScan: () -> Unit,
     onOpenAddFriend: () -> Unit,
+    onOpenCreateGroup: () -> Unit,
     onSubmitFriend: suspend (account: String, message: String) -> String
 ) {
     // 页面只负责内容，进出场由 UI组件 同一聊天根的 AnimatedVisibility 执行。
@@ -83,7 +84,8 @@ internal fun ToolbarWorkspaceFullScreen(
                 ToolbarWorkspaceMode.Search -> ToolbarMessageSearchContent(messages)
                 ToolbarWorkspaceMode.Scan -> ToolbarScanActions(
                     onRequestScan = { close(onRequestScan) },
-                    onOpenAddFriend = onOpenAddFriend
+                    onOpenAddFriend = onOpenAddFriend,
+                    onOpenCreateGroup = onOpenCreateGroup
                 )
                 ToolbarWorkspaceMode.AddFriend -> ToolbarAddFriendContent(onSubmitFriend)
             }
@@ -161,7 +163,8 @@ private fun ToolbarMessageSearchContent(messages: List<FloatingChatMessage>) {
 @Composable
 private fun ToolbarScanActions(
     onRequestScan: () -> Unit,
-    onOpenAddFriend: () -> Unit
+    onOpenAddFriend: () -> Unit,
+    onOpenCreateGroup: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -194,6 +197,16 @@ private fun ToolbarScanActions(
                     leadingContent = { Icon(Icons.Filled.PersonAddAlt1, contentDescription = null) },
                     headlineContent = { Text("添加好友", fontWeight = FontWeight.Normal) },
                     supportingContent = { Text("通过微信号或手机号发送申请", fontWeight = FontWeight.Normal) }
+                )
+            }
+        }
+        item {
+            Card(Modifier.fillMaxWidth()) {
+                ListItem(
+                    modifier = Modifier.clickable(onClick = onOpenCreateGroup),
+                    leadingContent = { Icon(Icons.Filled.GroupAdd, contentDescription = null) },
+                    headlineContent = { Text("创建群聊", fontWeight = FontWeight.Normal) },
+                    supportingContent = { Text("选择多个好友发起群聊", fontWeight = FontWeight.Normal) }
                 )
             }
         }

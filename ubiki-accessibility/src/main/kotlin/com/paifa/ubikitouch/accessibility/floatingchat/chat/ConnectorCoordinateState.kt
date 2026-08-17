@@ -506,62 +506,82 @@ internal data class ConnectorViewportEdgeState(
     val hasBelow: Boolean = false
 )
 
-internal data class ConnectorOffscreenIndex(
-    val beforeByIndex: List<Set<ConnectorTargetKey>>,
-    val afterByIndex: List<Set<ConnectorTargetKey>>
+internal class ConnectorOffscreenIndex private constructor(
+    private val messageCount: Int,
+    private val firstOccurrences: List<ConnectorTargetOccurrence>,
+    private val lastOccurrencesDescending: List<ConnectorTargetOccurrence>
 ) {
-    fun targetsAbove(firstVisibleIndex: Int): Set<ConnectorTargetKey> {
-        if (beforeByIndex.isEmpty()) return emptySet()
-        return beforeByIndex[firstVisibleIndex.coerceIn(0, beforeByIndex.lastIndex)]
-    }
+    fun updateEdges(
+        firstVisibleIndex: Int,
+        lastVisibleIndex: Int,
+        destination: MutableMap<ConnectorTargetKey, ConnectorViewportEdgeState>
+    ) {
+        destination.clear()
+        if (messageCount == 0) return
 
-    fun targetsBelow(lastVisibleIndex: Int): Set<ConnectorTargetKey> {
-        if (afterByIndex.isEmpty()) return emptySet()
-        return afterByIndex[lastVisibleIndex.coerceIn(0, afterByIndex.lastIndex)]
+        val firstVisible = firstVisibleIndex.coerceIn(0, messageCount - 1)
+        for (occurrence in firstOccurrences) {
+            if (occurrence.index >= firstVisible) break
+            destination[occurrence.key] = ConnectorAboveViewportEdgeState
+        }
+
+        val lastVisible = lastVisibleIndex.coerceIn(0, messageCount - 1)
+        for (occurrence in lastOccurrencesDescending) {
+            if (occurrence.index <= lastVisible) break
+            destination[occurrence.key] = if (destination.containsKey(occurrence.key)) {
+                ConnectorBothViewportEdgesState
+            } else {
+                ConnectorBelowViewportEdgeState
+            }
+        }
     }
 
     companion object {
-        fun fromMessages(
-            messages: List<FloatingChatMessage>,
-            selection: ChatThreadSelection,
-            selectedAccountId: String,
-            homeOverviewVisible: Boolean = false,
-            groupMemberAvatarsVisible: Boolean
+        private val Empty = ConnectorOffscreenIndex(
+            messageCount = 0,
+            firstOccurrences = emptyList(),
+            lastOccurrencesDescending = emptyList()
+        )
+
+        fun empty(): ConnectorOffscreenIndex = Empty
+
+        fun fromKeys(
+            messageCount: Int,
+            keyAt: (Int) -> ConnectorTargetKey?
         ): ConnectorOffscreenIndex {
-            if (messages.isEmpty()) {
-                return ConnectorOffscreenIndex(emptyList(), emptyList())
-            }
+            if (messageCount <= 0) return Empty
 
-            val keysByIndex = messages.map { message ->
-                offscreenConnectorTargetKey(
-                    message = message,
-                    selection = selection,
-                    selectedAccountId = selectedAccountId,
-                    homeOverviewVisible = homeOverviewVisible,
-                    groupMemberAvatarsVisible = groupMemberAvatarsVisible
-                )
+            val firstIndexByTarget = linkedMapOf<ConnectorTargetKey, Int>()
+            val lastIndexByTarget = mutableMapOf<ConnectorTargetKey, Int>()
+            repeat(messageCount) { index ->
+                val key = keyAt(index) ?: return@repeat
+                firstIndexByTarget.putIfAbsent(key, index)
+                lastIndexByTarget[key] = index
             }
-            val beforeByIndex = MutableList(messages.size) { emptySet<ConnectorTargetKey>() }
-            val seenBefore = linkedSetOf<ConnectorTargetKey>()
-            keysByIndex.forEachIndexed { index, key ->
-                beforeByIndex[index] = seenBefore.toSet()
-                if (key != null) seenBefore += key
-            }
-
-            val afterByIndex = MutableList(messages.size) { emptySet<ConnectorTargetKey>() }
-            val seenAfter = linkedSetOf<ConnectorTargetKey>()
-            for (index in keysByIndex.lastIndex downTo 0) {
-                afterByIndex[index] = seenAfter.toSet()
-                keysByIndex[index]?.let { key -> seenAfter += key }
-            }
-
             return ConnectorOffscreenIndex(
-                beforeByIndex = beforeByIndex,
-                afterByIndex = afterByIndex
+                messageCount = messageCount,
+                firstOccurrences = firstIndexByTarget.map { (key, index) ->
+                    ConnectorTargetOccurrence(key, index)
+                },
+                lastOccurrencesDescending = lastIndexByTarget
+                    .map { (key, index) -> ConnectorTargetOccurrence(key, index) }
+                    .sortedByDescending { occurrence -> occurrence.index }
             )
         }
     }
 }
+
+private data class ConnectorTargetOccurrence(
+    val key: ConnectorTargetKey,
+    val index: Int
+)
+
+private val ConnectorAboveViewportEdgeState = ConnectorViewportEdgeState(hasAbove = true)
+private val ConnectorBelowViewportEdgeState = ConnectorViewportEdgeState(hasBelow = true)
+private val ConnectorBothViewportEdgesState = ConnectorViewportEdgeState(
+    hasAbove = true,
+    hasBelow = true
+)
 
 internal fun createGroupMemberMessageConnectorBranch(
     avatarBounds: Rect,
@@ -635,13 +655,11 @@ internal fun updateOffscreenConnectorEdges(
     lastVisibleIndex: Int,
     destination: MutableMap<ConnectorTargetKey, ConnectorViewportEdgeState>
 ) {
-    destination.clear()
-    index.targetsAbove(firstVisibleIndex).forEach { key ->
-        destination[key] = (destination[key] ?: ConnectorViewportEdgeState()).copy(hasAbove = true)
-    }
-    index.targetsBelow(lastVisibleIndex).forEach { key ->
-        destination[key] = (destination[key] ?: ConnectorViewportEdgeState()).copy(hasBelow = true)
-    }
+    index.updateEdges(
+        firstVisibleIndex = firstVisibleIndex,
+        lastVisibleIndex = lastVisibleIndex,
+        destination = destination
+    )
 }
 
 internal fun FloatingChatMessage.toConnectorTargetKey(

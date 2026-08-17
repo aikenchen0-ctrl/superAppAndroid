@@ -561,24 +561,23 @@ internal fun homeOverviewMessageGroups(
     messages: List<FloatingChatMessage>,
     accountIdsByMessageId: Map<String, String> = emptyMap()
 ): List<HomeOverviewMessageGroup> {
-    val groupsByContactAndAccount = linkedMapOf<Pair<String?, String>, HomeOverviewMessageGroup>()
+    val messagesByContactAndAccount = linkedMapOf<Pair<String?, String>, MutableList<FloatingChatMessage>>()
     messages.forEach { message ->
         val avatarContactId = message.connectionTargetId
         val accountId = accountIdsByMessageId[message.id].orEmpty()
         val groupKey = avatarContactId to accountId
-        val existing = groupsByContactAndAccount[groupKey]
-        groupsByContactAndAccount[groupKey] = if (existing == null) {
-            HomeOverviewMessageGroup(
-                avatarContactId = avatarContactId,
-                accountId = accountId,
-                connectorId = "home-group:${accountId}:${avatarContactId}:${message.id}",
-                messages = listOf(message)
-            )
-        } else {
-            existing.copy(messages = existing.messages + message)
-        }
+        messagesByContactAndAccount.getOrPut(groupKey) { mutableListOf() }.add(message)
     }
-    return groupsByContactAndAccount.values.toList()
+    return messagesByContactAndAccount.map { (groupKey, groupedMessages) ->
+        val (avatarContactId, accountId) = groupKey
+        val firstMessage = groupedMessages.first()
+        HomeOverviewMessageGroup(
+            avatarContactId = avatarContactId,
+            accountId = accountId,
+            connectorId = "home-group:${accountId}:${avatarContactId}:${firstMessage.id}",
+            messages = groupedMessages.toList()
+        )
+    }
 }
 
 internal fun homeOverviewMessagesForVisibleGroup(
@@ -754,11 +753,10 @@ private fun homeUnreadThreadSummariesForAccount(
     accountId: String,
     conversation: FloatingChatConversation
 ): List<HomeUnreadThreadSummary> {
+    val messageIndex = HomeUnreadMessageIndex(conversation)
     return homeUnreadCandidateSelections(conversation).mapNotNull { selection ->
-        val threadId = selection.toLocalThreadId()
-        val selectedAccountId = selectedAccountForThread(conversation, selection).id
-        val threadMessages = visibleMessagesForThread(
-            conversation = conversation,
+        val selectedAccountId = messageIndex.selectedAccountIdFor(selection)
+        val threadMessages = messageIndex.messagesFor(
             selection = selection,
             selectedAccountId = selectedAccountId
         )
@@ -769,6 +767,115 @@ private fun homeUnreadThreadSummariesForAccount(
             selection = selection,
             unrepliedMessages = unrepliedMessages
         )
+    }
+}
+
+private class HomeUnreadMessageIndex(
+    private val conversation: FloatingChatConversation
+) {
+    private data class IndexedMessage(
+        val sourceIndex: Int,
+        val message: FloatingChatMessage
+    )
+
+    private val defaultGroupId = conversation.groupContacts.firstOrNull { group -> group.selected }?.id
+        ?: conversation.groupContacts.firstOrNull()?.id
+    private val messagesByThreadId = mutableMapOf<String?, MutableList<FloatingChatMessage>>()
+    private val defaultGroupMessages = mutableListOf<FloatingChatMessage>()
+    private val fallbackUserMessages = mutableMapOf<String, MutableList<IndexedMessage>>()
+    private val fallbackAccountMessages = mutableMapOf<String, MutableList<IndexedMessage>>()
+    private val fallbackNeutralMessages = mutableListOf<IndexedMessage>()
+    private val firstAccountIdByThreadId = mutableMapOf<String?, String>()
+    private val activeAccounts: List<FloatingChatContact>
+
+    init {
+        val activeAccountIds = mutableSetOf<String>()
+        conversation.messages.forEachIndexed { sourceIndex, message ->
+            messagesByThreadId.getOrPut(message.threadContactId) { mutableListOf() }.add(message)
+            if (message.threadContactId == null || message.threadContactId == defaultGroupId) {
+                defaultGroupMessages.add(message)
+            }
+            if (message.threadContactId == null) {
+                val indexedMessage = IndexedMessage(sourceIndex, message)
+                when (message.connectionTarget) {
+                    FloatingChatConnectionTarget.User -> message.connectionTargetId?.let { contactId ->
+                        fallbackUserMessages.getOrPut(contactId) { mutableListOf() }.add(indexedMessage)
+                    }
+                    FloatingChatConnectionTarget.Account -> message.connectionTargetId?.let { accountId ->
+                        fallbackAccountMessages.getOrPut(accountId) { mutableListOf() }.add(indexedMessage)
+                    }
+                    FloatingChatConnectionTarget.None -> fallbackNeutralMessages.add(indexedMessage)
+                }
+            }
+            if (
+                message.connectionTarget == FloatingChatConnectionTarget.Account &&
+                !message.connectionTargetId.isNullOrBlank()
+            ) {
+                val targetAccountId = message.connectionTargetId.orEmpty()
+                activeAccountIds.add(targetAccountId)
+                firstAccountIdByThreadId.putIfAbsent(message.threadContactId, targetAccountId)
+            }
+        }
+        activeAccounts = conversation.accountContacts
+            .filter { account -> account.id in activeAccountIds }
+            .ifEmpty { conversation.accountContacts }
+    }
+
+    fun selectedAccountIdFor(selection: ChatThreadSelection): String {
+        require(activeAccounts.isNotEmpty()) { "Conversation must have at least one account." }
+        val contactId = when (selection) {
+            ChatThreadSelection.Group -> conversation.groupContacts.firstOrNull { group -> group.selected }?.id
+                ?: conversation.groupContacts.firstOrNull()?.id
+                ?: conversation.contacts.firstOrNull()?.id
+                ?: ""
+            is ChatThreadSelection.GroupChat -> selection.groupId
+            is ChatThreadSelection.Private -> selection.contactId
+        }
+        val targetThreadId = if (contactId == defaultGroupId) null else contactId
+        firstAccountIdByThreadId[targetThreadId]?.let { accountId ->
+            activeAccounts.firstOrNull { account -> account.id == accountId }?.let { account ->
+                return account.id
+            }
+        }
+        val contactIndex = when {
+            conversation.groupContacts.any { group -> group.id == contactId } -> {
+                conversation.groupContacts.indexOfFirst { group -> group.id == contactId }
+            }
+            else -> conversation.contacts.indexOfFirst { contact -> contact.id == contactId }
+        }.takeIf { index -> index >= 0 } ?: 0
+        return activeAccounts[contactIndex % activeAccounts.size].id
+    }
+
+    fun messagesFor(
+        selection: ChatThreadSelection,
+        selectedAccountId: String
+    ): List<FloatingChatMessage> {
+        return when (selection) {
+            ChatThreadSelection.Group -> groupMessagesFor(groupId = null)
+            is ChatThreadSelection.GroupChat -> groupMessagesFor(selection.groupId)
+            is ChatThreadSelection.Private -> privateMessagesFor(selection.contactId, selectedAccountId)
+        }
+    }
+
+    private fun groupMessagesFor(groupId: String?): List<FloatingChatMessage> {
+        return if (groupId == defaultGroupId) {
+            defaultGroupMessages
+        } else {
+            messagesByThreadId[groupId].orEmpty()
+        }
+    }
+
+    private fun privateMessagesFor(
+        contactId: String,
+        accountId: String
+    ): List<FloatingChatMessage> {
+        messagesByThreadId[contactId]?.takeIf { messages -> messages.isNotEmpty() }?.let { return it }
+        val fallbackMessages = mutableListOf<IndexedMessage>()
+        fallbackMessages.addAll(fallbackUserMessages[contactId].orEmpty())
+        fallbackMessages.addAll(fallbackAccountMessages[accountId].orEmpty())
+        fallbackMessages.addAll(fallbackNeutralMessages)
+        fallbackMessages.sortBy { indexed -> indexed.sourceIndex }
+        return fallbackMessages.map { indexed -> indexed.message }
     }
 }
 

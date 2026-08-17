@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Forward
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
@@ -72,6 +73,7 @@ internal enum class MessageLongPressAction(val label: String) {
     Quote("引用"),
     Zoom("放大"),
     Delete("删除"),
+    Revoke("撤销"),
     ScrmOperations("更多")
 }
 
@@ -88,17 +90,54 @@ internal fun messageLongPressPrimaryActions(): List<MessageLongPressAction> {
     )
 }
 
+internal fun messageSupportsVoiceTranscription(message: FloatingChatMessage): Boolean {
+    return message.type == com.paifa.ubikitouch.core.model.FloatingChatMessageType.Voice &&
+        message.remoteMessageId?.let { it > 0L } == true
+}
+
+internal fun messageRemoteIdForVoiceTranscription(
+    message: FloatingChatMessage,
+    candidates: List<FloatingChatMessage>
+): Long? {
+    message.remoteMessageId?.takeIf { it > 0L }?.let { return it }
+    val clientRequestId = message.clientRequestId?.takeIf { it.isNotBlank() } ?: return null
+    return candidates.asSequence()
+        .filter {
+            it.type == com.paifa.ubikitouch.core.model.FloatingChatMessageType.Voice &&
+                it.fromMe && it.clientRequestId == clientRequestId
+        }
+        .mapNotNull { it.remoteMessageId?.takeIf { id -> id > 0L } }
+        .firstOrNull()
+}
+
+internal fun messageSupportsRevoke(message: FloatingChatMessage): Boolean {
+    return message.fromMe
+}
+
+internal fun messageRemoteIdForRevoke(
+    message: FloatingChatMessage,
+    candidates: List<FloatingChatMessage>
+): Long? {
+    message.remoteMessageId?.takeIf { it > 0L }?.let { return it }
+    val clientRequestId = message.clientRequestId?.takeIf { it.isNotBlank() } ?: return null
+    return candidates.asSequence()
+        .filter { it.fromMe && it.clientRequestId == clientRequestId }
+        .mapNotNull { it.remoteMessageId?.takeIf { id -> id > 0L } }
+        .firstOrNull()
+}
+
 /**
- * UI：点击已同步语音消息时，将“转文字”放在首层操作菜单；本地录音和其他消息不展示。
- * 测试流程：依次点击已同步语音、本地语音和文本消息，仅第一种应在首位看到“转文字”。
+ * 语音消息在同步前也保留“转文字”入口；真正请求时再解析可用的 SCRM 消息 ID。
  */
 internal fun messageLongPressActionsFor(message: FloatingChatMessage): List<MessageLongPressAction> {
-    val canTranscribe = message.type == com.paifa.ubikitouch.core.model.FloatingChatMessageType.Voice &&
-        message.remoteMessageId?.let { it > 0L } == true
-    return if (canTranscribe) {
-        listOf(MessageLongPressAction.Transcribe) + messageLongPressPrimaryActions()
-    } else {
-        messageLongPressPrimaryActions()
+    return buildList {
+        if (message.type == com.paifa.ubikitouch.core.model.FloatingChatMessageType.Voice) {
+            add(MessageLongPressAction.Transcribe)
+        }
+        addAll(messageLongPressPrimaryActions())
+        if (messageSupportsRevoke(message)) {
+            add(MessageLongPressAction.Revoke)
+        }
     }
 }
 
@@ -516,6 +555,7 @@ private fun MessageLongPressAction.icon(): ImageVector {
         MessageLongPressAction.Forward -> Icons.AutoMirrored.Filled.Forward
         MessageLongPressAction.Favorite -> Icons.Filled.Star
         MessageLongPressAction.Delete -> Icons.Filled.Delete
+        MessageLongPressAction.Revoke -> Icons.AutoMirrored.Filled.Undo
         MessageLongPressAction.MultiSelect -> Icons.Filled.Checklist
         MessageLongPressAction.Quote -> Icons.Filled.FormatQuote
         MessageLongPressAction.ScrmOperations -> Icons.Filled.MoreHoriz

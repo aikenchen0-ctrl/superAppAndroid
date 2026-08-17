@@ -48,6 +48,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -75,6 +77,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.paifa.ubikitouch.accessibility.FloatingChatMediaPickerBridge
 import com.paifa.ubikitouch.accessibility.floatingchat.components.TextLabel
+import com.paifa.ubikitouch.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactGroupSummary
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactProfileIntroAction
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.ContactProfileUiState
@@ -138,6 +141,7 @@ import kotlinx.serialization.json.jsonPrimitive
 internal fun ScrmContactsPanel(
     route: ScrmFloatingAccountRoute?,
     openAddFriend: Boolean = false,
+    openStartGroup: Boolean = false,
     onClose: () -> Unit,
     onOpenPrivateChat: (ScrmFloatingAccountRoute, ScrmContact) -> Unit,
     onOpenFriendProfile: (ScrmFloatingAccountRoute, ScrmContact) -> Unit
@@ -149,10 +153,13 @@ internal fun ScrmContactsPanel(
     var addWxidText by remember { mutableStateOf("") }
     var addMessageText by remember { mutableStateOf("你好，我是通过只发添加你的") }
     var state by remember { mutableStateOf(ScrmContactsPanelState()) }
-    var panelScreen by remember(openAddFriend) {
+    var panelScreen by remember(openAddFriend, openStartGroup) {
         mutableStateOf(
-            if (openAddFriend) WechatContactsPanelScreen.AddFriend
-            else WechatContactsPanelScreen.Contacts
+            when {
+                openStartGroup -> WechatContactsPanelScreen.StartGroup
+                openAddFriend -> WechatContactsPanelScreen.AddFriend
+                else -> WechatContactsPanelScreen.Contacts
+            }
         )
     }
     var showPlusMenu by remember { mutableStateOf(false) }
@@ -662,7 +669,9 @@ internal fun ScrmContactsPanel(
             successStatus = { message -> "已提交建群任务：$message" },
             onSuccess = {
                 startGroupSelectedContactIds.clear()
-                panelScreen = WechatContactsPanelScreen.Contacts
+                if (!openStartGroup) {
+                    panelScreen = WechatContactsPanelScreen.Contacts
+                }
             }
         ) {
             val session = manager.loadSelectedSessionOrBootstrap()
@@ -837,8 +846,10 @@ internal fun ScrmContactsPanel(
                 error = state.error,
                 onBack = {
                     startGroupSelectedContactIds.clear()
-                    panelScreen = WechatContactsPanelScreen.Contacts
-                    state = state.copy(error = null)
+                    if (openStartGroup) onClose() else {
+                        panelScreen = WechatContactsPanelScreen.Contacts
+                        state = state.copy(error = null)
+                    }
                 },
                 onDone = ::createChatRoomFromSelectedContacts,
                 onPlaceholderClick = { label ->
@@ -895,38 +906,18 @@ private fun WechatStartGroupPanel(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(44.dp)
-                .background(WechatContactsHeaderBackground)
-                .padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack, modifier = Modifier.size(34.dp)) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = null,
-                    tint = WechatContactsPrimaryText,
-                    modifier = Modifier.size(21.dp)
-                )
+        FloatingWorkspaceTopAppBar(
+            title = wechatStartGroupTitle(),
+            onBack = onBack,
+            actions = {
+                TextButton(
+                    onClick = onDone,
+                    enabled = selectedCount > 0 && !loading
+                ) {
+                    Text(wechatStartGroupDoneLabel(selectedCount))
+                }
             }
-            TextLabel(
-                text = wechatStartGroupTitle(),
-                size = 16.sp,
-                weight = FontWeight.Bold,
-                color = WechatContactsPrimaryText,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                modifier = Modifier.weight(1f)
-            )
-            ScrmPanelButton(
-                label = wechatStartGroupDoneLabel(selectedCount),
-                enabled = selectedCount > 0 && !loading,
-                accent = true,
-                onClick = onDone
-            )
-        }
+        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -2086,10 +2077,10 @@ internal fun wechatContactsPendingMenuLabels(): List<String> {
 
 internal fun wechatContactsStartGroupUsesContactPicker(): Boolean = true
 
-internal fun wechatStartGroupTitle(): String = "发起群聊"
+internal fun wechatStartGroupTitle(): String = "创建群聊"
 
 internal fun wechatStartGroupDoneLabel(selectedCount: Int): String {
-    return if (selectedCount > 0) "完成($selectedCount)" else "完成"
+    return if (selectedCount > 0) "确定($selectedCount)" else "确定"
 }
 
 internal fun wechatStartGroupOptionLabels(): List<String> {

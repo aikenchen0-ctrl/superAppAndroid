@@ -19,6 +19,8 @@ import java.util.concurrent.ConcurrentHashMap
 internal class FloatingChatOverlayRuntimeState {
     private val voiceTranscriptionTaskIds =
         ConcurrentHashMap<VoiceTranscriptionTaskKey, Long>()
+    private val messageRevokeTaskIds =
+        ConcurrentHashMap<MessageRevokeTaskKey, Long>()
 
     var previewVisible by mutableStateOf(false)
     var mediaActionSheetVisible by mutableStateOf(false)
@@ -190,6 +192,25 @@ internal class FloatingChatOverlayRuntimeState {
         voiceTranscriptionTaskIds.remove(VoiceTranscriptionTaskKey(accountId, remoteMessageId))
     }
 
+    fun rememberMessageRevokeTask(accountId: String, remoteMessageId: Long, taskId: Long) {
+        require(accountId.isNotBlank()) { "accountId 不能为空" }
+        require(remoteMessageId > 0L) { "remoteMessageId 必须大于 0" }
+        require(taskId > 0L) { "taskId 必须大于 0" }
+        messageRevokeTaskIds[MessageRevokeTaskKey(accountId, remoteMessageId)] = taskId
+    }
+
+    fun messageRevokeTaskId(accountId: String, remoteMessageId: Long): Long? {
+        require(accountId.isNotBlank()) { "accountId 不能为空" }
+        require(remoteMessageId > 0L) { "remoteMessageId 必须大于 0" }
+        return messageRevokeTaskIds[MessageRevokeTaskKey(accountId, remoteMessageId)]
+    }
+
+    fun clearMessageRevokeTask(accountId: String, remoteMessageId: Long) {
+        require(accountId.isNotBlank()) { "accountId 不能为空" }
+        require(remoteMessageId > 0L) { "remoteMessageId 必须大于 0" }
+        messageRevokeTaskIds.remove(MessageRevokeTaskKey(accountId, remoteMessageId))
+    }
+
     fun openMediaPreview(
         mediaMessages: List<FloatingChatMessage>,
         initialIndex: Int,
@@ -223,6 +244,11 @@ internal class FloatingChatOverlayRuntimeState {
 }
 
 private data class VoiceTranscriptionTaskKey(
+    val accountId: String,
+    val remoteMessageId: Long
+)
+
+private data class MessageRevokeTaskKey(
     val accountId: String,
     val remoteMessageId: Long
 )

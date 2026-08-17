@@ -10,29 +10,15 @@ internal fun buildOffscreenConnectorIndex(
     homeOverviewVisible: Boolean,
     groupMemberAvatarsVisible: Boolean
 ): ConnectorOffscreenIndex {
-    if (messages.isEmpty()) return ConnectorOffscreenIndex(emptyList(), emptyList())
-    val keysByIndex = messages.map { message ->
+    return ConnectorOffscreenIndex.fromKeys(messages.size) { index ->
         offscreenConnectorTargetKey(
-            message = message,
+            message = messages[index],
             selection = selection,
             selectedAccountId = selectedAccountId,
             homeOverviewVisible = homeOverviewVisible,
             groupMemberAvatarsVisible = groupMemberAvatarsVisible
         )
     }
-    val beforeByIndex = MutableList(messages.size) { emptySet<ConnectorTargetKey>() }
-    val seenBefore = linkedSetOf<ConnectorTargetKey>()
-    keysByIndex.forEachIndexed { index, key ->
-        beforeByIndex[index] = seenBefore.toSet()
-        if (key != null) seenBefore += key
-    }
-    val afterByIndex = MutableList(messages.size) { emptySet<ConnectorTargetKey>() }
-    val seenAfter = linkedSetOf<ConnectorTargetKey>()
-    for (index in keysByIndex.lastIndex downTo 0) {
-        afterByIndex[index] = seenAfter.toSet()
-        keysByIndex[index]?.let { key -> seenAfter += key }
-    }
-    return ConnectorOffscreenIndex(beforeByIndex, afterByIndex)
 }
 
 /**

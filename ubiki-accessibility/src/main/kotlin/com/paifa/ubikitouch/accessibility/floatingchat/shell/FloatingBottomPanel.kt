@@ -164,6 +164,7 @@ internal fun FloatingBottomPanel(
     mode: BottomPanelMode,
     scrmContactsRoute: ScrmFloatingAccountRoute?,
     contactsOpenAddFriend: Boolean,
+    contactsOpenStartGroup: Boolean,
     scrmMomentsRoute: ScrmFloatingAccountRoute?,
     scrmMessageRoute: ScrmFloatingAccountRoute?,
     scrmMessageConversationId: String?,
@@ -383,6 +384,7 @@ internal fun FloatingBottomPanel(
                 BottomPanelMode.Contacts -> ScrmContactsPanel(
                     route = scrmContactsRoute,
                     openAddFriend = contactsOpenAddFriend,
+                    openStartGroup = contactsOpenStartGroup,
                     onClose = onClose,
                     onOpenPrivateChat = onOpenPrivateChat,
                     onOpenFriendProfile = onOpenFriendProfile

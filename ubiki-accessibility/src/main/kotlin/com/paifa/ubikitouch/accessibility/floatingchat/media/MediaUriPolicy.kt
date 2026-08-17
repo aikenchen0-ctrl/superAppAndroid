@@ -1,5 +1,6 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.media
 
+import java.io.File
 import java.net.URL
 
 internal fun isLocalContentUri(uriText: String?): Boolean {
@@ -17,6 +18,19 @@ internal fun isRemoteImageUri(uriText: String?): Boolean {
 internal fun normalizedRemoteImageUri(uriText: String?): String? {
     val raw = uriText?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     if (raw.startsWith("//")) return "https:$raw"
+    // SCRM sticker bodies can carry an absolute filesystem path instead of a URI.
+    // Only expose an existing regular file to the decoder; missing paths must fall
+    // through to the renderer's original-body fallback instead of an empty bubble.
+    if (!raw.startsWith("http://", ignoreCase = true) &&
+        !raw.startsWith("https://", ignoreCase = true) &&
+        !raw.startsWith("content://", ignoreCase = true) &&
+        !raw.startsWith("file://", ignoreCase = true)
+    ) {
+        val localFile = File(raw)
+        if (localFile.isAbsolute) {
+            return localFile.takeIf(File::isFile)?.toURI()?.toString()
+        }
+    }
     if (!raw.startsWith("http://", ignoreCase = true)) return raw
     val host = runCatching { URL(raw).host.lowercase() }.getOrNull() ?: return raw
     return if (host in WeChatAvatarHttpsHosts) {

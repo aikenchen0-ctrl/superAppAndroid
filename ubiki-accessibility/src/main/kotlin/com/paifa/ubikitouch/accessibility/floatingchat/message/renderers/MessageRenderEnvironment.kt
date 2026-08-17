@@ -7,6 +7,7 @@ import com.paifa.ubikitouch.core.model.FloatingChatMessage
 internal data class MessageRenderEnvironment(
     val onPreviewMedia: (FloatingChatMessage) -> Unit,
     val onOpenMediaActions: (FloatingChatMessage) -> Unit,
+    val onMessageClick: (FloatingChatMessage) -> Unit,
     val onLongPressMessage: (FloatingChatMessage, Rect?) -> Unit,
     val multiSelectMode: Boolean,
     val onToggleSelection: () -> Unit,

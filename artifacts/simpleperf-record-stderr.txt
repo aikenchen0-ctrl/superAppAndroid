@@ -1,0 +1,3 @@
+simpleperf W kallsyms.cpp:163] Access to kernel symbol addresses is restricted. If possible, please do `echo 0 >/proc/sys/kernel/kptr_restrict` to fix this.
+simpleperf I cmd_record.cpp:798] Recorded for 8.9921 seconds. Start post processing.
+simpleperf I cmd_record.cpp:891] Samples recorded: 4560. Samples lost: 0.

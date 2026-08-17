@@ -74,7 +74,8 @@ internal fun DocumentPreviewOverlay(
         ) {
             FileFormatIcon(
                 format = message.fileFormat,
-                fileName = fileDisplayName(message)
+                fileName = fileDisplayName(message),
+                thumbnailUrl = message.thumbnailUrl ?: message.resourceUrl
             )
             Column(modifier = Modifier.weight(1f)) {
                 TextLabel(

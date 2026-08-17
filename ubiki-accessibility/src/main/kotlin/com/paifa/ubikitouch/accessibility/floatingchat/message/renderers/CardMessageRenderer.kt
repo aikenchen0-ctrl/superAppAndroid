@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import com.paifa.ubikitouch.accessibility.floatingchat.media.FilePreviewContent
 import com.paifa.ubikitouch.accessibility.floatingchat.message.ChatHistoryMessageContent
 import com.paifa.ubikitouch.accessibility.floatingchat.message.ContactLinkCardContent
+import com.paifa.ubikitouch.accessibility.floatingchat.message.EnterpriseInviteMessageCard
 import com.paifa.ubikitouch.accessibility.floatingchat.message.InlineContactContent
 import com.paifa.ubikitouch.accessibility.floatingchat.message.InlineLocationContent
 import com.paifa.ubikitouch.accessibility.floatingchat.message.LinkMessageCard
@@ -23,6 +24,7 @@ internal object CardMessageRenderer : MessageRenderer {
         FloatingChatMessageType.InlineLocation,
         FloatingChatMessageType.LiveLocation,
         FloatingChatMessageType.GroupInvite,
+        FloatingChatMessageType.EnterpriseInvite,
         FloatingChatMessageType.WebLink,
         FloatingChatMessageType.Article,
         FloatingChatMessageType.ChannelsLive,
@@ -47,6 +49,7 @@ internal object CardMessageRenderer : MessageRenderer {
             FloatingChatMessageType.GroupInvite -> ContactLinkCardContent(
                 message.copy(type = FloatingChatMessageType.ContactLink)
             )
+            FloatingChatMessageType.EnterpriseInvite -> EnterpriseInviteMessageCard(message)
             FloatingChatMessageType.MiniProgramLink -> MiniProgramLinkContent(message, environment.claimed)
             FloatingChatMessageType.WebLink -> LinkMessageCard(message)
             FloatingChatMessageType.Article -> OfficialArticleMessageCard(message)

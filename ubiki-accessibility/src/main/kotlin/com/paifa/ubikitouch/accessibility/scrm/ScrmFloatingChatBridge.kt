@@ -5,6 +5,7 @@ import com.paifa.ubikitouch.core.model.FloatingChatArticleItem
 import com.paifa.ubikitouch.core.model.FloatingChatContact
 import com.paifa.ubikitouch.core.model.FloatingChatConversation
 import com.paifa.ubikitouch.core.model.FloatingChatConnectionTarget
+import com.paifa.ubikitouch.core.model.FloatingChatFileFormat
 import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import com.paifa.ubikitouch.core.model.FloatingChatMessageType
 import com.paifa.ubikitouch.core.model.FloatingChatMessagePresentation
@@ -32,6 +33,20 @@ private val ScrmFinderLiveMessageTypes = setOf(973078577, 975175729)
 private data class ScrmFloatingArticlePayload(
     val senderNickname: String?,
     val items: List<FloatingChatArticleItem>
+)
+
+private data class ScrmFloatingFilePayload(
+    val title: String,
+    val description: String,
+    val extension: String?,
+    val resourceUrl: String?
+)
+
+private data class ScrmFloatingEnterpriseInvitePayload(
+    val title: String,
+    val description: String,
+    val resourceUrl: String?,
+    val source: String?
 )
 
 private val ScrmAvatarPalette = longArrayOf(
@@ -233,15 +248,40 @@ private fun scrmFloatingMappedMessage(
 ): FloatingChatMessage {
     val articlePayload = scrmFloatingArticlePayload(remote.content)
     val articleItems = articlePayload?.items.orEmpty()
+    val enterpriseInvitePayload = scrmFloatingEnterpriseInvitePayload(remote.content)
+        ?: remote.extensions
+            .asSequence()
+            .filter { extension ->
+                extension.key.equals("resBody", ignoreCase = true) ||
+                    extension.key.equals("messageContent", ignoreCase = true) ||
+                    extension.key.equals("body", ignoreCase = true)
+            }
+            .mapNotNull { extension -> scrmFloatingEnterpriseInvitePayload(extension.value) }
+            .firstOrNull()
+    val filePayload = scrmFloatingFilePayload(remote.content)
+        ?: remote.extensions
+            .asSequence()
+            .filter { extension ->
+                extension.key.equals("resBody", ignoreCase = true) ||
+                    extension.key.equals("messageContent", ignoreCase = true) ||
+                    extension.key.equals("body", ignoreCase = true)
+            }
+            .mapNotNull { extension -> scrmFloatingFilePayload(extension.value) }
+            .firstOrNull()
     val type = scrmFloatingMessageType(
         messageType = remote.messageType,
         content = remote.content,
-        hasOfficialArticleItems = articleItems.isNotEmpty()
+        hasOfficialArticleItems = articleItems.isNotEmpty(),
+        hasEnterpriseInvitePayload = enterpriseInvitePayload != null,
+        // The backend may normalize the outer type (for example 6 or 74),
+        // while retaining the canonical file fields in resBody.
+        hasFilePayload = filePayload != null
     )
-    val text = if (type == FloatingChatMessageType.Article) {
-        scrmFloatingArticleTitle(articleItems)
-    } else {
-        scrmFloatingMessageText(type, remote.content)
+    val text = when {
+        type == FloatingChatMessageType.Article -> scrmFloatingArticleTitle(articleItems)
+        type == FloatingChatMessageType.EnterpriseInvite && enterpriseInvitePayload != null -> enterpriseInvitePayload.title
+        type == FloatingChatMessageType.FilePreview && filePayload != null -> filePayload.title
+        else -> scrmFloatingMessageText(type, remote.content)
     }
     val system = remote.messageType == 10000 || remote.messageType == 10002
     val mediaUrl = remote.media.firstOrNull()?.resolvedUrl
@@ -255,9 +295,15 @@ private fun scrmFloatingMappedMessage(
     // Preserve it as the resource URL as well, so the same image is used by the bubble and preview flows.
     val resourceUrl = mediaUrl
         ?: articleItems.firstOrNull()?.detailUrl
+        ?: enterpriseInvitePayload?.resourceUrl
+        ?: filePayload?.resourceUrl
         ?: scrmFloatingMessageUrl(remote.content)
         ?: thumbnailUrl.takeIf { type == FloatingChatMessageType.StickerGif }
-    val detail = scrmFloatingMessageDetail(type, remote.content, remote.voiceText)
+    val detail = when {
+        type == FloatingChatMessageType.StickerGif -> remote.content.trim().takeIf { it.isNotBlank() }
+        else -> enterpriseInvitePayload?.description?.takeIf { it.isNotBlank() }
+            ?: scrmFloatingMessageDetail(type, remote.content, remote.voiceText)
+    }
     scrmFloatingStickerDebugLog(
         remote = remote,
         resolvedType = type,
@@ -279,15 +325,19 @@ private fun scrmFloatingMappedMessage(
         connectionTargetId = connectionTargetId,
         threadContactId = threadContactId,
         detail = detail,
-        appName = articlePayload?.senderNickname,
+        appName = enterpriseInvitePayload?.source ?: articlePayload?.senderNickname,
         articleItems = articleItems,
         resourceUrl = resourceUrl,
         thumbnailUrl = thumbnailUrl,
-        fileName = remote.media.firstOrNull()?.fileExtension?.takeIf { it.isNotBlank() },
-        fileSizeLabel = remote.media.firstOrNull()?.fileSize?.takeIf { it > 0L }?.let(::scrmFormatFileSize),
+        fileName = filePayload?.title
+            ?: remote.media.firstOrNull()?.fileExtension?.takeIf { it.isNotBlank() },
+        fileFormat = filePayload?.extension?.let(::scrmFloatingFileFormat),
+        fileSizeLabel = filePayload?.description?.takeIf { it.isNotBlank() }
+            ?: remote.media.firstOrNull()?.fileSize?.takeIf { it > 0L }?.let(::scrmFormatFileSize),
         remoteMessageId = remote.messageId.takeIf { it > 0L },
         remoteMessageServerId = remote.messageServerId?.toString(),
-        finderUserName = scrmFinderUserName(remote.content, remote.extensions)
+        finderUserName = scrmFinderUserName(remote.content, remote.extensions),
+        clientRequestId = remote.clientMessageId
     )
 }
 
@@ -295,7 +345,9 @@ private fun scrmFloatingMappedMessage(
 private fun scrmFloatingMessageType(
     messageType: Int,
     content: String,
-    hasOfficialArticleItems: Boolean = false
+    hasOfficialArticleItems: Boolean = false,
+    hasEnterpriseInvitePayload: Boolean = false,
+    hasFilePayload: Boolean = false
 ): FloatingChatMessageType {
     // Some history/change payloads omit the outer WeChat type or flatten it to text,
     // but retain the original sticker body. Md5 plus Thumb is the stable image-sticker
@@ -304,6 +356,8 @@ private fun scrmFloatingMessageType(
         return FloatingChatMessageType.StickerGif
     }
     if (hasOfficialArticleItems) return FloatingChatMessageType.Article
+    if (hasEnterpriseInvitePayload) return FloatingChatMessageType.EnterpriseInvite
+    if (hasFilePayload) return FloatingChatMessageType.FilePreview
     val lower = content.lowercase()
     return when (messageType) {
         // Full WeChat outer types are required. Do not infer Finder messages from appmsg internals.
@@ -332,6 +386,71 @@ private fun scrmFloatingMessageType(
         // System/group-management notifications keep Text as their model type,
         // while presentation is switched to System above so they render without a bubble.
         else -> FloatingChatMessageType.Text
+    }
+}
+
+/** Parses the JSON file body returned by SCRM for WeChat file messages. */
+private fun scrmFloatingFilePayload(content: String): ScrmFloatingFilePayload? {
+    val root = scrmFloatingJsonElement(content) as? JsonObject ?: return null
+    val title = root.scrmFilePrimitiveContent("Title")
+        ?.trim()
+        ?.takeIf(String::isNotBlank)
+        ?: return null
+    val extension = root.scrmFilePrimitiveContent("FileExt")
+        ?.trim()
+        ?.trimStart('.')
+        ?.takeIf(String::isNotBlank)
+    val description = root.scrmFilePrimitiveContent("Des")?.trim().orEmpty()
+    val typeString = root.scrmFilePrimitiveContent("TypeStr").orEmpty()
+    val hasFileMarker = extension != null ||
+        root.scrmFilePrimitiveContent("CdnFileType") != null ||
+        root.scrmFilePrimitiveContent("Type") == "74" ||
+        typeString.contains("文件")
+    if (!hasFileMarker) return null
+    val resourceUrl = listOf("Url", "url", "Thumb", "thumb")
+        .firstNotNullOfOrNull { key ->
+            root.scrmFilePrimitiveContent(key)?.trim()?.takeIf(String::isNotBlank)
+        }
+    return ScrmFloatingFilePayload(title, description, extension, resourceUrl)
+}
+
+/** Parses the WeCom enterprise invitation body carried by an app-message response. */
+private fun scrmFloatingEnterpriseInvitePayload(content: String): ScrmFloatingEnterpriseInvitePayload? {
+    val root = scrmFloatingJsonElement(content) as? JsonObject ?: return null
+    val title = root.scrmFilePrimitiveContent("Title")
+        ?.trim()
+        ?.takeIf(String::isNotBlank)
+        ?: return null
+    val source = root.scrmFilePrimitiveContent("Source")?.trim()
+    val type = root.scrmFilePrimitiveContent("Type")?.trim()
+    val resourceUrl = root.scrmFilePrimitiveContent("Url")
+        ?.trim()
+        ?.takeIf(String::isNotBlank)
+    val isEnterpriseInvite = source.equals("企业微信", ignoreCase = true) &&
+        (type == "5" || resourceUrl?.contains("work.weixin.qq.com", ignoreCase = true) == true)
+    if (!isEnterpriseInvite) return null
+    return ScrmFloatingEnterpriseInvitePayload(
+        title = title,
+        description = root.scrmFilePrimitiveContent("Des")?.trim().orEmpty(),
+        resourceUrl = resourceUrl,
+        source = source
+    )
+}
+
+private fun JsonObject.scrmFilePrimitiveContent(key: String): String? {
+    return entries.firstOrNull { (name, value) ->
+        name.equals(key, ignoreCase = true) && value is JsonPrimitive
+    }?.value?.jsonPrimitive?.contentOrNull
+}
+
+private fun scrmFloatingFileFormat(extension: String): FloatingChatFileFormat? {
+    return when (extension.lowercase()) {
+        "txt" -> FloatingChatFileFormat.Txt
+        "md", "markdown" -> FloatingChatFileFormat.Markdown
+        "doc", "docx" -> FloatingChatFileFormat.Word
+        "pdf" -> FloatingChatFileFormat.Pdf
+        "zip" -> FloatingChatFileFormat.Zip
+        else -> null
     }
 }
 

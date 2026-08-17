@@ -102,7 +102,8 @@ private fun FloatingChatMessage.hasDisplayableContent(): Boolean {
         FloatingChatMessageType.VideoCall,
         FloatingChatMessageType.ChatHistory,
         FloatingChatMessageType.Relay,
-        FloatingChatMessageType.GroupNotice -> true
+        FloatingChatMessageType.GroupNotice,
+        FloatingChatMessageType.EnterpriseInvite -> true
         FloatingChatMessageType.Location,
         FloatingChatMessageType.LiveLocation,
         FloatingChatMessageType.InlineLocation,

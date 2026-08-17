@@ -37,10 +37,14 @@ import com.paifa.ubikitouch.core.model.FloatingChatMessage
 import java.util.Locale
 
 @Composable
-internal fun VoiceMessageContent(message: FloatingChatMessage) {
+internal fun VoiceMessageContent(
+    message: FloatingChatMessage,
+    onClick: () -> Unit = {}
+) {
     val context = LocalContext.current
     var playing by remember(message.id) { mutableStateOf(false) }
     var failed by remember(message.id) { mutableStateOf(false) }
+    var preparing by remember(message.id) { mutableStateOf(false) }
     var playerRef by remember(message.id) { mutableStateOf<MediaPlayer?>(null) }
     val durationText = message.detail ?: formatVoiceTimecode(message.mediaDurationMs ?: 0)
 
@@ -64,6 +68,8 @@ internal fun VoiceMessageContent(message: FloatingChatMessage) {
         CompactInteractiveSize {
             FilledTonalIconButton(
                 onClick = {
+                    onClick()
+                    if (preparing) return@FilledTonalIconButton
                     val currentPlayer = playerRef
                     if (currentPlayer?.isPlaying == true) {
                         currentPlayer.pause()
@@ -81,28 +87,49 @@ internal fun VoiceMessageContent(message: FloatingChatMessage) {
                         failed = true
                         return@FilledTonalIconButton
                     }
+                    var mediaPlayer: MediaPlayer? = null
                     runCatching {
-                        MediaPlayer().apply {
+                        MediaPlayer().also { mediaPlayer = it }.apply {
                             setDataSource(context, uri)
+                            setOnPreparedListener { preparedPlayer ->
+                                if (playerRef !== preparedPlayer) return@setOnPreparedListener
+                                preparing = false
+                                runCatching { preparedPlayer.start() }
+                                    .onSuccess {
+                                        playing = true
+                                        failed = false
+                                    }
+                                    .onFailure {
+                                        if (playerRef === preparedPlayer) playerRef = null
+                                        playing = false
+                                        failed = true
+                                        preparedPlayer.release()
+                                    }
+                            }
                             setOnCompletionListener {
                                 playing = false
                                 it.seekTo(0)
                             }
                             setOnErrorListener { mp, _, _ ->
-                                playing = false
-                                failed = true
+                                if (playerRef === mp) {
+                                    playerRef = null
+                                    preparing = false
+                                    playing = false
+                                    failed = true
+                                }
                                 mp.release()
-                                playerRef = null
                                 true
                             }
-                            prepare()
-                            start()
+                            playerRef = this
+                            preparing = true
+                            prepareAsync()
                         }
-                    }.onSuccess { mediaPlayer ->
-                        playerRef = mediaPlayer
-                        playing = true
-                        failed = false
                     }.onFailure {
+                        mediaPlayer?.let { failedPlayer ->
+                            if (playerRef === failedPlayer) playerRef = null
+                            failedPlayer.release()
+                        }
+                        preparing = false
                         playing = false
                         failed = true
                     }

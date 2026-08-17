@@ -60,7 +60,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoUiEvent
 import com.paifa.ubikitouch.accessibility.floatingchat.contract.GroupInfoUiState
 
 /**
- * iOS 群信息的 Android 全屏悬浮实现。
+ * iOS 群信息的 Android 全屏悬浮实现。【群信息】
  *
  * 测试流程：从群聊右侧工具进入，检查 30dp 顶部安全区、三个分页及返回动画；依次刷新群资料、
  * 编辑资料、邀请成员和切换群设置，确认接口返回状态显示在页面顶部。进出场由聊天根的

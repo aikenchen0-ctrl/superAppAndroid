@@ -214,5 +214,6 @@ private fun documentIcon(format: FloatingChatFileFormat?): ImageVector = when (f
     FloatingChatFileFormat.Word -> Icons.Filled.Description
     FloatingChatFileFormat.Markdown,
     FloatingChatFileFormat.Txt,
+    FloatingChatFileFormat.Zip,
     null -> Icons.Filled.Article
 }

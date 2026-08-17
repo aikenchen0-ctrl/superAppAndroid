@@ -61,6 +61,7 @@ internal fun messageRendererGroupFor(type: FloatingChatMessageType): MessageRend
         FloatingChatMessageType.InlineLocation -> MessageRendererGroup.Location
         FloatingChatMessageType.ContactLink,
         FloatingChatMessageType.GroupInvite,
+        FloatingChatMessageType.EnterpriseInvite,
         FloatingChatMessageType.InlineContact -> MessageRendererGroup.Profile
         FloatingChatMessageType.MiniProgramLink,
         FloatingChatMessageType.WebLink,

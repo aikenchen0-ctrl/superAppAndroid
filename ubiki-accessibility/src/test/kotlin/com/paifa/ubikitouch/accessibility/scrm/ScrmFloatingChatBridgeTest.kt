@@ -18,6 +18,144 @@ import org.junit.Test
 
 class ScrmFloatingChatBridgeTest {
     @Test
+    fun floatingChatMapsJsonFileResBodyToFilePreviewCardData() {
+        val content = """
+            wxid_fc4l1owrdktn21:{
+              "CdnFileType":7,
+              "Des":"47.7KB, zip",
+              "FileExt":"zip",
+              "Title":"wukong-codex-migration-kit-10000x-logic.risk-key..zip",
+              "TotalLen":"48891",
+              "Type":74,
+              "TypeStr":"[文件]"
+            }
+        """.trimIndent()
+        val conversation = scrmFloatingChatConversation(
+            base = FloatingChatPrototype.sampleConversation(),
+            contacts = emptyList(),
+            accountConversations = listOf(
+                ScrmFloatingAccountConversation(
+                    deviceUuid = "device-1",
+                    weChatId = "wxid_account",
+                    contacts = emptyList(),
+                    messagesByConversation = mapOf(
+                        "wxid_friend" to listOf(
+                            ScrmChatMessage(messageId = 82L, messageType = 49, content = content)
+                        )
+                    )
+                )
+            ),
+            accounts = listOf(ScrmWechatAccount("wxid_account", "Account", "device-1")),
+            devices = listOf(device("device-1", "wxid_account", online = true)),
+            selectedDeviceUuid = "device-1",
+            selectedWeChatId = "wxid_account"
+        )
+
+        val message = conversation.messages.single()
+        assertEquals("FilePreview", message.type.name)
+        assertEquals("wukong-codex-migration-kit-10000x-logic.risk-key..zip", message.text)
+        assertEquals("wukong-codex-migration-kit-10000x-logic.risk-key..zip", message.fileName)
+        assertEquals("47.7KB, zip", message.fileSizeLabel)
+        assertEquals("Zip", message.fileFormat?.name)
+    }
+
+    @Test
+    fun floatingChatMapsFileResBodyEvenWhenOuterTypeIsNormalized() {
+        val content = """
+            {"CdnFileType":7,"Des":"47.7KB, zip","FileExt":"zip","Title":"archive.zip","Type":74}
+        """.trimIndent()
+        val conversation = scrmFloatingChatConversation(
+            base = FloatingChatPrototype.sampleConversation(),
+            contacts = emptyList(),
+            accountConversations = listOf(
+                ScrmFloatingAccountConversation(
+                    deviceUuid = "device-1",
+                    weChatId = "wxid_account",
+                    contacts = emptyList(),
+                    messagesByConversation = mapOf(
+                        "wxid_friend" to listOf(
+                            ScrmChatMessage(messageId = 83L, messageType = 6, content = content)
+                        )
+                    )
+                )
+            ),
+            accounts = listOf(ScrmWechatAccount("wxid_account", "Account", "device-1")),
+            devices = listOf(device("device-1", "wxid_account", online = true)),
+            selectedDeviceUuid = "device-1",
+            selectedWeChatId = "wxid_account"
+        )
+
+        assertEquals("FilePreview", conversation.messages.single().type.name)
+        assertEquals("archive.zip", conversation.messages.single().fileName)
+    }
+
+    @Test
+    fun floatingChatMapsFileResBodyWhenPayloadIsStoredInExtension() {
+        val payload = """{"CdnFileType":7,"Des":"12 KB, pdf","FileExt":"pdf","Title":"guide.pdf","Type":74}"""
+        val conversation = scrmFloatingChatConversation(
+            base = FloatingChatPrototype.sampleConversation(),
+            contacts = emptyList(),
+            accountConversations = listOf(
+                ScrmFloatingAccountConversation(
+                    deviceUuid = "device-1",
+                    weChatId = "wxid_account",
+                    contacts = emptyList(),
+                    messagesByConversation = mapOf(
+                        "wxid_friend" to listOf(
+                            ScrmChatMessage(
+                                messageId = 84L,
+                                messageType = 49,
+                                content = "",
+                                extensions = listOf(ScrmChatExtension("resBody", payload))
+                            )
+                        )
+                    )
+                )
+            ),
+            accounts = listOf(ScrmWechatAccount("wxid_account", "Account", "device-1")),
+            devices = listOf(device("device-1", "wxid_account", online = true)),
+            selectedDeviceUuid = "device-1",
+            selectedWeChatId = "wxid_account"
+        )
+
+        assertEquals("FilePreview", conversation.messages.single().type.name)
+        assertEquals("guide.pdf", conversation.messages.single().fileName)
+    }
+
+    @Test
+    fun floatingChatMapsWeComEnterpriseInviteToEnterpriseInviteCard() {
+        val content = """
+            {"Des":"一起来使用属于“青羽维龙（深圳）文化科技有限公司”自己的微信，开启全新办公体验吧。","Source":"企业微信","Title":"邀请你加入“青羽维龙（深圳）文化科技有限公司”","Type":5,"TypeStr":"[链接]","Url":"https://work.weixin.qq.com/wework_admin/join?vcode=invite"}
+        """.trimIndent()
+        val conversation = scrmFloatingChatConversation(
+            base = FloatingChatPrototype.sampleConversation(),
+            contacts = emptyList(),
+            accountConversations = listOf(
+                ScrmFloatingAccountConversation(
+                    deviceUuid = "device-1",
+                    weChatId = "wxid_account",
+                    contacts = emptyList(),
+                    messagesByConversation = mapOf(
+                        "wxid_friend" to listOf(
+                            ScrmChatMessage(messageId = 85L, messageType = 49, content = content)
+                        )
+                    )
+                )
+            ),
+            accounts = listOf(ScrmWechatAccount("wxid_account", "Account", "device-1")),
+            devices = listOf(device("device-1", "wxid_account", online = true)),
+            selectedDeviceUuid = "device-1",
+            selectedWeChatId = "wxid_account"
+        )
+
+        val message = conversation.messages.single()
+        assertEquals("EnterpriseInvite", message.type.name)
+        assertEquals("邀请你加入“青羽维龙（深圳）文化科技有限公司”", message.text)
+        assertEquals("一起来使用属于“青羽维龙（深圳）文化科技有限公司”自己的微信，开启全新办公体验吧。", message.detail)
+        assertEquals("https://work.weixin.qq.com/wework_admin/join?vcode=invite", message.resourceUrl)
+    }
+
+    @Test
     fun floatingChatMapsOfficialAccountArticleItems() {
         val content = """
             {
@@ -549,6 +687,39 @@ class ScrmFloatingChatBridgeTest {
         )
 
         assertEquals("后端转写文字", conversation.messages.single().detail)
+    }
+
+    @Test
+    fun floatingChatPreservesClientMessageIdForOutgoingRevokeMatching() {
+        val conversation = scrmFloatingChatConversation(
+            base = FloatingChatPrototype.sampleConversation(),
+            contacts = emptyList(),
+            accountConversations = listOf(
+                ScrmFloatingAccountConversation(
+                    deviceUuid = "device-1",
+                    weChatId = "wxid_account",
+                    contacts = emptyList(),
+                    messagesByConversation = mapOf(
+                        "wxid_friend" to listOf(
+                            ScrmChatMessage(
+                                messageId = 81L,
+                                senderWxid = "wxid_account",
+                                receiverWxid = "wxid_friend",
+                                direction = 1,
+                                content = "待撤销消息",
+                                clientMessageId = "request-81"
+                            )
+                        )
+                    )
+                )
+            ),
+            accounts = listOf(ScrmWechatAccount("wxid_account", "Account", "device-1")),
+            devices = listOf(device("device-1", "wxid_account", online = true)),
+            selectedDeviceUuid = "device-1",
+            selectedWeChatId = "wxid_account"
+        )
+
+        assertEquals("request-81", conversation.messages.single().clientRequestId)
     }
 
     @Test

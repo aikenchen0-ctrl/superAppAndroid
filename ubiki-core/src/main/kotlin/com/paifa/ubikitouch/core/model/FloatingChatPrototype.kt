@@ -126,6 +126,7 @@ enum class FloatingChatMessageType(val label: String) {
     CapturedPhoto("拍摄照片"),
     LiveLocation("实时位置"),
     GroupInvite("群邀请卡"),
+    EnterpriseInvite("企微企业邀请"),
     WebLink("网页链接"),
     Article("公众号文章"),
     ChannelsVideo("视频号视频"),
@@ -154,7 +155,8 @@ enum class FloatingChatFileFormat(val label: String) {
     Txt("txt"),
     Markdown("md"),
     Word("word"),
-    Pdf("pdf")
+    Pdf("pdf"),
+    Zip("zip")
 }
 
 enum class FloatingChatVisibilityScope(val label: String) {

@@ -45,7 +45,59 @@ class MessageStandardActionsTest {
     }
 
     @Test
-    fun onlySyncedVoiceMessagesExposeTranscribeInTheClickMenu() {
+    fun allOutgoingMessagesExposeRevokeInTheClickMenu() {
+        val syncedOutgoing = FloatingChatMessage(
+            id = "outgoing-1",
+            type = FloatingChatMessageType.Text,
+            text = "待撤销消息",
+            fromMe = true,
+            senderName = "我",
+            time = "10:00",
+            remoteMessageId = 81L
+        )
+
+        assertTrue(messageLongPressActionsFor(syncedOutgoing).contains(MessageLongPressAction.Revoke))
+        assertFalse(
+            messageLongPressActionsFor(syncedOutgoing.copy(fromMe = false))
+                .contains(MessageLongPressAction.Revoke)
+        )
+        assertTrue(
+            messageLongPressActionsFor(syncedOutgoing.copy(remoteMessageId = null))
+                .contains(MessageLongPressAction.Revoke)
+        )
+        assertTrue(
+            messageLongPressActionsFor(syncedOutgoing.copy(remoteMessageId = 0L))
+                .contains(MessageLongPressAction.Revoke)
+        )
+        assertTrue(
+            messageLongPressActionsFor(syncedOutgoing.copy(remoteMessageId = -1L))
+                .contains(MessageLongPressAction.Revoke)
+        )
+    }
+
+    @Test
+    fun localOutgoingMessageResolvesRemoteIdFromItsSyncedCopy() {
+        val local = FloatingChatMessage(
+            id = "local-outgoing",
+            type = FloatingChatMessageType.Text,
+            text = "待撤销消息",
+            fromMe = true,
+            senderName = "我",
+            time = "10:00",
+            clientRequestId = "request-81"
+        )
+        val synced = local.copy(
+            id = "scrm-message:81",
+            remoteMessageId = 81L
+        )
+
+        assertEquals(81L, messageRemoteIdForRevoke(local, listOf(local, synced)))
+        assertEquals(81L, messageRemoteIdForRevoke(synced, listOf(local, synced)))
+        assertEquals(null, messageRemoteIdForRevoke(local, listOf(local)))
+    }
+
+    @Test
+    fun voiceMessagesExposeTranscribeInTheClickMenuBeforeAndAfterSync() {
         val syncedVoice = FloatingChatMessage(
             id = "voice-1",
             type = FloatingChatMessageType.Voice,
@@ -60,22 +112,46 @@ class MessageStandardActionsTest {
             MessageLongPressAction.Transcribe,
             messageLongPressActionsFor(syncedVoice).first()
         )
-        assertFalse(
-            messageLongPressActionsFor(syncedVoice.copy(remoteMessageId = null))
-                .contains(MessageLongPressAction.Transcribe)
-        )
-        assertFalse(
-            messageLongPressActionsFor(syncedVoice.copy(remoteMessageId = 0L))
-                .contains(MessageLongPressAction.Transcribe)
-        )
-        assertFalse(
-            messageLongPressActionsFor(syncedVoice.copy(remoteMessageId = -1L))
-                .contains(MessageLongPressAction.Transcribe)
-        )
+        assertTrue(messageLongPressActionsFor(syncedVoice.copy(remoteMessageId = null)).contains(MessageLongPressAction.Transcribe))
+        assertTrue(messageLongPressActionsFor(syncedVoice.copy(remoteMessageId = 0L)).contains(MessageLongPressAction.Transcribe))
+        assertTrue(messageLongPressActionsFor(syncedVoice.copy(remoteMessageId = -1L)).contains(MessageLongPressAction.Transcribe))
         assertFalse(
             messageLongPressActionsFor(syncedVoice.copy(type = FloatingChatMessageType.Text))
                 .contains(MessageLongPressAction.Transcribe)
         )
+    }
+
+    @Test
+    fun localOutgoingVoiceResolvesRemoteIdFromItsSyncedCopy() {
+        val local = FloatingChatMessage(
+            id = "local-voice",
+            type = FloatingChatMessageType.Voice,
+            text = "[voice]",
+            fromMe = true,
+            senderName = "me",
+            time = "10:00",
+            clientRequestId = "voice-request-81"
+        )
+        val synced = local.copy(id = "scrm-voice:81", remoteMessageId = 81L)
+
+        assertEquals(81L, messageRemoteIdForVoiceTranscription(local, listOf(local, synced)))
+        assertEquals(null, messageRemoteIdForVoiceTranscription(local, listOf(local)))
+    }
+
+    @Test
+    fun syncedVoiceMessagesOpenActionsFromUnreadOverview() {
+        val syncedVoice = FloatingChatMessage(
+            id = "voice-overview-1",
+            type = FloatingChatMessageType.Voice,
+            text = "[语音]",
+            fromMe = false,
+            senderName = "张三",
+            time = "10:00",
+            remoteMessageId = 123L
+        )
+
+        assertTrue(messageSupportsVoiceTranscription(syncedVoice))
+        assertFalse(messageSupportsVoiceTranscription(syncedVoice.copy(remoteMessageId = null)))
     }
 
     @Test
@@ -104,6 +180,7 @@ class MessageStandardActionsTest {
             onListenMessage = {},
             onZoomMessage = {},
             onTranscribeMessage = { transcribeTarget = it },
+            onRevokeMessageRequested = {},
             onScrmOperationRequested = {},
             onCloseLongPressMenu = { menuClosed = true }
         )
@@ -111,6 +188,43 @@ class MessageStandardActionsTest {
         actions.performLongPressAction(message, MessageLongPressAction.Transcribe)
 
         assertEquals(message, transcribeTarget)
+        assertTrue(menuClosed)
+    }
+
+    @Test
+    fun revokeActionForwardsTheSelectedMessageAndClosesTheMenu() {
+        val message = FloatingChatMessage(
+            id = "outgoing-81",
+            type = FloatingChatMessageType.Text,
+            text = "待撤销消息",
+            fromMe = true,
+            senderName = "我",
+            time = "10:00",
+            remoteMessageId = 81L
+        )
+        var revokeTarget: FloatingChatMessage? = null
+        var menuClosed = false
+        val actions = MessageLongPressActions(
+            favoriteMessageIds = mutableMapOf(),
+            hiddenMessageIds = mutableMapOf(),
+            selectedMessageIds = mutableMapOf(),
+            onCopyText = {},
+            onShowToast = {},
+            onBeginForward = {},
+            onFavoriteChanged = { _, _ -> },
+            onMultiSelectModeChanged = {},
+            onQuoteMessage = {},
+            onListenMessage = {},
+            onZoomMessage = {},
+            onTranscribeMessage = {},
+            onRevokeMessageRequested = { revokeTarget = it },
+            onScrmOperationRequested = {},
+            onCloseLongPressMenu = { menuClosed = true }
+        )
+
+        actions.performLongPressAction(message, MessageLongPressAction.Revoke)
+
+        assertEquals(message, revokeTarget)
         assertTrue(menuClosed)
     }
 
@@ -138,6 +252,32 @@ class MessageStandardActionsTest {
         assertEquals(
             "account-selected",
             voiceTranscriptionAccountId(
+                message.copy(threadContactId = "legacy-unscoped-thread"),
+                fallbackAccountId = "account-selected"
+            )
+        )
+    }
+
+    @Test
+    fun messageOperationsUseMessageScopedAccountBeforeSelectedAccount() {
+        val message = FloatingChatMessage(
+            id = "outgoing-other-account",
+            type = FloatingChatMessageType.Text,
+            text = "待撤销消息",
+            fromMe = true,
+            senderName = "我",
+            time = "10:00",
+            threadContactId = "account-from-message__scrm-contact:peer",
+            remoteMessageId = 82L
+        )
+
+        assertEquals(
+            "account-from-message",
+            messageOperationAccountId(message, fallbackAccountId = "account-selected")
+        )
+        assertEquals(
+            "account-selected",
+            messageOperationAccountId(
                 message.copy(threadContactId = "legacy-unscoped-thread"),
                 fallbackAccountId = "account-selected"
             )

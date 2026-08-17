@@ -27,6 +27,7 @@ internal class ScrmContactTaskRunner(
 
     fun submitAndAwait(
         reloadContactsOnSuccess: Boolean,
+        onTaskAccepted: (Long) -> Unit = {},
         submit: () -> ScrmTaskSubmissionResult
     ): ScrmContactTaskOutcome {
         val submitted = submit()
@@ -37,11 +38,34 @@ internal class ScrmContactTaskRunner(
             )
         }
 
+        onTaskAccepted(submitted.taskId)
+        return awaitTask(
+            taskId = submitted.taskId,
+            reloadContactsOnSuccess = reloadContactsOnSuccess,
+            initialMessage = submitted.message,
+            initialData = submitted.data
+        )
+    }
+
+    fun awaitExistingTask(
+        taskId: Long,
+        reloadContactsOnSuccess: Boolean = false
+    ): ScrmContactTaskOutcome {
+        require(taskId > 0L) { "taskId 必须大于 0" }
+        return awaitTask(taskId, reloadContactsOnSuccess)
+    }
+
+    private fun awaitTask(
+        taskId: Long,
+        reloadContactsOnSuccess: Boolean,
+        initialMessage: String? = null,
+        initialData: JsonElement? = null
+    ): ScrmContactTaskOutcome {
         var lastResult: ScrmTaskResult? = null
         repeat(maxPollAttempts) { attempt ->
             if (attempt > 0) sleepMillis(pollDelayMillis)
             val result = try {
-                taskApi.getTask(submitted.taskId)
+                taskApi.getTask(taskId)
             } catch (error: ScrmRequestException) {
                 if (error.isMissingRecentTaskResult()) {
                     return@repeat
@@ -52,10 +76,10 @@ internal class ScrmContactTaskRunner(
             when (resolveScrmTaskResult(result).pollState) {
                 ScrmTaskPollState.Completed -> {
                     return ScrmContactTaskOutcome(
-                        taskId = submitted.taskId,
+                        taskId = taskId,
                         message = result.message?.takeIf { it.isNotBlank() }
-                            ?: submitted.message?.takeIf { it.isNotBlank() }
-                            ?: "联系人任务已完成 #${submitted.taskId}",
+                            ?: initialMessage?.takeIf { it.isNotBlank() }
+                            ?: "联系人任务已完成 #$taskId",
                         shouldReloadContacts = reloadContactsOnSuccess,
                         completed = true,
                         data = result.data
@@ -65,13 +89,13 @@ internal class ScrmContactTaskRunner(
                 ScrmTaskPollState.FailedFinal -> {
                     throw ScrmRequestException(
                         statusCode = 400,
-                        message = result.message ?: "联系人任务执行失败 #${submitted.taskId}"
+                        message = result.message ?: "联系人任务执行失败 #$taskId"
                     )
                 }
 
                 ScrmTaskPollState.ManualReview -> {
                     throw ScrmInvalidResponseException(
-                        result.message ?: "联系人任务结果未知 #${submitted.taskId}"
+                        result.message ?: "联系人任务结果未知 #$taskId"
                     )
                 }
 
@@ -80,14 +104,14 @@ internal class ScrmContactTaskRunner(
         }
 
         return ScrmContactTaskOutcome(
-            taskId = submitted.taskId,
+            taskId = taskId,
             message = lastResult?.message?.takeIf { it.isNotBlank() }
-                ?: submitted.message?.takeIf { it.isNotBlank() }
-                ?.let { "${it} #${submitted.taskId}，等待 Android 回包" }
-                ?: "联系人任务仍在处理中 #${submitted.taskId}，等待 Android 回包后请重试搜索",
+                ?: initialMessage?.takeIf { it.isNotBlank() }
+                ?.let { "$it #$taskId，等待 Android 回包" }
+                ?: "联系人任务仍在处理中 #$taskId，等待 Android 回包后请重试搜索",
             shouldReloadContacts = false,
             completed = false,
-            data = lastResult?.data
+            data = lastResult?.data ?: initialData
         )
     }
 }

@@ -102,3 +102,132 @@
 - 独立审查发现 PROCESSING 结果的 taskId 尚未跨点击保留，存在再次 POST 的风险；实现阶段重新打开。计划复用 Controller 持有的 `FloatingChatOverlayRuntimeState` 保存账号/消息对应 taskId，并给 runner 增加只续查既有 taskId 的路径。
 - 续查与缓存刷新契约已取得有效红灯：测试编译仅因 `awaitExistingTask`、runtime task 映射方法和始终刷新选中 route 的策略函数不存在而失败，生产源码同轮编译成功。
 - 合并账号路由契约时发现并发协作者已先补入 `voiceTranscriptionAccountId` 测试与 `(String) -> Unit` UI 断言；首个补丁因旧上下文不匹配而安全失败，随后按当前文件合并，未覆盖其改动。
+# 2026-08-17：悬浮聊天性能优化
+
+- 状态：阶段 1 进行中。
+- 已确认目标与五项禁止修改范围。
+- 已读取任务执行、文件化规划、系统化调试、TDD 和完成前验证规范。
+- 已运行会话恢复检查；工具报告原生 Codex 会话解析尚未实现，无可恢复上下文。
+- 已发现并保留既有计划历史，未修改任何产品源码。
+- 已完整读取系统化调试、方案设计、TDD 与最小改动规范；下一步开始项目上下文和性能证据调查。
+- 已通过前端性能技能的产品上下文门槛并读取 `optimize` 与 product 注册参考；确认本轮不涉及视觉设计和图片资产。
+- 已完整读取《卡顿原因.md》、仓库目录、近期提交和工作树状态；确认既有基线与 26 个候选原因，并发现消息渲染/媒体/SCRM 路径存在大量协作中的未提交改动。
+- 首次并行代码检索因包含不存在的测试目录而退出；已确认实际测试入口，后续改用存在性明确的目录。
+- 第二次检索确认未读分组的重复列表复制热点、三类 `flatMap`、右轨布局快照分配和根输入状态位置；尚未修改生产代码。
+- 深入读取连接线状态与测试后确认已有等值短路和批量失效优化；发现离屏索引前后集合累计复制，以及同一未读分组输入在 `CoordinateChatBody` 中计算两次的新线索。
+- 已确认 OnePlus 9 真机在线；现有 benchmark 只有冷启动，后续需用 ADB/现有脚本建立悬浮聊天定向前后基线。
+- 已确认真机应用与无障碍服务均可用；一次文档检索因 PowerShell 裸通配符失败，已记录并改用 `rg -g` 规则。
+- 已核对真机 WindowManager 状态：悬浮聊天全屏 overlay 当前可见并启用背景模糊；该样式保持不变，只作为测量环境条件记录。
+- 第一次截图因当前 PowerShell 缺少 `AsByteStream` 参数失败，未生成有效图片；已切换为 ADB 原生截图/拉取流程。
+- 已成功保存并查看真机优化前截图 `artifacts/device-before.png`，确认聊天、多种消息、连接线与双侧轨道均在测试场景内。
+- 已完成优化前真机固定滚动第 1 轮，复现 43.14% 卡顿率并保存 `artifacts/gfxinfo-before-optimization-round1.txt`。
+- 已完成第 2、3 轮相同滚动基线，暖态卡顿率分别为 29.42% 和 24.38%；三轮原始 `gfxinfo` 均已保存。
+- 已完成连接线 Canvas 与几何链审计，确认逐帧存在稳定可移出的 key 构造和多层集合/data class 分配，且现有几何测试可守住 UI 输出。
+- 已确认坐标状态已有严格等值短路，拒绝采用阈值节流；未读分组已有输出顺序契约，可用于守住线性化改造的业务等价性。
+- 已核对 Controller 当前实现与契约：部分报告结论已被缓存/保留视图路径修正，但 force 刷新仍整棵重建，构造期四类持久化读取仍同步。
+- 并行未读审计发现总览分支构建但不消费的 O(n²) 离屏索引、按线程重复扫全消息的 O(T×M) 路径，以及两项未使用派生结果；主线程开始复核这些证据。
+- 已复核 `CoordinateChatBody` 用户 diff，仅触及第 420 行点击逻辑；195～309 行的四项纯计算优化可独立补丁，不覆盖协作改动。
+- 已定位空离屏索引表达和 `CountingList` 确定性复杂度测试模式，为下一阶段红灯测试做准备。
+- 已完整梳理未读线程 fallback 语义，确认必须新建精确索引而不能误用带截断兜底的既有索引。
+- 连接线阶段 2 已接手：读取 TDD、文件化规划与最小改动规范，并将父代理给出的 direct writer 架构视为已批准设计；尚未修改本阶段生产代码。
+- 已先新增 `ChatConnectorPathWriterTest`：用旧 geometry 生成 move/line/quad oracle，覆盖用户、账号、乱序/扩容、上下消息离屏、avatar 上下离屏、group tree、空树与 group-member 直线；另有生产源码分配契约。尚未运行 Gradle 红灯。
+- 第二阶段定向红灯有效：13 秒内在 `compileDebugUnitTestKotlin` 仅因 `ChatConnectorPathWriter`、`ChatConnectorCommandSink` 与对应 recorder override 目标缺失而失败；生产 Kotlin 为 up-to-date，现进入最小实现。
+- 已新增 `ChatConnectorPathWriter.kt` 并接入 layer：primitive anchor scratch、稳定排序、直接 trunk/hook 命令、remembered Path sinks、group-member 直接写入均已落盘；旧 geometry 文件未改。静态推演补充了“空可见项 + 离屏 avatar”边界并修正 trunk 累计。
+- 已完成首轮源码扫描：layer/writer 中旧 geometry 调用、Branch 与 Offset 构造均为零匹配；未运行 Gradle 绿灯，继续复核现有测试契约与浮点/排序边界。
+- 已恢复本轮技能与书面计划上下文，并通过产品性能预检；`PRODUCT.md` 有效，`DESIGN.md` 缺失但本任务禁止视觉变化，因此图片与形状设计门槛不适用。
+- 已补采 Phase 1 APK 的 framestats 第 2、3、4 轮；因既有 round1 总帧数与当前协议不同，正式 Phase 1 cohort 固定为同样包含 120ms swipe 间隔的 round2～4，round1 仅保留为历史样本。独立审计正在按匿名悬浮窗 ViewRoot 复算，避免 MainActivity 混入。
+- 第二阶段只读审计确认总览头像轨订阅全局连接线版本会产生额外失效，并排除左右轨、`retainMessageBounds()` 和根滚动布尔值为中央逐帧主因；是否实施版本拆分将由 direct writer 同源 A/B 决定。
+- 已启动第一阶段独立规范复核，重点检查未读 fallback/顺序、离屏索引全位置等价与异步语音生命周期；连接线生产文件保持单一代理所有权，主线程不并发编辑。
+- direct writer 首轮串行绿灯通过：`ChatConnectorPathWriterTest`、`ChatConnectorLayerPerformanceContractTest`、`FloatingChatConnectorGeometryTest` 与生产 Kotlin 编译均在 21 秒内返回 `BUILD SUCCESSFUL`；下一步扩大到坐标、未读、总览和语音组合回归。
+- 扩大到 191 项 `FloatingChatMessageUiContractTest` 组合回归时出现 4 项已知失败，分别属于群成员轨、运行时更新、左轨和右轨；已读取 XML 与断言确认不经过本轮优化文件，不据此修改业务。下一步排除已知整类旧契约后运行本轮 8 组定向测试。
+- 本轮 8 组性能、几何、坐标、总览与语音定向测试在 14 秒内组合返回 `BUILD SUCCESSFUL`。
+- `:app:assembleDebug` 在 1 分 19 秒内成功；Phase 2 APK 已覆盖安装，服务启用且全屏悬浮窗恢复。截图 `artifacts/device-after-phase2-expand.png` 显示原消息、轨道、连接线和输入栏正常，准备执行预热及三轮同协议 framestats。
+
+---
+
+## 2026-08-17：Phase 2 反证与回归审查
+
+- 独立复算 Phase 2 三轮同协议 framestats：`310/1677 = 18.49%`，较 Phase 1 的 `16.25%` 上升 `2.23pp`；当前阶段明确未完成，继续定位 Slow UI/Slow issue draw 联合背压。
+- direct writer 浮点审查提出 1 ULP 风险；先加入审查给定分数坐标并运行旧几何 oracle，测试仍为绿。随后读取当前 Compose UI Geometry 1.7.6 源码，确认 `Rect.center` 本就采用 `top + height / 2`，已撤掉无效测试假设且未改生产公式。
+- 语音播放器错误边界契约先红：3 项中只有 `MediaPlayer` 构造未处于 `runCatching` 内失败。最小修复后同一 3 项测试在 20 秒内 `BUILD SUCCESSFUL`，构造、配置和异步准备异常继续显式进入失败状态并释放已创建播放器。
+- 一次依赖检索因向 PowerShell `rg` 传入裸 `build.gradle*` 通配路径失败；已改为 `-g` 过滤规则并取得 Compose 版本与本地 sources.jar 证据。
+
+## 2026-08-17：Perfetto 重组定位
+
+- 以既定 x=520、y=1650↔650、260ms 的 12 次往返滑动，在 OnePlus 9 成功采集 15 秒 Perfetto trace；首次输出目录权限不足后改用 `/data/misc/perfetto-traces`，不把失败采样作为性能结论。
+- 使用官方 Trace Processor v57.2，SHA-256 已校验为 `100334B6091596FBC97F872556849A5747BF47A7F7190C485BA8CEA8D2409C7B`。trace 留在本地 artifacts，未上传。
+- 证据显示主线程 `Recomposer:recompose` 99 次累计 895.954ms、最高 41.492ms；`Compose:recompose` 最高 23.040ms。测量布局、普通绘制与输入分发均显著低于该成本，下一步回溯状态订阅而非盲目继续优化 Canvas。
+
+## 2026-08-17：续作状态恢复
+
+- 已重新读取性能专项计划、发现记录、进度记录和工作区状态。会话恢复脚本确认当前 Codex 会话没有可自动解析的旧上下文，已以仓库内记录和真机 trace 作为事实来源继续。
+- 工作区包含大量与消息渲染、SCRM、媒体和其他页面相关的协作者改动；后续仅调查浮窗聊天滚动状态、坐标状态及其专属性能测试，禁止回退或覆盖其他变更。
+- 当前结论仍为：Phase 2 同协议真机卡顿率 `18.49%` 高于 Phase 1 的 `16.25%`，不能宣称优化已完成。正在追踪滚动写入状态到上层 Compose 重组的完整调用链。
+
+## 2026-08-17：滚动重组链路补证
+
+- 读取 `卡顿原因.md`、消息坐标主体、两侧轨道和 simpleperf 调用图后确认：已有 trace 的主矛盾仍是 Compose 重组，而非普通测量、输入分发或 direct Path writer。
+- simpleperf 的消息项调用图出现 `LazyLayoutItemContentFactory` 与 `AndroidPrefetchScheduler.run` 的预组合路径，并进入 `MessageCoordinatePane`/`MessageRow`。该发现只说明预取参与了滚动成本，尚未证明禁用或削减预取会改善用户可见帧，因此不直接修改策略。
+- 下一步：量化预取、坐标状态订阅与连接线绘制各自的时间占比，随后只针对已验证根因新增红灯契约和最小修复。
+
+## 2026-08-17：消息列表预取单变量验证
+
+- 根据 Foundation 1.7.6 源码与 simpleperf `AndroidPrefetchScheduler.run` 的 `7.85%` 样本，新增 `MessageListPrefetchPerformanceContractTest`。初次运行按预期有 2 项失败，因 `NoMessageListPrefetchStrategy` 尚不存在。
+- 最小实现只为 `CoordinateChatBody` 的主消息列表传入私有无预取策略，策略不调用 `schedulePrefetch`。未改消息内容、消息 renderer、接口、样式、业务状态或其他 LazyColumn。
+- 同一契约与 `:ubiki-accessibility:compileDebugKotlin` 已在 10 秒内返回 `BUILD SUCCESSFUL`。下一步为真机同协议 A/B，若未改善则撤销该单变量。
+
+## 2026-08-17：预取 A/B 部署
+
+- `:app:assembleDebug` 在 1 分 4 秒内返回 `BUILD SUCCESSFUL`，debug APK 已通过 `adb install -r -t` 覆盖安装到 OnePlus 9，保留设备数据。
+- 无障碍服务和应用进程均在线。首次尝试从收起态恢复聊天时误进入系统最近任务界面，该状态不纳入任何性能统计；后续将先恢复既定全屏聊天场景并截图核对后再执行固定手势。
+
+## 2026-08-17：预取 A/B 协议校正
+
+- 全屏聊天截图已确认消息、连接线、左右轨道和输入栏均正常。首组三轮误把“12 次交替 swipe”执行成 12 对 swipe，得到约 1200 帧/轮，是历史正式 cohort 约 559 帧/轮的两倍。
+- 误协议三轮为 `199/1223`、`159/1237`、`213/1207`；这些样本只保留为诊断记录，禁止与 Phase 1/2 比较或作为完成证据。
+- 根据相同设备 120Hz 与手势时长反推，正式协议应为 12 次总 swipe，即 6 次上下成对。后续三轮按该帧量级重采。
+
+## 2026-08-17：无预取正式三轮
+
+- 按校正后的 12 次总 swipe 协议完成三轮，匿名悬浮窗根每轮为 `99/658` (`15.05%`)、`93/658` (`14.13%`)、`83/658` (`12.61%`)；合计 `275/1974 = 13.93%`。
+- 该结果只作为候选优化数据，历史 Phase 1/2 的帧量级和设备状态不同。为排除环境偏差，下一步在同一设备和同一会话中恢复默认预取做三轮对照，然后再恢复无预取实现。
+
+## 2026-08-17：对照场景污染
+
+- 默认预取 APK 已覆盖安装并恢复聊天截图；第一轮对照重置后执行手势时，采样结束画面进入“群信息”面板，且窗口/PID 发生变化，证明触摸场景没有被稳定锁定。
+- 该对照轮及其帧数据不纳入任何性能结论。后续先用返回操作和单次 swipe 截图确认仍在消息列表，再继续同机 A/B；若无法稳定锁定场景，将以 Perfetto/静态证据为主并明确真机数据限制。
+
+## 2026-08-17：全屏悬浮聊天 toolbar 续作
+
+- 用户新增确认的需求是局部 toolbar 布局与备注输入交互：两侧等权 Box、左侧返回红点/标题走马灯/编辑，右侧二维码/账号走马灯/搜索，且保持搜索、二维码和既有资料入口业务不变。
+- 已完整审计实际显示路径，确认 `FloatingChatWorkspaceHeader` 才是 `floatFullScreenChatView` 可见 toolbar；`CoordinateChatBody.ChatTopToolbar` 当前以 `showTopToolbar = false` 关闭，不能作为实现目标。
+- 已确认私聊编辑、群聊群信息和联系人备注持久化的既有回调链；备注输入将实现为同一悬浮根内的输入层，不创建 Android Dialog 或新增 Window。
+- 两名并行只读审计代理因协作服务流断开而失败，未修改工作区；改由主线程继续本地审计和验证。
+
+## 2026-08-17：本人消息撤销启动
+
+- 用户确认交互与 A 方案：本人已同步消息显示“撤销”，二次确认后调用真实接口，只有服务端任务完成才刷新会话。
+- 已提交设计文档 `1631f0b`，并完成中文实施计划；自审时将确认实现调整为现有 Compose 根内模态层，以遵守悬浮窗口不新建 Window 的约束。
+- 已确认相关生产文件存在未提交协作改动；后续使用局部补丁叠加，不覆盖 toolbar、语音转写或其他消息渲染改动。
+- 已按 TDD 完成菜单展示/分发、消息账号作用域、根内确认层和撤回任务适配器；每组测试均先观察到目标缺失红灯，再补最小实现转绿。
+- 四组撤销定向验证与生产 Kotlin 编译通过，`git diff --check` 无错误；未在真实账号执行破坏性的撤回写测试。
+- 验证期间先后遇到共享测试结果文件锁、`classes.jar` 并发写入损坏和强制重建超过 60 秒上限；未删除共享缓存，改用热 Gradle daemon 拆分验证后通过。
+- 消息包扩大回归运行 56 项，唯一失败为 HEAD 既有 `MessageRendererRegistryTest` 字符串断言不匹配；未修改无关渲染代码或测试。
+
+## 2026-08-17：toolbar 窄屏交互修正与验证
+
+- 首轮静态与 Compose 红灯确认原 toolbar 为 25dp 命中区域；在 360dp 窄屏中这会偏离 Material 默认交互尺寸并挤压等权区域。
+- 将左侧标题槽改为剩余空间内最多 110dp，恢复默认 IconButton 最小交互尺寸；右侧二维码、账号、搜索顺序和既有回调保持不变。
+- 备注输入层新增遮罩命中拦截和系统返回键关闭，仍使用已有 Compose 根和 `updateContactProfile`，未创建第二个 Window。
+- `basicMarquee` 增加 `ExperimentalFoundationApi` opt-in；强制重编译 `:ubiki-accessibility:compileDebugKotlin --rerun-tasks` 成功。
+- `FloatingChatToolbarLayoutContractTest` 与 `FloatingChatComposeUiTest`（含窄屏四控件点击）最新组合运行成功。
+- 既有根 `.clearAndSetSemantics {}` 保留，原因是其承担悬浮窗语义隔离和性能边界；本轮不扩大到消息主体语义树。
+# 2026-08-17 创建群聊
+
+- 已完成只读定位：扫码菜单、悬浮宿主、联系人数据、建群 API 和现有测试均已确认。
+- 已确定实现路径：扫码菜单事件 -> 联系人全屏建群模式 -> 现有真实 SCRM 建群任务。
+- 下一步：先写并运行失败测试。
+
+- 已完成两轮红绿验证：首次 4 项中新增 3 项按预期失败后转绿；导航契约新增后 5 项中 1 项按预期失败后转绿。
+- 最终串行运行扫码/建群契约、`ScrmApiClientTest` 与 `compileDebugKotlin`，Gradle 返回 `BUILD SUCCESSFUL`。
+- `git diff --check` 无补丁错误，仅报告仓库现有 LF/CRLF 转换提示。

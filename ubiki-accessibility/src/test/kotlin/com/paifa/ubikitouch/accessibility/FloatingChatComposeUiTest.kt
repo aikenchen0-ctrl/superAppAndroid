@@ -1,6 +1,8 @@
 package com.paifa.ubikitouch.accessibility
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
@@ -10,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
+import androidx.compose.ui.unit.dp
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.AccountScopedConversation
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatNavigationRoute
 import com.paifa.ubikitouch.accessibility.floatingchat.chat.ChatNavigationState
@@ -59,6 +62,46 @@ class FloatingChatComposeUiTest {
         composeRule.onNode(hasContentDescription("返回") and hasClickAction()).performClick()
 
         composeRule.runOnIdle { assertEquals(1, backCalls) }
+    }
+
+    @Test(timeout = 60_000)
+    fun headerControlsRemainClickableInANarrowFullscreenWindow() {
+        var backCalls = 0
+        var editCalls = 0
+        var scanCalls = 0
+        var searchCalls = 0
+        composeRule.setContent {
+            Box(Modifier.width(360.dp)) {
+                FloatingChatWorkspaceHeader(
+                    state = floatingChatHeaderState(
+                        route = FloatingChatHeaderRoute.Conversation,
+                        accountName = TestAccount.name,
+                        conversationTitle = "联系人备注很长",
+                        unreadCount = 1,
+                        messageScrollInProgress = false,
+                        editable = true
+                    ),
+                    accountName = TestAccount.name,
+                    onLeadingClick = { backCalls += 1 },
+                    onEditClick = { editCalls += 1 },
+                    onSearchClick = { searchCalls += 1 },
+                    onScanClick = { scanCalls += 1 },
+                    onAddFriendClick = {}
+                )
+            }
+        }
+
+        composeRule.onNode(hasContentDescription("返回") and hasClickAction()).performClick()
+        composeRule.onNode(hasContentDescription("编辑会话备注") and hasClickAction()).performClick()
+        composeRule.onNode(hasContentDescription("扫一扫与添加朋友") and hasClickAction()).performClick()
+        composeRule.onNode(hasContentDescription("搜索聊天记录") and hasClickAction()).performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(1, backCalls)
+            assertEquals(1, editCalls)
+            assertEquals(1, scanCalls)
+            assertEquals(1, searchCalls)
+        }
     }
 
     @Test(timeout = 60_000)

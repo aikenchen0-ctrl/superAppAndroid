@@ -95,7 +95,7 @@ class ChatExtractionContractTest {
         assertTrue(text.contains("fun rightRailVirtualAccountAvatarBounds("))
         assertTrue(text.contains("fun leftRailVirtualSessionAvatarBounds("))
         assertTrue(text.contains("fun createGroupMemberMessageConnectorBranch("))
-        assertTrue(text.contains("data class ConnectorOffscreenIndex"))
+        assertTrue(text.contains("class ConnectorOffscreenIndex"))
 
         val legacy = sourceFile("FloatingChatOverlayUi.kt").readText()
         assertFalse(legacy.contains("internal class ConnectorCoordinateState"))
@@ -103,7 +103,7 @@ class ChatExtractionContractTest {
         assertFalse(legacy.contains("internal data class LeftRailVisibleSessionItem"))
         assertFalse(legacy.contains("internal enum class RailPinnedAvatarEdge"))
         assertFalse(legacy.contains("internal enum class ConnectorAvatarLane"))
-        assertFalse(legacy.contains("internal data class ConnectorOffscreenIndex"))
+        assertFalse(legacy.contains("internal class ConnectorOffscreenIndex"))
         assertFalse(legacy.contains("internal fun rightRailVirtualAccountAvatarBounds("))
         assertFalse(legacy.contains("internal fun leftRailVirtualSessionAvatarBounds("))
         assertFalse(legacy.contains("internal fun createGroupMemberMessageConnectorBranch("))

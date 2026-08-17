@@ -1,6 +1,7 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.chat
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,8 +13,12 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListLayoutInfo
+import androidx.compose.foundation.lazy.LazyListPrefetchScope
+import androidx.compose.foundation.lazy.LazyListPrefetchStrategy
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.layout.NestedPrefetchScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
@@ -49,6 +54,7 @@ import com.paifa.ubikitouch.accessibility.floatingchat.message.isPaymentCardMess
 import com.paifa.ubikitouch.accessibility.floatingchat.message.messageListInitialFirstVisibleItemIndex
 import com.paifa.ubikitouch.accessibility.floatingchat.message.messageListViewportKey
 import com.paifa.ubikitouch.accessibility.floatingchat.message.shouldRetargetMessageList
+import com.paifa.ubikitouch.accessibility.floatingchat.message.messageSupportsVoiceTranscription
 import com.paifa.ubikitouch.accessibility.floatingchat.tools.RightCoordinateRail
 import com.paifa.ubikitouch.accessibility.floatingchat.message.BubbleAppearance
 import com.paifa.ubikitouch.accessibility.floatingchat.message.bubbleAppearanceButtonLabel
@@ -132,6 +138,7 @@ internal fun chatToolbarTitle(
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 internal fun CoordinateChatBody(
     conversation: FloatingChatConversation,
     homeOverviewConversations: List<AccountScopedConversation>,
@@ -208,9 +215,6 @@ internal fun CoordinateChatBody(
     val homeUnreadSummaryByMessageId = remember(homeUnreadSummaries) {
         homeUnreadSummaries.associateBy { summary -> summary.message.id }
     }
-    val homeUnreadAvatarContacts = remember(homeUnreadSummaries) {
-        homeUnreadSummaries.map { summary -> summary.avatarContact }.distinctBy { contact -> contact.id }
-    }
     val homeUnreadAccountIds = remember(homeUnreadSummaries) {
         homeUnreadSummaries.map { summary -> summary.accountId }.toSet()
     }
@@ -225,31 +229,22 @@ internal fun CoordinateChatBody(
     val homeUnreadAccountIdsByMessageId = remember(homeUnreadSummaries) {
         homeUnreadSummaries.associate { summary -> summary.message.id to summary.accountId }
     }
-    val threadMessages = remember(conversation, selectedThread, selectedAccount.id) {
-        visibleMessagesForThread(
-            conversation = conversation,
-            selection = selectedThread,
-            selectedAccountId = selectedAccount.id
-        )
+    val threadMessages = remember(conversation, selectedThread, selectedAccount.id, homeOverviewVisible) {
+        if (homeOverviewVisible) {
+            emptyList()
+        } else {
+            visibleMessagesForThread(
+                conversation = conversation,
+                selection = selectedThread,
+                selectedAccountId = selectedAccount.id
+            )
+        }
     }
     val visibleMessages = remember(homeOverviewVisible, homeUnreadSummaries, threadMessages) {
         if (homeOverviewVisible) {
             homeUnreadSummaries.map { summary -> summary.message }
         } else {
             threadMessages
-        }
-    }
-    val homeOverviewConnectorGroupIds = remember(
-        homeOverviewVisible,
-        visibleMessages,
-        homeUnreadAccountIdsByMessageId
-    ) {
-        if (homeOverviewVisible) {
-            homeOverviewMessageGroups(visibleMessages, homeUnreadAccountIdsByMessageId)
-                .flatMap { group -> group.messages.map { message -> message.id to group.connectorId } }
-                .toMap()
-        } else {
-            emptyMap()
         }
     }
     val homeOverviewMessageGroups = remember(
@@ -263,6 +258,11 @@ internal fun CoordinateChatBody(
             emptyList()
         }
     }
+    val homeOverviewConnectorGroupIds = remember(homeOverviewMessageGroups) {
+        homeOverviewMessageGroups
+            .flatMap { group -> group.messages.map { message -> message.id to group.connectorId } }
+            .toMap()
+    }
     val viewportKey = remember(selectedThread, selectedAccount.id, homeOverviewVisible) {
         messageListViewportKey(
             selection = selectedThread,
@@ -274,7 +274,8 @@ internal fun CoordinateChatBody(
         initialFirstVisibleItemIndex = messageListInitialFirstVisibleItemIndex(
             messageCount = visibleMessages.size,
             homeOverviewVisible = homeOverviewVisible
-        )
+        ),
+        prefetchStrategy = NoMessageListPrefetchStrategy
     )
     val viewportTracker = remember {
         MessageListViewportTracker(viewportKey, visibleMessages.size)
@@ -299,13 +300,17 @@ internal fun CoordinateChatBody(
         selectedAccount.id,
         groupMemberAvatarsVisible
     ) {
-        buildOffscreenConnectorIndex(
-            messages = visibleMessages,
-            selection = selectedThread,
-            selectedAccountId = selectedAccount.id,
-            homeOverviewVisible = homeOverviewVisible,
-            groupMemberAvatarsVisible = groupMemberAvatarsVisible
-        )
+        if (homeOverviewVisible) {
+            ConnectorOffscreenIndex.empty()
+        } else {
+            buildOffscreenConnectorIndex(
+                messages = visibleMessages,
+                selection = selectedThread,
+                selectedAccountId = selectedAccount.id,
+                homeOverviewVisible = homeOverviewVisible,
+                groupMemberAvatarsVisible = groupMemberAvatarsVisible
+            )
+        }
     }
     val contactsById = remember(conversation.groupContacts, conversation.contacts) {
         (conversation.groupContacts + conversation.contacts).associateBy { contact -> contact.id }
@@ -419,7 +424,7 @@ internal fun CoordinateChatBody(
                 onToggleMessageSelection = onToggleMessageSelection,
                 onMessageClick = { message ->
                     onBlankAreaTap()
-                    if (homeOverviewVisible) {
+                    if (homeOverviewVisible && !messageSupportsVoiceTranscription(message)) {
                         homeUnreadSummaryByMessageId[message.id]?.let(onHomeUnreadSelected)
                     } else if (message.kind == FloatingChatMessageKind.AiDraft) {
                         onAiDraftClick(message)
@@ -782,3 +787,12 @@ private class MessageListViewportTracker(
     var viewportKey: MessageListViewportKey,
     var messageCount: Int
 )
+
+@OptIn(ExperimentalFoundationApi::class)
+private object NoMessageListPrefetchStrategy : LazyListPrefetchStrategy {
+    override fun LazyListPrefetchScope.onScroll(delta: Float, layoutInfo: LazyListLayoutInfo) = Unit
+
+    override fun LazyListPrefetchScope.onVisibleItemsUpdated(layoutInfo: LazyListLayoutInfo) = Unit
+
+    override fun NestedPrefetchScope.onNestedPrefetch(firstVisibleItemIndex: Int) = Unit
+}

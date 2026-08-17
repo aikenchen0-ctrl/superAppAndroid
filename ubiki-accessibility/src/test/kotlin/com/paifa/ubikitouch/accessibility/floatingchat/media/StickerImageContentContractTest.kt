@@ -51,6 +51,15 @@ class StickerImageContentContractTest {
         assertTrue(loader.contains("STICKER_THUMBNAIL_CACHE_NAMESPACE"))
     }
 
+    @Test
+    fun stickerContentShowsOriginalBodyWhenBitmapCannotBeDecoded() {
+        val source = sourceFile("floatingchat/media/StickerImageContent.kt").readText()
+
+        assertTrue(source.contains("mediaBitmap == null"))
+        assertTrue(source.contains("message.detail"))
+        assertTrue(source.contains("message.text"))
+    }
+
     private fun assertStickerBranchUsesDedicatedContent(renderer: String, branchEnd: String) {
         val stickerBranch = renderer
             .substringAfter("FloatingChatMessageType.StickerGif ->")

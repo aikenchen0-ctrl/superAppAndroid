@@ -19,7 +19,10 @@ internal object VoiceCallMessageRenderer : MessageRenderer {
         environment: MessageRenderEnvironment
     ) {
         when (model.type) {
-            FloatingChatMessageType.Voice -> VoiceMessageContent(model.message)
+            FloatingChatMessageType.Voice -> VoiceMessageContent(
+                message = model.message,
+                onClick = { environment.onMessageClick(model.message) }
+            )
             FloatingChatMessageType.VoiceCall,
             FloatingChatMessageType.VideoCall -> CallMessageCard(model.message)
             else -> renderLegacyMessage(model, environment)

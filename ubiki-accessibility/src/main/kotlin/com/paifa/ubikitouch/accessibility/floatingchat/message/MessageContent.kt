@@ -20,6 +20,7 @@ internal fun MessageContent(
     index: Int,
     onPreviewMedia: (FloatingChatMessage) -> Unit,
     onOpenMediaActions: (FloatingChatMessage) -> Unit,
+    onMessageClick: (FloatingChatMessage) -> Unit,
     onLongPressMessage: (FloatingChatMessage, Rect?) -> Unit,
     multiSelectMode: Boolean,
     onToggleSelection: () -> Unit,
@@ -33,6 +34,7 @@ internal fun MessageContent(
     val environment = MessageRenderEnvironment(
         onPreviewMedia = onPreviewMedia,
         onOpenMediaActions = onOpenMediaActions,
+        onMessageClick = onMessageClick,
         onLongPressMessage = onLongPressMessage,
         multiSelectMode = multiSelectMode,
         onToggleSelection = onToggleSelection,

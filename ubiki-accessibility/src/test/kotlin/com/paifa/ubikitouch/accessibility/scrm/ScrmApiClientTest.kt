@@ -1664,6 +1664,41 @@ class ScrmApiClientTest {
     }
 
     @Test
+    fun messageRevokeUsesScrmMessageIdPathAndAccountBody() {
+        val transport = RecordingTransport(
+            ok("""{"taskId":702,"success":true,"message":"queued"}""")
+        )
+        val result = ScrmApiClient(config, transport).revokeMessage(
+            messageId = 124L,
+            request = ScrmMessageOperationRequest(
+                deviceUuid = "device-2",
+                weChatId = "wxid_revoke_account"
+            )
+        )
+
+        val request = requireNotNull(transport.lastRequest)
+        val body = Json.parseToJsonElement(requireNotNull(request.body)).jsonObject
+        assertEquals(702L, result.taskId)
+        assertEquals("POST", request.method)
+        assertEquals(
+            "https://api.example.com/openapi/v1/messages/124/revoke",
+            request.url
+        )
+        assertEquals("device-2", body.getValue("deviceUuid").jsonPrimitive.content)
+        assertEquals("wxid_revoke_account", body.getValue("weChatId").jsonPrimitive.content)
+
+        val invalidTransport = RecordingTransport(ok("{}"))
+        val invalid = runCatching {
+            ScrmApiClient(config, invalidTransport).revokeMessage(
+                messageId = 0L,
+                request = ScrmMessageOperationRequest("device-2", "wxid_revoke_account")
+            )
+        }
+        assertTrue(invalid.exceptionOrNull() is IllegalArgumentException)
+        assertNull(invalidTransport.lastRequest)
+    }
+
+    @Test
     fun missingApiKeyFailsBeforeTransportIsCalled() {
         val transport = RecordingTransport(ok("{}"))
         val client = ScrmApiClient(

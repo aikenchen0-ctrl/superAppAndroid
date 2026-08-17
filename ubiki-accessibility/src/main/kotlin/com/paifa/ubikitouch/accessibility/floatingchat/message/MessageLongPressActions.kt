@@ -57,7 +57,7 @@ internal fun parseMessageAsideAnalysis(response: String): MessageAsideAnalysis {
  * 转文字应跟随被点击消息的账号作用域；旧的非作用域消息才回退到当前选中账号。
  * 测试流程：在“全部未回消息”中点击其他账号的语音消息，操作菜单选择“转文字”。
  */
-internal fun voiceTranscriptionAccountId(
+internal fun messageOperationAccountId(
     message: FloatingChatMessage,
     fallbackAccountId: String
 ): String {
@@ -65,6 +65,11 @@ internal fun voiceTranscriptionAccountId(
         ?.let(::accountIdForScopedThreadId)
         ?: fallbackAccountId
 }
+
+internal fun voiceTranscriptionAccountId(
+    message: FloatingChatMessage,
+    fallbackAccountId: String
+): String = messageOperationAccountId(message, fallbackAccountId)
 
 internal class MessageLongPressActions(
     private val favoriteMessageIds: MutableMap<String, Boolean>,
@@ -79,6 +84,7 @@ internal class MessageLongPressActions(
     private val onListenMessage: (FloatingChatMessage) -> Unit,
     private val onZoomMessage: (FloatingChatMessage) -> Unit,
     private val onTranscribeMessage: (FloatingChatMessage) -> Unit,
+    private val onRevokeMessageRequested: (FloatingChatMessage) -> Unit,
     private val onScrmOperationRequested: (FloatingChatMessage) -> Unit,
     private val onCloseLongPressMenu: () -> Unit
 ) {
@@ -87,6 +93,9 @@ internal class MessageLongPressActions(
             MessageLongPressAction.Transcribe -> {
                 // 接口：由悬浮聊天宿主使用消息的 SCRM remoteMessageId 提交真实语音转写任务。
                 onTranscribeMessage(message)
+            }
+            MessageLongPressAction.Revoke -> {
+                onRevokeMessageRequested(message)
             }
             MessageLongPressAction.Listen -> {
                 onListenMessage(message)

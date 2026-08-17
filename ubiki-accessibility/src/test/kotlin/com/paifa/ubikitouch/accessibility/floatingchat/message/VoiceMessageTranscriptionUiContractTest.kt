@@ -16,7 +16,7 @@ class VoiceMessageTranscriptionUiContractTest {
             .substringBefore("onScrmOperationRequested =")
 
         assertTrue(source.contains("onRefreshConversation: (String) -> Unit"))
-        assertTrue(callback.contains("message.remoteMessageId"))
+        assertTrue(callback.contains("messageRemoteIdForVoiceTranscription("))
         assertTrue(callback.contains("voiceTranscriptionAccountId(message, selectedAccount.id)"))
         assertTrue(callback.contains("scrmFloatingAccountRouteForContactId(transcriptionAccountId)"))
         assertTrue(callback.contains("withContext(Dispatchers.IO)"))

@@ -1,7 +1,9 @@
 package com.paifa.ubikitouch.accessibility.floatingchat.components
 
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -12,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -70,5 +73,34 @@ fun FloatingWorkspaceTopAppBar(
             }
         },
         actions = actions
+    )
+}
+
+/**
+ * 与标准标题栏共享同一 surface、Insets 和高度的自定义内容槽。
+ * 聊天 header 用它组织左右等权区域，其他工作区继续使用字符串标题重载。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FloatingWorkspaceTopAppBar(
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit
+) {
+    TopAppBar(
+        modifier = modifier,
+        windowInsets = WindowInsets(top = FloatingWorkspaceTopBarDefaults.StatusBarTopPaddingDp.dp),
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+            scrolledContainerColor = MaterialTheme.colorScheme.surface
+        ),
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                content = content
+            )
+        },
+        navigationIcon = {},
+        actions = {}
     )
 }

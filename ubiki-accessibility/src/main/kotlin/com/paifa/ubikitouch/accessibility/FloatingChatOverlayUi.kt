@@ -199,7 +199,6 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -209,7 +208,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.Surface as MaterialSurface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -277,8 +275,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.Dp.Companion.Unspecified
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -340,6 +336,7 @@ import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskResult
 import com.paifa.ubikitouch.accessibility.scrm.ScrmTaskSubmissionResult
 import com.paifa.ubikitouch.accessibility.scrm.ScrmVoiceTranscriptionState
 import com.paifa.ubikitouch.accessibility.scrm.ScrmVoiceTranscriptionTaskRunner
+import com.paifa.ubikitouch.accessibility.scrm.ScrmMessageRevokeTaskRunner
 import com.paifa.ubikitouch.accessibility.scrm.ScrmPaymentApi
 import com.paifa.ubikitouch.accessibility.scrm.ScrmRedPacketQueryByMessageRequest
 import com.paifa.ubikitouch.accessibility.scrm.PaymentDetailParser
@@ -422,6 +419,7 @@ internal fun floatingChatHeaderState(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun FloatingChatWorkspaceHeader(
     state: FloatingChatHeaderState,
@@ -435,41 +433,89 @@ internal fun FloatingChatWorkspaceHeader(
     // 未回消息总览、单账号会话与普通会话均复用 UI组件 的 surface M3 工具栏。
     // 测试流程：从全部未回消息或具体账号页面打开后确认 30dp 位于 AppBar 内，点击搜索/扫码继续进入同一根工作区。
     FloatingWorkspaceTopAppBar(
-        title = state.title,
-        onBack = onLeadingClick,
-        actions = {
-            if (state.showUnreadDot) {
-                FloatingChatUnreadDot()
-            }
-            Text(
-                text = accountName,
-                modifier = Modifier.width(62.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Normal,
-                textAlign = TextAlign.End,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (state.showEdit && onEditClick != null) {
-                IconButton(onClick = onEditClick) {
-                    Icon(
-                        imageVector = Icons.Filled.Edit,
-                        contentDescription = "编辑会话备注"
-                    )
+        content = {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box {
+                        IconButton(onClick = onLeadingClick) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "返回"
+                            )
+                        }
+                        if (state.showUnreadDot) {
+                            Box(modifier = Modifier.align(Alignment.TopEnd)) {
+                                FloatingChatUnreadDot()
+                            }
+                        }
+                    }
+                    Box(
+                        modifier = Modifier.weight(1f, fill = true),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        Text(
+                            text = state.title,
+                            modifier = Modifier
+                                .widthIn(max = 110.dp)
+                                .fillMaxWidth()
+                                .basicMarquee(),
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Normal,
+                            maxLines = 1,
+                            overflow = TextOverflow.Clip
+                        )
+                    }
+                    if (state.showEdit && onEditClick != null) {
+                        IconButton(onClick = onEditClick) {
+                            Icon(
+                                imageVector = Icons.Filled.Edit,
+                                contentDescription = "编辑会话备注"
+                            )
+                        }
+                    }
                 }
             }
-            IconButton(onClick = onSearchClick) {
-                Icon(
-                    imageVector = Icons.Filled.Search,
-                    contentDescription = "搜索聊天记录"
-                )
-            }
-            IconButton(onClick = onScanClick) {
-                Icon(
-                    imageVector = Icons.Filled.QrCodeScanner,
-                    contentDescription = "扫一扫与添加朋友"
-                )
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onScanClick) {
+                        Icon(
+                            imageVector = Icons.Filled.QrCodeScanner,
+                            contentDescription = "扫一扫与添加朋友"
+                        )
+                    }
+                    Text(
+                        text = accountName,
+                        modifier = Modifier
+                            .width(36.dp)
+                            .basicMarquee(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Normal,
+                        textAlign = TextAlign.End,
+                        maxLines = 1,
+                        overflow = TextOverflow.Clip
+                    )
+                    IconButton(onClick = onSearchClick) {
+                        Icon(
+                            imageVector = Icons.Filled.Search,
+                            contentDescription = "搜索聊天记录"
+                        )
+                    }
+                }
             }
         }
     )
@@ -546,6 +592,8 @@ internal fun FloatingChatOverlay(
     }
     var contactsOpenAddFriend by remember { mutableStateOf(false) }
     var displayedContactsOpenAddFriend by remember { mutableStateOf(false) }
+    var contactsOpenStartGroup by remember { mutableStateOf(false) }
+    var displayedContactsOpenStartGroup by remember { mutableStateOf(false) }
     val bottomPanelVisibility = remember { MutableTransitionState(false) }
     val workspaceRequest = runtimeState.workspaceRequest
     LaunchedEffect(workspaceRequest?.token) {
@@ -564,10 +612,12 @@ internal fun FloatingChatOverlay(
         }
         if (bottomPanelMode == BottomPanelMode.Contacts) {
             displayedContactsOpenAddFriend = contactsOpenAddFriend
+            displayedContactsOpenStartGroup = contactsOpenStartGroup
         }
         bottomPanelVisibility.targetState = bottomPanelMode != BottomPanelMode.None
         if (bottomPanelMode != BottomPanelMode.Contacts) {
             contactsOpenAddFriend = false
+            contactsOpenStartGroup = false
         }
     }
     LaunchedEffect(imeVisible) {
@@ -610,6 +660,7 @@ internal fun FloatingChatOverlay(
     var aiDraftEditMessage by remember { mutableStateOf<FloatingChatMessage?>(null) }
     val mediaOverlayState = rememberFloatingChatMediaOverlayState()
     var longPressMessage by remember { mutableStateOf<FloatingChatMessage?>(null) }
+    var revokeConfirmationMessage by remember { mutableStateOf<FloatingChatMessage?>(null) }
     var longPressAnchorBounds by remember { mutableStateOf<Rect?>(null) }
     var asideAnalysisState by remember { mutableStateOf<MessageAsideAnalysisState?>(null) }
     var textZoomMessage by remember { mutableStateOf<FloatingChatMessage?>(null) }
@@ -630,6 +681,7 @@ internal fun FloatingChatOverlay(
     var favoriteLongPressAnchorBounds by remember { mutableStateOf<Rect?>(null) }
     var favoriteMultiSelectMode by remember { mutableStateOf(false) }
     var contactEditorTarget by remember { mutableStateOf<ContactEditorTarget?>(null) }
+    var contactRemarkDialogTarget by remember { mutableStateOf<FloatingChatContact?>(null) }
     var groupInfoWorkspaceTarget by remember { mutableStateOf<FloatingChatContact?>(null) }
     var displayedGroupInfoWorkspaceTarget by remember { mutableStateOf<FloatingChatContact?>(null) }
     var groupMemberAddFriendTargetId by remember { mutableStateOf<String?>(null) }
@@ -647,6 +699,7 @@ internal fun FloatingChatOverlay(
     val selectedFavoriteItemIds = remember { mutableStateMapOf<String, Boolean>() }
     val hiddenMessageIds = remember { mutableStateMapOf<String, Boolean>() }
     val transcribingRemoteMessageIds = remember { mutableSetOf<Long>() }
+    val revokingRemoteMessageIds = remember { mutableSetOf<Long>() }
     val hiddenParticipantIds = remember { mutableStateMapOf<String, Boolean>() }
     val contactProfiles = remember(initialContactProfiles) {
         mutableStateMapOf<String, LocalContactProfile>().apply {
@@ -1274,6 +1327,75 @@ internal fun FloatingChatOverlay(
     val selectedMessagesForCurrentAction = {
         selectedMessagesForAction(displayConversation.messages, selectedMessageIds)
     }
+    fun revokeMessage(message: FloatingChatMessage) {
+        if (!message.fromMe) {
+            Toast.makeText(context, "只能撤销本人发送的消息", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val accountId = messageOperationAccountId(message, selectedAccount.id)
+        val remoteMessageId = messageRemoteIdForRevoke(message, displayConversation.messages)
+        if (remoteMessageId == null) {
+            Toast.makeText(context, "消息尚未同步，正在刷新会话", Toast.LENGTH_SHORT).show()
+            onRefreshConversation(accountId)
+            return
+        }
+        val route = scrmFloatingAccountRouteForContactId(accountId)
+        if (route == null) {
+            Toast.makeText(context, "该消息所属账号没有可用的 SCRM 设备路由", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val existingTaskId = runtimeState.messageRevokeTaskId(accountId, remoteMessageId)
+        if (!revokingRemoteMessageIds.add(remoteMessageId)) {
+            Toast.makeText(context, "该消息正在撤销", Toast.LENGTH_SHORT).show()
+            return
+        }
+        coroutineScope.launch {
+            try {
+                val outcome = withContext(Dispatchers.IO) {
+                    val session = ScrmSettingsManager(context.applicationContext)
+                        .loadSelectedSessionOrBootstrap()
+                    ScrmMessageRevokeTaskRunner(
+                        messageApi = session.messageOperationApi,
+                        taskApi = session.taskApi
+                    ).let { runner ->
+                        if (existingTaskId != null) {
+                            runner.awaitExistingTask(existingTaskId)
+                        } else {
+                            runner.revokeAndAwait(
+                                remoteMessageId = remoteMessageId,
+                                deviceUuid = route.deviceUuid,
+                                weChatId = route.weChatId,
+                                onTaskAccepted = { taskId ->
+                                    runtimeState.rememberMessageRevokeTask(
+                                        accountId,
+                                        remoteMessageId,
+                                        taskId
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+                if (outcome.completed) {
+                    runtimeState.clearMessageRevokeTask(accountId, remoteMessageId)
+                    Toast.makeText(context, "消息已撤销，正在刷新会话", Toast.LENGTH_SHORT).show()
+                    onRefreshConversation(accountId)
+                } else {
+                    Toast.makeText(
+                        context,
+                        "撤销处理中：${outcome.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                val detail = error.message?.takeIf(String::isNotBlank) ?: "未知错误"
+                Toast.makeText(context, "撤销失败：$detail", Toast.LENGTH_SHORT).show()
+            } finally {
+                revokingRemoteMessageIds.remove(remoteMessageId)
+            }
+        }
+    }
     var scrmMessageOperationTarget by remember { mutableStateOf<FloatingChatMessage?>(null) }
     val messageLongPressActions = MessageLongPressActions(
         favoriteMessageIds = favoriteMessageIds,
@@ -1315,7 +1437,10 @@ internal fun FloatingChatOverlay(
         // 测试流程：点击或长按已同步语音消息 -> 转文字；成功后刷新当前会话读取服务端 voiceText。
         // 接口：POST /openapi/v1/messages/{messageId}/voice-trans-text，路径只使用 SCRM remoteMessageId。
         onTranscribeMessage = transcribe@{ message ->
-            val remoteMessageId = message.remoteMessageId?.takeIf { it > 0L }
+            val remoteMessageId = messageRemoteIdForVoiceTranscription(
+                message,
+                displayConversation.messages
+            )
             if (remoteMessageId == null) {
                 Toast.makeText(context, "该语音消息尚未同步，无法转文字", Toast.LENGTH_SHORT).show()
                 return@transcribe
@@ -1415,6 +1540,7 @@ internal fun FloatingChatOverlay(
                 }
             }
         },
+        onRevokeMessageRequested = { message -> revokeConfirmationMessage = message },
         onScrmOperationRequested = { message -> scrmMessageOperationTarget = message },
         onCloseLongPressMenu = { longPressMessage = null }
     )
@@ -1483,6 +1609,7 @@ internal fun FloatingChatOverlay(
     val headerEditableContact = (selectedThread as? ChatThreadSelection.Private)?.let { thread ->
         displayConversation.contacts.firstOrNull { contact -> contact.id == thread.contactId }
     }
+    val headerEditableGroup = groupInfoTargetForThread(displayConversation, selectedThread)
     val headerTitle = chatToolbarTitle(
         conversation = displayConversation,
         selectedThread = selectedThread,
@@ -1495,7 +1622,7 @@ internal fun FloatingChatOverlay(
         conversationTitle = headerTitle,
         unreadCount = currentUnreadCount,
         messageScrollInProgress = headerCompact,
-        editable = headerEditableContact != null
+        editable = headerEditableContact != null || headerEditableGroup != null
     )
     val openUnreadOverview = {
         chatNavigationActions.openAllAccountsUnread()
@@ -1557,7 +1684,17 @@ internal fun FloatingChatOverlay(
                     bottomPanelMode = BottomPanelMode.None
                 },
                 onEditClick = headerEditableContact?.let { contact ->
-                    { contactEditorTarget = ContactEditorTarget.User(contact) }
+                    {
+                        contactEditorTarget = ContactEditorTarget.User(contact)
+                        contactRemarkDialogTarget = contact
+                    }
+                } ?: headerEditableGroup?.let { group ->
+                    {
+                        groupInfoWorkspaceTarget = group
+                        displayedGroupInfoWorkspaceTarget = group
+                        contactEditorTarget = null
+                        bottomPanelMode = BottomPanelMode.GroupInfo
+                    }
                 },
                 onSearchClick = { bottomPanelMode = BottomPanelMode.ToolbarSearch },
                 onScanClick = { bottomPanelMode = BottomPanelMode.ToolbarScan },
@@ -2106,6 +2243,10 @@ internal fun FloatingChatOverlay(
                         onOpenAddFriend = {
                             bottomPanelMode = BottomPanelMode.ToolbarAddFriend
                         },
+                        onOpenCreateGroup = {
+                            contactsOpenStartGroup = true
+                            bottomPanelMode = BottomPanelMode.Contacts
+                        },
                         onSubmitFriend = { account, message ->
                             val route = scrmFloatingAccountRouteForContactId(selectedAccount.id)
                                 ?: throw IllegalStateException("当前账号没有可用的 SCRM 设备路由")
@@ -2406,6 +2547,7 @@ internal fun FloatingChatOverlay(
                     fallbackWeChatId = null
                 ),
                 contactsOpenAddFriend = displayedContactsOpenAddFriend,
+                contactsOpenStartGroup = displayedContactsOpenStartGroup,
                 scrmMomentsRoute = scrmContactsPanelRouteForSelectedAccount(
                     selectedAccountId = selectedAccount.id,
                     fallbackDeviceUuid = null,
@@ -2999,6 +3141,7 @@ internal fun FloatingChatOverlay(
         MessageInteractionOverlayHost(
             paymentDetailMessage = paymentDetailMessage,
             longPressMessage = longPressMessage,
+            revokeConfirmationMessage = revokeConfirmationMessage,
             longPressAnchorBounds = longPressAnchorBounds,
             asideAnalysisState = asideAnalysisState,
             textZoomMessage = textZoomMessage,
@@ -3127,6 +3270,11 @@ internal fun FloatingChatOverlay(
                 }
             },
             onLongPressMessageChanged = { message -> longPressMessage = message },
+            onRevokeConfirmationDismissed = { revokeConfirmationMessage = null },
+            onRevokeConfirmed = { message ->
+                revokeConfirmationMessage = null
+                revokeMessage(message)
+            },
             onAsideAnalysisDismissed = { messageAsideAnalysisActions.dismiss() },
             onTextZoomDismissed = { textZoomMessage = null },
             onStartForwardingMessages = startForwardingMessages,
@@ -3174,7 +3322,10 @@ internal fun FloatingChatOverlay(
             onDeleteFriend = { contact -> contactRemoteTaskActions.deleteFriendFromProfile(contact) },
             onOpenPrivateChat = { contact -> chatNavigationActions.openChatThread(ChatThreadSelection.Private(contact.id)) },
             onAddFriendFromGroupMember = { member -> contactRemoteTaskActions.addFriendFromGroupMember(member) },
-            onContactEditorTargetChanged = { target -> contactEditorTarget = target },
+            onContactEditorTargetChanged = { target ->
+                contactEditorTarget = target
+                if (target == null) contactRemarkDialogTarget = null
+            },
             onPickAccountAvatar = { account -> toolMessageActions.pickAccountAvatar(account.id) },
             onSaveAccountProfile = { account, profile ->
                 profilePersistenceActions.updateAccountProfile(account.id, profile)
@@ -3182,6 +3333,21 @@ internal fun FloatingChatOverlay(
             onAccountEditorTargetChanged = { account -> accountEditorTarget = account },
             modifier = Modifier
         )
+        contactRemarkDialogTarget?.let { contact ->
+            val profile = contactProfiles[contactProfileKey(selectedAccount.id, contact.id)]
+                ?: defaultLocalContactProfileFor(selectedAccount.id, contact)
+            ContactRemarkInputDialog(
+                initialRemark = profile.remark,
+                onDismiss = { contactRemarkDialogTarget = null },
+                onConfirm = { remark ->
+                    profilePersistenceActions.updateContactProfile(
+                        profile.copy(remark = remark, updatedAt = System.currentTimeMillis())
+                    )
+                    contactRemarkDialogTarget = null
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
         MediaOverlayHost(
             actionMessage = mediaOverlayState.actionMessage,
             previewSession = runtimeState.previewSession,
