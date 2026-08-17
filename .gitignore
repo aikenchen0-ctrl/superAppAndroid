@@ -3,6 +3,7 @@
 .kotlin/
 .superpowers
 .vscode
+artifacts/
 build/
 */build/
 local.properties
