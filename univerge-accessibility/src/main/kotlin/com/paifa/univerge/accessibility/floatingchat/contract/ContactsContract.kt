@@ -145,6 +145,7 @@ data class GroupInfoUiState(
     val muted: Boolean = false,
     val pinned: Boolean = false,
     val savedToContacts: Boolean = false,
+    val joinVerification: Boolean = false,
     val memberNicknamesVisible: Boolean = true,
     val memberAvatarsVisible: Boolean = true,
     val backgroundLabel: String = "",
@@ -212,10 +213,13 @@ sealed interface GroupInfoUiEvent {
     data object PublishAnnouncementRequested : GroupInfoUiEvent
     data class RemarkChanged(val value: String) : GroupInfoUiEvent
     data object SaveRemarkRequested : GroupInfoUiEvent
+    data object TransferOwnerRequested : GroupInfoUiEvent
+    data object ManagersRequested : GroupInfoUiEvent
     data object SearchChatHistoryRequested : GroupInfoUiEvent
     data class MutedChanged(val enabled: Boolean) : GroupInfoUiEvent
     data class PinnedChanged(val enabled: Boolean) : GroupInfoUiEvent
     data class SavedToContactsChanged(val enabled: Boolean) : GroupInfoUiEvent
+    data class JoinVerificationChanged(val enabled: Boolean) : GroupInfoUiEvent
     data class MyNicknameChanged(val value: String) : GroupInfoUiEvent
     data object SaveMyNicknameRequested : GroupInfoUiEvent
     data class MemberNicknamesVisibleChanged(val visible: Boolean) : GroupInfoUiEvent
@@ -240,6 +244,8 @@ sealed interface GroupInfoAction {
     data object PublishAnnouncement : GroupInfoAction
     data class UpdateRemark(val value: String) : GroupInfoAction
     data object SaveRemark : GroupInfoAction
+    data object TransferOwner : GroupInfoAction
+    data object ManageManagers : GroupInfoAction
     data object SearchChatHistory : GroupInfoAction
     data class SetMuted(val enabled: Boolean) : GroupInfoAction
     data class SetPinned(val enabled: Boolean) : GroupInfoAction
@@ -252,6 +258,7 @@ sealed interface GroupInfoAction {
     data object ClearChatHistory : GroupInfoAction
     data object Report : GroupInfoAction
     data object ExitGroup : GroupInfoAction
+    data class SetJoinVerification(val enabled: Boolean) : GroupInfoAction
 }
 
 fun groupInfoAction(event: GroupInfoUiEvent): GroupInfoAction = when (event) {
@@ -268,10 +275,13 @@ fun groupInfoAction(event: GroupInfoUiEvent): GroupInfoAction = when (event) {
     GroupInfoUiEvent.PublishAnnouncementRequested -> GroupInfoAction.PublishAnnouncement
     is GroupInfoUiEvent.RemarkChanged -> GroupInfoAction.UpdateRemark(event.value)
     GroupInfoUiEvent.SaveRemarkRequested -> GroupInfoAction.SaveRemark
+    GroupInfoUiEvent.TransferOwnerRequested -> GroupInfoAction.TransferOwner
+    GroupInfoUiEvent.ManagersRequested -> GroupInfoAction.ManageManagers
     GroupInfoUiEvent.SearchChatHistoryRequested -> GroupInfoAction.SearchChatHistory
     is GroupInfoUiEvent.MutedChanged -> GroupInfoAction.SetMuted(event.enabled)
     is GroupInfoUiEvent.PinnedChanged -> GroupInfoAction.SetPinned(event.enabled)
     is GroupInfoUiEvent.SavedToContactsChanged -> GroupInfoAction.SetSavedToContacts(event.enabled)
+    is GroupInfoUiEvent.JoinVerificationChanged -> GroupInfoAction.SetJoinVerification(event.enabled)
     is GroupInfoUiEvent.MyNicknameChanged -> GroupInfoAction.UpdateMyNickname(event.value)
     GroupInfoUiEvent.SaveMyNicknameRequested -> GroupInfoAction.SaveMyNickname
     is GroupInfoUiEvent.MemberNicknamesVisibleChanged -> GroupInfoAction.SetMemberNicknamesVisible(event.visible)

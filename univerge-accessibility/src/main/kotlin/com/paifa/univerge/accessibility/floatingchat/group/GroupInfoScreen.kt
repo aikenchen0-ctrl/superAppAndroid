@@ -1,7 +1,6 @@
 package com.paifa.univerge.accessibility.floatingchat.group
 
 import android.graphics.Bitmap
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -62,6 +61,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.paifa.univerge.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
@@ -74,9 +74,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val GroupInfoGridColumns = 5
-private val GroupInfoGridHeight = 264.dp
+private val GroupInfoGridRowHeight = 78.dp
+private val GroupInfoGridVerticalPadding = 20.dp
+private val GroupInfoGridRowSpacing = 4.dp
 private val GroupInfoAvatarSize = 48.dp
 private val GroupInfoMemberLabelWidth = 56.dp
+private val GroupInfoSettingRowHeight = 55.dp
 
 private enum class GroupInfoDestination {
     Main,
@@ -106,15 +109,6 @@ internal fun GroupInfoScreen(
     var destination by remember { mutableStateOf(GroupInfoDestination.Main) }
     var editor by remember { mutableStateOf<GroupInfoEditor?>(null) }
     var showExitConfirmation by remember { mutableStateOf(false) }
-
-    BackHandler {
-        when {
-            editor != null -> editor = null
-            showExitConfirmation -> showExitConfirmation = false
-            destination != GroupInfoDestination.Main -> destination = GroupInfoDestination.Main
-            else -> onEvent(GroupInfoUiEvent.BackRequested)
-        }
-    }
 
     Box(
         modifier = modifier
@@ -189,7 +183,7 @@ private fun GroupInfoMainScreen(
 ) {
     Column(Modifier.fillMaxSize()) {
         FloatingWorkspaceTopAppBar(
-            title = "聊天信息${state.memberCount}",
+            title = "聊天信息\t\t${state.memberCount}人",
             onBack = { onEvent(GroupInfoUiEvent.BackRequested) },
             actions = {
                 IconButton(onClick = onSearchMembers) {
@@ -215,6 +209,7 @@ private fun GroupInfoMainScreen(
                 GroupInfoNavigationRow(
                     label = "群聊名称",
                     value = state.groupName,
+                    valueWeight = 0.8f,
                     onClick = {
                         onEdit(
                             GroupInfoEditor(
@@ -228,11 +223,9 @@ private fun GroupInfoMainScreen(
                     }
                 )
             }
-            item { GroupInfoDivider() }
             item {
                 GroupInfoNavigationRow(label = "群聊二维码", onClick = onOpenQrCode)
             }
-            item { GroupInfoDivider() }
             item {
                 GroupInfoNavigationRow(
                     label = "群公告",
@@ -250,11 +243,11 @@ private fun GroupInfoMainScreen(
                     }
                 )
             }
-            item { GroupInfoDivider() }
             item {
                 GroupInfoNavigationRow(
                     label = "备注",
                     value = state.remark,
+                    valueWeight = 0.8f,
                     onClick = {
                         onEdit(
                             GroupInfoEditor(
@@ -268,7 +261,7 @@ private fun GroupInfoMainScreen(
                     }
                 )
             }
-            item { GroupInfoSectionGap() }
+            item { GroupInfoDivider() }
             item {
                 GroupInfoSwitchRow(
                     label = "消息通知",
@@ -277,7 +270,6 @@ private fun GroupInfoMainScreen(
                     onCheckedChange = { enabled -> onEvent(GroupInfoUiEvent.MutedChanged(!enabled)) }
                 )
             }
-            item { GroupInfoDivider() }
             item {
                 GroupInfoSwitchRow(
                     label = "置顶聊天",
@@ -286,7 +278,6 @@ private fun GroupInfoMainScreen(
                     onCheckedChange = { onEvent(GroupInfoUiEvent.PinnedChanged(it)) }
                 )
             }
-            item { GroupInfoDivider() }
             item {
                 GroupInfoSwitchRow(
                     label = "保存到通讯录",
@@ -295,11 +286,32 @@ private fun GroupInfoMainScreen(
                     onCheckedChange = { onEvent(GroupInfoUiEvent.SavedToContactsChanged(it)) }
                 )
             }
-            item { GroupInfoSectionGap() }
+            item {
+                GroupInfoSwitchRow(
+                    label = "入群验证",
+                    checked = state.joinVerification,
+                    enabled = !state.loading,
+                    onCheckedChange = { onEvent(GroupInfoUiEvent.JoinVerificationChanged(it)) }
+                )
+            }
+            item {
+                GroupInfoNavigationRow(
+                    label = "转让群主",
+                    onClick = { onEvent(GroupInfoUiEvent.TransferOwnerRequested) }
+                )
+            }
+            item {
+                GroupInfoNavigationRow(
+                    label = "群管理员",
+                    onClick = { onEvent(GroupInfoUiEvent.ManagersRequested) }
+                )
+            }
+            item { GroupInfoDivider() }
             item {
                 GroupInfoNavigationRow(
                     label = "我在群里的昵称",
                     value = state.myNickname,
+                    valueWeight = 0.8f,
                     onClick = {
                         onEdit(
                             GroupInfoEditor(
@@ -313,7 +325,6 @@ private fun GroupInfoMainScreen(
                     }
                 )
             }
-            item { GroupInfoDivider() }
             item {
                 GroupInfoSwitchRow(
                     label = "显示群成员昵称",
@@ -329,7 +340,8 @@ private fun GroupInfoMainScreen(
                     enabled = !state.loading,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 60.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error,
                         contentColor = Color.White
@@ -352,11 +364,15 @@ private fun GroupMemberPreviewGrid(
     onAdd: () -> Unit
 ) {
     val cells = remember(members.size) { groupInfoMemberPreviewCells(members.size) }
+    val rowCount = ((cells.size + GroupInfoGridColumns - 1) / GroupInfoGridColumns).coerceAtLeast(1)
+    val gridHeight = GroupInfoGridVerticalPadding +
+        (GroupInfoGridRowHeight * rowCount) +
+        (GroupInfoGridRowSpacing * (rowCount - 1))
     LazyVerticalGrid(
         columns = GridCells.Fixed(GroupInfoGridColumns),
         modifier = Modifier
             .fillMaxWidth()
-            .height(GroupInfoGridHeight)
+            .height(gridHeight)
             .padding(horizontal = 8.dp, vertical = 10.dp),
         userScrollEnabled = false,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -432,6 +448,7 @@ private fun GroupMemberGridCard(
                     .basicMarquee(),
                 maxLines = 1,
                 overflow = TextOverflow.Clip,
+                textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -472,6 +489,7 @@ private fun GroupMemberActionCard(
                 modifier = Modifier.width(GroupInfoMemberLabelWidth),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -480,21 +498,28 @@ private fun GroupMemberActionCard(
 }
 
 @Composable
-private fun GroupInfoNavigationRow(label: String, value: String? = null, onClick: () -> Unit) {
+private fun GroupInfoNavigationRow(
+    label: String,
+    value: String? = null,
+    valueWeight: Float = 1f,
+    onClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .height(GroupInfoSettingRowHeight)
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 16.dp),
+            .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
         value?.takeIf(String::isNotBlank)?.let {
             Text(
                 text = it,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(valueWeight),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.End,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium
             )
@@ -519,8 +544,9 @@ private fun GroupInfoSwitchRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .height(GroupInfoSettingRowHeight)
             .clickable(enabled = enabled) { onCheckedChange(!checked) }
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
@@ -530,12 +556,7 @@ private fun GroupInfoSwitchRow(
 
 @Composable
 private fun GroupInfoDivider() {
-    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-}
-
-@Composable
-private fun GroupInfoSectionGap() {
-    Spacer(Modifier.height(12.dp))
+    HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
 }
 
 @Composable
@@ -608,7 +629,6 @@ private fun GroupMemberSearchScreen(
             }
             items(visibleMembers, key = GroupInfoMemberUiState::id) { member ->
                 GroupMemberSearchRow(member = member, onClick = { onMemberClick(member) })
-                GroupInfoDivider()
             }
         }
     }

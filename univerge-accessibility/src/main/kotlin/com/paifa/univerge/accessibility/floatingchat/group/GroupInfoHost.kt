@@ -69,6 +69,7 @@ internal fun GroupInfoHost(
     var saveToContacts by remember(profile.accountId, profile.groupId, profile.saveToContacts) {
         mutableStateOf(profile.saveToContacts)
     }
+    var joinVerification by remember(group.id) { mutableStateOf(false) }
     var showMemberNicknames by remember(profile.accountId, profile.groupId, profile.showMemberNicknames) {
         mutableStateOf(profile.showMemberNicknames)
     }
@@ -312,6 +313,10 @@ internal fun GroupInfoHost(
                 actionStatus = "查找聊天记录入口已保留"
                 actionError = null
             }
+            GroupInfoAction.TransferOwner,
+            GroupInfoAction.ManageManagers -> {
+                showScrmGroupManagement = true
+            }
             is GroupInfoAction.SetMuted -> {
                 val currentRoute = route ?: return
                 // API 是“新消息通知”，与 UI 的“消息免打扰”语义相反。
@@ -351,6 +356,19 @@ internal fun GroupInfoHost(
                     val api = session.chatRoomApi as? ScrmChatRoomManagementApi
                         ?: error("当前 SCRM 客户端不支持通讯录接口")
                     api.setChatRoomSavedToPhonebook(
+                        ScrmChatRoomSwitchRequest(currentRoute.deviceUuid, currentRoute.weChatId, requireNotNull(chatRoomId), action.enabled)
+                    )
+                }
+            }
+            is GroupInfoAction.SetJoinVerification -> {
+                val currentRoute = route ?: return
+                submitRemoteGroupTask("正在更新入群验证", "已提交入群验证设置", onSuccess = {
+                    joinVerification = action.enabled
+                }) {
+                    val session = manager.loadSelectedSessionOrBootstrap()
+                    val api = session.chatRoomApi as? ScrmChatRoomManagementApi
+                        ?: error("当前 SCRM 客户端不支持入群验证接口")
+                    api.setChatRoomVerify(
                         ScrmChatRoomSwitchRequest(currentRoute.deviceUuid, currentRoute.weChatId, requireNotNull(chatRoomId), action.enabled)
                     )
                 }
@@ -460,6 +478,7 @@ internal fun GroupInfoHost(
             muted = mute,
             pinned = pinned,
             savedToContacts = saveToContacts,
+            joinVerification = joinVerification,
             memberNicknamesVisible = showMemberNicknames,
             memberAvatarsVisible = showMemberAvatars,
             backgroundLabel = backgroundLabel,

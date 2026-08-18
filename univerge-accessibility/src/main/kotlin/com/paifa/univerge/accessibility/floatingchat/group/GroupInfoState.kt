@@ -21,7 +21,6 @@ internal fun groupInfoMemberPreviewCells(memberCount: Int): List<GroupInfoMember
     val visibleMembers = memberCount.coerceAtMost(GroupInfoMemberPreviewCapacity)
     return buildList(GroupInfoPreviewCellCount) {
         repeat(visibleMembers) { index -> add(GroupInfoMemberPreviewCell.Member(index)) }
-        repeat(GroupInfoMemberPreviewCapacity - visibleMembers) { add(GroupInfoMemberPreviewCell.Empty) }
         add(GroupInfoMemberPreviewCell.More)
         add(GroupInfoMemberPreviewCell.Add)
     }

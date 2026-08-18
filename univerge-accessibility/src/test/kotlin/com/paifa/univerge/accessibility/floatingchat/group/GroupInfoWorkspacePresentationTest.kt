@@ -73,6 +73,7 @@ class GroupInfoWorkspacePresentationTest {
         assertTrue(screenSource.contains("GroupInfoInputDialog("))
         assertTrue(screenSource.contains("GroupQrCodeScreen("))
         assertTrue(screenSource.contains("GroupMemberSearchScreen("))
+        assertFalse(screenSource.contains("BackHandler("))
         assertFalse(screenSource.contains("TabRow("))
         assertFalse(screenSource.contains("HorizontalPager("))
 
