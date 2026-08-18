@@ -6,7 +6,7 @@ internal object FloatingChatFavoriteLibraryBridge {
     @Volatile
     private var snapshot: FloatingChatFavoriteLibrarySnapshot? = null
 
-    fun open() { UbikiAccessibilityService.instance?.requestFloatingChatFavoriteLibrary() }
+    fun open() { UniVergeAccessibilityService.instance?.requestFloatingChatFavoriteLibrary() }
 
     fun updateSnapshot(value: FloatingChatFavoriteLibrarySnapshot) {
         snapshot = value
@@ -15,7 +15,7 @@ internal object FloatingChatFavoriteLibraryBridge {
     fun currentSnapshot(): FloatingChatFavoriteLibrarySnapshot? = snapshot
 
     fun send(item: FavoriteCollectionItem): Boolean {
-        return UbikiAccessibilityService.instance?.sendFloatingChatFavorite(item) == true
+        return UniVergeAccessibilityService.instance?.sendFloatingChatFavorite(item) == true
     }
 }
 

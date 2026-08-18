@@ -2,10 +2,10 @@ package com.paifa.univerge.accessibility
 
 object FloatingChatLocationPermissionBridge {
     fun requestLocationPermission() {
-        UbikiAccessibilityService.instance?.requestFloatingChatLocationPermission()
+        UniVergeAccessibilityService.instance?.requestFloatingChatLocationPermission()
     }
 
     fun deliverLocationPermission(granted: Boolean) {
-        UbikiAccessibilityService.instance?.onFloatingChatLocationPermissionResult(granted)
+        UniVergeAccessibilityService.instance?.onFloatingChatLocationPermissionResult(granted)
     }
 }

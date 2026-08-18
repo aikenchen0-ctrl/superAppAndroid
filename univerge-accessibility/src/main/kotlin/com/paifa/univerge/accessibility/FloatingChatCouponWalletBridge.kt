@@ -2,10 +2,10 @@ package com.paifa.univerge.accessibility
 
 object FloatingChatCouponWalletBridge {
     fun open() {
-        UbikiAccessibilityService.instance?.requestFloatingChatCouponWallet()
+        UniVergeAccessibilityService.instance?.requestFloatingChatCouponWallet()
     }
 
     fun notifyClosed() {
-        UbikiAccessibilityService.instance?.onFloatingChatCouponWalletClosed()
+        UniVergeAccessibilityService.instance?.onFloatingChatCouponWalletClosed()
     }
 }

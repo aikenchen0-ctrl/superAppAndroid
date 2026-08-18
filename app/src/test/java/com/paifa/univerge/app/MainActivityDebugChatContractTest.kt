@@ -9,7 +9,7 @@ class MainActivityDebugChatContractTest {
     fun debugHomeProvidesARealFloatingChatExpandEntryPoint() {
         val mainActivitySource = sourceFile("app/src/main/java/com/paifa/univerge/app/MainActivity.kt").readText()
         val serviceSource = sourceFile(
-            "univerge-accessibility/src/main/kotlin/com/paifa/univerge/accessibility/UbikiAccessibilityService.kt"
+            "univerge-accessibility/src/main/kotlin/com/paifa/univerge/accessibility/UniVergeAccessibilityService.kt"
         ).readText()
 
         assertTrue(mainActivitySource.contains("BuildConfig.DEBUG"))

@@ -14,7 +14,7 @@ class FloatingWorkspaceExternalEntryContractTest {
     fun commonRightRailEntriesUseTheExistingFloatingChatWorkspace() {
         val service = File(
             System.getProperty("user.dir"),
-            "src/main/kotlin/com/paifa/univerge/accessibility/UbikiAccessibilityService.kt"
+            "src/main/kotlin/com/paifa/univerge/accessibility/UniVergeAccessibilityService.kt"
         ).readText()
         val panelMode = File(
             System.getProperty("user.dir"),

@@ -66,7 +66,7 @@ class FloatingChatActivityTaskContractTest {
     @Test
     fun gesturePersistenceUsesWatchdogAfterTaskRemoval() {
         val persistenceSource = sourceFile(
-            "univerge-accessibility/src/main/kotlin/com/paifa/univerge/accessibility/UbikiGesturePersistence.kt"
+            "univerge-accessibility/src/main/kotlin/com/paifa/univerge/accessibility/UniVergeGesturePersistence.kt"
         ).readText()
         val keepAliveSource = sourceFile(
             "univerge-accessibility/src/main/kotlin/com/paifa/univerge/accessibility/UbikiGestureKeepAliveService.kt"

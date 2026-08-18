@@ -47,14 +47,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
-import com.paifa.univerge.accessibility.UbikiPreferences
+import com.paifa.univerge.accessibility.UniVergePreferences
 import com.paifa.univerge.core.model.GestureAction
 import com.paifa.univerge.core.model.GestureActionCatalog
 
 class SideFunctionsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val preferences = UbikiPreferences(this)
+        val preferences = UniVergePreferences(this)
         val launchableApps = packageManager.queryIntentActivities(
             Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER),
             0
@@ -85,7 +85,7 @@ class SideFunctionsActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SideFunctionsScreen(
-    preferences: UbikiPreferences,
+    preferences: UniVergePreferences,
     apps: List<SideLaunchableApp>,
     packageManager: PackageManager,
     onBack: () -> Unit

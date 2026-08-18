@@ -213,7 +213,7 @@ class FloatingWorkspaceAdoptionContractTest {
         ).readText()
         val service = File(
             System.getProperty("user.dir"),
-            "src/main/kotlin/com/paifa/univerge/accessibility/UbikiAccessibilityService.kt"
+            "src/main/kotlin/com/paifa/univerge/accessibility/UniVergeAccessibilityService.kt"
         ).readText()
         listOf(
             BottomPanelMode.Moments,
@@ -251,7 +251,7 @@ class FloatingWorkspaceAdoptionContractTest {
         ).readText()
         val service = File(
             System.getProperty("user.dir"),
-            "src/main/kotlin/com/paifa/univerge/accessibility/UbikiAccessibilityService.kt"
+            "src/main/kotlin/com/paifa/univerge/accessibility/UniVergeAccessibilityService.kt"
         ).readText()
         val panelMode = File(
             System.getProperty("user.dir"),

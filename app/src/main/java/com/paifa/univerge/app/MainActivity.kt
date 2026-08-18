@@ -84,9 +84,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.paifa.univerge.accessibility.UbikiAccessibilityService
-import com.paifa.univerge.accessibility.UbikiGesturePersistence
-import com.paifa.univerge.accessibility.UbikiPreferences
+import com.paifa.univerge.accessibility.UniVergeAccessibilityService
+import com.paifa.univerge.accessibility.UniVergeGesturePersistence
+import com.paifa.univerge.accessibility.UniVergePreferences
 import com.adbcore.WifiAutoRecover
 import com.paifa.univerge.accessibility.BottomGestureBarGestureType
 import com.paifa.univerge.accessibility.scrm.ScrmSettingsManager
@@ -95,8 +95,6 @@ import com.paifa.univerge.accessibility.floatingChatBackgroundColorPresetRgbs
 import com.paifa.univerge.accessibility.sanitizeFloatingChatBackgroundOpacityPercent
 import com.paifa.univerge.accessibility.sanitizeFloatingChatBackgroundColorRgb
 import com.paifa.univerge.accessibility.sanitizeFloatingChatBlurRadiusDp
-import com.paifa.univerge.app.BuildConfig
-import com.paifa.univerge.app.R
 import com.paifa.univerge.core.model.EdgeSide
 import com.paifa.univerge.core.model.EdgeZoneConfig
 import com.paifa.univerge.core.model.GestureAction
@@ -112,7 +110,7 @@ import kotlinx.coroutines.launch
  * Jetpack Compose 界面，而不需要传统 XML 布局文件。
  */
 class MainActivity : ComponentActivity() {
-    private lateinit var keepAlivePreferences: UbikiPreferences
+    private lateinit var keepAlivePreferences: UniVergePreferences
     private var accessibilityServiceEnabled by mutableStateOf(false)
 
     /**
@@ -123,9 +121,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         // `this` 就是当前 Activity。两个管理类负责读取和保存设置数据。
-        val preferences = UbikiPreferences(this)
+        val preferences = UniVergePreferences(this)
         keepAlivePreferences = preferences
-        accessibilityServiceEnabled = UbikiGesturePersistence.isAccessibilityServiceEnabled(this)
+        accessibilityServiceEnabled = UniVergeGesturePersistence.isAccessibilityServiceEnabled(this)
         val scrmSettingsManager = ScrmSettingsManager(this)
 
         // 读取手机中能从桌面启动的应用，供后面的“选择要启动/屏蔽的应用”对话框使用。
@@ -142,7 +140,7 @@ class MainActivity : ComponentActivity() {
                         keepAliveController = AccessibilityKeepAliveController(this@MainActivity, preferences),
                         accessibilityServiceEnabled = accessibilityServiceEnabled,
                         refreshAccessibilityServiceStatus = {
-                            accessibilityServiceEnabled = UbikiGesturePersistence.isAccessibilityServiceEnabled(this@MainActivity)
+                            accessibilityServiceEnabled = UniVergeGesturePersistence.isAccessibilityServiceEnabled(this@MainActivity)
                         },
                         openAccessibilitySettings = {
                             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
@@ -161,7 +159,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        accessibilityServiceEnabled = UbikiGesturePersistence.isAccessibilityServiceEnabled(this)
+        accessibilityServiceEnabled = UniVergeGesturePersistence.isAccessibilityServiceEnabled(this)
         if (::keepAlivePreferences.isInitialized && keepAlivePreferences.accessibilityKeepAliveEnabled) {
             lifecycleScope.launch {
                 AccessibilityKeepAliveController(this@MainActivity, keepAlivePreferences).ensureEnabled()
@@ -221,7 +219,7 @@ class GlobalControlsActivity : ComponentActivity() {
 @Composable
 private fun GlobalControlsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
-    val preferences = remember(context) { UbikiPreferences(context) }
+    val preferences = remember(context) { UniVergePreferences(context) }
     var globalEnabled by remember { mutableStateOf(preferences.globalEnabled) }
     var showIndicators by remember { mutableStateOf(preferences.showIndicators) }
     var hapticFeedback by remember { mutableStateOf(preferences.hapticFeedback) }
@@ -231,11 +229,11 @@ private fun GlobalControlsScreen(onBack: () -> Unit) {
     var longPullThreshold by remember { mutableIntStateOf(preferences.longPullThresholdDp) }
 
     fun refreshOverlays() {
-        UbikiAccessibilityService.instance?.requestOverlayRefresh()
+        UniVergeAccessibilityService.instance?.requestOverlayRefresh()
     }
 
     fun showPullDistancePreview() {
-        UbikiAccessibilityService.instance?.showPullDistancePreview(
+        UniVergeAccessibilityService.instance?.showPullDistancePreview(
             shortDistanceDp = shortPullThreshold,
             longDistanceDp = longPullThreshold
         )
@@ -321,7 +319,7 @@ private fun GlobalControlsScreen(onBack: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeDashboardScreen(
-    preferences: UbikiPreferences,
+    preferences: UniVergePreferences,
     keepAliveController: AccessibilityKeepAliveController,
     accessibilityServiceEnabled: Boolean,
     refreshAccessibilityServiceStatus: () -> Unit,
@@ -369,7 +367,7 @@ private fun HomeDashboardScreen(
                         icon = Icons.Outlined.Accessibility,
                         checked = isRunning
                     ) { requestedEnabled ->
-                        val serviceEnabled = UbikiGesturePersistence.isAccessibilityServiceEnabled(context)
+                        val serviceEnabled = UniVergeGesturePersistence.isAccessibilityServiceEnabled(context)
                         refreshStatus()
                         if (requestedEnabled && !serviceEnabled) {
                             openAccessibilitySettings()
@@ -526,13 +524,13 @@ private fun HomeDashboardScreen(
                         onGlobalEnabledChange = {
                             globalEnabled = it
                             preferences.globalEnabled = it
-                            UbikiAccessibilityService.instance?.requestOverlayRefresh()
+                            UniVergeAccessibilityService.instance?.requestOverlayRefresh()
                         },
                         showIndicators = showIndicators,
                         onShowIndicatorsChange = {
                             showIndicators = it
                             preferences.showIndicators = it
-                            UbikiAccessibilityService.instance?.requestOverlayRefresh()
+                            UniVergeAccessibilityService.instance?.requestOverlayRefresh()
                         },
                         hapticFeedback = hapticFeedback,
                         onHapticFeedbackChange = {
@@ -543,13 +541,13 @@ private fun HomeDashboardScreen(
                         onDisableInLandscapeChange = {
                             disableInLandscape = it
                             preferences.disableInLandscape = it
-                            UbikiAccessibilityService.instance?.requestOverlayRefresh()
+                            UniVergeAccessibilityService.instance?.requestOverlayRefresh()
                         },
                         disableWhenKeyboardShown = disableWhenKeyboardShown,
                         onDisableWhenKeyboardShownChange = {
                             disableWhenKeyboardShown = it
                             preferences.disableWhenKeyboardShown = it
-                            UbikiAccessibilityService.instance?.requestOverlayRefresh()
+                            UniVergeAccessibilityService.instance?.requestOverlayRefresh()
                         },
                         shortPullThreshold = preferences.shortPullThresholdDp,
                         onShortPullThresholdChange = { preferences.shortPullThresholdDp = it },
@@ -570,7 +568,7 @@ private fun DebugFloatingChatExpandButton() {
 
     Button(
         onClick = {
-            UbikiAccessibilityService.instance?.requestFloatingChatExpandForDebug()
+            UniVergeAccessibilityService.instance?.requestFloatingChatExpandForDebug()
         }
     ) {
         Text("展开聊天")
@@ -579,7 +577,7 @@ private fun DebugFloatingChatExpandButton() {
 
 @Composable
 private fun MainScreen(
-    preferences: UbikiPreferences,
+    preferences: UniVergePreferences,
     scrmSettingsManager: ScrmSettingsManager,
     launchableApps: List<LaunchableApp>
 ) {
@@ -596,7 +594,7 @@ private fun MainScreen(
 
     // 设置变化后，请无障碍服务重新创建/更新边缘悬浮层；`?.` 允许服务尚未启动。
     fun refreshOverlays() {
-        UbikiAccessibilityService.instance?.requestOverlayRefresh()
+        UniVergeAccessibilityService.instance?.requestOverlayRefresh()
     }
 
     // LazyColumn 是可滚动的竖向列表，只组合当前屏幕附近的内容，适合较长的设置页。
@@ -1157,7 +1155,7 @@ private fun normalizeEdgeConfigs(side: EdgeSide, configs: List<EdgeZoneConfig>):
 internal fun GestureMappingPanel(
     side: EdgeSide,
     title: String,
-    preferences: UbikiPreferences,
+    preferences: UniVergePreferences,
     revision: Int,
     onPickAction: (GestureType) -> Unit
 ) {
@@ -1530,7 +1528,7 @@ internal fun BottomGestureBarPanel(
     widthDp: Int,
     onWidthChange: (Int) -> Unit,
     onWidthChangeFinished: (() -> Unit)? = null,
-    preferences: UbikiPreferences,
+    preferences: UniVergePreferences,
     revision: Int,
     onPickAction: (BottomGestureBarGestureType) -> Unit,
     showWidth: Boolean = true,

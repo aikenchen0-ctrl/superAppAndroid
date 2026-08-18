@@ -6,7 +6,7 @@ object FloatingChatBlinkVoiceBridge {
     private var fullscreenCaptureCloser: (() -> Unit)? = null
 
     fun requestCapture() {
-        UbikiAccessibilityService.instance?.requestFloatingChatBlinkVoiceCapture()
+        UniVergeAccessibilityService.instance?.requestFloatingChatBlinkVoiceCapture()
     }
 
     /** App camera module registers the fullscreen overlay host; the accessibility module stays camera-SDK free. */
@@ -23,7 +23,7 @@ object FloatingChatBlinkVoiceBridge {
 
     fun requestHeadlessCapture() {
         if (headlessCaptureCloser != null) return
-        UbikiAccessibilityService.instance?.requestFloatingChatBlinkVoiceHeadlessCapture()
+        UniVergeAccessibilityService.instance?.requestFloatingChatBlinkVoiceHeadlessCapture()
     }
 
     fun stopHeadlessCapture() {
@@ -46,7 +46,7 @@ object FloatingChatBlinkVoiceBridge {
         confidence: Float,
         headless: Boolean = false
     ) {
-        UbikiAccessibilityService.instance?.onFloatingChatBlinkVoiceResult(
+        UniVergeAccessibilityService.instance?.onFloatingChatBlinkVoiceResult(
             eventType = eventType,
             durationMs = durationMs,
             confidence = confidence,
@@ -55,7 +55,7 @@ object FloatingChatBlinkVoiceBridge {
     }
 
     fun notifyCaptureClosed() {
-        UbikiAccessibilityService.instance?.onFloatingChatBlinkVoiceClosed()
+        UniVergeAccessibilityService.instance?.onFloatingChatBlinkVoiceClosed()
     }
 }
 

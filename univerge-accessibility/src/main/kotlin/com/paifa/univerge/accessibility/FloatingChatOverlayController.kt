@@ -15,7 +15,6 @@ import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
 import com.paifa.univerge.core.model.FloatingChatMessage
-import com.paifa.univerge.core.model.FloatingChatMessageType
 import com.paifa.univerge.core.model.FloatingChatSendState
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
@@ -98,7 +97,7 @@ internal class FloatingChatOverlayController(
 ) {
     private var composeView: ComposeView? = null
     private var composeOwner: AccessibilityOverlayComposeOwner? = null
-    private val preferences = UbikiPreferences(context)
+    private val preferences = UniVergePreferences(context)
     private var state: FloatingChatOverlayState = FloatingChatOverlayState.Collapsed
     private var conversation = FloatingChatPrototype.sampleConversation()
     fun friendManagementSnapshot(): FloatingChatFriendManagementSnapshot =
@@ -1794,7 +1793,7 @@ internal class FloatingChatOverlayController(
 
     private fun WindowManager.LayoutParams.applyExpandedWindowFlags(
         previewVisible: Boolean,
-        preferences: UbikiPreferences
+        preferences: UniVergePreferences
     ) {
         if (previewVisible) {
             flags = flags or

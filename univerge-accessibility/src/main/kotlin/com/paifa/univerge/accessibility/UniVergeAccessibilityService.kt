@@ -41,10 +41,10 @@ import com.paifa.univerge.overlay.EdgeOverlayView
 import com.paifa.univerge.overlay.edgeOutlinePlacement
 import kotlin.math.roundToInt
 
-class UbikiAccessibilityService : AccessibilityService() {
+class UniVergeAccessibilityService : AccessibilityService() {
     private lateinit var windowManager: WindowManager
-    private lateinit var preferences: UbikiPreferences
-    private lateinit var actionExecutor: UbikiActionExecutor
+    private lateinit var preferences: UniVergePreferences
+    private lateinit var actionExecutor: UniVergeActionExecutor
     private lateinit var backWaveOverlayController: BackWaveOverlayController
     private lateinit var bottomGestureBarOverlayController: BottomGestureBarOverlayController
     private lateinit var bottomGestureBarPreviewController: BottomGestureBarPreviewController
@@ -150,7 +150,7 @@ class UbikiAccessibilityService : AccessibilityService() {
         instance = this
         isRunning = true
         startPersistentForeground()
-        UbikiGesturePersistence.scheduleRecoveryWatchdog(this)
+        UniVergeGesturePersistence.scheduleRecoveryWatchdog(this)
         startKeepAliveService()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         videoDemoOverlayController = VideoDemoOverlayController(this, windowManager)
@@ -179,8 +179,8 @@ class UbikiAccessibilityService : AccessibilityService() {
         contactRelationsOverlayController = ContactRelationsOverlayController(this, windowManager)
         leftSidebarOverlayController = LeftSidebarOverlayController(this, windowManager)
         FloatingChatLeftSidebarBridge.loadDisplayMode(this)
-        preferences = UbikiPreferences(this)
-        actionExecutor = UbikiActionExecutor(
+        preferences = UniVergePreferences(this)
+        actionExecutor = UniVergeActionExecutor(
             this,
             isHapticFeedbackEnabled = { preferences.hapticFeedback },
             floatingChatOverlayController = floatingChatOverlayController,
@@ -288,10 +288,10 @@ class UbikiAccessibilityService : AccessibilityService() {
         }
         removeFloatingChatOverlay()
         removeAllOverlays()
-        if (UbikiGesturePersistence.isAccessibilityServiceEnabled(this)) {
-            UbikiGesturePersistence.scheduleRecoveryWatchdog(this, ACCESSIBILITY_DESTROYED_RECOVERY_DELAY_MS)
+        if (UniVergeGesturePersistence.isAccessibilityServiceEnabled(this)) {
+            UniVergeGesturePersistence.scheduleRecoveryWatchdog(this, ACCESSIBILITY_DESTROYED_RECOVERY_DELAY_MS)
         } else {
-            UbikiGesturePersistence.cancelRecoveryWatchdog(this)
+            UniVergeGesturePersistence.cancelRecoveryWatchdog(this)
         }
         stopPersistentForeground()
         super.onDestroy()
@@ -879,7 +879,7 @@ class UbikiAccessibilityService : AccessibilityService() {
         Log.d(TAG, "recreate overlays")
         runCatching {
             removeAllOverlays(restoreNavigationProtection = false)
-            actionExecutor = UbikiActionExecutor(
+            actionExecutor = UniVergeActionExecutor(
                 this,
                 isHapticFeedbackEnabled = { preferences.hapticFeedback },
                 floatingChatOverlayController = floatingChatOverlayController,
@@ -987,7 +987,7 @@ class UbikiAccessibilityService : AccessibilityService() {
 
     private fun startPersistentForeground() {
         runCatching {
-            UbikiGesturePersistence.startForeground(this)
+            UniVergeGesturePersistence.startForeground(this)
         }.onFailure {
             Log.w(TAG, "failed to start persistent foreground notification", it)
         }
@@ -995,7 +995,7 @@ class UbikiAccessibilityService : AccessibilityService() {
 
     private fun startKeepAliveService() {
         runCatching {
-            UbikiGesturePersistence.startKeepAliveService(this)
+            UniVergeGesturePersistence.startKeepAliveService(this)
         }.onFailure {
             Log.w(TAG, "failed to start keep alive service", it)
         }
@@ -1003,7 +1003,7 @@ class UbikiAccessibilityService : AccessibilityService() {
 
     private fun stopPersistentForeground() {
         runCatching {
-            UbikiGesturePersistence.stopForeground(this)
+            UniVergeGesturePersistence.stopForeground(this)
         }.onFailure {
             Log.w(TAG, "failed to stop persistent foreground notification", it)
         }
@@ -1881,7 +1881,7 @@ class UbikiAccessibilityService : AccessibilityService() {
         private const val ACCESSIBILITY_DESTROYED_RECOVERY_DELAY_MS = 3_000L
         private const val MAX_PAUSE_TIMER_DELAY_MS = 24L * 60L * 60L * 1000L
 
-        var instance: UbikiAccessibilityService? = null
+        var instance: UniVergeAccessibilityService? = null
             private set
         var isRunning: Boolean = false
             private set

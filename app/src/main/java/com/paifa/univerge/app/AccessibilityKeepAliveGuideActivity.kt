@@ -23,7 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.paifa.univerge.accessibility.UbikiAccessibilityService
+import com.paifa.univerge.accessibility.UniVergeAccessibilityService
 
 class AccessibilityKeepAliveGuideActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,7 +31,7 @@ class AccessibilityKeepAliveGuideActivity : ComponentActivity() {
         val service = accessibilityServiceComponent(this)
         val command = buildAccessibilityEnableCommands(
             packageName = packageName,
-            serviceClassName = UbikiAccessibilityService::class.java.name,
+            serviceClassName = UniVergeAccessibilityService::class.java.name,
             currentServices = ""
         ).joinToString("\n") { "adb shell $it" }
         setContent {

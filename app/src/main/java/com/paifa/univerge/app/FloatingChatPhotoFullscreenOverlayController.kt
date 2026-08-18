@@ -68,7 +68,7 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.paifa.univerge.accessibility.FloatingChatMediaPickerBridge
-import com.paifa.univerge.accessibility.UbikiAccessibilityService
+import com.paifa.univerge.accessibility.UniVergeAccessibilityService
 import com.paifa.univerge.accessibility.floatingchat.components.FloatingWorkspaceTopAppBar
 import com.paifa.univerge.core.model.FloatingChatPrototype
 import com.paifa.univerge.core.model.FloatingChatThumbnailOrientation
@@ -104,7 +104,7 @@ object FloatingChatPhotoOverlayHost {
     private var controller: FloatingChatPhotoFullscreenOverlayController? = null
 
     fun show(): Boolean {
-        val service = UbikiAccessibilityService.instance ?: return false
+        val service = UniVergeAccessibilityService.instance ?: return false
         if (ContextCompat.checkSelfPermission(service, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             return false
         }

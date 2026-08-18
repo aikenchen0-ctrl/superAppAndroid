@@ -5,9 +5,9 @@ import android.os.Build
 import com.adbcore.AdbCore
 import com.adbcore.WifiAutoRecover
 import com.paifa.univerge.accessibility.FloatingChatBlinkVoiceBridge
-import com.paifa.univerge.accessibility.UbikiPreferences
+import com.paifa.univerge.accessibility.UniVergePreferences
 
-class UbikiApplication : Application() {
+class UniVergeApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         AdbCore.init(this)
@@ -15,7 +15,7 @@ class UbikiApplication : Application() {
             starter = FloatingChatBlinkVoiceOverlayHost::show,
             closer = FloatingChatBlinkVoiceOverlayHost::dismissImmediately
         )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && UbikiPreferences(this).accessibilityKeepAliveEnabled) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && UniVergePreferences(this).accessibilityKeepAliveEnabled) {
             WifiAutoRecover.armOnce(this)
         }
     }

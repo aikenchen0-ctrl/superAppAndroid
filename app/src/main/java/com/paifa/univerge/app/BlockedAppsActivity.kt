@@ -39,13 +39,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.paifa.univerge.accessibility.UbikiAccessibilityService
-import com.paifa.univerge.accessibility.UbikiPreferences
+import com.paifa.univerge.accessibility.UniVergeAccessibilityService
+import com.paifa.univerge.accessibility.UniVergePreferences
 
 class BlockedAppsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val preferences = UbikiPreferences(this)
+        val preferences = UniVergePreferences(this)
         val apps = loadLaunchableApps()
         setContent {
             MaterialTheme {
@@ -64,7 +64,7 @@ class BlockedAppsActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun BlockedAppsScreen(
-    preferences: UbikiPreferences,
+    preferences: UniVergePreferences,
     launchableApps: List<LaunchableApp>,
     onBack: () -> Unit
 ) {
@@ -72,7 +72,7 @@ private fun BlockedAppsScreen(
     var showDialog by remember { mutableStateOf(false) }
 
     fun refreshOverlays() {
-        UbikiAccessibilityService.instance?.requestOverlayRefresh()
+        UniVergeAccessibilityService.instance?.requestOverlayRefresh()
     }
 
     fun updateBlockedPackages() {

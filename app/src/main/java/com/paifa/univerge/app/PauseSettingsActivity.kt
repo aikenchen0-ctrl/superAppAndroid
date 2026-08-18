@@ -40,13 +40,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.paifa.univerge.accessibility.QuietHoursSchedule
-import com.paifa.univerge.accessibility.UbikiAccessibilityService
-import com.paifa.univerge.accessibility.UbikiPreferences
+import com.paifa.univerge.accessibility.UniVergeAccessibilityService
+import com.paifa.univerge.accessibility.UniVergePreferences
 
 class PauseSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val preferences = UbikiPreferences(this)
+        val preferences = UniVergePreferences(this)
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
@@ -63,14 +63,14 @@ class PauseSettingsActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PauseSettingsScreen(
-    preferences: UbikiPreferences,
+    preferences: UniVergePreferences,
     onBack: () -> Unit
 ) {
     var pausedUntilEpochMs by remember { mutableStateOf(preferences.pausedUntilEpochMs) }
     var schedules by remember { mutableStateOf(preferences.quietHoursSchedules) }
 
     fun refreshOverlays() {
-        UbikiAccessibilityService.instance?.requestOverlayRefresh()
+        UniVergeAccessibilityService.instance?.requestOverlayRefresh()
     }
 
     fun updateSchedules(newValue: List<QuietHoursSchedule>) {

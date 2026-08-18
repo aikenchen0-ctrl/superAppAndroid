@@ -7,7 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
-import com.paifa.univerge.accessibility.UbikiAccessibilityService
+import com.paifa.univerge.accessibility.UniVergeAccessibilityService
 
 class FloatingChatDocumentViewerActivity : Activity() {
     private var externalViewerLaunched = false
@@ -80,7 +80,7 @@ class FloatingChatDocumentViewerActivity : Activity() {
     private fun restoreFloatingOverlay() {
         if (overlayRestored) return
         overlayRestored = true
-        UbikiAccessibilityService.instance?.onFloatingChatExternalDocumentClosed()
+        UniVergeAccessibilityService.instance?.onFloatingChatExternalDocumentClosed()
     }
 
     companion object {

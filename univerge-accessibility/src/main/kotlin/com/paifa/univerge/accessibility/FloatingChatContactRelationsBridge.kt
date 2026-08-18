@@ -50,7 +50,7 @@ object FloatingChatContactRelationsBridge {
     private val mutableSnapshot = MutableStateFlow(FloatingChatContactRelationsSnapshot())
     val snapshot: StateFlow<FloatingChatContactRelationsSnapshot> = mutableSnapshot.asStateFlow()
 
-    fun open() = UbikiAccessibilityService.instance?.requestFloatingChatContactRelations()
+    fun open() = UniVergeAccessibilityService.instance?.requestFloatingChatContactRelations()
 
     internal fun updateShell(accounts: List<FloatingChatContact>, selectedAccountId: String?, groups: List<FloatingChatContact>) {
         val weChatId = selectedAccountId?.let(::scrmFloatingAccountRouteForContactId)?.weChatId
@@ -69,7 +69,7 @@ object FloatingChatContactRelationsBridge {
         mutableSnapshot.value = mutableSnapshot.value.copy(segment = segment, contacts = emptyList(), totalCount = 0, loading = true, error = null)
         scope.launch {
             runCatching {
-                val manager = ScrmSettingsManager(UbikiAccessibilityService.instance!!.applicationContext)
+                val manager = ScrmSettingsManager(UniVergeAccessibilityService.instance!!.applicationContext)
                 fun fetch() = loadRelations(manager, weChatId, segment, search)
                 try { fetch() } catch (error: ScrmAuthenticationException) {
                     if (manager.bootstrapWithBundledAdminCredentials() !is ScrmAdminBootstrapResult.Success) throw error
@@ -151,7 +151,7 @@ object FloatingChatContactRelationsBridge {
         updatedAt = contact.updatedAt
     )
 
-    fun notifyClosed() = UbikiAccessibilityService.instance?.onFloatingChatContactRelationsClosed()
+    fun notifyClosed() = UniVergeAccessibilityService.instance?.onFloatingChatContactRelationsClosed()
 
     private fun setError(message: String) { mutableSnapshot.value = mutableSnapshot.value.copy(loading = false, error = message) }
 }

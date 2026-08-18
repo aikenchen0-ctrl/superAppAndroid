@@ -15,7 +15,7 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
-class UbikiPreferencesTest {
+class UniVergePreferencesTest {
     private lateinit var context: Application
 
     @Before
@@ -31,12 +31,12 @@ class UbikiPreferencesTest {
 
     @Test(timeout = 60_000L)
     fun keyboardShownDisablesEdgeGesturesByDefault() {
-        assertEquals(true, UbikiPreferences(context).disableWhenKeyboardShown)
+        assertEquals(true, UniVergePreferences(context).disableWhenKeyboardShown)
     }
 
     @Test(timeout = 60_000L)
     fun edgeInsetsArePersistedIndependentlyAndSanitized() {
-        val preferences = UbikiPreferences(context)
+        val preferences = UniVergePreferences(context)
 
         preferences.leftEdgeInsetDp = -4
         preferences.rightEdgeInsetDp = 200
@@ -47,7 +47,7 @@ class UbikiPreferencesTest {
         preferences.setEdgeInsetDp(EdgeSide.LEFT, 32)
         preferences.setEdgeInsetDp(EdgeSide.RIGHT, 48)
 
-        val reloaded = UbikiPreferences(context)
+        val reloaded = UniVergePreferences(context)
         assertEquals(32, reloaded.edgeInsetDp(EdgeSide.LEFT))
         assertEquals(48, reloaded.edgeInsetDp(EdgeSide.RIGHT))
     }
@@ -60,7 +60,7 @@ class UbikiPreferencesTest {
             .putInt("edge_left_zone_count", 2)
             .commit()
 
-        val preferences = UbikiPreferences(context)
+        val preferences = UniVergePreferences(context)
         assertEquals(
             listOf(32, 32),
             preferences.edgeConfigs(EdgeSide.LEFT).map { it.edgeInsetDp }
@@ -74,7 +74,7 @@ class UbikiPreferencesTest {
             )
         )
 
-        val reloaded = UbikiPreferences(context)
+        val reloaded = UniVergePreferences(context)
         assertEquals(
             listOf(12, 48),
             reloaded.edgeConfigs(EdgeSide.LEFT).map { it.edgeInsetDp }
@@ -91,7 +91,7 @@ class UbikiPreferencesTest {
             .putInt("edge_left_inset_dp", 32)
             .commit()
 
-        val preferences = UbikiPreferences(context)
+        val preferences = UniVergePreferences(context)
         preferences.setEdgeConfigs(
             EdgeSide.LEFT,
             listOf(
@@ -102,13 +102,13 @@ class UbikiPreferencesTest {
 
         assertEquals(
             listOf(32, 0),
-            UbikiPreferences(context).edgeConfigs(EdgeSide.LEFT).map { it.edgeInsetDp }
+            UniVergePreferences(context).edgeConfigs(EdgeSide.LEFT).map { it.edgeInsetDp }
         )
     }
 
     @Test(timeout = 60_000L)
     fun removingTheLastZonePersistsAnEmptySideWithoutLeavingAnyZoneStateBehind() {
-        val preferences = UbikiPreferences(context)
+        val preferences = UniVergePreferences(context)
         preferences.setEdgeConfigs(
             EdgeSide.LEFT,
             listOf(EdgeZoneConfig.defaultFor(EdgeSide.LEFT, zoneId = 0))
@@ -119,7 +119,7 @@ class UbikiPreferencesTest {
         assertEquals(emptyList<EdgeZoneConfig>(), preferences.edgeConfigs(EdgeSide.LEFT))
         assertEquals(
             emptyList<EdgeZoneConfig>(),
-            UbikiPreferences(context).edgeConfigs(EdgeSide.LEFT)
+            UniVergePreferences(context).edgeConfigs(EdgeSide.LEFT)
         )
         assertEquals(
             0,
@@ -133,7 +133,7 @@ class UbikiPreferencesTest {
 
     @Test(timeout = 60_000L)
     fun edgeOverlayColorOpacityDefaultsToTransparentAndIsClamped() {
-        val preferences = UbikiPreferences(context)
+        val preferences = UniVergePreferences(context)
 
         assertEquals(0, preferences.edgeOverlayOpacityPercent)
         assertEquals(0, preferences.overlayOpacity)
@@ -146,19 +146,19 @@ class UbikiPreferencesTest {
 
     @Test(timeout = 60_000L)
     fun quietHoursSchedulesRoundTripThroughPreferences() {
-        val preferences = UbikiPreferences(context)
+        val preferences = UniVergePreferences(context)
 
         preferences.quietHoursSchedules = listOf(
             QuietHoursSchedule(id = "morning", startMinuteOfDay = 8 * 60, endMinuteOfDay = 9 * 60)
         )
 
-        assertEquals(1, UbikiPreferences(context).quietHoursSchedules.size)
-        assertEquals("morning", UbikiPreferences(context).quietHoursSchedules.first().id)
+        assertEquals(1, UniVergePreferences(context).quietHoursSchedules.size)
+        assertEquals("morning", UniVergePreferences(context).quietHoursSchedules.first().id)
     }
 
     @Test(timeout = 60_000L)
     fun quietHoursCanActivatePauseWithoutTemporaryTimer() {
-        val preferences = UbikiPreferences(context)
+        val preferences = UniVergePreferences(context)
 
         preferences.quietHoursSchedules = listOf(
             QuietHoursSchedule(startMinuteOfDay = 8 * 60, endMinuteOfDay = 10 * 60)
@@ -173,7 +173,7 @@ class UbikiPreferencesTest {
 
     @Test(timeout = 60_000L)
     fun sideFunctionActionsRoundTripWithOrderingAndLimit() {
-        val preferences = UbikiPreferences(context)
+        val preferences = UniVergePreferences(context)
 
         preferences.sideFunctionCustomActionIds = listOf(
             "home",
@@ -187,7 +187,7 @@ class UbikiPreferencesTest {
 
         assertEquals(
             listOf("home", "launch_app:pkg", "recents", "notifications", "quick_settings"),
-            UbikiPreferences(context).sideFunctionCustomActionIds
+            UniVergePreferences(context).sideFunctionCustomActionIds
         )
     }
 

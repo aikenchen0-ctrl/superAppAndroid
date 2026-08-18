@@ -13,7 +13,7 @@ import android.widget.Toast
 import com.paifa.univerge.core.model.GestureAction
 import com.paifa.univerge.core.model.GestureData
 
-internal class UbikiActionExecutor(
+internal class UniVergeActionExecutor(
     private val service: AccessibilityService,
     private val isHapticFeedbackEnabled: () -> Boolean,
     private val floatingChatOverlayController: FloatingChatOverlayController? = null,

@@ -14,7 +14,7 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import java.util.Calendar
 
-class UbikiPreferences(context: Context) {
+class UniVergePreferences(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
 
     /**
@@ -94,6 +94,7 @@ class UbikiPreferences(context: Context) {
         get() = sanitizeFloatingChatBlurRadiusDp(
             prefs.getInt(KEY_FLOATING_CHAT_BLUR_RADIUS_DP, DEFAULT_FLOATING_CHAT_BLUR_RADIUS_DP)
         )
+
         set(value) = prefs.edit()
             .putInt(KEY_FLOATING_CHAT_BLUR_RADIUS_DP, sanitizeFloatingChatBlurRadiusDp(value))
             .apply()

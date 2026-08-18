@@ -3,8 +3,8 @@ package com.paifa.univerge.app
 import android.content.ComponentName
 import android.content.Context
 import com.adbcore.AdbCore
-import com.paifa.univerge.accessibility.UbikiAccessibilityService
-import com.paifa.univerge.accessibility.UbikiPreferences
+import com.paifa.univerge.accessibility.UniVergeAccessibilityService
+import com.paifa.univerge.accessibility.UniVergePreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -17,7 +17,7 @@ internal data class AccessibilityKeepAliveResult(
 }
 
 internal fun accessibilityServiceComponent(context: Context): String =
-    ComponentName(context, UbikiAccessibilityService::class.java).flattenToShortString()
+    ComponentName(context, UniVergeAccessibilityService::class.java).flattenToShortString()
 
 internal fun mergeAccessibilityServices(current: String?, service: String): String {
     val entries = current.orEmpty()
@@ -61,7 +61,7 @@ internal class RuntimeRootShell : RootShell {
 
 internal class AccessibilityKeepAliveController(
     private val context: Context,
-    private val preferences: UbikiPreferences,
+    private val preferences: UniVergePreferences,
     private val rootShell: RootShell = RuntimeRootShell()
 ) {
     suspend fun ensureEnabled(): AccessibilityKeepAliveResult = withContext(Dispatchers.IO) {

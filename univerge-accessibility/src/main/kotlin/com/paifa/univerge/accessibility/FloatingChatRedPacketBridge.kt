@@ -10,13 +10,13 @@ object FloatingChatRedPacketBridge {
 
     fun open(nextSession: FloatingChatRedPacketSession) {
         session = nextSession
-        UbikiAccessibilityService.instance?.requestFloatingChatRedPacket()
+        UniVergeAccessibilityService.instance?.requestFloatingChatRedPacket()
     }
 
     fun currentSession(): FloatingChatRedPacketSession? = session
 
     fun notifyClosed() {
         session = null
-        UbikiAccessibilityService.instance?.onFloatingChatRedPacketClosed()
+        UniVergeAccessibilityService.instance?.onFloatingChatRedPacketClosed()
     }
 }

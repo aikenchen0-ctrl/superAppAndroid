@@ -19,7 +19,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 
-object UbikiGesturePersistence {
+object UniVergeGesturePersistence {
     const val ACTION_RECOVER_GESTURE = "com.paifa.univerge.action.RECOVER_GESTURE"
 
     fun startForeground(service: Service) {
@@ -69,7 +69,7 @@ object UbikiGesturePersistence {
 
     fun startKeepAliveService(context: Context) {
         scheduleRecoveryWatchdog(context)
-        val intent = Intent(context, UbikiGestureKeepAliveService::class.java)
+        val intent = Intent(context, UniVergeGestureKeepAliveService::class.java)
         ContextCompat.startForegroundService(context, intent)
     }
 
@@ -90,7 +90,7 @@ object UbikiGesturePersistence {
                 notifyRecoveryReminder(context, reason)
             }
         }
-        UbikiAccessibilityService.instance?.requestOverlayRecoveryCheck()
+        UniVergeAccessibilityService.instance?.requestOverlayRecoveryCheck()
     }
 
     fun scheduleRecoveryWatchdog(
@@ -123,7 +123,7 @@ object UbikiGesturePersistence {
     }
 
     fun isAccessibilityServiceEnabled(context: Context): Boolean {
-        val component = ComponentName(context.packageName, UbikiAccessibilityService::class.java.name)
+        val component = ComponentName(context.packageName, UniVergeAccessibilityService::class.java.name)
         val enabledServices = Settings.Secure.getString(
             context.contentResolver,
             Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES

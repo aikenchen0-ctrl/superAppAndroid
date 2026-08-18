@@ -2,10 +2,10 @@ package com.paifa.univerge.accessibility
 
 object FloatingChatBackgroundRemovalBridge {
     fun open() {
-        UbikiAccessibilityService.instance?.requestFloatingChatBackgroundRemoval()
+        UniVergeAccessibilityService.instance?.requestFloatingChatBackgroundRemoval()
     }
 
     fun notifyClosed() {
-        UbikiAccessibilityService.instance?.onFloatingChatBackgroundRemovalClosed()
+        UniVergeAccessibilityService.instance?.onFloatingChatBackgroundRemovalClosed()
     }
 }

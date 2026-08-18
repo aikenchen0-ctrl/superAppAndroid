@@ -18,7 +18,7 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
-import com.paifa.univerge.accessibility.UbikiAccessibilityService
+import com.paifa.univerge.accessibility.UniVergeAccessibilityService
 import com.paifa.univerge.accessibility.floatingchat.components.FloatingWorkspaceMotion
 
 private const val WorkspaceOverlayAnimationMillis = 240L
@@ -35,7 +35,7 @@ internal object FloatingWorkspaceOverlayHost {
         content: @Composable (onBack: () -> Unit) -> Unit,
         onClosed: () -> Unit = {}
     ): Boolean {
-        val service = UbikiAccessibilityService.instance ?: return false
+        val service = UniVergeAccessibilityService.instance ?: return false
         if (controller != null) return true
         return FloatingWorkspaceOverlayController(
             context = service,

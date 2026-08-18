@@ -6,7 +6,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -79,7 +78,6 @@ internal fun ContactEditOverlay(
                 Modifier
                     .fillMaxSize()
                     // 悬浮窗不自动消费系统状态栏 inset，显式保留顶部安全区。
-                    .padding(top = ContactProfileStatusBarReserve)
             } else if (fullScreenGroupInfo) {
                 // 群信息自身绘制 30dp 安全区和进出场 translationY 动画，不能再作为居中对话框展示。
                 Modifier.fillMaxSize()
@@ -165,5 +163,3 @@ internal fun ContactEditOverlay(
         }
     }
 }
-
-private val ContactProfileStatusBarReserve = 30.dp

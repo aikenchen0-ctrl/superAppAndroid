@@ -24,7 +24,7 @@ object FloatingChatMediaPreviewBridge {
 
     fun close() {
         session = null
-        UbikiAccessibilityService.instance?.onFloatingChatMediaPreviewClosed()
+        UniVergeAccessibilityService.instance?.onFloatingChatMediaPreviewClosed()
     }
 }
 

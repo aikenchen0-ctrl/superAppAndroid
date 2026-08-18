@@ -91,7 +91,7 @@ class GroupInfoWorkspacePresentationTest {
     @Test(timeout = 60_000)
     fun groupInfoExitAndBlinkCaptureKeepTheFloatingRootStable() {
         val overlaySource = sourceFile("FloatingChatOverlayUi.kt")
-        val serviceSource = sourceFile("UbikiAccessibilityService.kt")
+        val serviceSource = sourceFile("UniVergeAccessibilityService.kt")
 
         assertTrue(overlaySource.contains("displayedGroupInfoWorkspaceTarget"))
         assertTrue(overlaySource.contains("isGroupInfoWorkspaceVisible"))

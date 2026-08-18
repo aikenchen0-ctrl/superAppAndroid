@@ -14,19 +14,19 @@ object FloatingChatMediaPickerBridge {
         mediaKind: FloatingChatPrototype.PickedMediaKind,
         target: FloatingChatMediaTarget = FloatingChatMediaTarget.Chat
     ) {
-        UbikiAccessibilityService.instance?.requestFloatingChatMediaPick(mediaKind, target)
+        UniVergeAccessibilityService.instance?.requestFloatingChatMediaPick(mediaKind, target)
     }
 
     fun requestCapture() {
-        UbikiAccessibilityService.instance?.requestFloatingChatMediaCapture()
+        UniVergeAccessibilityService.instance?.requestFloatingChatMediaCapture()
     }
 
     fun requestScan() {
-        UbikiAccessibilityService.instance?.requestFloatingChatScan()
+        UniVergeAccessibilityService.instance?.requestFloatingChatScan()
     }
 
     fun requestDocumentPick() {
-        UbikiAccessibilityService.instance?.requestFloatingChatDocumentPick()
+        UniVergeAccessibilityService.instance?.requestFloatingChatDocumentPick()
     }
 
     fun deliverPickedMedia(
@@ -37,7 +37,7 @@ object FloatingChatMediaPickerBridge {
         aspectRatio: Float?,
         target: FloatingChatMediaTarget = FloatingChatMediaTarget.Chat
     ) {
-        UbikiAccessibilityService.instance?.onFloatingChatMediaPicked(
+        UniVergeAccessibilityService.instance?.onFloatingChatMediaPicked(
             mediaKind = mediaKind,
             mediaUri = mediaUri.toString(),
             previewUri = previewUri.toString(),
@@ -48,11 +48,11 @@ object FloatingChatMediaPickerBridge {
     }
 
     fun deliverPickedDocument(document: FloatingChatPickedDocument) {
-        UbikiAccessibilityService.instance?.onFloatingChatDocumentPicked(document)
+        UniVergeAccessibilityService.instance?.onFloatingChatDocumentPicked(document)
     }
 
     fun notifyPickerClosed() {
-        UbikiAccessibilityService.instance?.onFloatingChatMediaPickerClosed()
+        UniVergeAccessibilityService.instance?.onFloatingChatMediaPickerClosed()
     }
 }
 

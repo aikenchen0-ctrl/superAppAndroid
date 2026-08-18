@@ -3,13 +3,12 @@ package com.paifa.univerge.app
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
-import com.paifa.univerge.accessibility.UbikiAccessibilityService
-import com.paifa.univerge.accessibility.UbikiPreferences
-import com.paifa.univerge.app.R
+import com.paifa.univerge.accessibility.UniVergeAccessibilityService
+import com.paifa.univerge.accessibility.UniVergePreferences
 
-class UbikiQuickTileService : TileService() {
-    private val preferences: UbikiPreferences by lazy {
-        UbikiPreferences(this)
+class UniVergeQuickTileService : TileService() {
+    private val preferences: UniVergePreferences by lazy {
+        UniVergePreferences(this)
     }
 
     override fun onStartListening() {
@@ -24,7 +23,7 @@ class UbikiQuickTileService : TileService() {
         } else {
             preferences.pauseFor(DEFAULT_TILE_PAUSE_MS)
         }
-        UbikiAccessibilityService.instance?.requestOverlayRefresh()
+        UniVergeAccessibilityService.instance?.requestOverlayRefresh()
         updateTile()
     }
 

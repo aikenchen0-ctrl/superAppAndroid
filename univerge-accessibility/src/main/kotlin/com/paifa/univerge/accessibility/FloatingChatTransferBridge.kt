@@ -33,7 +33,7 @@ object FloatingChatTransferBridge {
 
     fun open(nextSession: FloatingChatTransferSession) {
         session = nextSession
-        UbikiAccessibilityService.instance?.requestFloatingChatTransfer()
+        UniVergeAccessibilityService.instance?.requestFloatingChatTransfer()
     }
 
     fun currentSession(): FloatingChatTransferSession? = session
@@ -85,6 +85,6 @@ object FloatingChatTransferBridge {
 
     fun notifyClosed() {
         session = null
-        UbikiAccessibilityService.instance?.onFloatingChatTransferClosed()
+        UniVergeAccessibilityService.instance?.onFloatingChatTransferClosed()
     }
 }

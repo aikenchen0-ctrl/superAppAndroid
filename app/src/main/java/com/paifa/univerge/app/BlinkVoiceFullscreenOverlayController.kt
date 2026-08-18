@@ -69,7 +69,7 @@ import com.blinkvoice.visual.events.BlinkEventClassifier
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
 import com.paifa.univerge.accessibility.FloatingChatBlinkVoiceBridge
-import com.paifa.univerge.accessibility.UbikiAccessibilityService
+import com.paifa.univerge.accessibility.UniVergeAccessibilityService
 import com.paifa.univerge.accessibility.blinkVoiceCaptureAutoFinishOnEvent
 import com.paifa.univerge.accessibility.blinkVoiceRealtimeStatusLabel
 import com.paifa.univerge.accessibility.blinkVoiceStatusLogEntry
@@ -106,7 +106,7 @@ object FloatingChatBlinkVoiceOverlayHost {
     private var controller: BlinkVoiceFullscreenOverlayController? = null
 
     fun show(): Boolean {
-        val service = UbikiAccessibilityService.instance ?: return false
+        val service = UniVergeAccessibilityService.instance ?: return false
         if (ContextCompat.checkSelfPermission(service, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             return false
         }

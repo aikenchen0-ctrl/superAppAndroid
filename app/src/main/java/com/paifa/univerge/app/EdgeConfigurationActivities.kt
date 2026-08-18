@@ -26,10 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.paifa.univerge.accessibility.BottomGestureBarGestureType
-import com.paifa.univerge.accessibility.UbikiAccessibilityService
-import com.paifa.univerge.accessibility.UbikiPreferences
-import com.paifa.univerge.core.model.EdgeSide
-import com.paifa.univerge.core.model.GestureType
+import com.paifa.univerge.accessibility.UniVergeAccessibilityService
+import com.paifa.univerge.accessibility.UniVergePreferences
 
 private const val EXTRA_CONFIGURATION_TARGET = "configuration_target"
 
@@ -76,7 +74,7 @@ class EdgeFunctionSettingsActivity : ComponentActivity() {
 @Composable
 private fun EdgeStyleSettingsScreen(target: ConfigurationTarget, onBack: () -> Unit) {
     val context = LocalContext.current
-    val preferences = remember(context) { UbikiPreferences(context) }
+    val preferences = remember(context) { UniVergePreferences(context) }
     val side = target.edgeSideOrNull()
     var configs by remember(side) { mutableStateOf(side?.let(preferences::edgeConfigs).orEmpty()) }
     var bottomWidth by remember { mutableIntStateOf(preferences.bottomGestureBarWidthDp) }
@@ -87,7 +85,7 @@ private fun EdgeStyleSettingsScreen(target: ConfigurationTarget, onBack: () -> U
                 widthDp = bottomWidth,
                 onWidthChange = { width ->
                     bottomWidth = width
-                    UbikiAccessibilityService.instance?.showBottomGestureBarPreview(bottomWidth)
+                    UniVergeAccessibilityService.instance?.showBottomGestureBarPreview(bottomWidth)
                 },
                 onWidthChangeFinished = {
                     if (shouldPersistBottomGestureBarWidth(isFinished = true)) {
@@ -108,7 +106,7 @@ private fun EdgeStyleSettingsScreen(target: ConfigurationTarget, onBack: () -> U
                     preferences.setEdgeConfigs(side, updated)
                 },
                 onConfigAdjusted = { config ->
-                    UbikiAccessibilityService.instance?.showEdgeConfigAdjustmentPreview(config)
+                    UniVergeAccessibilityService.instance?.showEdgeConfigAdjustmentPreview(config)
                 }
             )
         }
@@ -123,7 +121,7 @@ private fun EdgeFunctionSettingsScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
-    val preferences = remember(context) { UbikiPreferences(context) }
+    val preferences = remember(context) { UniVergePreferences(context) }
     val side = target.edgeSideOrNull()
     var revision by remember { mutableIntStateOf(0) }
     var edgePicker by remember { mutableStateOf<Pair<com.paifa.univerge.core.model.EdgeSide, com.paifa.univerge.core.model.GestureType>?>(null) }
@@ -157,7 +155,7 @@ private fun EdgeFunctionSettingsScreen(
             onSelect = { action ->
                 preferences.setAction(pickerSide, gestureType, action)
                 revision += 1
-                UbikiAccessibilityService.instance?.requestOverlayRefresh()
+                UniVergeAccessibilityService.instance?.requestOverlayRefresh()
                 edgePicker = null
             }
         )

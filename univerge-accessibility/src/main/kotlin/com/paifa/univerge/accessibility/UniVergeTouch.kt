@@ -6,8 +6,8 @@ import com.paifa.univerge.core.model.EdgeZoneConfig
 import com.paifa.univerge.core.model.GestureAction
 import com.paifa.univerge.core.model.GestureType
 
-class UbikiTouch private constructor(context: Context) {
-    private val preferences = UbikiPreferences(context.applicationContext)
+class UniVergeTouch private constructor(context: Context) {
+    private val preferences = UniVergePreferences(context.applicationContext)
 
     var globalEnabled: Boolean
         get() = preferences.globalEnabled
@@ -17,7 +17,7 @@ class UbikiTouch private constructor(context: Context) {
         }
 
     val isServiceRunning: Boolean
-        get() = UbikiAccessibilityService.isRunning
+        get() = UniVergeAccessibilityService.isRunning
 
     fun getAction(side: EdgeSide, gestureType: GestureType): GestureAction {
         return preferences.actionFor(side, gestureType)
@@ -107,10 +107,10 @@ class UbikiTouch private constructor(context: Context) {
     }
 
     fun requestOverlayRefresh() {
-        UbikiAccessibilityService.instance?.requestOverlayRefresh()
+        UniVergeAccessibilityService.instance?.requestOverlayRefresh()
     }
 
     companion object {
-        fun create(context: Context): UbikiTouch = UbikiTouch(context)
+        fun create(context: Context): UniVergeTouch = UniVergeTouch(context)
     }
 }

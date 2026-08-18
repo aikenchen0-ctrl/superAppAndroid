@@ -199,7 +199,7 @@ private fun bottomGestureBarOutlineLayoutParams(
 internal class BottomGestureBarOverlayController(
     private val context: Context,
     private val windowManager: WindowManager,
-    private val preferences: UbikiPreferences,
+    private val preferences: UniVergePreferences,
     private val onGesture: (GestureAction, GestureData) -> Unit
 ) {
     private var gestureBarView: BottomGestureBarView? = null

@@ -24,13 +24,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.paifa.univerge.accessibility.UbikiAccessibilityService
-import com.paifa.univerge.accessibility.UbikiPreferences
+import com.paifa.univerge.accessibility.UniVergeAccessibilityService
+import com.paifa.univerge.accessibility.UniVergePreferences
 
 class WeChatChatAppearanceActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val preferences = UbikiPreferences(applicationContext)
+        val preferences = UniVergePreferences(applicationContext)
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
@@ -44,7 +44,7 @@ class WeChatChatAppearanceActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WeChatChatAppearanceScreen(
-    preferences: UbikiPreferences,
+    preferences: UniVergePreferences,
     onBack: () -> Unit
 ) {
     var frostedBackgroundEnabled by remember {
@@ -57,7 +57,7 @@ private fun WeChatChatAppearanceScreen(
     var backgroundColorRgb by remember { mutableIntStateOf(preferences.floatingChatBackgroundColorRgb) }
 
     fun refreshOverlay() {
-        UbikiAccessibilityService.instance?.requestOverlayRefresh()
+        UniVergeAccessibilityService.instance?.requestOverlayRefresh()
     }
 
     Scaffold(

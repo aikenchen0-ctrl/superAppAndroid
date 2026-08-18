@@ -4,6 +4,9 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -68,17 +71,54 @@ internal fun ContactProfileScreen(
     onEvent: (ContactProfileUiEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    AnimatedContent(
-        targetState = state.editing,
-        transitionSpec = { fadeIn() togetherWith fadeOut() },
-        modifier = modifier,
-        label = "contact-profile-navigation"
-    ) { editing ->
-        if (editing) {
-            ContactEditorContent(state, onEvent, Modifier.fillMaxSize())
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
+    var entered by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { entered = true }
+    val dispatchEvent: (ContactProfileUiEvent) -> Unit = { event ->
+        if (event == ContactProfileUiEvent.DeleteRequested) {
+            showDeleteConfirmation = true
         } else {
-            ContactIntroContent(state, onEvent, Modifier.fillMaxSize())
+            onEvent(event)
         }
+    }
+    AnimatedVisibility(
+        visible = entered,
+        enter = slideInVertically(initialOffsetY = { it / 8 }) + fadeIn(),
+        exit = slideOutVertically(targetOffsetY = { it / 8 }) + fadeOut(),
+        modifier = modifier
+    ) {
+        AnimatedContent(
+            targetState = state.editing,
+            transitionSpec = { fadeIn() togetherWith fadeOut() },
+            label = "contact-profile-content"
+        ) { editing ->
+            if (editing) {
+                ContactEditorContent(state, dispatchEvent, Modifier.fillMaxSize())
+            } else {
+                ContactIntroContent(state, dispatchEvent, Modifier.fillMaxSize())
+            }
+        }
+    }
+    if (showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = false },
+            title = { Text("删除好友") },
+            text = { Text("确定要删除该好友吗？") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteConfirmation = false
+                        onEvent(ContactProfileUiEvent.DeleteRequested)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("删除", color = Color.White) }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { showDeleteConfirmation = false }) {
+                    Text("取消")
+                }
+            }
+        )
     }
 }
 
@@ -156,17 +196,16 @@ private fun ContactEditorContent(
     onEvent: (ContactProfileUiEvent) -> Unit,
     modifier: Modifier
 ) {
-    var showDeleteConfirmation by remember { mutableStateOf(false) }
-    LazyColumn(
-        modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface),
-        contentPadding = PaddingValues(bottom = 12.dp)
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
     ) {
-        item {
-            FloatingWorkspaceTopAppBar(
-                title = "朋友资料",
-                onBack = { onEvent(ContactProfileUiEvent.BackRequested) }
-            )
-        }
+        ProfileTopBar { onEvent(ContactProfileUiEvent.BackRequested) }
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(bottom = 12.dp)
+        ) {
         item { ProfileHeader(state) }
         item { FriendProfileSectionTitle("备注") }
         item {
@@ -218,7 +257,7 @@ private fun ContactEditorContent(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Button(
-                    onClick = { showDeleteConfirmation = true },
+                    onClick = { onEvent(ContactProfileUiEvent.DeleteRequested) },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error,
@@ -235,27 +274,7 @@ private fun ContactEditorContent(
                 }
             }
         }
-    }
-    if (showDeleteConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirmation = false },
-            title = { Text("删除好友") },
-            text = { Text("确定要删除该好友吗？") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showDeleteConfirmation = false
-                        onEvent(ContactProfileUiEvent.DeleteRequested)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text("删除", color = Color.White) }
-            },
-            dismissButton = {
-                androidx.compose.material3.TextButton(onClick = { showDeleteConfirmation = false }) {
-                    Text("取消")
-                }
-            }
-        )
+        }
     }
 }
 
@@ -305,19 +324,7 @@ private fun ContactIntroActionRow(icon: ImageVector, label: String, enabled: Boo
 
 @Composable
 private fun ProfileTopBar(onBack: () -> Unit) {
-    Box(Modifier.fillMaxWidth().height(46.dp).background(ProfilePageBackground)) {
-        IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart).padding(start = 8.dp)) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = ProfilePrimaryText)
-        }
-        TextLabel(
-            text = "朋友资料",
-            size = 14.sp,
-            modifier = Modifier.align(Alignment.Center),
-            color = ProfilePrimaryText,
-            weight = FontWeight.SemiBold,
-            maxLines = 1
-        )
-    }
+    FloatingWorkspaceTopAppBar(title = "朋友资料", onBack = onBack)
 }
 
 @Composable
@@ -502,8 +509,7 @@ private val ContactsRowBackground = Color(0xFFFCFCFC)
 private val ContactsPrimaryText = Color(0xFF202020)
 private val ContactsSecondaryText = Color(0xFF8B8B8B)
 private val ContactsChevronText = Color(0xFFC0C0C0)
-private val ProfilePageBackground = Color(0xFFF2F3F5)
-private val ProfileCardBackground = Color.White
+private val ProfileCardBackground = Color.Transparent
 private val ProfilePrimaryText = Color(0xFF111111)
 private val ProfileSecondaryText = Color(0xFF656A70)
 private val ProfileSectionText = Color(0xFF8C939A)

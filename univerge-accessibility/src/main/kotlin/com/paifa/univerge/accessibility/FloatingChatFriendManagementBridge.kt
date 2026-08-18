@@ -15,7 +15,7 @@ object FloatingChatFriendManagementBridge {
         private set
 
     fun open() {
-        UbikiAccessibilityService.instance?.requestFloatingChatFriendManagement()
+        UniVergeAccessibilityService.instance?.requestFloatingChatFriendManagement()
     }
 
     internal fun updateSnapshot(value: FloatingChatFriendManagementSnapshot) {
@@ -23,14 +23,14 @@ object FloatingChatFriendManagementBridge {
     }
 
     fun notifyClosed() {
-        UbikiAccessibilityService.instance?.onFloatingChatFriendManagementClosed()
+        UniVergeAccessibilityService.instance?.onFloatingChatFriendManagementClosed()
     }
 
     fun refresh() {
-        UbikiAccessibilityService.instance?.refreshFloatingChatFriendManagement()
+        UniVergeAccessibilityService.instance?.refreshFloatingChatFriendManagement()
     }
 
     fun pullFriendRequests() {
-        UbikiAccessibilityService.instance?.pullFloatingChatFriendRequests()
+        UniVergeAccessibilityService.instance?.pullFloatingChatFriendRequests()
     }
 }

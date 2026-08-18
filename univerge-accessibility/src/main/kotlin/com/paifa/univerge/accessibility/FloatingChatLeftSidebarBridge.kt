@@ -43,7 +43,7 @@ object FloatingChatLeftSidebarBridge {
     val displayMode: StateFlow<LeftSidebarDisplayMode> = mutableDisplayMode.asStateFlow()
 
     fun open() {
-        UbikiAccessibilityService.instance?.requestFloatingChatLeftSidebar()
+        UniVergeAccessibilityService.instance?.requestFloatingChatLeftSidebar()
     }
 
     internal fun updateSnapshot(value: FloatingChatLeftSidebarSnapshot) {
