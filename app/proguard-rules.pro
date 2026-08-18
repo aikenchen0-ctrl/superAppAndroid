@@ -1,4 +1,4 @@
--keep class com.paifa.ubikitouch.accessibility.UbikiAccessibilityService { *; }
+-keep class com.paifa.univerge.accessibility.UbikiAccessibilityService { *; }
 
 # MediaPipe discovers fields from generated Proto messages by their original names.
 -keepclassmembers class com.google.mediapipe.** { <fields>; }

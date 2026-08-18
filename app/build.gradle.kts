@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.paifa.ubikitouch.app"
+    namespace = "com.paifa.univerge.app"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.paifa.ubikitouch"
+        applicationId = "com.paifa.univerge"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
@@ -51,7 +51,7 @@ android {
 }
 
 dependencies {
-    implementation(project(":ubiki-accessibility"))
+    implementation(project(":univerge-accessibility"))
     implementation(project(":adbcore"))
     implementation(files("libs/blinkvoice-visual-sdk-release.aar"))
 

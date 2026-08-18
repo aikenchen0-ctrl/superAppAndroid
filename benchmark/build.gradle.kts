@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.paifa.ubikitouch.benchmark"
+    namespace = "com.paifa.univerge.benchmark"
     compileSdk = 36
 
     defaultConfig {

@@ -22,8 +22,8 @@ dependencyResolutionManagement {
 
 rootProject.name = "UbikiTouch"
 include(":app")
-include(":ubiki-core")
-include(":ubiki-overlay")
-include(":ubiki-accessibility")
+include(":univerge-core")
+include(":univerge-overlay")
+include(":univerge-accessibility")
 include(":benchmark")
 include(":adbcore")

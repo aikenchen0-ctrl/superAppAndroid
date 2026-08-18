@@ -1,0 +1,49 @@
+package com.paifa.univerge.accessibility.floatingchat.input
+
+import com.paifa.univerge.accessibility.floatingchat.message.OutgoingMessageActions
+import com.paifa.univerge.accessibility.floatingchat.shell.BottomPanelMode
+import com.paifa.univerge.core.model.FloatingChatMessage
+
+internal class InputMessageActions(
+    private val outgoingMessageActions: OutgoingMessageActions,
+    private val quotedMessage: () -> FloatingChatMessage?,
+    private val inputText: () -> String,
+    private val onQuotedMessageChanged: (FloatingChatMessage?) -> Unit,
+    private val onInputTextChanged: (String) -> Unit,
+    private val onBlinkGeneratedInputClearableChanged: (Boolean) -> Unit,
+    private val onBottomPanelModeChanged: (BottomPanelMode) -> Unit,
+    private val onBlinkInputStatusChanged: (String?, Boolean) -> Unit,
+    private val onBlinkInputStatusVersionIncremented: () -> Unit
+) {
+    fun sendTextToCurrentThread(outgoingText: String) {
+        outgoingMessageActions.addTextMessage(outgoingText, quotedMessage())
+        onQuotedMessageChanged(null)
+    }
+
+    fun sendInputMessage() {
+        val outgoingText = inputText().trim()
+        if (outgoingText.isNotEmpty()) {
+            sendTextToCurrentThread(outgoingText)
+            onInputTextChanged("")
+            onBlinkGeneratedInputClearableChanged(false)
+            onBottomPanelModeChanged(BottomPanelMode.None)
+        }
+    }
+
+    /** 录音完成后创建语音消息；SCRM 路由可用时由既有出站队列执行语音上传和发送接口。 */
+    fun sendVoiceMessage(audioUri: String, durationMs: Int, closePanel: Boolean = true) {
+        outgoingMessageActions.addVoiceMessage(audioUri, durationMs)
+        if (closePanel) {
+            onBottomPanelModeChanged(BottomPanelMode.None)
+        }
+    }
+
+    fun showBlinkInputStatus(message: String, autoDismiss: Boolean) {
+        onBlinkInputStatusChanged(message, autoDismiss)
+        onBlinkInputStatusVersionIncremented()
+    }
+
+    fun clearBlinkInputStatus() {
+        onBlinkInputStatusChanged(null, false)
+    }
+}

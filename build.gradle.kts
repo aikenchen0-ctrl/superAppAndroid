@@ -8,6 +8,6 @@ plugins {
 }
 
 allprojects {
-    group = "com.paifa.ubikitouch"
+    group = "com.paifa.univerge"
     version = "0.1.0"
 }

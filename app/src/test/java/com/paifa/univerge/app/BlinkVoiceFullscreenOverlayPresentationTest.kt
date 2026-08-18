@@ -1,0 +1,99 @@
+package com.paifa.univerge.app
+
+import android.view.WindowManager
+import com.paifa.univerge.app.blinkVoiceFullscreenEntryTranslationY
+import com.paifa.univerge.app.blinkVoiceFullscreenExitTranslationY
+import com.paifa.univerge.app.blinkVoiceFullscreenOverlayWindowPresentation
+import com.paifa.univerge.app.blinkVoiceFullscreenStatusBarHeightDp
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.io.File
+
+/**
+ * Test flow: create the window contract, then verify fullscreen geometry, accessibility type,
+ * focusability, status-bar spacing, and the two translation endpoints used by the property animation.
+ */
+class BlinkVoiceFullscreenOverlayPresentationTest {
+    @Test
+    fun blinkVoiceUsesAnInteractiveFullscreenAccessibilityOverlay() {
+        val presentation = blinkVoiceFullscreenOverlayWindowPresentation()
+
+        assertEquals(WindowManager.LayoutParams.MATCH_PARENT, presentation.width)
+        assertEquals(WindowManager.LayoutParams.MATCH_PARENT, presentation.height)
+        assertEquals(WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, presentation.type)
+        assertTrue(presentation.focusable)
+        assertEquals(30, blinkVoiceFullscreenStatusBarHeightDp())
+    }
+
+    @Test
+    fun overlayMotionSlidesUpOnEntryAndDownOnExit() {
+        assertEquals(1_000f, blinkVoiceFullscreenEntryTranslationY(1_000))
+        assertEquals(-1_000f, blinkVoiceFullscreenExitTranslationY(1_000))
+    }
+
+    /**
+     * 测试流程：从右侧眨眼测试图标打开页面，确认状态区由工具栏内边距承载；
+     * 再点击左上返回，确认进出场均复用 UI组件 工作区的实体位移动画规格。
+     */
+    @Test
+    fun blinkVoiceReusesTheFloatingWorkspaceToolbarAndMotionContract() {
+        val source = File(
+            System.getProperty("user.dir"),
+            "src/main/java/com/paifa/univerge/app/BlinkVoiceFullscreenOverlayController.kt"
+        ).readText()
+
+        assertTrue(source.contains("FloatingWorkspaceTopAppBar("))
+        assertTrue(source.contains("FloatingWorkspaceMotion.enterTranslationY"))
+        assertTrue(source.contains("FloatingWorkspaceMotion.exitTranslationY"))
+        assertFalse(source.contains("Spacer(Modifier.height(blinkVoiceFullscreenStatusBarHeightDp().dp))"))
+    }
+
+    /** 测试流程：从右侧打开智能抠图与 OpenAPI，确认两者均由统一悬浮工作区承载，而非普通 Activity 窗口。 */
+    @Test
+    fun rightRailActivityEntriesDelegateToTheExistingFloatingChatWorkspace() {
+        val backgroundRemoval = File(
+            System.getProperty("user.dir"),
+            "src/main/java/com/paifa/univerge/app/BackgroundRemovalActivity.kt"
+        ).readText()
+        val openApi = File(
+            System.getProperty("user.dir"),
+            "src/main/java/com/paifa/univerge/app/OpenApiWorkbenchActivity.kt"
+        ).readText()
+
+        assertTrue(backgroundRemoval.contains("FloatingChatBackgroundRemovalBridge.open()"))
+        assertTrue(openApi.contains("FloatingChatOpenApiBridge.open()"))
+        assertFalse(backgroundRemoval.contains("FloatingWorkspaceOverlayHost.show"))
+        assertFalse(openApi.contains("FloatingWorkspaceOverlayHost.show"))
+    }
+
+    /**
+     * 测试流程：分别打开智能抠图与眨眼测试，确认可见工作区根使用 Material 3 surface，
+     * 不再透出下层聊天界面。
+     */
+    @Test
+    fun blinkVoiceFullscreenWorkspaceUsesAnOpaqueSurfaceRoot() {
+        val backgroundRemoval = File(
+            System.getProperty("user.dir"),
+            "src/main/java/com/paifa/univerge/app/BackgroundRemovalActivity.kt"
+        ).readText()
+        val blinkVoice = File(
+            System.getProperty("user.dir"),
+            "src/main/java/com/paifa/univerge/app/BlinkVoiceFullscreenOverlayController.kt"
+        ).readText()
+
+        assertTrue(
+            blinkVoice.contains(
+                "Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)"
+            )
+        )
+        assertFalse(blinkVoice.contains("background(Color.Transparent)"))
+        assertTrue(
+            backgroundRemoval.contains(
+                "Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)"
+            )
+        )
+        assertFalse(backgroundRemoval.contains("background(Color.Transparent)"))
+    }
+}

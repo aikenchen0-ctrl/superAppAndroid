@@ -293,3 +293,17 @@
 - 联系人页 `ScrmContactsPanel` 已有完整建群流程：加载真实联系人、多选、提取去重 wxid、调用 `POST /openapi/v1/chatrooms` 并通过 `ScrmContactTaskRunner` 等待任务结果。
 - 最低风险路径是给联系人页增加直接打开建群模式的参数，由扫码页导航过去；无需新增接口客户端或复制任务轮询。
 - 全屏视觉基准是 `FloatingWorkspaceTopAppBar`、`MaterialTheme.colorScheme.surface` 和根节点 `fillMaxSize()`。
+## 2026-08-18 群聊聊天信息界面发现
+
+- 当前 `GroupInfoHost` 已接入改群名、公告、备注、群内昵称、消息通知、置顶、保存通讯录、二维码、邀请/移出成员和退群接口。
+- 当前 `GroupInfoScreen` 仍是“资料/成员/设置”三 Tab，不符合单页 5 列设置列表规格；二维码调用后也未消费 `ScrmContactTaskOutcome.data`。
+- 共享 `FloatingWorkspaceTopAppBar` 已通过 `WindowInsets(top = 30.dp)` 保留状态区，根 `FloatingChatOverlayUi` 已提供自下而上进入、自上而下退出动画。
+- 模块已依赖 ZXing 3.5.3，可直接从后端二维码内容生成 Bitmap，不需新增库。
+- 工作树正在进行包目录迁移：旧 `com/paifa/ubikitouch` 路径删除，新 `com/paifa/univerge` 路径未跟踪，但 Kotlin package 暂仍是旧命名；本轮只编辑新目录中的实际源码。
+## 2026-08-18 包名前缀迁移发现
+
+- `app` 主源码已移动到 `src/main/java/com/paifa/univerge/app`，但 `app/build.gradle.kts` 仍是旧 namespace/applicationId，Manifest 仍混有旧 accessibility 组件名和 taskAffinity/action。
+- `ubiki-accessibility` 主源码已在 `src/main/kotlin/com/paifa/univerge/accessibility`，但 package/import 文本仍约 2993 处旧前缀；旧目录已不存在，导致部分源码契约测试按旧路径读取失败。
+- `ubiki-core` 和 `ubiki-overlay` 主源码尚未移动，仍在旧目录；模块 namespace 也仍为旧前缀。
+- `adbcore` 使用独立 `com.adbcore`，不属于 `com.paifa` 前缀，不应擅自改名。
+- 生成目录 `build/bin/.gradle/.cxx` 不参与迁移，避免污染或修改二进制产物。
