@@ -85,6 +85,7 @@ internal fun MessageRow(
     claimed: Boolean,
     onToggleSelection: () -> Unit,
     onClick: () -> Unit,
+    onDoubleClick: () -> Unit = {},
     onBubbleBoundsChanged: (Rect) -> Unit,
     onGroupMemberAvatarBoundsChanged: (Rect) -> Unit,
     onGroupMemberAvatarRemoved: () -> Unit,
@@ -167,6 +168,7 @@ internal fun MessageRow(
             claimed = claimed,
             onToggleSelection = onToggleSelection,
             onClick = onClick,
+            onDoubleClick = onDoubleClick,
             onBubbleBoundsChanged = onBubbleBoundsChanged,
             homeOverviewVisible = homeOverviewVisible,
             homeOverviewAccountColor = homeOverviewAccountColor,
@@ -204,6 +206,7 @@ internal fun MessageBlock(
     claimed: Boolean,
     onToggleSelection: () -> Unit,
     onClick: () -> Unit,
+    onDoubleClick: () -> Unit = {},
     onBubbleBoundsChanged: (Rect) -> Unit,
     homeOverviewVisible: Boolean = false,
     homeOverviewAccountColor: Long? = null,
@@ -342,6 +345,7 @@ internal fun MessageBlock(
                                         onClick()
                                     }
                                 },
+                                onDoubleClick = onDoubleClick,
                                 onLongClick = { onLongPressMessage(message, currentBounds.value) }
                             )
                             .padding(
@@ -410,6 +414,7 @@ internal fun MessageBlock(
                                         onClick()
                                     }
                                 },
+                                onDoubleClick = onDoubleClick,
                                 onLongClick = { onLongPressMessage(message, currentBounds.value) }
                             )
                     ) {

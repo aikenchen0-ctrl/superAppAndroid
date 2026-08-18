@@ -14,23 +14,44 @@ internal sealed interface ChatNavigationBackResult {
     data object Collapse : ChatNavigationBackResult
 }
 
+internal data class ChatNavigationStackEntry(
+    val route: ChatNavigationRoute,
+    val activeAccountId: String,
+    val selectedThread: ChatThreadSelection,
+    val unreadSourceAccountId: String?
+)
+
 internal data class ChatNavigationState(
-    val route: ChatNavigationRoute = ChatNavigationRoute.Conversation,
+    val route: ChatNavigationRoute = ChatNavigationRoute.AllAccountsUnread,
     val activeAccountId: String = "",
     val selectedThread: ChatThreadSelection = ChatThreadSelection.Group,
     val unreadSourceAccountId: String? = null,
-    val handledSummaryMessageIds: Set<String> = emptySet()
+    val handledSummaryMessageIds: Set<String> = emptySet(),
+    val backStack: List<ChatNavigationStackEntry> = emptyList()
 ) {
-    fun openAllAccountsUnread(): ChatNavigationState = copy(
-        route = ChatNavigationRoute.AllAccountsUnread,
-        unreadSourceAccountId = null
+    private fun snapshot(): ChatNavigationStackEntry = ChatNavigationStackEntry(
+        route = route,
+        activeAccountId = activeAccountId,
+        selectedThread = selectedThread,
+        unreadSourceAccountId = unreadSourceAccountId
     )
 
-    fun openSingleAccountUnread(accountId: String): ChatNavigationState = copy(
+    private fun withPushedHistory(next: ChatNavigationState): ChatNavigationState {
+        if (next.route == route) return next.copy(backStack = backStack)
+        return next.copy(backStack = backStack + snapshot())
+    }
+
+    fun openAllAccountsUnread(): ChatNavigationState = copy(
+        route = ChatNavigationRoute.AllAccountsUnread,
+        unreadSourceAccountId = null,
+        backStack = emptyList()
+    )
+
+    fun openSingleAccountUnread(accountId: String): ChatNavigationState = withPushedHistory(copy(
         route = ChatNavigationRoute.SingleAccountUnread,
         activeAccountId = accountId,
         unreadSourceAccountId = null
-    )
+    ))
 
     fun switchUnreadAccount(accountId: String): ChatNavigationState = copy(
         route = ChatNavigationRoute.SingleAccountUnread,
@@ -38,45 +59,62 @@ internal data class ChatNavigationState(
         unreadSourceAccountId = null
     )
 
-    fun openConversation(thread: ChatThreadSelection): ChatNavigationState = copy(
+    fun openConversation(thread: ChatThreadSelection): ChatNavigationState = withPushedHistory(copy(
         route = ChatNavigationRoute.Conversation,
         selectedThread = thread,
         unreadSourceAccountId = activeAccountId.takeIf {
             route == ChatNavigationRoute.SingleAccountUnread
         }
-    )
+    ))
 
-    fun openUnreadConversation(summary: HomeUnreadThreadSummary): ChatNavigationState = copy(
+    fun openUnreadConversation(summary: HomeUnreadThreadSummary): ChatNavigationState = withPushedHistory(copy(
         route = ChatNavigationRoute.Conversation,
         activeAccountId = summary.accountId,
         selectedThread = summary.selection,
         unreadSourceAccountId = summary.accountId.takeIf {
             route == ChatNavigationRoute.SingleAccountUnread
         }
-    )
+    ))
 
     fun switchConversationAccount(
         accountId: String,
         thread: ChatThreadSelection
-    ): ChatNavigationState = copy(
+    ): ChatNavigationState = withPushedHistory(copy(
         route = ChatNavigationRoute.Conversation,
         activeAccountId = accountId,
         selectedThread = thread,
         unreadSourceAccountId = null
-    )
+    ))
 
-    fun back(): ChatNavigationBackResult = when (route) {
-        ChatNavigationRoute.Conversation -> ChatNavigationBackResult.Navigate(
-            unreadSourceAccountId?.let { sourceAccountId ->
+    fun back(): ChatNavigationBackResult {
+        val previous = backStack.lastOrNull()
+        if (previous != null) {
+            return ChatNavigationBackResult.Navigate(
                 copy(
-                    route = ChatNavigationRoute.SingleAccountUnread,
-                    activeAccountId = sourceAccountId,
-                    unreadSourceAccountId = null
+                    route = previous.route,
+                    // The cold all-account directory has no selected account. Keep the
+                    // account that led into the directory so the next transition remains
+                    // anchored to the same visible data set.
+                    activeAccountId = previous.activeAccountId.ifBlank { activeAccountId },
+                    selectedThread = previous.selectedThread,
+                    unreadSourceAccountId = previous.unreadSourceAccountId,
+                    backStack = backStack.dropLast(1)
                 )
-            } ?: openAllAccountsUnread()
-        )
-        ChatNavigationRoute.SingleAccountUnread -> ChatNavigationBackResult.Navigate(openAllAccountsUnread())
-        ChatNavigationRoute.AllAccountsUnread -> ChatNavigationBackResult.Collapse
+            )
+        }
+        return when (route) {
+            ChatNavigationRoute.Conversation -> ChatNavigationBackResult.Navigate(
+                unreadSourceAccountId?.let { sourceAccountId ->
+                    copy(
+                        route = ChatNavigationRoute.SingleAccountUnread,
+                        activeAccountId = sourceAccountId,
+                        unreadSourceAccountId = null
+                    )
+                } ?: openAllAccountsUnread()
+            )
+            ChatNavigationRoute.SingleAccountUnread -> ChatNavigationBackResult.Navigate(openAllAccountsUnread())
+            ChatNavigationRoute.AllAccountsUnread -> ChatNavigationBackResult.Collapse
+        }
     }
 
     fun markHandled(summary: HomeUnreadThreadSummary): ChatNavigationState = copy(

@@ -42,7 +42,7 @@ class FloatingChatHeaderStateTest {
     }
 
     @Test
-    fun ordinaryConversationShowsUnreadCountAndEdit() {
+    fun ordinaryConversationShowsBackToAllUnreadAndEdit() {
         val state = floatingChatHeaderState(
             route = FloatingChatHeaderRoute.Conversation,
             accountName = "工作号",
@@ -52,7 +52,7 @@ class FloatingChatHeaderStateTest {
             editable = true
         )
 
-        assertEquals("未回 3", state.leadingLabel)
+        assertEquals("返回全部未回", state.leadingLabel)
         assertEquals("林晓晓", state.title)
         assertTrue(state.showUnreadDot)
         assertTrue(state.showEdit)
@@ -70,7 +70,7 @@ class FloatingChatHeaderStateTest {
             editable = true
         )
 
-        assertEquals("未回", state.leadingLabel)
+        assertEquals("返回全部未回", state.leadingLabel)
         assertTrue(state.showUnreadDot)
         assertTrue(state.compact)
     }

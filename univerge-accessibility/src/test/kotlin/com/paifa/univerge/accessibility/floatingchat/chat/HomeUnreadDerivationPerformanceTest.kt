@@ -1,5 +1,6 @@
 package com.paifa.univerge.accessibility.floatingchat.chat
 
+import androidx.compose.ui.geometry.Rect
 import com.paifa.univerge.core.model.FloatingChatConnectionTarget
 import com.paifa.univerge.core.model.FloatingChatContact
 import com.paifa.univerge.core.model.FloatingChatConversation
@@ -135,13 +136,53 @@ class HomeUnreadDerivationPerformanceTest {
         val bobSummary = summaries.getValue(ChatThreadSelection.Private(bob.id))
 
         assertEquals(2, aliceSummary.unreadCount)
+        assertEquals(
+            listOf("alice-new-1", "alice-new-2"),
+            aliceSummary.messages.map { message ->
+                message.id.removePrefix("home-unread-${aliceSummary.threadId}-")
+            }
+        )
         assertTrue(aliceSummary.message.id.endsWith("-alice-new-2"))
         assertEquals(alice, aliceSummary.avatarContact)
         assertEquals("Alice - Account A", aliceSummary.message.senderName)
         assertEquals(1, bobSummary.unreadCount)
+        assertEquals(1, bobSummary.messages.size)
         assertTrue(bobSummary.message.id.endsWith("-bob-direct-new"))
         assertEquals(bob, bobSummary.avatarContact)
         assertEquals("Bob - Account A", bobSummary.message.senderName)
+    }
+
+    @Test
+    fun homeOverviewAvatarPinsBetweenFirstAndLastUnreadMessageCenters() {
+        val viewport = Rect(left = 0f, top = 100f, right = 400f, bottom = 700f)
+
+        assertEquals(
+            140f,
+            homeOverviewAvatarCenterY(
+                firstMessageBounds = Rect(100f, 120f, 300f, 160f),
+                lastMessageBounds = Rect(100f, 300f, 300f, 340f),
+                messageViewport = viewport,
+                avatarSizePx = 40f
+            )
+        )
+        assertEquals(
+            120f,
+            homeOverviewAvatarCenterY(
+                firstMessageBounds = Rect(100f, 40f, 300f, 80f),
+                lastMessageBounds = Rect(100f, 200f, 300f, 240f),
+                messageViewport = viewport,
+                avatarSizePx = 40f
+            )
+        )
+        assertEquals(
+            80f,
+            homeOverviewAvatarCenterY(
+                firstMessageBounds = Rect(100f, -80f, 300f, -40f),
+                lastMessageBounds = Rect(100f, 60f, 300f, 100f),
+                messageViewport = viewport,
+                avatarSizePx = 40f
+            )
+        )
     }
 
     @Test

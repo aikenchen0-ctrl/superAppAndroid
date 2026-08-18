@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.unit.dp
 import com.paifa.univerge.accessibility.floatingchat.chat.AccountScopedConversation
 import com.paifa.univerge.accessibility.floatingchat.chat.ChatNavigationRoute
@@ -120,7 +121,7 @@ class FloatingChatComposeUiTest {
     }
 
     @Test(timeout = 60_000)
-    fun unreadMessageTouchOpensOwningConversation() {
+    fun unreadMessageDoubleTapOpensOwningConversation() {
         var selectedThread: ChatThreadSelection? = null
         val conversation = testConversation(messages = listOf(TestUnreadMessage))
         setUnreadBody(
@@ -129,7 +130,8 @@ class FloatingChatComposeUiTest {
             onHomeUnreadSelected = { summary -> selectedThread = summary.selection }
         )
 
-        composeRule.onNodeWithText(TestUnreadMessage.text).performClick()
+        composeRule.onNodeWithText(TestUnreadMessage.text)
+            .performTouchInput { doubleClick() }
 
         composeRule.runOnIdle {
             assertEquals(ChatThreadSelection.Private(TestContact.id), selectedThread)

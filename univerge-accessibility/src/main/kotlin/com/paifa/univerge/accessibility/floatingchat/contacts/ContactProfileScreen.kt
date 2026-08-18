@@ -9,6 +9,8 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +42,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -196,6 +199,7 @@ private fun ContactEditorContent(
     onEvent: (ContactProfileUiEvent) -> Unit,
     modifier: Modifier
 ) {
+    var showMemoDialog by remember { mutableStateOf(false) }
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -210,42 +214,49 @@ private fun ContactEditorContent(
         item { FriendProfileSectionTitle("备注") }
         item {
             FriendProfileSection {
-                FriendProfileEditableRow("备注名", state.remark, "填写备注名") {
-                    onEvent(ContactProfileUiEvent.RemarkChanged(it))
-                }
-                FriendProfileDivider()
+                FriendProfileEditableRow(
+                    label = "备注名",
+                    value = state.remark,
+                    placeholder = "填写备注名",
+                    onValueChange = { onEvent(ContactProfileUiEvent.RemarkChanged(it)) }
+                )
                 FriendProfileInfoRow("电话", state.phone)
-                FriendProfileDivider()
-                FriendProfileEditableRow("标签", state.tags, "添加标签") {
-                    onEvent(ContactProfileUiEvent.TagsChanged(it))
-                }
-                FriendProfileDivider()
-                FriendProfileEditableRow("备注", state.memo, "添加描述", maxLines = 2, minHeight = 58.dp) {
-                    onEvent(ContactProfileUiEvent.MemoChanged(it))
-                }
-                FriendProfileDivider()
+                FriendProfileEditableRow(
+                    label = "标签",
+                    value = state.tags,
+                    placeholder = "添加标签",
+                    onValueChange = { onEvent(ContactProfileUiEvent.TagsChanged(it)) }
+                )
+                FriendProfileEditableRow(
+                    label = "备注",
+                    value = state.memo,
+                    placeholder = "添加描述",
+                    maxLines = 2,
+                    minHeight = 58.dp,
+                    onValueChange = { onEvent(ContactProfileUiEvent.MemoChanged(it)) },
+                    onClick = { showMemoDialog = true }
+                )
                 ProfilePhotosRow(state)
             }
         }
+        item { FriendProfileDivider() }
         item { FriendProfileSectionTitle("朋友权限") }
         item {
             FriendProfileSection {
                 FriendProfileSwitchRow("朋友圈和状态", "允许他看我的朋友圈", state.friendCircleVisible) {
                     onEvent(ContactProfileUiEvent.FriendCircleVisibilityChanged(it))
                 }
-                FriendProfileDivider()
                 FriendProfileSwitchRow("仅聊天", "开启后不看彼此朋友圈", state.onlyChat) {
                     onEvent(ContactProfileUiEvent.OnlyChatChanged(it))
                 }
             }
         }
+        item { FriendProfileDivider() }
         item { FriendProfileSectionTitle("更多信息") }
         item {
             FriendProfileSection {
                 FriendProfileInfoRow("我和他的共同群聊", "${state.commonGroupCount} 个群聊")
-                FriendProfileDivider()
                 FriendProfileInfoRow("来源", state.source)
-                FriendProfileDivider()
                 FriendProfileInfoRow("添加时间", state.addedTime)
             }
         }
@@ -275,6 +286,34 @@ private fun ContactEditorContent(
             }
         }
         }
+    }
+    if (showMemoDialog) {
+        var memoDraft by remember(state.memo) { mutableStateOf(state.memo) }
+        AlertDialog(
+            onDismissRequest = { showMemoDialog = false },
+            title = { Text("修改备注") },
+            text = {
+                OutlinedTextField(
+                    value = memoDraft,
+                    onValueChange = { memoDraft = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("备注") },
+                    minLines = 2,
+                    maxLines = 4
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    onEvent(ContactProfileUiEvent.MemoChanged(memoDraft))
+                    showMemoDialog = false
+                }) { Text("保存") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { showMemoDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
     }
 }
 
@@ -401,9 +440,18 @@ private fun FriendProfileInfoRow(
     showArrow: Boolean = true,
     onClick: (() -> Unit)? = null
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 44.dp)
-            .then(if (onClick == null) Modifier else Modifier.clickable(onClick = onClick))
+        Modifier
+            .fillMaxWidth()
+            .height(55.dp)
+            .background(if (pressed) Color.Black.copy(alpha = 0.12f) else Color.Transparent)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = { onClick?.invoke() }
+            )
             .padding(horizontal = 18.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -423,15 +471,25 @@ private fun FriendProfileEditableRow(
     placeholder: String,
     maxLines: Int = 1,
     minHeight: Dp = 44.dp,
-    onValueChange: (String) -> Unit
+    onValueChange: (String) -> Unit,
+    onClick: (() -> Unit)? = null
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
     Row(
-        Modifier.fillMaxWidth().heightIn(min = minHeight).padding(horizontal = 18.dp, vertical = 10.dp),
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = maxOf(55.dp, minHeight))
+            .background(if (pressed) Color.Black.copy(alpha = 0.12f) else Color.Transparent)
+            .clickable(interactionSource = interactionSource, indication = null) {
+                onClick?.invoke()
+            }
+            .padding(horizontal = 18.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         TextLabel(label, 13.sp, color = ProfilePrimaryText, modifier = Modifier.width(70.dp), maxLines = 1)
         BasicTextField(
-            value, onValueChange, singleLine = maxLines == 1, maxLines = maxLines,
+            value, onValueChange, readOnly = onClick != null, singleLine = maxLines == 1, maxLines = maxLines,
             textStyle = TextStyle(color = ProfileSecondaryText, fontSize = 12.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.End),
             cursorBrush = SolidColor(OverlayTokens.accent), modifier = Modifier.weight(1f),
             decorationBox = { field ->
@@ -448,8 +506,17 @@ private fun FriendProfileEditableRow(
 
 @Composable
 private fun FriendProfileSwitchRow(label: String, value: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 18.dp, vertical = 8.dp),
+        Modifier
+            .fillMaxWidth()
+            .height(55.dp)
+            .background(if (pressed) Color.Black.copy(alpha = 0.12f) else Color.Transparent)
+            .clickable(interactionSource = interactionSource, indication = null) {
+                onCheckedChange(!checked)
+            }
+            .padding(horizontal = 18.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -462,8 +529,15 @@ private fun FriendProfileSwitchRow(label: String, value: String, checked: Boolea
 
 @Composable
 private fun ProfilePhotosRow(state: ContactProfileUiState) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 58.dp).padding(horizontal = 18.dp, vertical = 10.dp),
+        Modifier
+            .fillMaxWidth()
+            .height(55.dp)
+            .background(if (pressed) Color.Black.copy(alpha = 0.12f) else Color.Transparent)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = {})
+            .padding(horizontal = 18.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         TextLabel("照片", 13.sp, color = ProfilePrimaryText, modifier = Modifier.width(70.dp), maxLines = 1)

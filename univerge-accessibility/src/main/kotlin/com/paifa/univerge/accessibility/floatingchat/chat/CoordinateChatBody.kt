@@ -173,6 +173,7 @@ internal fun CoordinateChatBody(
     onChatHistoryClick: (FloatingChatMessage) -> Unit,
     onAiDraftClick: (FloatingChatMessage) -> Unit,
     onMessageClick: (FloatingChatMessage) -> Unit,
+    onMessageDoubleClick: (FloatingChatMessage) -> Unit = {},
     onLongPressMessage: (FloatingChatMessage, Rect?) -> Unit,
     multiSelectMode: Boolean,
     selectedMessageIds: Map<String, Boolean>,
@@ -213,7 +214,12 @@ internal fun CoordinateChatBody(
         }
     }
     val homeUnreadSummaryByMessageId = remember(homeUnreadSummaries) {
-        homeUnreadSummaries.associateBy { summary -> summary.message.id }
+        homeUnreadSummaries
+            .flatMap { summary -> summary.messages.map { message -> message.id to summary } }
+            .toMap()
+    }
+    val homeUnreadMessages = remember(homeUnreadSummaries) {
+        homeUnreadSummaries.flatMap { summary -> summary.messages }
     }
     val homeUnreadAccountIds = remember(homeUnreadSummaries) {
         homeUnreadSummaries.map { summary -> summary.accountId }.toSet()
@@ -222,12 +228,20 @@ internal fun CoordinateChatBody(
         homeOverviewAccountColorsById(conversation.accountContacts)
     }
     val homeUnreadAccountColors = remember(homeUnreadSummaries, homeUnreadColorsByAccountId) {
-        homeUnreadSummaries.associate { summary ->
-            summary.message.id to (homeUnreadColorsByAccountId[summary.accountId] ?: 0xFF00A6FB)
-        }
+        homeUnreadSummaries
+            .flatMap { summary ->
+                summary.messages.map { message ->
+                    message.id to (homeUnreadColorsByAccountId[summary.accountId] ?: 0xFF00A6FB)
+                }
+            }
+            .toMap()
     }
     val homeUnreadAccountIdsByMessageId = remember(homeUnreadSummaries) {
-        homeUnreadSummaries.associate { summary -> summary.message.id to summary.accountId }
+        homeUnreadSummaries
+            .flatMap { summary ->
+                summary.messages.map { message -> message.id to summary.accountId }
+            }
+            .toMap()
     }
     val threadMessages = remember(conversation, selectedThread, selectedAccount.id, homeOverviewVisible) {
         if (homeOverviewVisible) {
@@ -240,9 +254,9 @@ internal fun CoordinateChatBody(
             )
         }
     }
-    val visibleMessages = remember(homeOverviewVisible, homeUnreadSummaries, threadMessages) {
+    val visibleMessages = remember(homeOverviewVisible, homeUnreadMessages, threadMessages) {
         if (homeOverviewVisible) {
-            homeUnreadSummaries.map { summary -> summary.message }
+            homeUnreadMessages
         } else {
             threadMessages
         }
@@ -436,6 +450,13 @@ internal fun CoordinateChatBody(
                         onChatHistoryClick(message)
                     } else {
                         onMessageClick(message)
+                    }
+                },
+                onMessageDoubleClick = { message ->
+                    if (homeOverviewVisible) {
+                        homeUnreadSummaryByMessageId[message.id]?.let(onHomeUnreadSelected)
+                    } else {
+                        onMessageDoubleClick(message)
                     }
                 },
                 onBlankAreaTap = onBlankAreaTap,

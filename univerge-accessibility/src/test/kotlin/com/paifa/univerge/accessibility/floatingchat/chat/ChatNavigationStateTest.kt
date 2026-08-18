@@ -82,6 +82,39 @@ class ChatNavigationStateTest {
     }
 
     @Test(timeout = 60_000)
+    fun `changing thread inside conversation keeps unread directory as back destination`() {
+        val directory = ChatNavigationState()
+            .openAllAccountsUnread()
+            .openSingleAccountUnread("account-a")
+        val next = directory
+            .openConversation(ChatThreadSelection.Private("contact-a"))
+            .openConversation(ChatThreadSelection.Private("contact-b"))
+
+        val back = (next.back() as ChatNavigationBackResult.Navigate).state
+
+        assertEquals(ChatNavigationRoute.SingleAccountUnread, back.route)
+        assertEquals("account-a", back.activeAccountId)
+    }
+
+    @Test(timeout = 60_000)
+    fun `switching account inside conversation keeps unread directory as back destination`() {
+        val directory = ChatNavigationState()
+            .openAllAccountsUnread()
+            .openSingleAccountUnread("account-a")
+        val next = directory
+            .openConversation(ChatThreadSelection.Private("contact-a"))
+            .switchConversationAccount(
+                accountId = "account-b",
+                thread = ChatThreadSelection.Private("contact-b")
+            )
+
+        val back = (next.back() as ChatNavigationBackResult.Navigate).state
+
+        assertEquals(ChatNavigationRoute.SingleAccountUnread, back.route)
+        assertEquals("account-a", back.activeAccountId)
+    }
+
+    @Test(timeout = 60_000)
     fun `handled summary is filtered and makes current scope empty`() {
         val first = summary("account-a", "contact-a", "summary-a-v1")
         val second = summary("account-b", "contact-b", "summary-b-v1")

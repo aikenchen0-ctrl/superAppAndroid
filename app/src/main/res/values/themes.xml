@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.UbikiTouch" parent="android:style/Theme.Material.Light.NoActionBar">
+    <style name="Theme.UniVerge" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
     </style>
 
-    <style name="Theme.UbikiTouch.Transparent" parent="android:style/Theme.Material.NoActionBar">
+    <style name="Theme.UniVerge.Transparent" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowIsTranslucent">true</item>
@@ -13,7 +13,7 @@
         <item name="android:backgroundDimEnabled">false</item>
     </style>
 
-    <style name="Theme.UbikiTouch.MediaPreview" parent="android:style/Theme.Material.NoActionBar">
+    <style name="Theme.UniVerge.MediaPreview" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowFullscreen">true</item>
@@ -24,7 +24,7 @@
         <item name="android:backgroundDimEnabled">false</item>
     </style>
 
-    <style name="Theme.UbikiTouch.FloatingBlinkVoice" parent="android:style/Theme.Material.NoActionBar">
+    <style name="Theme.UniVerge.FloatingBlinkVoice" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowIsFloating">true</item>

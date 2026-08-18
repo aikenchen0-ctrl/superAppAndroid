@@ -545,7 +545,8 @@ internal data class HomeUnreadThreadSummary(
     val selection: ChatThreadSelection,
     val message: FloatingChatMessage,
     val unreadCount: Int,
-    val avatarContact: FloatingChatContact
+    val avatarContact: FloatingChatContact,
+    val messages: List<FloatingChatMessage> = listOf(message)
 )
 
 internal data class HomeOverviewMessageGroup(
@@ -885,35 +886,39 @@ private fun homeUnreadThreadSummary(
     selection: ChatThreadSelection,
     unrepliedMessages: List<FloatingChatMessage>
 ): HomeUnreadThreadSummary? {
-    val latest = unrepliedMessages.lastOrNull() ?: return null
+    val latestUnreplied = unrepliedMessages.lastOrNull() ?: return null
     val contact = contactForSelection(conversation, selection) ?: return null
     val groupMember = if (selection.isGroupThread()) {
-        latest.connectionTargetId
+        latestUnreplied.connectionTargetId
             ?.let { targetId -> conversation.contacts.firstOrNull { candidate -> candidate.id == targetId } }
     } else {
         null
     }
     val avatarContact = groupMember ?: contact
-    val unreadCount = unrepliedMessages.size.coerceAtLeast(1)
     val threadId = selection.toLocalThreadId()
-    return HomeUnreadThreadSummary(
-        accountId = accountId,
-        threadId = threadId,
-        selection = selection,
-        unreadCount = unreadCount,
-        avatarContact = avatarContact,
-        message = latest.copy(
-            id = "home-unread-${threadId}-${latest.id}",
+    val senderName = homeUnreadSenderLabel(
+        contact = contact,
+        groupMember = groupMember,
+        accountName = conversation.accountName
+    )
+    val overviewMessages = unrepliedMessages.map { unreadMessage ->
+        unreadMessage.copy(
+            id = "home-unread-${threadId}-${unreadMessage.id}",
             fromMe = false,
-            senderName = homeUnreadSenderLabel(
-                contact = contact,
-                groupMember = groupMember,
-                accountName = conversation.accountName
-            ),
+            senderName = senderName,
             connectionTarget = FloatingChatConnectionTarget.User,
             connectionTargetId = avatarContact.id,
             threadContactId = selection.threadContactIdForHome()
         )
+    }
+    return HomeUnreadThreadSummary(
+        accountId = accountId,
+        threadId = threadId,
+        selection = selection,
+        unreadCount = overviewMessages.size,
+        avatarContact = avatarContact,
+        message = overviewMessages.last(),
+        messages = overviewMessages
     )
 }
 

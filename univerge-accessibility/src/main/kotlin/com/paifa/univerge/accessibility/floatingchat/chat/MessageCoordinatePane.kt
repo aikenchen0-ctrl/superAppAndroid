@@ -67,6 +67,7 @@ internal fun MessageCoordinatePane(
     claimedPaymentMessageIds: Map<String, Boolean>,
     onToggleMessageSelection: (FloatingChatMessage) -> Unit,
     onMessageClick: (FloatingChatMessage) -> Unit,
+    onMessageDoubleClick: (FloatingChatMessage) -> Unit = {},
     onBlankAreaTap: () -> Unit,
     bubbleAppearance: BubbleAppearance = BubbleAppearance.TwoD,
     modifier: Modifier = Modifier
@@ -117,6 +118,7 @@ internal fun MessageCoordinatePane(
                         claimedPaymentMessageIds = claimedPaymentMessageIds,
                         onToggleMessageSelection = onToggleMessageSelection,
                         onMessageClick = onMessageClick,
+                        onMessageDoubleClick = onMessageDoubleClick,
                         connectorState = connectorState,
                         bubbleAppearance = bubbleAppearance
                     )
@@ -146,6 +148,7 @@ internal fun MessageCoordinatePane(
                     claimed = claimedPaymentMessageIds[message.id] == true,
                     onToggleSelection = { onToggleMessageSelection(message) },
                     onClick = { onMessageClick(message) },
+                    onDoubleClick = { onMessageDoubleClick(message) },
                     onBubbleBoundsChanged = { bounds ->
                         connectorState.updateMessageBubble(message.id, bounds)
                     },
@@ -184,6 +187,7 @@ private fun HomeOverviewMessageGroupRow(
     claimedPaymentMessageIds: Map<String, Boolean>,
     onToggleMessageSelection: (FloatingChatMessage) -> Unit,
     onMessageClick: (FloatingChatMessage) -> Unit,
+    onMessageDoubleClick: (FloatingChatMessage) -> Unit,
     connectorState: ConnectorCoordinateState
     ,bubbleAppearance: BubbleAppearance
 ) {
@@ -210,6 +214,7 @@ private fun HomeOverviewMessageGroupRow(
                     claimed = claimedPaymentMessageIds[message.id] == true,
                     onToggleSelection = { onToggleMessageSelection(message) },
                     onClick = { onMessageClick(message) },
+                    onDoubleClick = { onMessageDoubleClick(message) },
                     onBubbleBoundsChanged = { bounds -> connectorState.updateMessageBubble(message.id, bounds) },
                     onGroupMemberAvatarBoundsChanged = {},
                     onGroupMemberAvatarRemoved = {},
@@ -232,6 +237,7 @@ internal fun HomeOverviewAvatarRail(
 ) {
     var railRootTopPx by remember { mutableStateOf(0f) }
     val density = LocalDensity.current
+    val avatarSizePx = with(density) { homeOverviewAvatarSizeDp().dp.toPx() }
     @Suppress("UNUSED_VARIABLE")
     val connectorVersion = connectorState.version
     val visibleGroups = homeOverviewVisibleGroups(
@@ -246,12 +252,27 @@ internal fun HomeOverviewAvatarRail(
     ) {
         visibleGroups.forEach { group ->
             val contact = group.avatarContactId?.let(contactsById::get) ?: return@forEach
-            val messageBounds = group.messages
+            val firstMessageBounds = group.messages
                 .asSequence()
                 .mapNotNull { message -> connectorState.messageBubbles[message.id] }
                 .firstOrNull()
                 ?: return@forEach
-            val offsetY = with(density) { (messageBounds.top - railRootTopPx).toDp() }
+            val lastMessageBounds = group.messages
+                .asReversed()
+                .asSequence()
+                .mapNotNull { message -> connectorState.messageBubbles[message.id] }
+                .firstOrNull()
+                ?: firstMessageBounds
+            val messageViewport = connectorState.messageViewport ?: return@forEach
+            val avatarCenterY = homeOverviewAvatarCenterY(
+                firstMessageBounds = firstMessageBounds,
+                lastMessageBounds = lastMessageBounds,
+                messageViewport = messageViewport,
+                avatarSizePx = avatarSizePx
+            )
+            val offsetY = with(density) {
+                (avatarCenterY - avatarSizePx / 2f - railRootTopPx).toDp()
+            }
             CompactAvatar(
                 contact = contact,
                 role = AvatarRole.Session,
@@ -267,4 +288,16 @@ internal fun HomeOverviewAvatarRail(
             )
         }
     }
+}
+
+internal fun homeOverviewAvatarCenterY(
+    firstMessageBounds: Rect,
+    lastMessageBounds: Rect,
+    messageViewport: Rect,
+    avatarSizePx: Float
+): Float {
+    val firstCenterY = firstMessageBounds.center.y
+    val lastCenterY = lastMessageBounds.center.y.coerceAtLeast(firstCenterY)
+    val pinnedCenterY = messageViewport.top + avatarSizePx / 2f
+    return pinnedCenterY.coerceIn(firstCenterY, lastCenterY)
 }

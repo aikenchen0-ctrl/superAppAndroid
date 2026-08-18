@@ -30,7 +30,7 @@
         android:networkSecurityConfig="@xml/network_security_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.UbikiTouch">
+        android:theme="@style/Theme.UniVerge">
 
         <activity android:name="com.paifa.univerge.app.SideFunctionsActivity" android:exported="false" />
         <activity
@@ -38,25 +38,25 @@
             android:excludeFromRecents="true"
             android:exported="false"
             android:taskAffinity="com.paifa.univerge.floatingchat"
-            android:theme="@style/Theme.UbikiTouch" />
+            android:theme="@style/Theme.UniVerge" />
         <activity
             android:name="com.paifa.univerge.accessibility.FinderPublishActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:taskAffinity="com.paifa.univerge.floatingchat"
-            android:theme="@style/Theme.UbikiTouch" />
+            android:theme="@style/Theme.UniVerge" />
         <activity
             android:name="com.paifa.univerge.accessibility.FavoriteLibraryActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:taskAffinity="com.paifa.univerge.floatingchat"
-            android:theme="@style/Theme.UbikiTouch.Transparent" />
+            android:theme="@style/Theme.UniVerge.Transparent" />
         <activity
             android:name="com.paifa.univerge.app.MaterialLibraryActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:taskAffinity="com.paifa.univerge.floatingchat"
-            android:theme="@style/Theme.UbikiTouch" />
+            android:theme="@style/Theme.UniVerge" />
         <activity android:name="com.paifa.univerge.app.AccessibilityKeepAliveGuideActivity" android:exported="false" />
         <activity android:name="com.paifa.univerge.app.PauseSettingsActivity" android:exported="false" />
         <activity android:name="com.paifa.univerge.app.BlockedAppsActivity" android:exported="false" />
@@ -65,37 +65,37 @@
         <activity android:name="com.paifa.univerge.app.EdgeStyleSettingsActivity" android:exported="false" />
         <activity android:name="com.paifa.univerge.app.EdgeFunctionSettingsActivity" android:exported="false" />
         <activity android:name="com.paifa.univerge.app.GlobalControlsActivity" android:exported="false" />
-        <activity android:name="com.paifa.univerge.app.TransferFlowActivity" android:excludeFromRecents="true" android:exported="false" android:taskAffinity="com.paifa.univerge.floatingchat" android:theme="@style/Theme.UbikiTouch" />
-        <activity android:name="com.paifa.univerge.app.RedPacketActivity" android:excludeFromRecents="true" android:exported="false" android:taskAffinity="com.paifa.univerge.floatingchat" android:theme="@style/Theme.UbikiTouch" />
+        <activity android:name="com.paifa.univerge.app.TransferFlowActivity" android:excludeFromRecents="true" android:exported="false" android:taskAffinity="com.paifa.univerge.floatingchat" android:theme="@style/Theme.UniVerge" />
+        <activity android:name="com.paifa.univerge.app.RedPacketActivity" android:excludeFromRecents="true" android:exported="false" android:taskAffinity="com.paifa.univerge.floatingchat" android:theme="@style/Theme.UniVerge" />
         <activity
             android:name="com.paifa.univerge.app.CouponWalletActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:taskAffinity="com.paifa.univerge.floatingchat"
-            android:theme="@style/Theme.UbikiTouch" />
+            android:theme="@style/Theme.UniVerge" />
         <activity
             android:name="com.paifa.univerge.app.BackgroundRemovalActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:taskAffinity="com.paifa.univerge.floatingchat"
-            android:theme="@style/Theme.UbikiTouch" />
+            android:theme="@style/Theme.UniVerge" />
         <activity
             android:name="com.paifa.univerge.app.FriendManagementActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:taskAffinity="com.paifa.univerge.floatingchat"
-            android:theme="@style/Theme.UbikiTouch" />
+            android:theme="@style/Theme.UniVerge" />
         <activity
             android:name="com.paifa.univerge.app.ContactRelationsActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:taskAffinity="com.paifa.univerge.floatingchat"
-            android:theme="@style/Theme.UbikiTouch" />
+            android:theme="@style/Theme.UniVerge" />
 
         <activity
             android:name="com.paifa.univerge.app.MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.UbikiTouch">
+            android:theme="@style/Theme.UniVerge">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -107,21 +107,21 @@
             android:excludeFromRecents="true"
             android:exported="false"
             android:taskAffinity="com.paifa.univerge.floatingchat"
-            android:theme="@style/Theme.UbikiTouch.Transparent" />
+            android:theme="@style/Theme.UniVerge.Transparent" />
 
         <activity
             android:name="com.paifa.univerge.app.FloatingChatDocumentPickerActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:taskAffinity="com.paifa.univerge.floatingchat"
-            android:theme="@style/Theme.UbikiTouch.Transparent" />
+            android:theme="@style/Theme.UniVerge.Transparent" />
 
         <activity
             android:name="com.paifa.univerge.app.FloatingChatDocumentViewerActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:taskAffinity="com.paifa.univerge.floatingchat"
-            android:theme="@style/Theme.UbikiTouch.Transparent" />
+            android:theme="@style/Theme.UniVerge.Transparent" />
 
         <activity
             android:name="com.paifa.univerge.app.FloatingChatCameraActivity"
@@ -129,42 +129,42 @@
             android:exported="false"
             android:screenOrientation="fullUser"
             android:taskAffinity="com.paifa.univerge.floatingchat"
-            android:theme="@style/Theme.UbikiTouch.MediaPreview" />
+            android:theme="@style/Theme.UniVerge.MediaPreview" />
 
         <activity
             android:name="com.paifa.univerge.app.FloatingChatPhotoCameraPermissionActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:taskAffinity="com.paifa.univerge.floatingchat"
-            android:theme="@style/Theme.UbikiTouch.Transparent" />
+            android:theme="@style/Theme.UniVerge.Transparent" />
 
         <activity
             android:name="com.paifa.univerge.app.FloatingChatBlinkVoiceActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:taskAffinity="com.paifa.univerge.floatingchat"
-            android:theme="@style/Theme.UbikiTouch.FloatingBlinkVoice" />
+            android:theme="@style/Theme.UniVerge.FloatingBlinkVoice" />
 
         <activity
             android:name="com.paifa.univerge.app.FloatingChatBlinkCameraPermissionActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:taskAffinity="com.paifa.univerge.floatingchat"
-            android:theme="@style/Theme.UbikiTouch.Transparent" />
+            android:theme="@style/Theme.UniVerge.Transparent" />
 
         <activity
             android:name="com.paifa.univerge.app.FloatingChatVoicePermissionActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:taskAffinity="com.paifa.univerge.floatingchat"
-            android:theme="@style/Theme.UbikiTouch.Transparent" />
+            android:theme="@style/Theme.UniVerge.Transparent" />
 
         <activity
             android:name="com.paifa.univerge.app.FloatingChatLocationPermissionActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:taskAffinity="com.paifa.univerge.floatingchat"
-            android:theme="@style/Theme.UbikiTouch.Transparent" />
+            android:theme="@style/Theme.UniVerge.Transparent" />
 
         <activity
             android:name="com.paifa.univerge.app.FloatingChatMediaPreviewActivity"
@@ -172,7 +172,7 @@
             android:exported="false"
             android:screenOrientation="fullUser"
             android:taskAffinity="com.paifa.univerge.floatingchat"
-            android:theme="@style/Theme.UbikiTouch.MediaPreview" />
+            android:theme="@style/Theme.UniVerge.MediaPreview" />
 
         <service
             android:name="com.paifa.univerge.accessibility.UniVergeAccessibilityService"

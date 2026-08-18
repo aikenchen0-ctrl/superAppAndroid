@@ -410,7 +410,7 @@ internal fun floatingChatHeaderState(
             compact = false
         )
         FloatingChatHeaderRoute.Conversation -> FloatingChatHeaderState(
-            leadingLabel = if (unreadCount > 0) "未回 $unreadCount" else "未回",
+            leadingLabel = "返回全部未回",
             title = conversationTitle.ifBlank { "消息" },
             showUnreadDot = true,
             showEdit = editable,
@@ -456,6 +456,16 @@ internal fun FloatingChatWorkspaceHeader(
                                 FloatingChatUnreadDot()
                             }
                         }
+                    }
+                    if (state.leadingLabel.length > 2) {
+                        Text(
+                            text = state.leadingLabel,
+                            modifier = Modifier.widthIn(max = 58.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 9.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                     Box(
                         modifier = Modifier.weight(1f, fill = true),

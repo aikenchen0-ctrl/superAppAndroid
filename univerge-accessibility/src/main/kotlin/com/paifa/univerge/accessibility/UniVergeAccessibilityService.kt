@@ -93,7 +93,10 @@ class UniVergeAccessibilityService : AccessibilityService() {
     }
     private var wakeResumeReason = "unknown"
     private val wakeResumeRunnable = Runnable {
-        Log.d(TAG, "resume overlays after wake reason=$wakeResumeReason interactive=${screenInteractiveState.isInteractive}")
+        Log.d(
+            TAG,
+            "resume overlays after wake reason=$wakeResumeReason interactive=${screenInteractiveState.isInteractive}"
+        )
         if (!screenInteractiveState.isInteractive) return@Runnable
         recreateOverlays()
         showFloatingChatOverlayIfAllowed()
@@ -132,10 +135,12 @@ class UniVergeAccessibilityService : AccessibilityService() {
                     }
                     removeAllOverlays()
                 }
+
                 Intent.ACTION_SCREEN_ON -> {
                     screenInteractiveState.markInteractive()
                     requestWakeOverlayResume("screen_on", SCREEN_ON_RESUME_DELAY_MS)
                 }
+
                 Intent.ACTION_USER_PRESENT -> {
                     screenInteractiveState.markInteractive()
                     requestWakeOverlayResume("user_present", USER_PRESENT_RESUME_DELAY_MS)
@@ -158,7 +163,8 @@ class UniVergeAccessibilityService : AccessibilityService() {
         pullDistancePreviewController = PullDistancePreviewController(this, windowManager)
         gestureHintOverlayController = GestureHintOverlayController(this, windowManager)
         backWaveOverlayController = BackWaveOverlayController(this, windowManager)
-        nativeGestureExclusionOverlayController = NativeGestureExclusionOverlayController(this, windowManager)
+        nativeGestureExclusionOverlayController =
+            NativeGestureExclusionOverlayController(this, windowManager)
         nativeBackGestureTakeoverController = NativeBackGestureTakeoverController(this)
         floatingChatOverlayController = FloatingChatOverlayController(
             context = this,
@@ -193,7 +199,8 @@ class UniVergeAccessibilityService : AccessibilityService() {
             onGesture = ::executeConfiguredGestureAction
         )
         bottomGestureBarPreviewController = BottomGestureBarPreviewController(this, windowManager)
-        bottomGestureBarIndicatorController = BottomGestureBarIndicatorController(this, windowManager)
+        bottomGestureBarIndicatorController =
+            BottomGestureBarIndicatorController(this, windowManager)
         screenInteractiveState.updateFromSystem(isDeviceInteractive())
         preferences.registerChangeListener(preferenceListener)
         registerScreenReceiver()
@@ -289,7 +296,10 @@ class UniVergeAccessibilityService : AccessibilityService() {
         removeFloatingChatOverlay()
         removeAllOverlays()
         if (UniVergeGesturePersistence.isAccessibilityServiceEnabled(this)) {
-            UniVergeGesturePersistence.scheduleRecoveryWatchdog(this, ACCESSIBILITY_DESTROYED_RECOVERY_DELAY_MS)
+            UniVergeGesturePersistence.scheduleRecoveryWatchdog(
+                this,
+                ACCESSIBILITY_DESTROYED_RECOVERY_DELAY_MS
+            )
         } else {
             UniVergeGesturePersistence.cancelRecoveryWatchdog(this)
         }
@@ -364,7 +374,13 @@ class UniVergeAccessibilityService : AccessibilityService() {
                         EDGE_CONFIG_ADJUSTMENT_PREVIEW_HIDE_DELAY_MS
                     )
                 }
-                .onFailure { error -> Log.w(TAG, "failed to update edge configuration preview", error) }
+                .onFailure { error ->
+                    Log.w(
+                        TAG,
+                        "failed to update edge configuration preview",
+                        error
+                    )
+                }
             return
         }
 
@@ -540,7 +556,10 @@ class UniVergeAccessibilityService : AccessibilityService() {
         if (FloatingChatBlinkVoiceBridge.requestFullscreenCapture()) return
         hideFloatingChatForExternalActivity("BlinkVoice")
         val intent = Intent()
-            .setClassName(packageName, "com.paifa.univerge.app.FloatingChatBlinkCameraPermissionActivity")
+            .setClassName(
+                packageName,
+                "com.paifa.univerge.app.FloatingChatBlinkCameraPermissionActivity"
+            )
             .addFloatingChatBridgeFlags()
         runCatching {
             startActivity(intent)
@@ -823,7 +842,13 @@ class UniVergeAccessibilityService : AccessibilityService() {
     fun requestFloatingChatLocationPermission() {
         if (::floatingChatOverlayController.isInitialized) {
             runCatching { floatingChatOverlayController.hideForPermissionPrompt() }
-                .onFailure { Log.w(TAG, "failed to hide floating chat for location permission", it) }
+                .onFailure {
+                    Log.w(
+                        TAG,
+                        "failed to hide floating chat for location permission",
+                        it
+                    )
+                }
         }
         val intent = Intent()
             .setClassName(
@@ -861,7 +886,13 @@ class UniVergeAccessibilityService : AccessibilityService() {
         setFloatingChatExternalActivityVisible(false)
         if (::floatingChatOverlayController.isInitialized) {
             runCatching { floatingChatOverlayController.restoreAfterExternalDocument() }
-                .onFailure { Log.w(TAG, "failed to restore floating chat after external document", it) }
+                .onFailure {
+                    Log.w(
+                        TAG,
+                        "failed to restore floating chat after external document",
+                        it
+                    )
+                }
         }
     }
 
@@ -1023,8 +1054,9 @@ class UniVergeAccessibilityService : AccessibilityService() {
         schedulePauseExpiryIfNeeded()
         currentPackageBlocked = preferences.isPackageBlocked(currentForegroundPackage)
         val disabledByLandscape = preferences.disableInLandscape &&
-            resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val keyboardVisible = if (preferences.disableWhenKeyboardShown) queryKeyboardVisibility() else false
+                resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val keyboardVisible =
+            if (preferences.disableWhenKeyboardShown) queryKeyboardVisibility() else false
         isKeyboardVisible = keyboardVisible
         val disabledByKeyboard = preferences.disableWhenKeyboardShown && keyboardVisible
         val paused = preferences.isTemporarilyPaused() || preferences.isQuietHoursActive()
@@ -1045,7 +1077,11 @@ class UniVergeAccessibilityService : AccessibilityService() {
         val (screenWidth, screenHeight) = currentDisplaySize()
         removeEdgeOutlines()
 
-        if (!edgeGestureOverlayWindowsAllowed(floatingChatExpanded, floatingChatExternalActivityVisible)) {
+        if (!edgeGestureOverlayWindowsAllowed(
+                floatingChatExpanded,
+                floatingChatExternalActivityVisible
+            )
+        ) {
             removeEdgeGestureOverlays()
             syncBottomGestureBar()
             applyServiceRuntimeConfig()
@@ -1058,7 +1094,10 @@ class UniVergeAccessibilityService : AccessibilityService() {
             }
             synchronizeGestureNavigationProtection(screenWidth, screenHeight)
             stopNativeEdgeGestures()
-            Log.d(TAG, "use floating chat internal edge input fallback while floating chat is expanded")
+            Log.d(
+                TAG,
+                "use floating chat internal edge input fallback while floating chat is expanded"
+            )
             return
         }
 
@@ -1221,7 +1260,8 @@ class UniVergeAccessibilityService : AccessibilityService() {
         backWavePresentedForGesture = false
         val index = selectedSideFunctionIndex
         selectedSideFunctionIndex = null
-        val ids = SideFunctionConfig.fromCustomActionIds(preferences.sideFunctionCustomActionIds).allActionIds
+        val ids =
+            SideFunctionConfig.fromCustomActionIds(preferences.sideFunctionCustomActionIds).allActionIds
         val selectedActionId = index?.let(ids::getOrNull)
         if (optionWasPresented && selectedActionId != null) {
             executeSideFunction(selectedActionId, data)
@@ -1308,8 +1348,14 @@ class UniVergeAccessibilityService : AccessibilityService() {
         GestureAction.CollapseFloatingChat -> "收起聊天"
         GestureAction.PlayVideo -> "显示视频"
         is GestureAction.LaunchApp -> runCatching {
-            packageManager.getApplicationLabel(packageManager.getApplicationInfo(action.packageName, 0)).toString()
+            packageManager.getApplicationLabel(
+                packageManager.getApplicationInfo(
+                    action.packageName,
+                    0
+                )
+            ).toString()
         }.getOrDefault(action.packageName)
+
         GestureAction.None -> "无动作"
     }
 
@@ -1341,7 +1387,11 @@ class UniVergeAccessibilityService : AccessibilityService() {
     }
 
     private fun executeConfiguredGestureAction(action: GestureAction, data: GestureData) {
-        if (shouldRestoreFloatingChatFromExternalActivity(action, floatingChatExternalActivityVisible)) {
+        if (shouldRestoreFloatingChatFromExternalActivity(
+                action,
+                floatingChatExternalActivityVisible
+            )
+        ) {
             Log.d(TAG, "restore floating chat from external activity gesture")
             setFloatingChatExternalActivityVisible(false)
         }
@@ -1349,7 +1399,8 @@ class UniVergeAccessibilityService : AccessibilityService() {
     }
 
     private fun sideFunctionItems(): List<SideFunctionPanelItem> {
-        val ids = SideFunctionConfig.fromCustomActionIds(preferences.sideFunctionCustomActionIds).allActionIds
+        val ids =
+            SideFunctionConfig.fromCustomActionIds(preferences.sideFunctionCustomActionIds).allActionIds
         val labels = sideFunctionPanelLabels(preferences.sideFunctionCustomActionIds) { actionId ->
             when (val action = GestureAction.fromId(actionId)) {
                 GestureAction.Home -> "主页"
@@ -1371,6 +1422,7 @@ class UniVergeAccessibilityService : AccessibilityService() {
                     }.getOrDefault(action.packageName)
                     name
                 }
+
                 else -> action.id
             }
         }
@@ -1433,7 +1485,11 @@ class UniVergeAccessibilityService : AccessibilityService() {
         scheduleBottomGestureBarZOrderRefresh()
         val (screenWidth, screenHeight) = currentDisplaySize()
         synchronizeGestureNavigationProtection(screenWidth, screenHeight)
-        if (floatingChatOwnsGestureSurface(floatingChatExpanded, floatingChatExternalActivityVisible)) {
+        if (floatingChatOwnsGestureSurface(
+                floatingChatExpanded,
+                floatingChatExternalActivityVisible
+            )
+        ) {
             removeEdgeGestureOverlays()
             syncBottomGestureBar()
             applyServiceRuntimeConfig()
@@ -1504,7 +1560,10 @@ class UniVergeAccessibilityService : AccessibilityService() {
             onBackGestureCancel = ::handleFloatingChatBackGestureCancel
         ).also { nativeEdgeGestureController = it }
         controller.setFloatingChatExpanded(
-            floatingChatOwnsGestureSurface(floatingChatExpanded, floatingChatExternalActivityVisible)
+            floatingChatOwnsGestureSurface(
+                floatingChatExpanded,
+                floatingChatExternalActivityVisible
+            )
         )
         return controller.start(
             NativeEdgeGestureConfig(
@@ -1513,8 +1572,14 @@ class UniVergeAccessibilityService : AccessibilityService() {
                 density = density,
                 leftConfigs = preferences.edgeConfigs(EdgeSide.LEFT),
                 rightConfigs = preferences.edgeConfigs(EdgeSide.RIGHT),
-                shortThresholdPx = nativeGestureThresholdPx(preferences.shortPullThresholdDp, density),
-                longThresholdPx = nativeGestureThresholdPx(preferences.longPullThresholdDp, density),
+                shortThresholdPx = nativeGestureThresholdPx(
+                    preferences.shortPullThresholdDp,
+                    density
+                ),
+                longThresholdPx = nativeGestureThresholdPx(
+                    preferences.longPullThresholdDp,
+                    density
+                ),
                 bottomGestureWidthDp = preferences.bottomGestureBarWidthDp
             )
         )
@@ -1533,12 +1598,24 @@ class UniVergeAccessibilityService : AccessibilityService() {
     private fun shouldShowBackWave(side: EdgeSide, gestureType: GestureType): Boolean {
         if (!::preferences.isInitialized) return false
         return preferences.actionFor(side, gestureType) != GestureAction.None ||
-            preferences.actionFor(side, GestureType.PULL_INWARD_SHORT) != GestureAction.None ||
-            preferences.actionFor(side, GestureType.PULL_INWARD_LONG) != GestureAction.None ||
-            preferences.actionFor(side, GestureType.PULL_DIAGONAL_UP_SHORT) != GestureAction.None ||
-            preferences.actionFor(side, GestureType.PULL_DIAGONAL_UP_LONG) != GestureAction.None ||
-            preferences.actionFor(side, GestureType.PULL_DIAGONAL_DOWN_SHORT) != GestureAction.None ||
-            preferences.actionFor(side, GestureType.PULL_DIAGONAL_DOWN_LONG) != GestureAction.None
+                preferences.actionFor(side, GestureType.PULL_INWARD_SHORT) != GestureAction.None ||
+                preferences.actionFor(side, GestureType.PULL_INWARD_LONG) != GestureAction.None ||
+                preferences.actionFor(
+                    side,
+                    GestureType.PULL_DIAGONAL_UP_SHORT
+                ) != GestureAction.None ||
+                preferences.actionFor(
+                    side,
+                    GestureType.PULL_DIAGONAL_UP_LONG
+                ) != GestureAction.None ||
+                preferences.actionFor(
+                    side,
+                    GestureType.PULL_DIAGONAL_DOWN_SHORT
+                ) != GestureAction.None ||
+                preferences.actionFor(
+                    side,
+                    GestureType.PULL_DIAGONAL_DOWN_LONG
+                ) != GestureAction.None
     }
 
     private fun applyServiceRuntimeConfig() {
@@ -1565,7 +1642,7 @@ class UniVergeAccessibilityService : AccessibilityService() {
                 packageBlocked = currentPackageBlocked,
                 paused = preferences.isTemporarilyPaused() || preferences.isQuietHoursActive(),
                 landscapeDisabled = preferences.disableInLandscape &&
-                    resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE,
+                        resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE,
                 keyboardDisabled = preferences.disableWhenKeyboardShown && isKeyboardVisible
             ),
             floatingChatExpanded = floatingChatExpanded,
@@ -1573,11 +1650,11 @@ class UniVergeAccessibilityService : AccessibilityService() {
         )
         info.flags = if (wantsNativeTouch) {
             info.flags or
-                AccessibilityServiceInfo.FLAG_REQUEST_TOUCH_EXPLORATION_MODE or
-                AccessibilityServiceInfo.FLAG_SEND_MOTION_EVENTS
+                    AccessibilityServiceInfo.FLAG_REQUEST_TOUCH_EXPLORATION_MODE or
+                    AccessibilityServiceInfo.FLAG_SEND_MOTION_EVENTS
         } else {
             info.flags and AccessibilityServiceInfo.FLAG_REQUEST_TOUCH_EXPLORATION_MODE.inv() and
-                AccessibilityServiceInfo.FLAG_SEND_MOTION_EVENTS.inv()
+                    AccessibilityServiceInfo.FLAG_SEND_MOTION_EVENTS.inv()
         }
         serviceInfo = info
     }
@@ -1588,7 +1665,7 @@ class UniVergeAccessibilityService : AccessibilityService() {
             requestedMode = preferences.gestureInputMode,
             sdkInt = Build.VERSION.SDK_INT,
             nativeTouchInteractionAvailable = Build.VERSION.SDK_INT >= NATIVE_TOUCH_INTERACTION_MIN_SDK &&
-                !nativeTouchInteractionRuntimeFailed,
+                    !nativeTouchInteractionRuntimeFailed,
             secureTakeoverApplied = nativeBackTakeoverApplied
         )
     }
@@ -1597,7 +1674,10 @@ class UniVergeAccessibilityService : AccessibilityService() {
         mainHandler.removeCallbacks(pauseExpiredRunnable)
         val remainingMs = preferences.pausedUntilEpochMs - System.currentTimeMillis()
         if (remainingMs > 0L) {
-            mainHandler.postDelayed(pauseExpiredRunnable, remainingMs.coerceAtMost(MAX_PAUSE_TIMER_DELAY_MS))
+            mainHandler.postDelayed(
+                pauseExpiredRunnable,
+                remainingMs.coerceAtMost(MAX_PAUSE_TIMER_DELAY_MS)
+            )
         }
     }
 
@@ -1612,7 +1692,10 @@ class UniVergeAccessibilityService : AccessibilityService() {
         val requestedWidth = (touchTargetDp * density).roundToInt().coerceAtLeast(1)
         val width = requestedWidth.coerceIn(1, screenWidth.coerceAtLeast(1))
         val heightPercent = 100 - sanitized.topInsetPercent - sanitized.bottomInsetPercent
-        val height = (screenHeight * heightPercent.coerceIn(EdgeZoneConfig.MIN_LENGTH_PERCENT, 100) / 100).coerceAtLeast(1)
+        val height = (screenHeight * heightPercent.coerceIn(
+            EdgeZoneConfig.MIN_LENGTH_PERCENT,
+            100
+        ) / 100).coerceAtLeast(1)
         val x = edgeTouchX(config.side, screenWidth, width)
         val y = (screenHeight * sanitized.topInsetPercent / 100).coerceIn(0, screenHeight - height)
 
@@ -1621,9 +1704,9 @@ class UniVergeAccessibilityService : AccessibilityService() {
             height,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
@@ -1702,7 +1785,13 @@ class UniVergeAccessibilityService : AccessibilityService() {
         if (!config.enabled) {
             edgeOutlines.remove(key)?.let { outline ->
                 runCatching { windowManager.removeView(outline) }
-                    .onFailure { error -> Log.w(TAG, "failed to remove persistent edge outline", error) }
+                    .onFailure { error ->
+                        Log.w(
+                            TAG,
+                            "failed to remove persistent edge outline",
+                            error
+                        )
+                    }
             }
             return
         }
@@ -1739,10 +1828,10 @@ class UniVergeAccessibilityService : AccessibilityService() {
             touchParams.height,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
@@ -1873,7 +1962,7 @@ class UniVergeAccessibilityService : AccessibilityService() {
     }
 
     companion object {
-        private const val TAG = "UbikiTouch"
+        private const val TAG = "UniVerge"
         private const val OVERLAY_REFRESH_DEBOUNCE_MS = 120L
         private const val SCREEN_ON_RESUME_DELAY_MS = 800L
         private const val USER_PRESENT_RESUME_DELAY_MS = 120L
@@ -1896,10 +1985,14 @@ class UniVergeAccessibilityService : AccessibilityService() {
 }
 
 internal fun gestureOverlayThicknessDp(configuredThicknessDp: Int): Int {
-    return configuredThicknessDp.coerceIn(EdgeZoneConfig.MIN_THICKNESS_DP, EdgeZoneConfig.MAX_THICKNESS_DP)
+    return configuredThicknessDp.coerceIn(
+        EdgeZoneConfig.MIN_THICKNESS_DP,
+        EdgeZoneConfig.MAX_THICKNESS_DP
+    )
 }
 
-internal fun shouldShowEdgeConfigAdjustmentPreview(showIndicators: Boolean): Boolean = !showIndicators
+internal fun shouldShowEdgeConfigAdjustmentPreview(showIndicators: Boolean): Boolean =
+    !showIndicators
 
 internal fun shouldUpdatePersistentEdgeOutline(showIndicators: Boolean): Boolean = showIndicators
 
@@ -1962,7 +2055,7 @@ internal fun sideFunctionSelectionIndex(
 private fun Intent.addFloatingChatBridgeFlags(): Intent {
     return addFlags(
         Intent.FLAG_ACTIVITY_NEW_TASK or
-            Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
+                Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
     )
 }
 
