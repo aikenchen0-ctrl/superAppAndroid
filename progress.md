@@ -235,3 +235,9 @@
 
 - 已完成范围确认、现有接口盘点和全屏动画链路检查。
 - 已确认不新增依赖，二维码使用现有 ZXing；下一步先写失败测试。
+## 2026-08-18 包名前缀统一
+
+- 已将主模块统一为 `univerge-*`，包名前缀、namespace、applicationId、Manifest 组件和测试引用统一为 `com.paifa.univerge...`。
+- 已完成 `:app:compileDebugKotlin`、`:univerge-accessibility:compileDebugKotlin`、`:univerge-core:compileKotlin`、`:univerge-overlay:compileDebugKotlin`。
+- 已完成 `:univerge-accessibility:testDebugUnitTest --tests com.paifa.univerge.accessibility.floatingchat.group.*`。
+- app 包名/Manifest 迁移契约已通过；全量 app 单测仍有 1 个旧页面文案契约失败（`MainActivityDebugChatContractTest` 查找已不存在的“悬浮聊天”标题），不影响包名编译闭环。

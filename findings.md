@@ -307,3 +307,8 @@
 - `ubiki-core` 和 `ubiki-overlay` 主源码尚未移动，仍在旧目录；模块 namespace 也仍为旧前缀。
 - `adbcore` 使用独立 `com.adbcore`，不属于 `com.paifa` 前缀，不应擅自改名。
 - 生成目录 `build/bin/.gradle/.cxx` 不参与迁移，避免污染或修改二进制产物。
+
+### 结果
+
+- 主工程模块名为 `univerge-core`、`univerge-overlay`、`univerge-accessibility`，应用 id 为 `com.paifa.univerge`。
+- 代码和配置范围内旧前缀残留为 0；文档中的旧安装包记录保留为历史事实。

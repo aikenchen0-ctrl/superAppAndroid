@@ -11,15 +11,15 @@ class FloatingChatActivityTaskContractTest {
     @Test
     fun floatingChatBridgeActivitiesDoNotShareSettingsTask() {
         val manifest = androidManifest()
-        val mainAffinity = manifest.activity(".MainActivity").taskAffinity.orEmpty()
+        val mainAffinity = manifest.activity("com.paifa.univerge.app.MainActivity").taskAffinity.orEmpty()
         val floatingAffinity = "com.paifa.univerge.floatingchat"
 
         listOf(
-            ".FloatingChatMediaPickerActivity",
-            ".FloatingChatCameraActivity",
-            ".FloatingChatVoicePermissionActivity",
-            ".FloatingChatLocationPermissionActivity",
-            ".FloatingChatMediaPreviewActivity"
+            "com.paifa.univerge.app.FloatingChatMediaPickerActivity",
+            "com.paifa.univerge.app.FloatingChatCameraActivity",
+            "com.paifa.univerge.app.FloatingChatVoicePermissionActivity",
+            "com.paifa.univerge.app.FloatingChatLocationPermissionActivity",
+            "com.paifa.univerge.app.FloatingChatMediaPreviewActivity"
         ).forEach { activityName ->
             val activity = manifest.activity(activityName)
             assertEquals(floatingAffinity, activity.taskAffinity)
@@ -44,7 +44,7 @@ class FloatingChatActivityTaskContractTest {
             service.property("android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE")
         )
 
-        val receiver = manifest.receiver(".GesturePersistenceReceiver")
+        val receiver = manifest.receiver("com.paifa.univerge.app.GesturePersistenceReceiver")
         assertEquals("true", receiver.exported)
         assertEquals("true", receiver.directBootAware)
         assertTrue(receiver.actions.contains("android.intent.action.BOOT_COMPLETED"))

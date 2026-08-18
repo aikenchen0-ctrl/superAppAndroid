@@ -254,7 +254,7 @@
 - 页面及子页面都承载在同一个全屏悬浮根节点，进出场仅由根级 `AnimatedVisibility` 执行。
 ## 追加目标：统一包名前缀（2026-08-18）
 
-- [ ] 盘点所有源码、配置和 Manifest 中的 `com.paifa.ubikitouch` 残留。
-- [ ] 统一为 `com.paifa.univerge`，包括 namespace、applicationId、组件全名和测试引用。
-- [ ] 将主源码目录整理到对应 `com/paifa/univerge` 路径，排除生成物。
-- [ ] 运行各模块编译与受影响单测，记录已有迁移导致的测试路径假设。
+- [x] 盘点所有源码、配置和 Manifest 中的 `com.paifa.ubikitouch` 残留。
+- [x] 统一为 `com.paifa.univerge`，包括 namespace、applicationId、组件全名和测试引用。
+- [x] 将主源码目录整理到对应 `com/paifa/univerge` 路径，排除生成物。
+- [x] 运行各模块编译与受影响单测，记录已有迁移导致的测试路径假设。
