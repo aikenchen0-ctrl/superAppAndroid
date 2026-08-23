@@ -28,6 +28,25 @@ class MainActivityDebugChatContractTest {
         assertTrue(sectionHeader.contains("DebugFloatingChatExpandButton()"))
     }
 
+    @Test
+    fun debugHomeOpensTheFullWidthTouchTestActivityBelowChatExpand() {
+        val mainActivitySource = sourceFile("app/src/main/java/com/paifa/univerge/app/MainActivity.kt").readText()
+        val manifestSource = sourceFile("app/src/main/AndroidManifest.xml").readText()
+        val activitySource = sourceFile("app/src/main/java/com/paifa/univerge/app/TouchTestActivity.kt").readText()
+
+        val expandIndex = mainActivitySource.indexOf("DebugFloatingChatExpandButton()")
+        val hapticIndex = mainActivitySource.indexOf("DebugHapticTestButton()")
+        assertTrue(hapticIndex > expandIndex)
+        assertTrue(mainActivitySource.contains("modifier = Modifier.fillMaxWidth()"))
+        assertTrue(mainActivitySource.contains("Text(\"触感测试\")"))
+        assertTrue(mainActivitySource.contains("TouchTestActivity::class.java"))
+        assertTrue(manifestSource.contains("com.paifa.univerge.app.TouchTestActivity"))
+        assertTrue(activitySource.contains("pointerInteropFilter"))
+        assertTrue(activitySource.contains("handleMotionEvent"))
+        assertTrue(activitySource.contains("selectedModelInfo"))
+        assertTrue(activitySource.contains("Icons.AutoMirrored.Outlined.ArrowBack"))
+    }
+
     private fun sourceFile(path: String): File {
         return listOf(File(path), File("../$path"))
             .firstOrNull { it.isFile }

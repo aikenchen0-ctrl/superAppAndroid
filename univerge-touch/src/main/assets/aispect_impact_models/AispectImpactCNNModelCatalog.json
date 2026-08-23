@@ -1,0 +1,8 @@
+[
+  {
+    "displayName": "Embedded legacy fallback four-class model",
+    "id": "lemon_tao_full4_enhanced_patch21_no_confidence",
+    "scalerResourceName": "AispectImpactCNNScaler_lemon_tao_full4_enhanced_patch21_no_confidence",
+    "weightsResourceName": "AispectImpactCNNWeights_lemon_tao_full4_enhanced_patch21_no_confidence"
+  }
+]

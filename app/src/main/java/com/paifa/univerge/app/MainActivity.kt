@@ -576,6 +576,21 @@ private fun DebugFloatingChatExpandButton() {
 }
 
 @Composable
+private fun DebugHapticTestButton() {
+    if (!BuildConfig.DEBUG) return
+    val context = LocalContext.current
+
+    Button(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = {
+            context.startActivity(Intent(context, TouchTestActivity::class.java))
+        }
+    ) {
+        Text("触感测试")
+    }
+}
+
+@Composable
 private fun MainScreen(
     preferences: UniVergePreferences,
     scrmSettingsManager: ScrmSettingsManager,
@@ -611,6 +626,7 @@ private fun MainScreen(
                 DebugFloatingChatExpandButton()
             }
         }
+        item { DebugHapticTestButton() }
         item {
             NavigationCard(
                 title = "连接微信服务",

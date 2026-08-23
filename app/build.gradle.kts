@@ -53,6 +53,7 @@ android {
 dependencies {
     implementation(project(":univerge-accessibility"))
     implementation(project(":adbcore"))
+    implementation(project(":univerge-touch"))
     implementation(files("libs/blinkvoice-visual-sdk-release.aar"))
 
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))

@@ -1,0 +1,12 @@
+package com.zhifaios.eyes.touch;
+
+public enum AispectTouchErrorCode {
+    MODEL_UNAVAILABLE,
+    MODEL_SCHEMA_MISMATCH,
+    MODEL_LOAD_FAILED,
+    SENSOR_UNAVAILABLE,
+    TOUCH_SEQUENCE_INVALID,
+    REMOTE_MODEL_REJECTED,
+    INFERENCE_FAILED,
+    UNKNOWN
+}

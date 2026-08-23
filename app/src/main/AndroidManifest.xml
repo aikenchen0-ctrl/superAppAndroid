@@ -61,6 +61,7 @@
         <activity android:name="com.paifa.univerge.app.PauseSettingsActivity" android:exported="false" />
         <activity android:name="com.paifa.univerge.app.BlockedAppsActivity" android:exported="false" />
         <activity android:name="com.paifa.univerge.app.WeChatServiceActivity" android:exported="false" />
+        <activity android:name="com.paifa.univerge.app.TouchTestActivity" android:exported="false" />
         <activity android:name="com.paifa.univerge.app.WeChatChatAppearanceActivity" android:exported="false" />
         <activity android:name="com.paifa.univerge.app.EdgeStyleSettingsActivity" android:exported="false" />
         <activity android:name="com.paifa.univerge.app.EdgeFunctionSettingsActivity" android:exported="false" />
