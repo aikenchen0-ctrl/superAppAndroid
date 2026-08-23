@@ -47,6 +47,17 @@ class MainActivityDebugChatContractTest {
         assertTrue(activitySource.contains("Icons.AutoMirrored.Outlined.ArrowBack"))
     }
 
+    @Test
+    fun touchTestShowsExplicitChineseGestureClassification() {
+        val activitySource = sourceFile("app/src/main/java/com/paifa/univerge/app/TouchTestActivity.kt").readText()
+
+        assertTrue(activitySource.contains("点击"))
+        assertTrue(activitySource.contains("重触"))
+        assertTrue(activitySource.contains("按压"))
+        assertTrue(activitySource.contains("长按"))
+        assertTrue(activitySource.contains("拖动"))
+    }
+
     private fun sourceFile(path: String): File {
         return listOf(File(path), File("../$path"))
             .firstOrNull { it.isFile }

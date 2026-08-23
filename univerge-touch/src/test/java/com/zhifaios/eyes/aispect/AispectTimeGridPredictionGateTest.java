@@ -1,5 +1,8 @@
 package com.zhifaios.eyes.aispect;
 
+import com.zhifa.univerge.eyes.aispect.AispectCollectionController;
+import com.zhifa.univerge.eyes.aispect.AispectModels;
+
 import org.junit.Assert;
 import org.junit.Test;
 

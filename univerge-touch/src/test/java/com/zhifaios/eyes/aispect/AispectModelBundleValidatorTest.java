@@ -1,5 +1,9 @@
 package com.zhifaios.eyes.aispect;
 
+import com.zhifa.univerge.eyes.aispect.AispectCanonicalModelContract;
+import com.zhifa.univerge.eyes.aispect.AispectModelBundleValidator;
+import com.zhifa.univerge.eyes.aispect.AispectRemoteModelAssignment;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.Assert;

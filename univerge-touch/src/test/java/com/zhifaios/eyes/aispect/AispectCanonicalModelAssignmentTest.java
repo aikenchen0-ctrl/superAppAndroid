@@ -1,5 +1,8 @@
 package com.zhifaios.eyes.aispect;
 
+import com.zhifa.univerge.eyes.aispect.AispectCanonicalModelAssignment;
+import com.zhifa.univerge.eyes.aispect.AispectCausalPressFeatureBuilder;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.Assert;

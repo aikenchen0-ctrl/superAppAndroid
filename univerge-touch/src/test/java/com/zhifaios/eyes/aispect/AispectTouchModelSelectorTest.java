@@ -1,5 +1,9 @@
 package com.zhifaios.eyes.aispect;
 
+import com.zhifa.univerge.eyes.aispect.AispectDeviceCapabilityProfiler;
+import com.zhifa.univerge.eyes.aispect.AispectImpactCNNClassifier;
+import com.zhifa.univerge.eyes.aispect.AispectTouchModelSelector;
+
 import org.junit.Assert;
 import org.junit.Test;
 

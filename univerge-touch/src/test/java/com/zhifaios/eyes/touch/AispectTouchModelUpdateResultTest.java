@@ -1,5 +1,8 @@
 package com.zhifaios.eyes.touch;
 
+import com.zhifa.univerge.eyes.touch.AispectTouchModelUpdateResult;
+import com.zhifa.univerge.eyes.touch.AispectTouchModelUpdateStatus;
+
 import org.junit.Assert;
 import org.junit.Test;
 

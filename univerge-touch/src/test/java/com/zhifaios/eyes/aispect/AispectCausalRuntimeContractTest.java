@@ -7,6 +7,10 @@ import java.lang.reflect.Method;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import com.zhifa.univerge.eyes.aispect.AispectCausalPressFeatureBuilder;
+import com.zhifa.univerge.eyes.aispect.AispectImpactCNNClassifier;
+import com.zhifa.univerge.eyes.aispect.AispectTimeGridGroupNormRuntime;
+
 public final class AispectCausalRuntimeContractTest {
     @Test
     public void supportsBothPublishedCausalTimeGridContracts() {

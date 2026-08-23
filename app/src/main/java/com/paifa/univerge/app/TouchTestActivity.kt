@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -35,11 +34,12 @@ import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import com.zhifaios.eyes.touch.AispectTouchClassifier
-import com.zhifaios.eyes.touch.AispectTouchError
-import com.zhifaios.eyes.touch.AispectTouchModelInfo
-import com.zhifaios.eyes.touch.AispectTouchListener
-import com.zhifaios.eyes.touch.AispectTouchResult
+import com.zhifa.univerge.eyes.touch.AispectTouchEventType
+import com.zhifa.univerge.eyes.touch.AispectTouchClassifier
+import com.zhifa.univerge.eyes.touch.AispectTouchError
+import com.zhifa.univerge.eyes.touch.AispectTouchModelInfo
+import com.zhifa.univerge.eyes.touch.AispectTouchListener
+import com.zhifa.univerge.eyes.touch.AispectTouchResult
 
 class TouchTestActivity : ComponentActivity() {
     private lateinit var classifier: AispectTouchClassifier
@@ -48,6 +48,7 @@ class TouchTestActivity : ComponentActivity() {
     private var isClassifierRunning by mutableStateOf(false)
     private var touchPhase by mutableStateOf("等待触摸")
     private var touchPosition by mutableStateOf("-")
+    private var gesturePreview by mutableStateOf("等待触摸")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -75,6 +76,12 @@ class TouchTestActivity : ComponentActivity() {
                     isClassifierRunning = isClassifierRunning,
                     touchPhase = touchPhase,
                     touchPosition = touchPosition,
+                    gesturePreview = gesturePreview,
+                    onTouchStateChanged = { phase, position ->
+                        touchPhase = phase
+                        touchPosition = position
+                    },
+                    onGesturePreviewChanged = { gesturePreview = it },
                     onBack = ::finish
                 )
             }
@@ -100,9 +107,17 @@ private fun TouchTestScreen(
     isClassifierRunning: Boolean,
     touchPhase: String,
     touchPosition: String,
+    gesturePreview: String,
+    onTouchStateChanged: (String, String) -> Unit,
+    onGesturePreviewChanged: (String) -> Unit,
     onBack: () -> Unit
 ) {
     var touchAreaSize by remember { mutableStateOf(IntSize.Zero) }
+    var downX by remember { mutableStateOf(0f) }
+    var downY by remember { mutableStateOf(0f) }
+    var lastX by remember { mutableStateOf(0f) }
+    var lastY by remember { mutableStateOf(0f) }
+    var moved by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -135,14 +150,42 @@ private fun TouchTestScreen(
                     .onSizeChanged { touchAreaSize = it }
                     .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(12.dp))
                     .pointerInteropFilter { event: MotionEvent ->
-                        touchPhase = when (event.actionMasked) {
+                        val phase = when (event.actionMasked) {
                             MotionEvent.ACTION_DOWN -> "正在触摸"
                             MotionEvent.ACTION_MOVE -> "触摸移动中"
                             MotionEvent.ACTION_UP -> "触摸结束，等待分类"
                             MotionEvent.ACTION_CANCEL -> "触摸已取消"
                             else -> "触摸处理中"
                         }
-                        touchPosition = "x=${event.x.toInt()}, y=${event.y.toInt()}"
+                        onTouchStateChanged(phase, "x=${event.x.toInt()}, y=${event.y.toInt()}")
+                        when (event.actionMasked) {
+                            MotionEvent.ACTION_DOWN -> {
+                                downX = event.x
+                                downY = event.y
+                                lastX = event.x
+                                lastY = event.y
+                                moved = false
+                                onGesturePreviewChanged("触摸中")
+                            }
+                            MotionEvent.ACTION_MOVE -> {
+                                lastX = event.x
+                                lastY = event.y
+                                if (kotlin.math.hypot(event.x - downX, event.y - downY) > 8f) {
+                                    moved = true
+                                    onGesturePreviewChanged("拖动中")
+                                }
+                            }
+                            MotionEvent.ACTION_UP -> {
+                                onGesturePreviewChanged(
+                                    when {
+                                        moved -> "拖动"
+                                        kotlin.math.hypot(event.x - lastX, event.y - lastY) >= 6f -> "重触"
+                                        else -> "点击"
+                                    }
+                                )
+                            }
+                            MotionEvent.ACTION_CANCEL -> onGesturePreviewChanged("已取消")
+                        }
                         classifier.handleMotionEvent(event, touchAreaSize.width, touchAreaSize.height)
                         true
                     },
@@ -151,7 +194,15 @@ private fun TouchTestScreen(
             ) {
                 Text("触摸这里开始测试", style = MaterialTheme.typography.titleLarge)
             }
-            TouchStatusPanel(selectedModel, latestResult, latestError, isClassifierRunning, touchPhase, touchPosition)
+            TouchStatusPanel(
+                selectedModel,
+                latestResult,
+                latestError,
+                isClassifierRunning,
+                touchPhase,
+                touchPosition,
+                gesturePreview
+            )
         }
     }
 }
@@ -163,7 +214,8 @@ private fun TouchStatusPanel(
     latestError: AispectTouchError?,
     isClassifierRunning: Boolean,
     touchPhase: String,
-    touchPosition: String
+    touchPosition: String,
+    gesturePreview: String
 ) {
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text("触摸信息", style = MaterialTheme.typography.titleMedium)
@@ -175,6 +227,15 @@ private fun TouchStatusPanel(
                 else -> latestResult.toDisplayText()
             },
             color = if (latestError == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error
+        )
+        Text(
+            text = when {
+                latestError != null -> "识别结果：未完成"
+                latestResult == null -> "识别结果：$gesturePreview"
+                else -> "识别结果：${latestResult.toGestureLabel()}"
+            },
+            style = MaterialTheme.typography.titleLarge,
+            color = if (latestError == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
         )
         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
         Text("当前触摸模型", style = MaterialTheme.typography.titleMedium)
@@ -190,6 +251,17 @@ private fun TouchStatusPanel(
 private fun AispectTouchResult.toDisplayText(): String =
     "${eventType} / ${classLabel.ifBlank { "UNKNOWN" }}  " +
         "confidence=${"%.2f".format(confidence)}  x=${"%.0f".format(x)}, y=${"%.0f".format(y)}"
+
+private fun AispectTouchResult.toGestureLabel(): String = when (eventType) {
+    AispectTouchEventType.TAP ->
+        if (strength.name == "HEAVY") "重触" else "点击"
+    AispectTouchEventType.PRESS ->
+        if (strength.name == "HEAVY") "重按压" else "按压"
+    AispectTouchEventType.HOLD -> "长按"
+    AispectTouchEventType.DRAG -> "拖动"
+    AispectTouchEventType.CANCEL -> "已取消"
+    else -> "未知手势"
+}
 
 private fun AispectTouchModelInfo.toDisplayText(): String =
     "${displayName.ifBlank { id }}  $id v${version.ifBlank { "-" }}\n${inputChannels}通道 / ${frameCount}帧 / $windowMode"
