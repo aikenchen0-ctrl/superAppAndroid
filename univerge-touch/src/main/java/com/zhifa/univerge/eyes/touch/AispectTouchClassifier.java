@@ -51,6 +51,7 @@ public final class AispectTouchClassifier implements AutoCloseable, AispectColle
         controller.config().maximumTouchTravelPx = safeConfig.maximumPressTravelPx;
         controller.interactionEngine().config().minimumSampleIntervalMs = safeConfig.minimumSampleIntervalMs;
         controller.interactionEngine().config().dragActivationRadiusPx = safeConfig.dragActivationRadiusPx;
+        controller.interactionEngine().config().heavyTouchAreaThresholdPx2 = safeConfig.heavyTouchAreaThresholdPx2;
         allowInsecureRemoteModelTransport = safeConfig.allowInsecureRemoteModelTransport;
         controller.setAllowInsecureRemoteModelTransport(allowInsecureRemoteModelTransport);
         controller.setRemoteModelAllowedHosts(resolveAllowedHosts(safeConfig.remoteModelAllowedHosts, safeConfig.remoteModelBaseUrl));

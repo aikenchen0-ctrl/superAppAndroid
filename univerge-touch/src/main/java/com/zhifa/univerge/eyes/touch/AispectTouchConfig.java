@@ -6,7 +6,7 @@ public final class AispectTouchConfig {
     public float maximumPressTravelPx = 36f;
     public long minimumSampleIntervalMs = 4L;
     public float dragActivationRadiusPx = 28f;
-    public float heavyLiftOffsetThresholdPx = 4f;
+    public float heavyTouchAreaThresholdPx2 = 40f;
     public String remoteModelBaseUrl = "";
     public String remoteModelAppId = "";
     public String remoteModelAppVersion = "";

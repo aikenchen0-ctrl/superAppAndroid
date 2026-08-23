@@ -13,6 +13,8 @@ public final class AispectInteractionEngine {
         public long holdDurationMs = 600L;
         public long minimumSampleIntervalMs = 11L;
         public float dragActivationRadiusPx = 8f;
+        public float heavyTouchAreaThresholdPx2 = 40f;
+        @Deprecated
         public float heavyLiftOffsetThresholdPx = 6f;
     }
 
@@ -28,6 +30,7 @@ public final class AispectInteractionEngine {
     private long lastEventTime;
     private boolean isDragging;
     private boolean isTracking;
+    private float maximumTouchArea;
     private Runnable holdRunnable;
 
     public AispectInteractionEngine(Listener listener) {
@@ -86,11 +89,13 @@ public final class AispectInteractionEngine {
         initialEventTime = event.getEventTime();
         lastSampleEventTime = initialEventTime;
         lastEventTime = initialEventTime;
+        maximumTouchArea = touchArea(event);
         emit(AispectModels.TouchKind.SAMPLE, initialX, initialY, initialEventTime, null);
         scheduleHold();
     }
 
     private void move(MotionEvent event) {
+        maximumTouchArea = Math.max(maximumTouchArea, touchArea(event));
         int pointerIndex = 0;
         int historySize = event.getHistorySize();
         boolean didEmitSample = false;
@@ -150,7 +155,8 @@ public final class AispectInteractionEngine {
             emit(AispectModels.TouchKind.DRAG_END, x, y, eventTime, null);
         } else {
             float liftOffset = distance(x - lastX, y - lastY);
-            AispectModels.TouchKind kind = liftOffset >= Math.max(1f, config.heavyLiftOffsetThresholdPx)
+            maximumTouchArea = Math.max(maximumTouchArea, touchArea(event));
+            AispectModels.TouchKind kind = maximumTouchArea > Math.max(0f, config.heavyTouchAreaThresholdPx2)
                     ? AispectModels.TouchKind.HEAVY_TAP
                     : AispectModels.TouchKind.LIGHT_TAP;
             emit(kind, x, y, eventTime, liftOffset);
@@ -197,4 +203,9 @@ public final class AispectInteractionEngine {
     private static float distance(float x, float y) {
         return (float) Math.sqrt(x * x + y * y);
     }
+
+    private static float touchArea(MotionEvent event) {
+        return Math.max(0f, event.getTouchMajor()) * Math.max(0f, event.getTouchMinor());
+    }
+
 }

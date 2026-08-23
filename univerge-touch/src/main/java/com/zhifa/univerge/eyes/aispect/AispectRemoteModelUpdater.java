@@ -320,7 +320,7 @@ public final class AispectRemoteModelUpdater {
         return result(State.ACTIVATED, modelId, version, "updated");
     }
 
-    static String sha256Hex(byte[] bytes) throws IOException {
+    public static String sha256Hex(byte[] bytes) throws IOException {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(bytes == null ? new byte[0] : bytes);

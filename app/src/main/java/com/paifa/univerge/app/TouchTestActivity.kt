@@ -118,6 +118,7 @@ private fun TouchTestScreen(
     var lastX by remember { mutableStateOf(0f) }
     var lastY by remember { mutableStateOf(0f) }
     var moved by remember { mutableStateOf(false) }
+    var maximumTouchArea by remember { mutableStateOf(0f) }
 
     Scaffold(
         topBar = {
@@ -157,29 +158,38 @@ private fun TouchTestScreen(
                             MotionEvent.ACTION_CANCEL -> "触摸已取消"
                             else -> "触摸处理中"
                         }
-                        onTouchStateChanged(phase, "x=${event.x.toInt()}, y=${event.y.toInt()}")
+                        onTouchStateChanged(
+                            phase,
+                            "x=${event.x.toInt()}, y=${event.y.toInt()}, size=${"%.3f".format(event.size)}, " +
+                                "touchMajor=${"%.1f".format(event.getTouchMajor())}, " +
+                                "touchMinor=${"%.1f".format(event.getTouchMinor())}, " +
+                                "area=${"%.1f".format(event.getTouchMajor() * event.getTouchMinor())}"
+                        )
                         when (event.actionMasked) {
                             MotionEvent.ACTION_DOWN -> {
                                 downX = event.x
                                 downY = event.y
                                 lastX = event.x
                                 lastY = event.y
+                                maximumTouchArea = event.getTouchMajor() * event.getTouchMinor()
                                 moved = false
                                 onGesturePreviewChanged("触摸中")
                             }
                             MotionEvent.ACTION_MOVE -> {
-                                lastX = event.x
-                                lastY = event.y
                                 if (kotlin.math.hypot(event.x - downX, event.y - downY) > 8f) {
                                     moved = true
                                     onGesturePreviewChanged("拖动中")
                                 }
+                                lastX = event.x
+                                lastY = event.y
+                                maximumTouchArea = maxOf(maximumTouchArea, event.getTouchMajor() * event.getTouchMinor())
                             }
                             MotionEvent.ACTION_UP -> {
+                                maximumTouchArea = maxOf(maximumTouchArea, event.getTouchMajor() * event.getTouchMinor())
                                 onGesturePreviewChanged(
                                     when {
                                         moved -> "拖动"
-                                        kotlin.math.hypot(event.x - lastX, event.y - lastY) >= 6f -> "重触"
+                                        maximumTouchArea > 40f -> "重触"
                                         else -> "点击"
                                     }
                                 )
