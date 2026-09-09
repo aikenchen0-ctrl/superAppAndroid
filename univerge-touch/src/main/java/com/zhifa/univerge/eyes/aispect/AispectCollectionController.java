@@ -5,6 +5,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.view.MotionEvent;
+import android.util.Log;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -16,6 +17,7 @@ import java.util.Locale;
 import java.util.UUID;
 
 public final class AispectCollectionController {
+    private static final String TAG = "AispectTouch";
     private static final long RELEASE_POST_ROLL_SAFETY_MARGIN_MS = 8L;
     public interface Listener {
         void onStatusChanged(Status status);
@@ -641,6 +643,9 @@ public final class AispectCollectionController {
                     ? "collector_waiting_for_touch_end"
                     : recognitionRunning ? "collector_recognition_waiting" : "collector_diagnostic_waiting";
             lastEventDetail = activeLabel.datasetKey();
+            Log.d(TAG, "touch_down seq=" + activeTouchSequence
+                    + " model=" + activeModelId
+                    + " x=" + event.getX() + " y=" + event.getY());
             signalCollector.updateTouchContext(unit(event.getX(), width), unit(event.getY(), height), downTimestampSeconds);
             emitStatus();
         }
@@ -730,17 +735,10 @@ public final class AispectCollectionController {
                         liftEventElapsedRealtimeNanos,
                         captureDelayMs
                 );
-                boolean liftBeforeEndpoint = liftEventElapsedRealtimeNanos > 0L
-                        && liftEventElapsedRealtimeNanos
-                        < downEventElapsedRealtimeNanos + captureDelayMs * 1_000_000L;
-                if (!hasWindowSupport || liftBeforeEndpoint) {
-                    if (liftBeforeEndpoint) {
-                        lastEventKey = "collector_causal_window_rejected";
-                        lastEventDetail = "lift_before_" + captureDelayMs + "ms";
-                        causalPredictionRunnable = null;
-                        emitStatus();
-                        return;
-                    }
+                // A finger can be lifted before the causal endpoint (+25ms), but
+                // the sensor stream still needs to be collected through that
+                // endpoint so the model receives its complete input window.
+                if (!hasWindowSupport) {
                     handler.postDelayed(this, 4L);
                     return;
                 }
@@ -919,6 +917,11 @@ public final class AispectCollectionController {
         if (!activeTouch || endingEvent == null || activeTouchSequence != sequence) {
             return;
         }
+        Log.d(TAG, "touch_finalize seq=" + sequence
+                + " frames=" + activeTouchFrames.size()
+                + " events=" + activeEvents.size()
+                + " model=" + activeModelId
+                + " sampleRate=" + signalCollector.snapshot().sampleRateHz);
         AispectImpactSignalCollector.Snapshot signalSnapshot = signalCollector.snapshot();
         AispectSignalWindowBuilder.Window impactWindow = windowBuilder.build(signalSnapshot.frames, endingEvent.timestampSeconds, signalSnapshot.sampleRateHz);
         AispectInputQuality.Reason signalReason = AispectInputQuality.signalReason(
@@ -958,6 +961,32 @@ public final class AispectCollectionController {
         if (config.enableCnnDiagnostics) {
             if (causalTimeGridModel) {
                 prediction = latestPrediction;
+                Log.d(TAG, "causal_prediction seq=" + sequence
+                        + " available=" + (prediction != null));
+                if (prediction == null) {
+                    // A causal window can be unavailable on devices whose IMU
+                    // stream starts late. Retry with the bundled four-class
+                    // release model so a valid touch result is still produced.
+                    for (AispectImpactCNNClassifier.ModelInfo candidate : classifier.availableModels()) {
+                        if (candidate.classCount != 4
+                                || AispectCausalPressFeatureBuilder.isTimeGridFeatureContract(candidate.featureContract)) {
+                            continue;
+                        }
+                        prediction = classifier.predict(
+                                impactWindow,
+                                candidate.id,
+                                patch,
+                                latestNormalizationProfile,
+                                latestContactEncodingProfile
+                        );
+                        Log.d(TAG, "fallback_prediction model=" + candidate.id
+                                + " available=" + (prediction != null));
+                        if (prediction != null) {
+                            activeModelId = candidate.id;
+                            break;
+                        }
+                    }
+                }
             } else {
                 prediction = classifier.predict(
                         impactWindow,
@@ -1003,6 +1032,10 @@ public final class AispectCollectionController {
             }
         }
         latestPrediction = prediction;
+        Log.d(TAG, "prediction_result seq=" + sequence
+                + " label=" + (prediction == null ? "null" : prediction.predictedLabel)
+                + " confidence=" + (prediction == null ? 0.0 : prediction.predictedProbability)
+                + " model=" + activeModelId);
         latestPredictionSequence = sequence;
         latestSampleRateHz = signalSnapshot.sampleRateHz;
         latestImpactMaxAbsDelta = impactWindow.maxAbsDelta;

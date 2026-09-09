@@ -1,4 +1,4 @@
-C:/WorkSpace/UbikiTouch/adbcore/.cxx/Debug/2w465x6h/armeabi-v7a/CMakeFiles/libadbcore.so.dir
-C:/WorkSpace/UbikiTouch/adbcore/.cxx/Debug/2w465x6h/armeabi-v7a/CMakeFiles/adb.dir
-C:/WorkSpace/UbikiTouch/adbcore/.cxx/Debug/2w465x6h/armeabi-v7a/CMakeFiles/edit_cache.dir
-C:/WorkSpace/UbikiTouch/adbcore/.cxx/Debug/2w465x6h/armeabi-v7a/CMakeFiles/rebuild_cache.dir
+D:/WorkSpace/superAppAndroid/adbcore/.cxx/Debug/2w465x6h/armeabi-v7a/CMakeFiles/libadbcore.so.dir
+D:/WorkSpace/superAppAndroid/adbcore/.cxx/Debug/2w465x6h/armeabi-v7a/CMakeFiles/adb.dir
+D:/WorkSpace/superAppAndroid/adbcore/.cxx/Debug/2w465x6h/armeabi-v7a/CMakeFiles/edit_cache.dir
+D:/WorkSpace/superAppAndroid/adbcore/.cxx/Debug/2w465x6h/armeabi-v7a/CMakeFiles/rebuild_cache.dir

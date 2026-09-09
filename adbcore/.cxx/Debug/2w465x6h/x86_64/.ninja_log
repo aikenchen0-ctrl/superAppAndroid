@@ -1,9 +1,26 @@
 # ninja log v5
 192	1057	8105492948958752	CMakeFiles/libadbcore.so.dir/android.cpp.o	271922637320b83a
+73	1387	8105492954430156	CMakeFiles/libadbcore.so.dir/cgroup.cpp.o	dc0907c212e03533
 103	1064	8105492951977597	CMakeFiles/libadbcore.so.dir/selinux.cpp.o	3fc9f72f11102485
 88	1386	8105492954546896	CMakeFiles/libadbcore.so.dir/misc.cpp.o	754e6966854d4c0f
-73	1387	8105492954430156	CMakeFiles/libadbcore.so.dir/cgroup.cpp.o	dc0907c212e03533
 118	3903	8105492977619604	CMakeFiles/adb.dir/adb_pairing.cpp.o	263fdd6e55582d0c
 1	4536	8105492986386962	CMakeFiles/libadbcore.so.dir/starter.cpp.o	8e955df3201f28c4
 4540	5520	8105492995773691	D:/WorkSpace/superAppAndroid/adbcore/build/intermediates/cxx/Debug/2w465x6h/obj/x86_64/libadbcore.so	c4f7bc7ac899083b
 3919	5521	8105492995581088	D:/WorkSpace/superAppAndroid/adbcore/build/intermediates/cxx/Debug/2w465x6h/obj/x86_64/libadb.so	b0683c3f8309eed5
+25	252	8106512236457217	CMakeFiles/libadbcore.so.dir/selinux.cpp.o	b9625769971469d0
+16	254	8106512236515575	CMakeFiles/libadbcore.so.dir/misc.cpp.o	3929b1894b24e46c
+43	268	8106512236643723	CMakeFiles/libadbcore.so.dir/android.cpp.o	d212c0db89520b4e
+34	269	8106512236669435	CMakeFiles/libadbcore.so.dir/cgroup.cpp.o	4b502ea27574f610
+53	850	8106512242532761	CMakeFiles/adb.dir/adb_pairing.cpp.o	b4ddceb498f1a4c0
+5	1161	8106512245487005	CMakeFiles/libadbcore.so.dir/starter.cpp.o	c26dfe69316f2202
+853	1239	8106512246086078	D:/WorkSpace/superAppAndroid/adbcore/build/intermediates/cxx/Debug/2w465x6h/obj/x86_64/libadb.so	35a10d240148c997
+1163	1642	8106512250545373	D:/WorkSpace/superAppAndroid/adbcore/build/intermediates/cxx/Debug/2w465x6h/obj/x86_64/libadbcore.so	208b8e5b7ff2a08
+0	11	0	clean	f35172bec07b64a9
+29	210	8106515579631287	CMakeFiles/libadbcore.so.dir/cgroup.cpp.o	4b502ea27574f610
+21	248	8106515579940674	CMakeFiles/libadbcore.so.dir/android.cpp.o	d212c0db89520b4e
+5	264	8106515579811577	CMakeFiles/libadbcore.so.dir/misc.cpp.o	3929b1894b24e46c
+39	264	8106515579992065	CMakeFiles/libadbcore.so.dir/selinux.cpp.o	b9625769971469d0
+48	858	8106515586092592	CMakeFiles/adb.dir/adb_pairing.cpp.o	b4ddceb498f1a4c0
+859	1174	8106515589252810	D:/WorkSpace/superAppAndroid/adbcore/build/intermediates/cxx/Debug/2w465x6h/obj/x86_64/libadb.so	35a10d240148c997
+12	1253	8106515589968733	CMakeFiles/libadbcore.so.dir/starter.cpp.o	c26dfe69316f2202
+1253	1778	8106515595281698	D:/WorkSpace/superAppAndroid/adbcore/build/intermediates/cxx/Debug/2w465x6h/obj/x86_64/libadbcore.so	208b8e5b7ff2a08

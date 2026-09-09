@@ -7,7 +7,6 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.paifa.univerge.app.MainActivity
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -23,7 +22,8 @@ class MainActivitySmokeTest {
 
         composeRule.onNodeWithText("ubikiTouch").assertIsDisplayed()
         composeRule.onNodeWithText(activity.getString(R.string.service_title)).assertIsDisplayed()
-        composeRule.onNodeWithText(activity.getString(R.string.global_controls_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(activity.getString(R.string.global_controls_title))
+            .assertIsDisplayed()
         composeRule.onNode(hasScrollAction())
             .performScrollToNode(hasText(activity.getString(R.string.left_edge)))
         composeRule.onNodeWithText(activity.getString(R.string.left_edge)).assertIsDisplayed()

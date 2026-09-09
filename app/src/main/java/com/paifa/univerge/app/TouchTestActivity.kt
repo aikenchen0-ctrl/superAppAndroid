@@ -62,6 +62,7 @@ class TouchTestActivity : ComponentActivity() {
                 override fun onTouchError(error: AispectTouchError) {
                     latestError = error
                 }
+
             })
             instance.start()
             isClassifierRunning = instance.isRunning()
@@ -88,6 +89,22 @@ class TouchTestActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        if (::classifier.isInitialized && !classifier.isRunning()) {
+            classifier.start()
+            isClassifierRunning = classifier.isRunning()
+        }
+    }
+
+    override fun onStop() {
+        if (::classifier.isInitialized && classifier.isRunning()) {
+            classifier.stop()
+            isClassifierRunning = false
+        }
+        super.onStop()
+    }
+
     override fun onDestroy() {
         if (::classifier.isInitialized) {
             classifier.stop()
@@ -97,7 +114,11 @@ class TouchTestActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
+@OptIn(
+    ExperimentalMaterial3Api::class,
+    ExperimentalFoundationApi::class,
+    ExperimentalComposeUiApi::class
+)
 @Composable
 private fun TouchTestScreen(
     classifier: AispectTouchClassifier,
@@ -113,25 +134,16 @@ private fun TouchTestScreen(
     onBack: () -> Unit
 ) {
     var touchAreaSize by remember { mutableStateOf(IntSize.Zero) }
-    var downX by remember { mutableStateOf(0f) }
-    var downY by remember { mutableStateOf(0f) }
-    var lastX by remember { mutableStateOf(0f) }
-    var lastY by remember { mutableStateOf(0f) }
-    var moved by remember { mutableStateOf(false) }
     var maximumTouchArea by remember { mutableStateOf(0f) }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("触感测试") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "返回")
-                    }
+            TopAppBar(title = { Text("触感测试") }, navigationIcon = {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "返回")
                 }
-            )
-        }
-    ) { paddingValues ->
+            })
+        }) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -149,7 +161,9 @@ private fun TouchTestScreen(
                     .fillMaxWidth()
                     .weight(1f)
                     .onSizeChanged { touchAreaSize = it }
-                    .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(12.dp))
+                    .background(
+                        MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(12.dp)
+                    )
                     .pointerInteropFilter { event: MotionEvent ->
                         val phase = when (event.actionMasked) {
                             MotionEvent.ACTION_DOWN -> "正在触摸"
@@ -160,43 +174,40 @@ private fun TouchTestScreen(
                         }
                         onTouchStateChanged(
                             phase,
-                            "x=${event.x.toInt()}, y=${event.y.toInt()}, size=${"%.3f".format(event.size)}, " +
-                                "touchMajor=${"%.1f".format(event.getTouchMajor())}, " +
-                                "touchMinor=${"%.1f".format(event.getTouchMinor())}, " +
-                                "area=${"%.1f".format(event.getTouchMajor() * event.getTouchMinor())}"
+                            "x=${event.x.toInt()}, y=${event.y.toInt()}, size=${"%.3f".format(event.size)}, " + "touchMajor=${
+                                "%.1f".format(event.getTouchMajor())
+                            }, " + "touchMinor=${"%.1f".format(event.getTouchMinor())}, " + "area=${
+                                "%.1f".format(
+                                    event.getTouchMajor() * event.getTouchMinor()
+                                )
+                            }"
                         )
                         when (event.actionMasked) {
                             MotionEvent.ACTION_DOWN -> {
-                                downX = event.x
-                                downY = event.y
-                                lastX = event.x
-                                lastY = event.y
                                 maximumTouchArea = event.getTouchMajor() * event.getTouchMinor()
-                                moved = false
                                 onGesturePreviewChanged("触摸中")
                             }
+
                             MotionEvent.ACTION_MOVE -> {
-                                if (kotlin.math.hypot(event.x - downX, event.y - downY) > 8f) {
-                                    moved = true
-                                    onGesturePreviewChanged("拖动中")
-                                }
-                                lastX = event.x
-                                lastY = event.y
-                                maximumTouchArea = maxOf(maximumTouchArea, event.getTouchMajor() * event.getTouchMinor())
-                            }
-                            MotionEvent.ACTION_UP -> {
-                                maximumTouchArea = maxOf(maximumTouchArea, event.getTouchMajor() * event.getTouchMinor())
-                                onGesturePreviewChanged(
-                                    when {
-                                        moved -> "拖动"
-                                        maximumTouchArea > 40f -> "重触"
-                                        else -> "点击"
-                                    }
+                                maximumTouchArea = maxOf(
+                                    maximumTouchArea, event.getTouchMajor() * event.getTouchMinor()
                                 )
                             }
+
+                            MotionEvent.ACTION_UP -> {
+                                maximumTouchArea = maxOf(
+                                    maximumTouchArea, event.getTouchMajor() * event.getTouchMinor()
+                                )
+                                onGesturePreviewChanged(
+                                    if (maximumTouchArea > 40f || isHeavyTouch(event)) "重触" else "轻触"
+                                )
+                            }
+
                             MotionEvent.ACTION_CANCEL -> onGesturePreviewChanged("已取消")
                         }
-                        classifier.handleMotionEvent(event, touchAreaSize.width, touchAreaSize.height)
+                        classifier.handleMotionEvent(
+                            event, touchAreaSize.width, touchAreaSize.height
+                        )
                         true
                     },
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -215,6 +226,18 @@ private fun TouchTestScreen(
             )
         }
     }
+}
+
+private fun isHeavyTouch(event: MotionEvent): Boolean {
+    val major = event.getTouchMajor()
+    val minor = event.getTouchMinor()
+    val area = major * minor
+    if (area > 40f || event.size >= 0.026f) {
+        return true
+    }
+    // Some devices report a constant normalized pressure of 1.0. Only use
+    // pressure when contact geometry is unavailable and the value exceeds it.
+    return major <= 0f && minor <= 0f && event.pressure >= 1.2f
 }
 
 @Composable
@@ -242,14 +265,18 @@ private fun TouchStatusPanel(
             text = when {
                 latestError != null -> "识别结果：未完成"
                 latestResult == null -> "识别结果：$gesturePreview"
-                else -> "识别结果：${latestResult.toGestureLabel()}"
+                else -> "识别结果：${latestResult.toClassificationDescription()}"
             },
             style = MaterialTheme.typography.titleLarge,
             color = if (latestError == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
         )
+        FourClassResultPanel(latestResult)
         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
         Text("当前触摸模型", style = MaterialTheme.typography.titleMedium)
-        Text(selectedModel?.toDisplayText() ?: "未加载触摸模型", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            selectedModel?.toDisplayText() ?: "未加载触摸模型",
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Text(
             if (isClassifierRunning) "分类器运行中" else "分类器未运行",
             style = MaterialTheme.typography.labelMedium,
@@ -258,20 +285,64 @@ private fun TouchStatusPanel(
     }
 }
 
+private val fourClassLabels = listOf(
+    "thumb_light", "thumb_heavy", "index_light", "index_heavy"
+)
+
+private fun fourClassDescription(label: String): String = when (label) {
+    "thumb_light" -> "拇指轻触"
+    "thumb_heavy" -> "拇指重触"
+    "index_light" -> "食指轻触"
+    "index_heavy" -> "食指重触"
+    else -> label.ifBlank { "未知类别" }
+}
+
+@Composable
+private fun FourClassResultPanel(result: AispectTouchResult?) {
+    Text("四分类模型反馈", style = MaterialTheme.typography.titleMedium)
+    if (result == null) {
+        Text("等待模型输出四分类结果", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        return
+    }
+    Text(
+        "${fourClassDescription(result.classLabel)}  confidence=${"%.2f".format(result.confidence)}",
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.primary
+    )
+    val probabilitiesByLabel = result.labelOrder.mapIndexed { index, label ->
+        label to result.probabilities.getOrNull(index).orZero()
+    }.toMap()
+    fourClassLabels.forEach { label ->
+        val probability = probabilitiesByLabel[label]
+        Text("${fourClassDescription(label)}（$label）：${probability?.let { "%.2f".format(it) } ?: "未提供"}",
+            color = if (label == result.classLabel) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            })
+    }
+}
+
+private fun Double?.orZero(): Double = this ?: 0.0
+
 private fun AispectTouchResult.toDisplayText(): String =
-    "${eventType} / ${classLabel.ifBlank { "UNKNOWN" }}  " +
-        "confidence=${"%.2f".format(confidence)}  x=${"%.0f".format(x)}, y=${"%.0f".format(y)}"
+    "${eventType} / ${classLabel.ifBlank { "UNKNOWN" }}  " + "confidence=${"%.2f".format(confidence)}  x=${
+        "%.0f".format(x)
+    }, y=${"%.0f".format(y)}"
 
 private fun AispectTouchResult.toGestureLabel(): String = when (eventType) {
-    AispectTouchEventType.TAP ->
-        if (strength.name == "HEAVY") "重触" else "点击"
-    AispectTouchEventType.PRESS ->
-        if (strength.name == "HEAVY") "重按压" else "按压"
+    AispectTouchEventType.TAP -> if (strength.name == "HEAVY") "重触" else "轻触"
+
+    AispectTouchEventType.PRESS -> if (strength.name == "HEAVY") "重按压" else "按压"
+
     AispectTouchEventType.HOLD -> "长按"
-    AispectTouchEventType.DRAG -> "拖动"
+    AispectTouchEventType.DRAG -> if (strength.name == "HEAVY") "重触" else "轻触"
     AispectTouchEventType.CANCEL -> "已取消"
     else -> "未知手势"
 }
+
+private fun AispectTouchResult.toClassificationDescription(): String =
+    if (classLabel in fourClassLabels) fourClassDescription(classLabel) else toGestureLabel()
 
 private fun AispectTouchModelInfo.toDisplayText(): String =
     "${displayName.ifBlank { id }}  $id v${version.ifBlank { "-" }}\n${inputChannels}通道 / ${frameCount}帧 / $windowMode"

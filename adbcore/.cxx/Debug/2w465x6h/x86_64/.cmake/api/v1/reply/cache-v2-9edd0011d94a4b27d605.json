@@ -11,7 +11,7 @@
 				}
 			],
 			"type" : "UNINITIALIZED",
-			"value" : "x86"
+			"value" : "x86_64"
 		},
 		{
 			"name" : "ANDROID_NDK",
@@ -75,7 +75,7 @@
 				}
 			],
 			"type" : "UNINITIALIZED",
-			"value" : "x86"
+			"value" : "x86_64"
 		},
 		{
 			"name" : "CMAKE_ANDROID_NDK",
@@ -163,7 +163,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "d:/WorkSpace/superAppAndroid/adbcore/.cxx/Debug/2w465x6h/x86"
+			"value" : "d:/WorkSpace/superAppAndroid/adbcore/.cxx/Debug/2w465x6h/x86_64"
 		},
 		{
 			"name" : "CMAKE_CACHE_MAJOR_VERSION",
@@ -635,7 +635,7 @@
 				}
 			],
 			"type" : "UNINITIALIZED",
-			"value" : "D:\\WorkSpace\\superAppAndroid\\adbcore\\.cxx\\Debug\\2w465x6h\\prefab\\x86\\prefab"
+			"value" : "D:\\WorkSpace\\superAppAndroid\\adbcore\\.cxx\\Debug\\2w465x6h\\prefab\\x86_64\\prefab"
 		},
 		{
 			"name" : "CMAKE_GENERATOR",
@@ -731,7 +731,7 @@
 				}
 			],
 			"type" : "UNINITIALIZED",
-			"value" : "D:\\WorkSpace\\superAppAndroid\\adbcore\\build\\intermediates\\cxx\\Debug\\2w465x6h\\obj\\x86"
+			"value" : "D:\\WorkSpace\\superAppAndroid\\adbcore\\build\\intermediates\\cxx\\Debug\\2w465x6h\\obj\\x86_64"
 		},
 		{
 			"name" : "CMAKE_LINKER",
@@ -1003,7 +1003,7 @@
 				}
 			],
 			"type" : "UNINITIALIZED",
-			"value" : "D:\\WorkSpace\\superAppAndroid\\adbcore\\build\\intermediates\\cxx\\Debug\\2w465x6h\\obj\\x86"
+			"value" : "D:\\WorkSpace\\superAppAndroid\\adbcore\\build\\intermediates\\cxx\\Debug\\2w465x6h\\obj\\x86_64"
 		},
 		{
 			"name" : "CMAKE_SHARED_LINKER_FLAGS",
@@ -1243,11 +1243,11 @@
 			[
 				{
 					"name" : "HELPSTRING",
-					"value" : "The CMake toolchain file"
+					"value" : "No help, variable specified on the command line."
 				}
 			],
-			"type" : "FILEPATH",
-			"value" : "D:/DevelopKits/Android/SDK/ndk/28.2.13676358/build/cmake/android.toolchain.cmake"
+			"type" : "UNINITIALIZED",
+			"value" : "D:\\DevelopKits\\Android\\SDK\\ndk\\28.2.13676358\\build\\cmake\\android.toolchain.cmake"
 		},
 		{
 			"name" : "CMAKE_VERBOSE_MAKEFILE",
@@ -1275,7 +1275,7 @@
 				}
 			],
 			"type" : "STATIC",
-			"value" : "D:/WorkSpace/superAppAndroid/adbcore/.cxx/Debug/2w465x6h/x86"
+			"value" : "D:/WorkSpace/superAppAndroid/adbcore/.cxx/Debug/2w465x6h/x86_64"
 		},
 		{
 			"name" : "adbcore_IS_TOP_LEVEL",
@@ -1311,7 +1311,7 @@
 				}
 			],
 			"type" : "PATH",
-			"value" : "D:/WorkSpace/superAppAndroid/adbcore/.cxx/Debug/2w465x6h/prefab/x86/prefab/lib/i686-linux-android/cmake/boringssl"
+			"value" : "D:/WorkSpace/superAppAndroid/adbcore/.cxx/Debug/2w465x6h/prefab/x86_64/prefab/lib/x86_64-linux-android/cmake/boringssl"
 		},
 		{
 			"name" : "cxx_DIR",
@@ -1323,7 +1323,7 @@
 				}
 			],
 			"type" : "PATH",
-			"value" : "D:/WorkSpace/superAppAndroid/adbcore/.cxx/Debug/2w465x6h/prefab/x86/prefab/lib/i686-linux-android/cmake/cxx"
+			"value" : "D:/WorkSpace/superAppAndroid/adbcore/.cxx/Debug/2w465x6h/prefab/x86_64/prefab/lib/x86_64-linux-android/cmake/cxx"
 		}
 	],
 	"kind" : "cache",

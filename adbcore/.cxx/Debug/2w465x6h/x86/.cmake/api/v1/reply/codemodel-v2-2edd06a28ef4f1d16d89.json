@@ -41,14 +41,14 @@
 				{
 					"directoryIndex" : 0,
 					"id" : "adb::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-adb-Debug-1fbb212b9ea350050a96.json",
+					"jsonFile" : "target-adb-Debug-cfa7eb777604d668e1c2.json",
 					"name" : "adb",
 					"projectIndex" : 0
 				},
 				{
 					"directoryIndex" : 0,
 					"id" : "libadbcore.so::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-libadbcore.so-Debug-04fefd650cd275775259.json",
+					"jsonFile" : "target-libadbcore.so-Debug-cbefc9c60b893f6f335c.json",
 					"name" : "libadbcore.so",
 					"projectIndex" : 0
 				}

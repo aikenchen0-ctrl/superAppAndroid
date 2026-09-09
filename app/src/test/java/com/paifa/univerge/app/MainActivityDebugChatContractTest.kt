@@ -55,7 +55,8 @@ class MainActivityDebugChatContractTest {
         assertTrue(activitySource.contains("重触"))
         assertTrue(activitySource.contains("按压"))
         assertTrue(activitySource.contains("长按"))
-        assertTrue(activitySource.contains("拖动"))
+        assertTrue(activitySource.contains("轻触"))
+        assertTrue(!activitySource.contains("拖动"))
     }
 
     private fun sourceFile(path: String): File {
