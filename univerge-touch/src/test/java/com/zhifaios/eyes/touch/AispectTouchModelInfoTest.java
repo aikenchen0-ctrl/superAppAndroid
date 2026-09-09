@@ -33,6 +33,32 @@ public final class AispectTouchModelInfoTest {
         Assert.assertEquals("thumb_light", info.labelOrder[0]);
         Assert.assertEquals("release", info.windowMode);
         Assert.assertEquals(0L, info.captureDelayMs);
+        Assert.assertEquals("", info.featureContract);
+        Assert.assertEquals("", info.runtimeArchitecture);
+    }
+
+    @Test
+    public void exposesCausalRuntimeContractMetadata() {
+        AispectTouchModelInfo info = new AispectTouchModelInfo(
+                "causal-model",
+                "2026.09.04",
+                "Causal touch",
+                19,
+                9,
+                new int[]{-3, -2, -1, 0, 1, 2, 3, 4, 5},
+                new String[]{"x_norm"},
+                4,
+                new String[]{"thumb_light", "thumb_heavy", "index_light", "index_heavy"},
+                "press",
+                25L,
+                "causal_touch_relative_v1",
+                "causal_touch_cnn_v1"
+        );
+
+        Assert.assertEquals("press", info.windowMode);
+        Assert.assertEquals(25L, info.captureDelayMs);
+        Assert.assertEquals("causal_touch_relative_v1", info.featureContract);
+        Assert.assertEquals("causal_touch_cnn_v1", info.runtimeArchitecture);
     }
 
 }

@@ -1,1 +1,1 @@
-C:\WorkSpace\UbikiTouch\adbcore\build\intermediates\cxx\Debug\2w465x6h\obj\arm64-v8a
+D:\WorkSpace\superAppAndroid\adbcore\build\intermediates\cxx\Debug\2w465x6h\obj\arm64-v8a

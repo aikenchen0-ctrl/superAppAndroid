@@ -14,6 +14,38 @@ public final class AispectTouchModelInfo {
     public final String[] labelOrder;
     public final String windowMode;
     public final long captureDelayMs;
+    public final String featureContract;
+    public final String runtimeArchitecture;
+
+    public AispectTouchModelInfo(
+            String id,
+            String version,
+            String displayName,
+            int inputChannels,
+            int frameCount,
+            int[] frameIndices,
+            String[] featureNames,
+            int classCount,
+                String[] labelOrder,
+                String windowMode,
+            long captureDelayMs
+    ) {
+        this(
+                id,
+                version,
+                displayName,
+                inputChannels,
+                frameCount,
+                frameIndices,
+                featureNames,
+                classCount,
+                labelOrder,
+                windowMode,
+                captureDelayMs,
+                "",
+                ""
+        );
+    }
 
     public AispectTouchModelInfo(
             String id,
@@ -26,7 +58,9 @@ public final class AispectTouchModelInfo {
             int classCount,
             String[] labelOrder,
             String windowMode,
-            long captureDelayMs
+            long captureDelayMs,
+            String featureContract,
+            String runtimeArchitecture
     ) {
         this.id = id == null ? "" : id;
         this.version = version == null ? "" : version;
@@ -39,6 +73,8 @@ public final class AispectTouchModelInfo {
         this.labelOrder = labelOrder == null ? new String[0] : labelOrder.clone();
         this.windowMode = windowMode == null ? "release" : windowMode;
         this.captureDelayMs = Math.max(0L, captureDelayMs);
+        this.featureContract = featureContract == null ? "" : featureContract;
+        this.runtimeArchitecture = runtimeArchitecture == null ? "" : runtimeArchitecture;
     }
 
     public AispectTouchModelInfo(
@@ -95,7 +131,9 @@ public final class AispectTouchModelInfo {
                 info.classCount,
                 info.labelOrder,
                 info.windowMode,
-                info.captureDelayMs
+                info.captureDelayMs,
+                info.featureContract,
+                info.runtimeArchitecture
         );
     }
 }

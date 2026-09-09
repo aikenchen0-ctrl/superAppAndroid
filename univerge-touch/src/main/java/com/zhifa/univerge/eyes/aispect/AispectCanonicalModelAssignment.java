@@ -19,8 +19,13 @@ final class AispectCanonicalModelAssignment {
     private static final String PLATFORM_ANDROID = "android";
     private static final String MODEL_TYPE_CNN_JSON = "cnn_json";
     private static final String MODEL_TYPE_TIME_GRID_GROUPNORM = "time_grid_groupnorm_cnn_v1";
+    private static final String MODEL_TYPE_CAUSAL_TOUCH = "causal_touch_cnn_v1";
+    private static final String MODEL_TYPE_CAUSAL_TOUCH_JSON = "aispect-causal-touch-json-v1";
+    private static final String MODEL_TYPE_FIELDWISE_SIZE = "aispect-fieldwise-size-json-v1";
     private static final String FEATURE_SCHEMA_ANDROID_V1 = "android-touch-cnn-v1";
     private static final String FEATURE_SCHEMA_TIME_GRID_GROUPNORM = "aispect-time-grid-groupnorm-v1";
+    private static final String FEATURE_SCHEMA_CAUSAL_TOUCH = "aispect-causal-touch-cnn-v1";
+    private static final String FEATURE_SCHEMA_FIELDWISE_SIZE = "aispect-fieldwise-size-cnn-v1";
 
     private AispectCanonicalModelAssignment() {
     }
@@ -56,14 +61,24 @@ final class AispectCanonicalModelAssignment {
         String modelType = selected.optString("modelType", "");
         boolean legacyModel = MODEL_TYPE_CNN_JSON.equals(modelType);
         boolean timeGridModel = MODEL_TYPE_TIME_GRID_GROUPNORM.equals(modelType);
-        if (!legacyModel && !timeGridModel) {
+        boolean causalModel = MODEL_TYPE_CAUSAL_TOUCH.equals(modelType)
+                || MODEL_TYPE_CAUSAL_TOUCH_JSON.equals(modelType);
+        boolean fieldwiseSizeModel = MODEL_TYPE_FIELDWISE_SIZE.equals(modelType);
+        if (!legacyModel && !timeGridModel && !causalModel && !fieldwiseSizeModel) {
             return reject("model_type_unsupported");
         }
         String featureSchemaId = selected.optString("featureSchemaId", "");
-        if (legacyModel && !FEATURE_SCHEMA_ANDROID_V1.equals(featureSchemaId)) {
+        if (legacyModel && !FEATURE_SCHEMA_ANDROID_V1.equals(featureSchemaId)
+                && !FEATURE_SCHEMA_CAUSAL_TOUCH.equals(featureSchemaId)) {
             return reject("feature_schema_unsupported");
         }
         if (timeGridModel && !FEATURE_SCHEMA_TIME_GRID_GROUPNORM.equals(featureSchemaId)) {
+            return reject("feature_schema_unsupported");
+        }
+        if (causalModel && !FEATURE_SCHEMA_CAUSAL_TOUCH.equals(featureSchemaId)) {
+            return reject("feature_schema_unsupported");
+        }
+        if (fieldwiseSizeModel && !FEATURE_SCHEMA_FIELDWISE_SIZE.equals(featureSchemaId)) {
             return reject("feature_schema_unsupported");
         }
         if (!hasCanonicalLabels(selected.optJSONArray("labelOrder"))) {
@@ -80,7 +95,15 @@ final class AispectCanonicalModelAssignment {
         int[] frameIndices = intArray(inputContract == null ? null : inputContract.optJSONArray("frameIndices"));
         String windowMode = inputContract == null ? "" : inputContract.optString("windowMode", "");
         int captureDelayMs = inputContract == null ? -1 : inputContract.optInt("captureDelayMs", -1);
-        if (legacyModel) {
+        if (causalModel || (legacyModel && FEATURE_SCHEMA_CAUSAL_TOUCH.equals(featureSchemaId))) {
+            if (!matchesCausalContract(inputContract, featureNames, frameIndices)) {
+                return reject("causal_contract_mismatch");
+            }
+        } else if (fieldwiseSizeModel) {
+            if (!matchesFieldwiseSizeContract(inputContract, featureNames, frameIndices)) {
+                return reject("fieldwise_size_contract_mismatch");
+            }
+        } else if (legacyModel) {
             if (!AispectCanonicalModelContract.matches(windowMode, captureDelayMs, frameIndices, featureNames)) {
                 return reject("release_contract_mismatch");
             }
@@ -126,7 +149,9 @@ final class AispectCanonicalModelAssignment {
         }
         String featureContract = inputContract.optString("featureContract", "");
         if (!AispectCausalPressFeatureBuilder.isTimeGridFeatureContract(featureContract)
-                || inputContract.optInt("frameCount", 0) != 9) {
+                || inputContract.optInt("frameCount", 0) != 9
+                || !"press".equals(inputContract.optString("windowMode", ""))
+                || inputContract.optInt("captureDelayMs", -1) != 25) {
             return false;
         }
         String[] expectedNames = AispectCausalPressFeatureBuilder.featureNames(featureContract);
@@ -143,6 +168,78 @@ final class AispectCanonicalModelAssignment {
                 && matrixShape.length() == 2
                 && matrixShape.optInt(0, -1) == 9
                 && matrixShape.optInt(1, -1) == expectedNames.length;
+    }
+
+    private static boolean matchesCausalContract(JSONObject inputContract, String[] featureNames, int[] frameIndices) {
+        if (inputContract == null
+                || !"causal_touch_relative_v1".equals(inputContract.optString("featureContract", ""))
+                || inputContract.optInt("frameCount", 0) != 9
+                || !"press".equals(inputContract.optString("windowMode", ""))
+                || inputContract.optInt("captureDelayMs", -1) != 25) {
+            return false;
+        }
+        String[] expectedNames = AispectCausalPressFeatureBuilder.featureNames("causal_touch_relative_v1");
+        if (featureNames.length != expectedNames.length || frameIndices.length != 9) {
+            return false;
+        }
+        for (int index = 0; index < expectedNames.length; index++) {
+            if (!expectedNames[index].equals(featureNames[index])) {
+                return false;
+            }
+        }
+        int[] expectedFrames = new int[]{-3, -2, -1, 0, 1, 2, 3, 4, 5};
+        if (!java.util.Arrays.equals(expectedFrames, frameIndices)) {
+            return false;
+        }
+        JSONArray matrixShape = inputContract.optJSONArray("matrixShape");
+        return matrixShape != null
+                && matrixShape.length() == 2
+                && matrixShape.optInt(0, -1) == 9
+                && matrixShape.optInt(1, -1) == expectedNames.length;
+    }
+
+    private static boolean matchesFieldwiseSizeContract(
+            JSONObject inputContract,
+            String[] featureNames,
+            int[] frameIndices
+    ) {
+        if (inputContract == null
+                || !AispectFieldwiseSizeFeatureBuilder.isFeatureContract(
+                inputContract.optString("featureContract", ""))
+                || !"press".equals(inputContract.optString("windowMode", ""))) {
+            return false;
+        }
+        int frameCount = inputContract.optInt("frameCount", 0);
+        if (frameCount != 9 && frameCount != 13 && frameCount != 17
+                && frameCount != 21 && frameCount != 25) {
+            return false;
+        }
+        if (featureNames.length != AispectFieldwiseSizeFeatureBuilder.featureNames().length
+                || frameIndices.length != frameCount) {
+            return false;
+        }
+        if (!java.util.Arrays.equals(
+                AispectFieldwiseSizeFeatureBuilder.featureNames(), featureNames)) {
+            return false;
+        }
+        for (int index = 0; index < frameCount; index++) {
+            if (frameIndices[index] != index) {
+                return false;
+            }
+        }
+        JSONArray offsets = inputContract.optJSONArray("gridOffsetsMs");
+        if (!AispectFieldwiseSizeFeatureBuilder.hasValidTimeGrid(
+                offsets,
+                frameCount,
+                inputContract.optLong("captureDelayMs", -1L)
+        )) {
+            return false;
+        }
+        JSONArray matrixShape = inputContract.optJSONArray("matrixShape");
+        return matrixShape != null
+                && matrixShape.length() == 2
+                && matrixShape.optInt(0, -1) == frameCount
+                && matrixShape.optInt(1, -1) == featureNames.length;
     }
 
     private static boolean hasStrictAscendingFrames(int[] frameIndices) {

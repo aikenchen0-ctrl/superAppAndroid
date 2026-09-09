@@ -3,6 +3,7 @@ package com.zhifa.univerge.eyes.touch;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Build;
 import android.view.MotionEvent;
 
 import com.zhifa.univerge.eyes.aispect.AispectCollectionController;
@@ -12,6 +13,7 @@ import com.zhifa.univerge.eyes.aispect.AispectImpactCNNClassifier;
 import com.zhifa.univerge.eyes.aispect.AispectRemoteModelUpdater;
 import com.zhifa.univerge.eyes.aispect.AispectModelUpdateReporter;
 import com.zhifa.univerge.eyes.aispect.AispectModelPreloadGate;
+import com.zhifa.univerge.eyes.aispect.AispectDeviceRegistrar;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -20,14 +22,17 @@ import java.net.URL;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
+import java.io.IOException;
+import org.json.JSONException;
 
 public final class AispectTouchClassifier implements AutoCloseable, AispectCollectionController.Listener {
-    public static final String SDK_VERSION = "1.0.0";
+    public static final String SDK_VERSION = "1.1.0";
     private final AispectCollectionController controller;
     private final String remoteModelBaseUrl;
     private final String remoteModelAppId;
     private final String remoteModelAppVersion;
     private final String remoteModelDeviceId;
+    private final String remoteModelDeviceName;
     private final boolean allowInsecureRemoteModelTransport;
     private final Handler callbackHandler;
     private final ExecutorService modelUpdateExecutor;
@@ -36,6 +41,7 @@ public final class AispectTouchClassifier implements AutoCloseable, AispectColle
     private volatile boolean closed;
     private AispectTouchListener listener;
     private volatile boolean running;
+    private volatile AispectTouchModelUpdateResult lastRemoteModelUpdateResult;
     private int lastEmittedPredictionSequence;
     private AispectTouchModelUpdateResult pendingUpdateReport;
 
@@ -51,7 +57,6 @@ public final class AispectTouchClassifier implements AutoCloseable, AispectColle
         controller.config().maximumTouchTravelPx = safeConfig.maximumPressTravelPx;
         controller.interactionEngine().config().minimumSampleIntervalMs = safeConfig.minimumSampleIntervalMs;
         controller.interactionEngine().config().dragActivationRadiusPx = safeConfig.dragActivationRadiusPx;
-        controller.interactionEngine().config().heavyTouchAreaThresholdPx2 = safeConfig.heavyTouchAreaThresholdPx2;
         allowInsecureRemoteModelTransport = safeConfig.allowInsecureRemoteModelTransport;
         controller.setAllowInsecureRemoteModelTransport(allowInsecureRemoteModelTransport);
         controller.setRemoteModelAllowedHosts(resolveAllowedHosts(safeConfig.remoteModelAllowedHosts, safeConfig.remoteModelBaseUrl));
@@ -63,6 +68,11 @@ public final class AispectTouchClassifier implements AutoCloseable, AispectColle
         remoteModelDeviceId = configuredDeviceId.isEmpty()
                 ? AispectTouchDeviceId.getOrCreate(context)
                 : configuredDeviceId;
+        remoteModelDeviceName = resolveRemoteModelDeviceName(
+                safeConfig.remoteModelDeviceName,
+                Build.MANUFACTURER,
+                Build.MODEL
+        );
         callbackHandler = new Handler(Looper.getMainLooper());
         modelPreloadGate = new AispectModelPreloadGate();
         modelUpdateExecutor = Executors.newSingleThreadExecutor(runnable -> {
@@ -87,7 +97,40 @@ public final class AispectTouchClassifier implements AutoCloseable, AispectColle
             }
             running = controller.isRecognitionRunning();
             lastEmittedPredictionSequence = 0;
+            scheduleDeviceRegistration();
             modelPreloadGate.schedule(modelUpdateExecutor, controller::preloadSelectedModel);
+        }
+    }
+
+    private void scheduleDeviceRegistration() {
+        if (remoteModelBaseUrl.trim().isEmpty() || remoteModelAppId.trim().isEmpty()) {
+            return;
+        }
+        try {
+            modelUpdateExecutor.execute(() -> {
+                try {
+                    AispectDeviceRegistrar.register(
+                            remoteModelBaseUrl,
+                            remoteModelAppId,
+                            remoteModelDeviceId,
+                            SDK_VERSION,
+                            remoteModelAppVersion,
+                            selectedModelInfo() == null ? "" : selectedModelInfo().id,
+                            selectedModelInfo() == null ? "" : selectedModelInfo().version,
+                            allowInsecureRemoteModelTransport,
+                            remoteModelDeviceName
+                    );
+                } catch (IOException | JSONException ignored) {
+                    // Registration is best effort and must not disable local recognition.
+                }
+                try {
+                    refreshRemoteModel();
+                } catch (RuntimeException ignored) {
+                    // Remote refresh is best effort and must not disable local recognition.
+                }
+            });
+        } catch (RejectedExecutionException ignored) {
+            // The executor may already be closing with the classifier.
         }
     }
 
@@ -134,6 +177,33 @@ public final class AispectTouchClassifier implements AutoCloseable, AispectColle
         return remoteModelDeviceId;
     }
 
+    public String remoteModelDeviceName() {
+        return remoteModelDeviceName;
+    }
+
+    public AispectTouchModelUpdateResult lastRemoteModelUpdateResult() {
+        return lastRemoteModelUpdateResult;
+    }
+
+    static String resolveRemoteModelDeviceName(String configured, String manufacturer, String model) {
+        String explicit = safe(configured).trim();
+        if (!explicit.isEmpty()) {
+            return explicit;
+        }
+        String maker = safe(manufacturer).trim();
+        String product = safe(model).trim();
+        if (!maker.isEmpty() && !product.isEmpty()) {
+            return maker + " " + product;
+        }
+        if (!product.isEmpty()) {
+            return product;
+        }
+        if (!maker.isEmpty()) {
+            return maker;
+        }
+        return "Android device";
+    }
+
     public boolean isSelectedModelSdkRecommended() {
         return controller.isSelectedModelSdkRecommended();
     }
@@ -155,7 +225,11 @@ public final class AispectTouchClassifier implements AutoCloseable, AispectColle
                 selectedModelInfo() == null ? "" : selectedModelInfo().version,
                 allowInsecureRemoteModelTransport
         );
-        return canonicalUrl.isEmpty() ? failedResult("canonical_configuration_invalid") : refreshCanonicalRemoteModel(canonicalUrl);
+        AispectTouchModelUpdateResult result = canonicalUrl.isEmpty()
+                ? failedResult("canonical_configuration_invalid")
+                : refreshCanonicalRemoteModel(canonicalUrl);
+        lastRemoteModelUpdateResult = result;
+        return result;
     }
 
     private AispectTouchModelUpdateResult refreshCanonicalRemoteModel(String assignmentUrl) {
@@ -164,6 +238,7 @@ public final class AispectTouchClassifier implements AutoCloseable, AispectColle
         }
         try {
             AispectTouchModelUpdateResult result = publicUpdateResult(controller.refreshCanonicalRemoteModel(assignmentUrl, SDK_VERSION));
+            lastRemoteModelUpdateResult = result;
             if (result.status == AispectTouchModelUpdateStatus.DEFERRED) {
                 pendingUpdateReport = result;
                 return result;
@@ -187,6 +262,7 @@ public final class AispectTouchClassifier implements AutoCloseable, AispectColle
             return result;
         } catch (Exception error) {
             AispectTouchModelUpdateResult result = failedResult(error.getClass().getSimpleName());
+            lastRemoteModelUpdateResult = result;
             AispectModelUpdateReporter.report(
                     remoteModelBaseUrl,
                     remoteModelAppId,

@@ -1,7 +1,7 @@
 package com.zhifa.univerge.eyes.aispect;
 
-public final class AispectAccelerationNormalizer {
-    static class Sample {
+final class AispectAccelerationNormalizer {
+    static final class Sample {
         final boolean reliable;
         final double x;
         final double y;

@@ -90,6 +90,16 @@ final class AispectModelBundleValidator {
         )) {
             return validateTimeGrid(assignment, weights, scaler);
         }
+        if (AispectRemoteModelAssignment.FEATURE_SCHEMA_CAUSAL_TOUCH_V1.equals(
+                assignment.featureSchemaId
+        )) {
+            return validateCausalTouch(assignment, weights, scaler);
+        }
+        if (AispectRemoteModelAssignment.FEATURE_SCHEMA_FIELDWISE_SIZE_V1.equals(
+                assignment.featureSchemaId
+        )) {
+            return validateFieldwiseSize(assignment, weights, scaler);
+        }
         try {
             JSONArray center = scaler.getJSONArray("center");
             JSONArray scale = scaler.getJSONArray("scale");
@@ -185,6 +195,92 @@ final class AispectModelBundleValidator {
         }
     }
 
+    private static Result validateFieldwiseSize(
+            AispectRemoteModelAssignment assignment,
+            JSONObject weights,
+            JSONObject scaler
+    ) {
+        try {
+            if (!AispectRemoteModelAssignment.MODEL_TYPE_FIELDWISE_SIZE_V1.equals(assignment.modelType)
+                    || !"fieldwise_size_cnn_v1".equals(scaler.optString("runtimeArchitecture", ""))
+                    || !"press".equals(scaler.optString("windowMode", ""))) {
+                return invalid("fieldwise_size_contract_mismatch");
+            }
+            String[] expectedNames = AispectFieldwiseSizeFeatureBuilder.featureNames();
+            JSONArray names = scaler.getJSONArray("featureNames");
+            JSONArray center = scaler.getJSONArray("center");
+            JSONArray scale = scaler.getJSONArray("scale");
+            JSONArray frameIndices = scaler.getJSONArray("frameIndices");
+            JSONArray offsets = scaler.getJSONArray("gridOffsetsMs");
+            int frameCount = scaler.optInt("frameCount", 0);
+            if (frameCount != 9 && frameCount != 13 && frameCount != 17
+                    && frameCount != 21 && frameCount != 25) {
+                return invalid("fieldwise_size_contract_mismatch");
+            }
+            if (names.length() != expectedNames.length
+                    || center.length() != expectedNames.length
+                    || scale.length() != expectedNames.length
+                    || frameIndices.length() != frameCount
+                    || !AispectFieldwiseSizeFeatureBuilder.hasValidTimeGrid(
+                    offsets,
+                    frameCount,
+                    scaler.optLong("captureDelayMs", -1L)
+            )) {
+                return invalid("fieldwise_size_contract_mismatch");
+            }
+            for (int index = 0; index < expectedNames.length; index++) {
+                if (!expectedNames[index].equals(names.optString(index, ""))
+                        || !isFiniteNumber(center.opt(index))
+                        || !isFiniteNumber(scale.opt(index))
+                        || ((Number) scale.opt(index)).doubleValue() <= 0.0) {
+                    return invalid("fieldwise_size_contract_mismatch");
+                }
+            }
+            for (int index = 0; index < frameCount; index++) {
+                if (frameIndices.optInt(index, Integer.MIN_VALUE) != index) {
+                    return invalid("fieldwise_size_contract_mismatch");
+                }
+            }
+            JSONArray matrixShape = scaler.optJSONArray("matrixShape");
+            if (matrixShape == null || matrixShape.length() != 2
+                    || matrixShape.optInt(0, -1) != frameCount
+                    || matrixShape.optInt(1, -1) != expectedNames.length) {
+                return invalid("fieldwise_size_contract_mismatch");
+            }
+            if (!matchesCausalLabels(assignment, scaler)) {
+                return invalid("output_schema_mismatch");
+            }
+            Tensor conv0 = tensor(weights, "features.0.weight");
+            Tensor conv0Bias = tensor(weights, "features.0.bias");
+            Tensor conv1 = tensor(weights, "features.4.weight");
+            Tensor conv1Bias = tensor(weights, "features.4.bias");
+            Tensor conv2 = tensor(weights, "features.9.weight");
+            Tensor conv2Bias = tensor(weights, "features.9.bias");
+            Tensor classifier0 = tensor(weights, "classifier.0.weight");
+            Tensor classifier0Bias = tensor(weights, "classifier.0.bias");
+            Tensor classifier3 = tensor(weights, "classifier.3.weight");
+            Tensor classifier3Bias = tensor(weights, "classifier.3.bias");
+            if (!matchesShape(conv0, 32, 22, 3)
+                    || !matchesShape(conv0Bias, 32)
+                    || !hasBatchNorm(weights, "features.1", 32)
+                    || !matchesShape(conv1, 64, 32, 3)
+                    || !matchesShape(conv1Bias, 64)
+                    || !hasBatchNorm(weights, "features.5", 64)
+                    || !matchesShape(conv2, 128, 64, 3)
+                    || !matchesShape(conv2Bias, 128)
+                    || !hasBatchNorm(weights, "features.10", 128)
+                    || !matchesShape(classifier0, 64, 128 * (frameCount / 4))
+                    || !matchesShape(classifier0Bias, 64)
+                    || !matchesShape(classifier3, 4, 64)
+                    || !matchesShape(classifier3Bias, 4)) {
+                return invalid("tensor_shape_mismatch");
+            }
+            return new Result(true, "valid");
+        } catch (JSONException | RuntimeException error) {
+            return invalid("model_json_invalid");
+        }
+    }
+
     private static Result validateTimeGrid(
             AispectRemoteModelAssignment assignment,
             JSONObject weights,
@@ -236,6 +332,109 @@ final class AispectModelBundleValidator {
         } catch (JSONException | RuntimeException error) {
             return invalid("model_json_invalid");
         }
+    }
+
+    private static Result validateCausalTouch(
+            AispectRemoteModelAssignment assignment,
+            JSONObject weights,
+            JSONObject scaler
+    ) {
+        try {
+            if (!"causal_touch_relative_v1".equals(scaler.optString("featureContract", ""))
+                    || !"causal_touch_cnn_v1".equals(scaler.optString("runtimeArchitecture", ""))
+                    || !"press".equals(scaler.optString("windowMode", ""))
+                    || scaler.optInt("captureDelayMs", -1) != 25) {
+                return invalid("causal_contract_mismatch");
+            }
+            String[] expectedNames = AispectCausalPressFeatureBuilder.featureNames("causal_touch_relative_v1");
+            JSONArray featureNames = scaler.getJSONArray("featureNames");
+            JSONArray center = scaler.getJSONArray("center");
+            JSONArray scale = scaler.getJSONArray("scale");
+            JSONArray frameIndices = scaler.getJSONArray("frameIndices");
+            if (featureNames.length() != expectedNames.length
+                    || center.length() != expectedNames.length
+                    || scale.length() != expectedNames.length
+                    || scaler.optInt("frameCount", 0) != 9
+                    || frameIndices.length() != 9) {
+                return invalid("causal_contract_mismatch");
+            }
+            for (int index = 0; index < expectedNames.length; index++) {
+                if (!expectedNames[index].equals(featureNames.optString(index, ""))) {
+                    return invalid("causal_contract_mismatch");
+                }
+                if (!isFiniteNumber(center.opt(index))) {
+                    return invalid("center_invalid");
+                }
+                Object scaleValue = scale.opt(index);
+                if (!isFiniteNumber(scaleValue)
+                        || ((Number) scaleValue).doubleValue() <= 0.0) {
+                    return invalid("scale_invalid");
+                }
+            }
+            int[] expectedFrames = new int[]{-3, -2, -1, 0, 1, 2, 3, 4, 5};
+            for (int index = 0; index < expectedFrames.length; index++) {
+                Object value = frameIndices.opt(index);
+                if (!(value instanceof Number)
+                        || ((Number) value).doubleValue() != expectedFrames[index]) {
+                    return invalid("causal_contract_mismatch");
+                }
+            }
+            if (!matchesCausalLabels(assignment, scaler)) {
+                return invalid("output_schema_mismatch");
+            }
+            Tensor conv0 = tensor(weights, "features.0.weight");
+            Tensor conv0Bias = tensor(weights, "features.0.bias");
+            Tensor conv1 = tensor(weights, "features.4.weight");
+            Tensor conv1Bias = tensor(weights, "features.4.bias");
+            Tensor conv2 = tensor(weights, "features.9.weight");
+            Tensor conv2Bias = tensor(weights, "features.9.bias");
+            Tensor classifier0 = tensor(weights, "classifier.0.weight");
+            Tensor classifier0Bias = tensor(weights, "classifier.0.bias");
+            Tensor classifier3 = tensor(weights, "classifier.3.weight");
+            Tensor classifier3Bias = tensor(weights, "classifier.3.bias");
+            if (!matchesShape(conv0, 32, 19, 3)
+                    || !matchesShape(conv0Bias, 32)
+                    || !hasBatchNorm(weights, "features.1", 32)
+                    || !matchesShape(conv1, 64, 32, 3)
+                    || !matchesShape(conv1Bias, 64)
+                    || !hasBatchNorm(weights, "features.5", 64)
+                    || !matchesShape(conv2, 128, 64, 3)
+                    || !matchesShape(conv2Bias, 128)
+                    || !hasBatchNorm(weights, "features.10", 128)
+                    || !matchesShape(classifier0, 64, 256)
+                    || !matchesShape(classifier0Bias, 64)
+                    || !matchesShape(classifier3, 4, 64)
+                    || !matchesShape(classifier3Bias, 4)) {
+                return invalid("tensor_shape_mismatch");
+            }
+            return new Result(true, "valid");
+        } catch (JSONException | RuntimeException error) {
+            return invalid("model_json_invalid");
+        }
+    }
+
+    private static boolean matchesCausalLabels(
+            AispectRemoteModelAssignment assignment,
+            JSONObject scaler
+    ) throws JSONException {
+        int classCount = scaler.optInt("classCount", 0);
+        String[] labels = stringArray(scaler.optJSONArray("labelOrder"));
+        return classCount == 4
+                && AispectCanonicalModelContract.matchesLabels(labels)
+                && assignment.classCount == 4
+                && Arrays.equals(assignment.labelOrder, labels);
+    }
+
+    private static boolean matchesShape(Tensor tensor, int... shape) {
+        if (tensor.shape.length != shape.length) {
+            return false;
+        }
+        for (int index = 0; index < shape.length; index++) {
+            if (tensor.shape[index] != shape[index]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean hasBatchNorm(JSONObject weights, String prefix, int size) throws JSONException {

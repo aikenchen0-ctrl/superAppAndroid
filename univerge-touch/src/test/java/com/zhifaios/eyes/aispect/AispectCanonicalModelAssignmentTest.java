@@ -2,6 +2,7 @@ package com.zhifaios.eyes.aispect;
 
 import com.zhifa.univerge.eyes.aispect.AispectCanonicalModelAssignment;
 import com.zhifa.univerge.eyes.aispect.AispectCausalPressFeatureBuilder;
+import com.zhifa.univerge.eyes.aispect.AispectFieldwiseSizeFeatureBuilder;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -141,7 +142,9 @@ public final class AispectCanonicalModelAssignmentTest {
                         AispectCausalPressFeatureBuilder.featureNames(featureContract)
                 ))
                 .put("frameCount", 9)
-                .put("matrixShape", new JSONArray().put(9).put(20)));
+                .put("matrixShape", new JSONArray().put(9).put(20))
+                .put("windowMode", "press")
+                .put("captureDelayMs", 25));
 
         AispectCanonicalModelAssignment.Result result = AispectCanonicalModelAssignment.parse(
                 manifest,
@@ -151,6 +154,85 @@ public final class AispectCanonicalModelAssignmentTest {
         Assert.assertTrue(result.reason, result.accepted);
         Assert.assertEquals("time_grid_groupnorm_cnn_v1", result.assignment.modelType);
         Assert.assertEquals("aispect-time-grid-groupnorm-v1", result.assignment.featureSchemaId);
+    }
+
+    @Test
+    public void acceptsCausalPressContractWithDeclaredDelay() throws Exception {
+        AispectCanonicalModelAssignment.Result result = AispectCanonicalModelAssignment.parse(
+                causalManifest(),
+                "1.0.0"
+        );
+
+        Assert.assertTrue(result.reason, result.accepted);
+        Assert.assertEquals("press", result.assignment.inputWindowMode);
+        Assert.assertEquals(25, result.assignment.inputCaptureDelayMs);
+    }
+
+    @Test
+    public void acceptsAllFieldwiseSizeWindowContracts() throws Exception {
+        int[] windowSizes = new int[]{9, 13, 17, 21, 25};
+        for (int windowSize : windowSizes) {
+            AispectCanonicalModelAssignment.Result result = AispectCanonicalModelAssignment.parse(
+                    fieldwiseManifest(windowSize),
+                    "1.0.0"
+            );
+
+            Assert.assertTrue(result.reason, result.accepted);
+            Assert.assertEquals("aispect-fieldwise-size-json-v1", result.assignment.modelType);
+            Assert.assertEquals("aispect-fieldwise-size-cnn-v1", result.assignment.featureSchemaId);
+            Assert.assertEquals(windowSize, result.assignment.inputFrameIndices.length);
+            Assert.assertEquals(windowSize == 9 ? 25 : windowSize == 13 ? 35 : windowSize == 17 ? 45 : windowSize == 21 ? 55 : 65,
+                    result.assignment.inputCaptureDelayMs);
+        }
+    }
+
+    @Test
+    public void rejectsShiftedFieldwiseSizeGrid() throws Exception {
+        JSONObject manifest = fieldwiseManifest(9);
+        JSONObject input = manifest.getJSONArray("models").getJSONObject(0).getJSONObject("inputContract");
+        JSONArray offsets = input.getJSONArray("gridOffsetsMs");
+        for (int index = 0; index < offsets.length(); index++) {
+            offsets.put(index, offsets.getInt(index) + 5);
+        }
+        input.put("captureDelayMs", 30);
+
+        Assert.assertEquals(
+                "fieldwise_size_contract_mismatch",
+                AispectCanonicalModelAssignment.parse(manifest, "1.1.0").reason
+        );
+    }
+
+    @Test
+    public void rejectsNonUniformFieldwiseSizeGrid() throws Exception {
+        JSONObject manifest = fieldwiseManifest(13);
+        manifest.getJSONArray("models").getJSONObject(0)
+                .getJSONObject("inputContract")
+                .getJSONArray("gridOffsetsMs")
+                .put(4, -4);
+
+        Assert.assertEquals(
+                "fieldwise_size_contract_mismatch",
+                AispectCanonicalModelAssignment.parse(manifest, "1.1.0").reason
+        );
+    }
+
+    @Test
+    public void rejectsCausalContractWhenWindowOrDelayDoesNotMatch() throws Exception {
+        JSONObject wrongWindow = causalManifest();
+        wrongWindow.getJSONArray("models").getJSONObject(0)
+                .getJSONObject("inputContract").put("windowMode", "release");
+        Assert.assertEquals(
+                "causal_contract_mismatch",
+                AispectCanonicalModelAssignment.parse(wrongWindow, "1.0.0").reason
+        );
+
+        JSONObject wrongDelay = causalManifest();
+        wrongDelay.getJSONArray("models").getJSONObject(0)
+                .getJSONObject("inputContract").put("captureDelayMs", 24);
+        Assert.assertEquals(
+                "causal_contract_mismatch",
+                AispectCanonicalModelAssignment.parse(wrongDelay, "1.0.0").reason
+        );
     }
 
     private static JSONObject withAndroidNullStringBehavior(JSONObject manifest) throws Exception {
@@ -200,6 +282,80 @@ public final class AispectCanonicalModelAssignmentTest {
                 .put("platform", "android")
                 .put("selectedModelId", "android-touch-model")
                 .put("assignmentReason", "device_exact")
+                .put("models", new JSONArray().put(model));
+    }
+
+    private static JSONObject causalManifest() throws Exception {
+        String featureContract = "causal_touch_relative_v1";
+        JSONObject model = new JSONObject()
+                .put("id", "causal-touch-model")
+                .put("version", "2026.09.04")
+                .put("displayName", "Causal touch model")
+                .put("platform", "android")
+                .put("modelType", "causal_touch_cnn_v1")
+                .put("minimumSdkVersion", "1.0.0")
+                .put("featureSchemaId", "aispect-causal-touch-cnn-v1")
+                .put("labelOrder", labels())
+                .put("inputContract", new JSONObject()
+                        .put("featureContract", featureContract)
+                        .put("featureNames", new JSONArray(AispectCausalPressFeatureBuilder.featureNames(featureContract)))
+                        .put("frameIndices", new JSONArray(new int[]{-3, -2, -1, 0, 1, 2, 3, 4, 5}))
+                        .put("frameCount", 9)
+                        .put("matrixShape", new JSONArray().put(9).put(19))
+                        .put("windowMode", "press")
+                        .put("captureDelayMs", 25))
+                .put("weightsURL", "https://models.example.com/api/v1/artifacts/android/causal-touch-model/2026.09.04/weights")
+                .put("scalerURL", "https://models.example.com/api/v1/artifacts/android/causal-touch-model/2026.09.04/scaler")
+                .put("weightsSHA256", repeat('a', 64))
+                .put("scalerSHA256", repeat('b', 64))
+                .put("weightsSizeBytes", 123L)
+                .put("scalerSizeBytes", 456L);
+        return new JSONObject()
+                .put("schemaVersion", 1)
+                .put("generatedAt", "2026-09-04T00:00:00Z")
+                .put("platform", "android")
+                .put("selectedModelId", "causal-touch-model")
+                .put("assignmentReason", "device_exact")
+                .put("models", new JSONArray().put(model));
+    }
+
+    private static JSONObject fieldwiseManifest(int windowSize) throws Exception {
+        int captureDelayMs = windowSize == 9 ? 25 : windowSize == 13 ? 35 : windowSize == 17 ? 45 : windowSize == 21 ? 55 : 65;
+        JSONArray frameIndices = new JSONArray();
+        JSONArray offsets = new JSONArray();
+        int firstOffset = -15 - ((windowSize - 9) / 2) * 5;
+        for (int index = 0; index < windowSize; index++) {
+            frameIndices.put(index);
+            offsets.put(firstOffset + index * 5);
+        }
+        JSONObject model = new JSONObject()
+                .put("id", "fieldwise-size-model-" + windowSize)
+                .put("version", "1.0.0")
+                .put("displayName", "Fieldwise size model")
+                .put("platform", "android")
+                .put("modelType", "aispect-fieldwise-size-json-v1")
+                .put("featureSchemaId", "aispect-fieldwise-size-cnn-v1")
+                .put("classCount", 4)
+                .put("labelOrder", labels())
+                .put("inputContract", new JSONObject()
+                        .put("featureContract", "fieldwise_size_causal_w" + String.format(java.util.Locale.US, "%02d", windowSize) + "_v1")
+                        .put("featureNames", new JSONArray(AispectFieldwiseSizeFeatureBuilder.featureNames()))
+                        .put("frameCount", windowSize)
+                        .put("frameIndices", frameIndices)
+                        .put("matrixShape", new JSONArray().put(windowSize).put(22))
+                        .put("gridOffsetsMs", offsets)
+                        .put("windowMode", "press")
+                        .put("captureDelayMs", captureDelayMs))
+                .put("weightsURL", "https://models.example.com/weights.json")
+                .put("scalerURL", "https://models.example.com/scaler.json")
+                .put("weightsSHA256", repeat('a', 64))
+                .put("scalerSHA256", repeat('b', 64))
+                .put("weightsSizeBytes", 123L)
+                .put("scalerSizeBytes", 456L);
+        return new JSONObject()
+                .put("schemaVersion", 1)
+                .put("platform", "android")
+                .put("selectedModelId", "fieldwise-size-model-" + windowSize)
                 .put("models", new JSONArray().put(model));
     }
 

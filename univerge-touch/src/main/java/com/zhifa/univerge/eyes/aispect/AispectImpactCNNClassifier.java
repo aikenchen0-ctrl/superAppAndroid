@@ -13,7 +13,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +24,7 @@ public final class AispectImpactCNNClassifier {
     private static final String MODEL_G13 = "g13_time_f14_pre4_post9";
     private static final String MODEL_ANDROID_TOP_WINDOW = "android_patch21_no_confidence_pre5_post9";
     private static final String MODEL_FINGER_FOUR_CLASS_TOP = AispectTouchModelSelector.PUBLISHED_MODEL_ID;
+    private static final String MODEL_CAUSAL_TOUCH_RELATIVE = "causal_touch_relative_v1_all_devices_fit_20260904";
     private static final double EPSILON = 1e-5;
     private static final int CONTACT_MAP_SIZE = 9;
     private static final double CONTACT_GRID_RADIUS_PX = 48.0;
@@ -181,6 +181,7 @@ public final class AispectImpactCNNClassifier {
     private final Map<String, Boolean> modelLoadAttempts = new HashMap<>();
     private final Map<String, AispectTimeGridGroupNormRuntime> timeGridRuntimeCache = new HashMap<>();
     private final Map<String, Boolean> timeGridRuntimeLoadAttempts = new HashMap<>();
+    private final AispectImmutableListCache<ModelInfo> publicCatalogCache = new AispectImmutableListCache<>();
     private List<ModelInfo> catalogModels;
 
     public AispectImpactCNNClassifier(Context context) {
@@ -193,7 +194,7 @@ public final class AispectImpactCNNClassifier {
     }
 
     public synchronized List<ModelInfo> availableModels() {
-        return Collections.unmodifiableList(new ArrayList<>(loadCatalogModels()));
+        return publicCatalogCache.snapshot(loadCatalogModels());
     }
 
     synchronized ModelInfo activeDownloadedModelInfo() {
@@ -217,6 +218,10 @@ public final class AispectImpactCNNClassifier {
     }
 
     public synchronized ModelInfo defaultModelInfo() {
+        ModelInfo causal = modelInfoForId(MODEL_CAUSAL_TOUCH_RELATIVE);
+        if (causal != null) {
+            return causal;
+        }
         ModelInfo fingerFourClass = modelInfoForId(MODEL_FINGER_FOUR_CLASS_TOP);
         if (fingerFourClass != null) {
             return fingerFourClass;
@@ -360,7 +365,14 @@ public final class AispectImpactCNNClassifier {
         if (model == null || window == null) {
             return null;
         }
-        double[][] features = makeFeatures(window, model, contactPatch, normalizationProfile, contactEncodingProfile);
+        double[][] features = makeFeatures(
+                window,
+                model,
+                contactPatch,
+                normalizationProfile,
+                contactEncodingProfile,
+                touchFrames
+        );
         if (features == null) {
             return null;
         }
@@ -402,6 +414,7 @@ public final class AispectImpactCNNClassifier {
 
     public synchronized void reloadModelCatalog() {
         catalogModels = null;
+        publicCatalogCache.invalidate();
         modelCache.clear();
         modelLoadAttempts.clear();
         timeGridRuntimeCache.clear();
@@ -487,6 +500,8 @@ public final class AispectImpactCNNClassifier {
             return new Model(
                     info.id,
                     info.version,
+                    info.featureContract,
+                    scaler,
                     inputChannels,
                     frameIndices,
                     featureNames,
@@ -684,8 +699,33 @@ public final class AispectImpactCNNClassifier {
             Model model,
             AispectContactPatch contactPatch,
             AispectTouchNormalizationProfile normalizationProfile,
-            AispectContactEncodingProfile contactEncodingProfile
+            AispectContactEncodingProfile contactEncodingProfile,
+            List<AispectTouchFrame> touchFrames
     ) {
+        if (AispectFieldwiseSizeFeatureBuilder.isFeatureContract(model.featureContract)) {
+            if (window == null || touchFrames == null || model.scaler == null) {
+                return null;
+            }
+            double[][] raw = AispectFieldwiseSizeFeatureBuilder.build(
+                    window.frames,
+                    touchFrames,
+                    Math.round(window.anchorTimestampSeconds * 1_000_000_000.0),
+                    model.featureContract,
+                    model.scaler,
+                    android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL
+            );
+            return normalizeFeatures(raw, model.center, model.scale);
+        }
+        if (AispectCausalPressFeatureBuilder.isTimeGridFeatureContract(model.featureContract)) {
+            return buildCausalModelFeatures(
+                    window,
+                    touchFrames,
+                    model.featureContract,
+                    model.frameIndices,
+                    model.center,
+                    model.scale
+            );
+        }
         // 手机端必须按训练导出的 featureNames 顺序取值，任何通道顺序漂移都会让 CNN 权重失效。
         Map<Integer, AispectModels.ImpactFrame> byIndex = new HashMap<>();
         for (int i = 0; i < window.frames.length; i++) {
@@ -702,6 +742,86 @@ public final class AispectImpactCNNClassifier {
             for (int channel = 0; channel < model.inputChannels; channel++) {
                 double raw = featureValue(source, model.featureNames[channel], contactPatch, normalizationProfile, contactFeatures);
                 output[frame][channel] = (raw - model.center[channel]) / model.scale[channel];
+            }
+        }
+        return output;
+    }
+
+    private static double[][] normalizeFeatures(
+            double[][] raw,
+            double[] center,
+            double[] scale
+    ) {
+        if (raw == null || center == null || scale == null || center.length != scale.length) {
+            return null;
+        }
+        double[][] output = new double[raw.length][center.length];
+        double[] safeScale = sanitizeScale(scale);
+        for (int frame = 0; frame < raw.length; frame++) {
+            if (raw[frame] == null || raw[frame].length != center.length) {
+                return null;
+            }
+            for (int channel = 0; channel < center.length; channel++) {
+                if (!Double.isFinite(raw[frame][channel]) || !Double.isFinite(center[channel])) {
+                    return null;
+                }
+                output[frame][channel] = (raw[frame][channel] - center[channel]) / safeScale[channel];
+            }
+        }
+        return output;
+    }
+
+    static double[][] buildCausalModelFeatures(
+            AispectSignalWindowBuilder.Window window,
+            List<AispectTouchFrame> touchFrames,
+            String featureContract,
+            int[] frameIndices,
+            double[] center,
+            double[] scale
+    ) {
+        if (!AispectCausalPressFeatureBuilder.isTimeGridFeatureContract(featureContract)
+                || window == null
+                || touchFrames == null
+                || frameIndices == null
+                || center == null
+                || scale == null
+                || frameIndices.length == 0
+                || center.length != AispectCausalPressFeatureBuilder.featureNames(featureContract).length
+                || scale.length != center.length) {
+            return null;
+        }
+        int[] expectedFrameIndices = new int[]{-3, -2, -1, 0, 1, 2, 3, 4, 5};
+        if (frameIndices.length != expectedFrameIndices.length) {
+            return null;
+        }
+        for (int index = 0; index < expectedFrameIndices.length; index++) {
+            if (frameIndices[index] != expectedFrameIndices[index]) {
+                return null;
+            }
+        }
+        long anchorNanos = Math.round(window.anchorTimestampSeconds * 1_000_000_000.0);
+        double[][] raw = AispectCausalPressFeatureBuilder.buildTimeGrid(
+                window.frames,
+                touchFrames,
+                anchorNanos,
+                featureContract
+        );
+        if (raw == null || raw.length != frameIndices.length) {
+            return null;
+        }
+        int inputChannels = center.length;
+        double[] safeScale = sanitizeScale(scale);
+        double[][] output = new double[raw.length][inputChannels];
+        for (int frame = 0; frame < raw.length; frame++) {
+            if (raw[frame] == null || raw[frame].length != inputChannels) {
+                return null;
+            }
+            for (int channel = 0; channel < inputChannels; channel++) {
+                double value = raw[frame][channel];
+                if (!Double.isFinite(value) || !Double.isFinite(center[channel])) {
+                    return null;
+                }
+                output[frame][channel] = (value - center[channel]) / safeScale[channel];
             }
         }
         return output;
@@ -1359,6 +1479,8 @@ public final class AispectImpactCNNClassifier {
     private static final class Model {
         final String id;
         final String version;
+        final String featureContract;
+        final JSONObject scaler;
         final int inputChannels;
         final int[] frameIndices;
         final String[] featureNames;
@@ -1396,6 +1518,8 @@ public final class AispectImpactCNNClassifier {
         Model(
                 String id,
                 String version,
+                String featureContract,
+                JSONObject scaler,
                 int inputChannels,
                 int[] frameIndices,
                 String[] featureNames,
@@ -1432,6 +1556,8 @@ public final class AispectImpactCNNClassifier {
         ) {
             this.id = id;
             this.version = version == null ? "" : version;
+            this.featureContract = featureContract == null ? "" : featureContract;
+            this.scaler = scaler;
             this.inputChannels = inputChannels;
             this.frameIndices = frameIndices;
             this.featureNames = featureNames;

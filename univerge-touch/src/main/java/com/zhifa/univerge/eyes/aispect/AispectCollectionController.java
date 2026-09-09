@@ -698,7 +698,12 @@ public final class AispectCollectionController {
 
     private void scheduleCausalPrediction(final int sequence) {
         AispectImpactCNNClassifier.ModelInfo info = classifier.modelInfoForId(activeModelId);
-        if (info == null || !AispectCausalPressFeatureBuilder.isTimeGridFeatureContract(info.featureContract)) {
+        final long captureDelayMs = info == null
+                ? -1L
+                : causalPredictionDelayMs(info.windowMode, info.captureDelayMs);
+        if (info == null
+                || !AispectCausalPressFeatureBuilder.isTimeGridFeatureContract(info.featureContract)
+                || captureDelayMs < 0L) {
             return;
         }
         cancelCausalPredictionRunnable();
@@ -712,15 +717,26 @@ public final class AispectCollectionController {
                 AispectModels.ImpactFrame[] frames = snapshot.frames.toArray(
                         new AispectModels.ImpactFrame[0]
                 );
-                if (!canPublishCausalTimeGridPrediction(
+                boolean hasWindowSupport = AispectFieldwiseSizeFeatureBuilder.isFeatureContract(info.featureContract)
+                        ? AispectFieldwiseSizeFeatureBuilder.hasTimeGridSupport(
                         frames,
                         downEventElapsedRealtimeNanos,
-                        liftEventElapsedRealtimeNanos
-                )) {
-                    if (liftEventElapsedRealtimeNanos > 0L
-                            && liftEventElapsedRealtimeNanos < downEventElapsedRealtimeNanos + 25_000_000L) {
+                        info.frameCount,
+                        captureDelayMs
+                )
+                        : canPublishCausalTimeGridPrediction(
+                        frames,
+                        downEventElapsedRealtimeNanos,
+                        liftEventElapsedRealtimeNanos,
+                        captureDelayMs
+                );
+                boolean liftBeforeEndpoint = liftEventElapsedRealtimeNanos > 0L
+                        && liftEventElapsedRealtimeNanos
+                        < downEventElapsedRealtimeNanos + captureDelayMs * 1_000_000L;
+                if (!hasWindowSupport || liftBeforeEndpoint) {
+                    if (liftBeforeEndpoint) {
                         lastEventKey = "collector_causal_window_rejected";
-                        lastEventDetail = "lift_before_25ms";
+                        lastEventDetail = "lift_before_" + captureDelayMs + "ms";
                         causalPredictionRunnable = null;
                         emitStatus();
                         return;
@@ -736,7 +752,24 @@ public final class AispectCollectionController {
                         0.0,
                         frames.length
                 );
-                latestPrediction = classifier.predict(window, activeModelId, new ArrayList<>(activeTouchFrames));
+                AispectModels.ImpactPrediction prediction = classifier.predict(
+                        window,
+                        activeModelId,
+                        new ArrayList<>(activeTouchFrames)
+                );
+                if (prediction == null) {
+                    latestPrediction = null;
+                    latestPredictionSequence = 0;
+                    latestSampleRateHz = snapshot.sampleRateHz;
+                    latestImpactMaxAbsDelta = 0.0;
+                    latestImpactLog = "causal model unavailable";
+                    lastEventKey = "collector_causal_model_unavailable";
+                    lastEventDetail = activeModelId;
+                    causalPredictionRunnable = null;
+                    emitStatus();
+                    return;
+                }
+                latestPrediction = prediction;
                 AispectTouchFrame latestFrame = activeTouchFrames.isEmpty()
                         ? null
                         : activeTouchFrames.get(activeTouchFrames.size() - 1);
@@ -753,10 +786,8 @@ public final class AispectCollectionController {
                 latestPredictionSequence = sequence;
                 latestSampleRateHz = snapshot.sampleRateHz;
                 latestImpactMaxAbsDelta = 0.0;
-                latestImpactLog = "causal time grid -15ms to +25ms";
-                lastEventKey = latestPrediction == null
-                        ? "collector_causal_model_unavailable"
-                        : "collector_causal_prediction_ready";
+                latestImpactLog = "causal time grid -15ms to +" + captureDelayMs + "ms";
+                lastEventKey = "collector_causal_prediction_ready";
                 lastEventDetail = activeModelId;
                 causalPredictionRunnable = null;
                 emitStatus();
@@ -770,13 +801,39 @@ public final class AispectCollectionController {
             long downEventElapsedRealtimeNanos,
             long liftEventElapsedRealtimeNanos
     ) {
+        return canPublishCausalTimeGridPrediction(
+                frames,
+                downEventElapsedRealtimeNanos,
+                liftEventElapsedRealtimeNanos,
+                25L
+        );
+    }
+
+    static boolean canPublishCausalTimeGridPrediction(
+            AispectModels.ImpactFrame[] frames,
+            long downEventElapsedRealtimeNanos,
+            long liftEventElapsedRealtimeNanos,
+            long captureDelayMs
+    ) {
+        if (captureDelayMs < 0L || captureDelayMs > Long.MAX_VALUE / 1_000_000L) {
+            return false;
+        }
+        long captureDelayNanos = captureDelayMs * 1_000_000L;
         return downEventElapsedRealtimeNanos > 0L
                 && (liftEventElapsedRealtimeNanos <= 0L
-                || liftEventElapsedRealtimeNanos >= downEventElapsedRealtimeNanos + 25_000_000L)
+                || liftEventElapsedRealtimeNanos >= downEventElapsedRealtimeNanos + captureDelayNanos)
                 && AispectCausalPressFeatureBuilder.hasTimeGridSupport(
                 frames,
                 downEventElapsedRealtimeNanos
         );
+    }
+
+    /** 中文注释：只有明确声明按下期延迟且数值为正时才启用因果预测，抬起期返回无效标记。 */
+    static long causalPredictionDelayMs(String windowMode, long captureDelayMs) {
+        if (!"press".equals(windowMode) || captureDelayMs <= 0L) {
+            return -1L;
+        }
+        return captureDelayMs;
     }
 
     private void cancelCausalPredictionRunnable() {

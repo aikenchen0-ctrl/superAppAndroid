@@ -2,10 +2,13 @@ package com.paifa.univerge.app
 
 import android.content.ComponentName
 import android.content.Context
+import android.provider.Settings
 import com.adbcore.AdbCore
 import com.paifa.univerge.accessibility.UniVergeAccessibilityService
 import com.paifa.univerge.accessibility.UniVergePreferences
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 internal data class AccessibilityKeepAliveResult(
@@ -64,13 +67,37 @@ internal class AccessibilityKeepAliveController(
     private val preferences: UniVergePreferences,
     private val rootShell: RootShell = RuntimeRootShell()
 ) {
-    suspend fun ensureEnabled(): AccessibilityKeepAliveResult = withContext(Dispatchers.IO) {
+    suspend fun ensureEnabled(): AccessibilityKeepAliveResult = rootGate.withLock {
+        ensureEnabledLocked()
+    }
+
+    private suspend fun ensureEnabledLocked(): AccessibilityKeepAliveResult = withContext(Dispatchers.IO) {
         val service = accessibilityServiceComponent(context)
+        val current = Settings.Secure.getString(
+            context.contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        )?.trim()?.takeUnless { it.isBlank() || it == "null" }
+        if (current.orEmpty().split(':').any { it.equals(service, ignoreCase = true) }) {
+            return@withContext AccessibilityKeepAliveResult(true, AccessibilityKeepAliveResult.Method.NONE, "无障碍服务已启用")
+        }
+
+        // Once su has been verified in this process, do not execute `su -c id`
+        // again. This prevents concurrent startup/toggle calls from re-opening
+        // the superuser authorization flow.
+        if (rootVerified) {
+            val commands = buildAccessibilityEnableCommands(context.packageName, service.substringAfter('/'), current)
+            val rootResult = commands.fold(Result.success("")) { _, command -> rootShell.execute(command) }
+            if (rootResult.isSuccess) {
+                return@withContext AccessibilityKeepAliveResult(true, AccessibilityKeepAliveResult.Method.ROOT, "ROOT 保活已执行")
+            }
+        }
+
         val rootIdentity = rootShell.execute("id").getOrNull().orEmpty()
         if (rootIdentity.contains("uid=0")) {
-            val currentResult = rootShell.execute("settings get secure enabled_accessibility_services")
-            val current = currentResult.getOrNull()?.trim()?.takeUnless { it == "null" }
-            val commands = buildAccessibilityEnableCommands(context.packageName, service.substringAfter('/'), current)
+            rootVerified = true
+            val rootCurrent = rootShell.execute("settings get secure enabled_accessibility_services")
+                .getOrNull()?.trim()?.takeUnless { it == "null" }
+            val commands = buildAccessibilityEnableCommands(context.packageName, service.substringAfter('/'), rootCurrent)
             val rootResult = commands.fold(Result.success("")) { _, command -> rootShell.execute(command) }
             if (rootResult.isSuccess) {
                 return@withContext AccessibilityKeepAliveResult(true, AccessibilityKeepAliveResult.Method.ROOT, "ROOT 保活已执行")
@@ -88,5 +115,10 @@ internal class AccessibilityKeepAliveController(
         } else {
             AccessibilityKeepAliveResult(false, AccessibilityKeepAliveResult.Method.NONE, adbResult.exceptionOrNull()?.message ?: "ADB 命令执行失败")
         }
+    }
+
+    private companion object {
+        val rootGate = Mutex()
+        @Volatile var rootVerified: Boolean = false
     }
 }

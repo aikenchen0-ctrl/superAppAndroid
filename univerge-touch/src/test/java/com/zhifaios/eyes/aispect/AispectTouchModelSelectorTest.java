@@ -12,6 +12,22 @@ import java.util.List;
 
 public final class AispectTouchModelSelectorTest {
     @Test
+    public void prefersCausalModelWhenItIsEmbedded() {
+        List<AispectImpactCNNClassifier.ModelInfo> models = Arrays.asList(
+                model("causal_touch_relative_v1_all_devices_fit_20260904"),
+                model("lemon_tao_full4_enhanced_patch21_no_confidence"),
+                model("oneplus_four_class_after_recollect_hard_nearfull_weighted_old13_multichannel")
+        );
+
+        String modelId = AispectTouchModelSelector.recommendedModelId(
+                level(AispectDeviceCapabilityProfiler.Level.A),
+                models
+        );
+
+        Assert.assertEquals("causal_touch_relative_v1_all_devices_fit_20260904", modelId);
+    }
+
+    @Test
     public void recommendsNonContactModelForLevelCDevice() {
         List<AispectImpactCNNClassifier.ModelInfo> models = Arrays.asList(
                 model("oneplus_four_class_after_recollect_hard_nearfull_weighted_old13_multichannel"),

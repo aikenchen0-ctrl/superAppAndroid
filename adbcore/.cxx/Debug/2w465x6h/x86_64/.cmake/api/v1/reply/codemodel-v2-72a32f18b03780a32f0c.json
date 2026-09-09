@@ -41,14 +41,14 @@
 				{
 					"directoryIndex" : 0,
 					"id" : "adb::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-adb-Debug-b47dbcf1e8fec9614c66.json",
+					"jsonFile" : "target-adb-Debug-14d9c8d1cd1fc8adb524.json",
 					"name" : "adb",
 					"projectIndex" : 0
 				},
 				{
 					"directoryIndex" : 0,
 					"id" : "libadbcore.so::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-libadbcore.so-Debug-46e9ff49077b58802ccc.json",
+					"jsonFile" : "target-libadbcore.so-Debug-6e18003d79f73ad0a0e7.json",
 					"name" : "libadbcore.so",
 					"projectIndex" : 0
 				}
@@ -58,8 +58,8 @@
 	"kind" : "codemodel",
 	"paths" : 
 	{
-		"build" : "C:/WorkSpace/UbikiTouch/adbcore/.cxx/Debug/2w465x6h/arm64-v8a",
-		"source" : "C:/WorkSpace/UbikiTouch/adbcore/src/main/jni"
+		"build" : "D:/WorkSpace/superAppAndroid/adbcore/.cxx/Debug/2w465x6h/x86_64",
+		"source" : "D:/WorkSpace/superAppAndroid/adbcore/src/main/jni"
 	},
 	"version" : 
 	{

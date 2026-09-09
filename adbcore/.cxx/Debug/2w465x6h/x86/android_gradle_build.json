@@ -1,19 +1,19 @@
 {
   "buildFiles": [
-    "C:\\WorkSpace\\UbikiTouch\\adbcore\\src\\main\\jni\\CMakeLists.txt"
+    "D:\\WorkSpace\\superAppAndroid\\adbcore\\src\\main\\jni\\CMakeLists.txt"
   ],
   "cleanCommandsComponents": [
     [
-      "C:\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe",
+      "D:\\DevelopKits\\Android\\SDK\\cmake\\3.22.1\\bin\\ninja.exe",
       "-C",
-      "C:\\WorkSpace\\UbikiTouch\\adbcore\\.cxx\\Debug\\2w465x6h\\x86",
+      "D:\\WorkSpace\\superAppAndroid\\adbcore\\.cxx\\Debug\\2w465x6h\\x86",
       "clean"
     ]
   ],
   "buildTargetsCommandComponents": [
-    "C:\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe",
+    "D:\\DevelopKits\\Android\\SDK\\cmake\\3.22.1\\bin\\ninja.exe",
     "-C",
-    "C:\\WorkSpace\\UbikiTouch\\adbcore\\.cxx\\Debug\\2w465x6h\\x86",
+    "D:\\WorkSpace\\superAppAndroid\\adbcore\\.cxx\\Debug\\2w465x6h\\x86",
     "{LIST_OF_TARGETS_TO_BUILD}"
   ],
   "libraries": {
@@ -21,21 +21,21 @@
       "toolchain": "toolchain",
       "abi": "x86",
       "artifactName": "adb",
-      "output": "C:\\WorkSpace\\UbikiTouch\\adbcore\\build\\intermediates\\cxx\\Debug\\2w465x6h\\obj\\x86\\libadb.so",
+      "output": "D:\\WorkSpace\\superAppAndroid\\adbcore\\build\\intermediates\\cxx\\Debug\\2w465x6h\\obj\\x86\\libadb.so",
       "runtimeFiles": []
     },
     "libadbcore.so::@6890427a1f51a3e7e1df": {
       "toolchain": "toolchain",
       "abi": "x86",
       "artifactName": "libadbcore.so",
-      "output": "C:\\WorkSpace\\UbikiTouch\\adbcore\\build\\intermediates\\cxx\\Debug\\2w465x6h\\obj\\x86\\libadbcore.so",
+      "output": "D:\\WorkSpace\\superAppAndroid\\adbcore\\build\\intermediates\\cxx\\Debug\\2w465x6h\\obj\\x86\\libadbcore.so",
       "runtimeFiles": []
     }
   },
   "toolchains": {
     "toolchain": {
-      "cCompilerExecutable": "C:\\Android\\Sdk\\ndk\\28.2.13676358\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang.exe",
-      "cppCompilerExecutable": "C:\\Android\\Sdk\\ndk\\28.2.13676358\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe"
+      "cCompilerExecutable": "D:\\DevelopKits\\Android\\SDK\\ndk\\28.2.13676358\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang.exe",
+      "cppCompilerExecutable": "D:\\DevelopKits\\Android\\SDK\\ndk\\28.2.13676358\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe"
     }
   },
   "cFileExtensions": [],

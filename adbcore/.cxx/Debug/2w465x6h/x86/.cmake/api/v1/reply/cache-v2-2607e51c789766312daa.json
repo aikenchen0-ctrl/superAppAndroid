@@ -11,7 +11,7 @@
 				}
 			],
 			"type" : "UNINITIALIZED",
-			"value" : "x86_64"
+			"value" : "x86"
 		},
 		{
 			"name" : "ANDROID_NDK",
@@ -23,7 +23,7 @@
 				}
 			],
 			"type" : "UNINITIALIZED",
-			"value" : "C:\\Android\\Sdk\\ndk\\28.2.13676358"
+			"value" : "D:\\DevelopKits\\Android\\SDK\\ndk\\28.2.13676358"
 		},
 		{
 			"name" : "ANDROID_PLATFORM",
@@ -63,7 +63,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-addr2line.exe"
+			"value" : "D:/DevelopKits/Android/SDK/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-addr2line.exe"
 		},
 		{
 			"name" : "CMAKE_ANDROID_ARCH_ABI",
@@ -75,7 +75,7 @@
 				}
 			],
 			"type" : "UNINITIALIZED",
-			"value" : "x86_64"
+			"value" : "x86"
 		},
 		{
 			"name" : "CMAKE_ANDROID_NDK",
@@ -87,7 +87,7 @@
 				}
 			],
 			"type" : "UNINITIALIZED",
-			"value" : "C:\\Android\\Sdk\\ndk\\28.2.13676358"
+			"value" : "D:\\DevelopKits\\Android\\SDK\\ndk\\28.2.13676358"
 		},
 		{
 			"name" : "CMAKE_AR",
@@ -103,7 +103,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-ar.exe"
+			"value" : "D:/DevelopKits/Android/SDK/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-ar.exe"
 		},
 		{
 			"name" : "CMAKE_ASM_FLAGS",
@@ -163,7 +163,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "c:/WorkSpace/UbikiTouch/adbcore/.cxx/Debug/2w465x6h/x86_64"
+			"value" : "d:/WorkSpace/superAppAndroid/adbcore/.cxx/Debug/2w465x6h/x86"
 		},
 		{
 			"name" : "CMAKE_CACHE_MAJOR_VERSION",
@@ -211,7 +211,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "C:/Android/Sdk/cmake/3.22.1/bin/cmake.exe"
+			"value" : "D:/DevelopKits/Android/SDK/cmake/3.22.1/bin/cmake.exe"
 		},
 		{
 			"name" : "CMAKE_CPACK_COMMAND",
@@ -223,7 +223,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "C:/Android/Sdk/cmake/3.22.1/bin/cpack.exe"
+			"value" : "D:/DevelopKits/Android/SDK/cmake/3.22.1/bin/cpack.exe"
 		},
 		{
 			"name" : "CMAKE_CTEST_COMMAND",
@@ -235,7 +235,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "C:/Android/Sdk/cmake/3.22.1/bin/ctest.exe"
+			"value" : "D:/DevelopKits/Android/SDK/cmake/3.22.1/bin/ctest.exe"
 		},
 		{
 			"name" : "CMAKE_CXX_COMPILER_AR",
@@ -251,7 +251,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-ar.exe"
+			"value" : "D:/DevelopKits/Android/SDK/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-ar.exe"
 		},
 		{
 			"name" : "CMAKE_CXX_COMPILER_RANLIB",
@@ -267,7 +267,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-ranlib.exe"
+			"value" : "D:/DevelopKits/Android/SDK/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-ranlib.exe"
 		},
 		{
 			"name" : "CMAKE_CXX_FLAGS",
@@ -379,7 +379,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-ar.exe"
+			"value" : "D:/DevelopKits/Android/SDK/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-ar.exe"
 		},
 		{
 			"name" : "CMAKE_C_COMPILER_RANLIB",
@@ -395,7 +395,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-ranlib.exe"
+			"value" : "D:/DevelopKits/Android/SDK/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-ranlib.exe"
 		},
 		{
 			"name" : "CMAKE_C_FLAGS",
@@ -507,7 +507,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-dlltool.exe"
+			"value" : "D:/DevelopKits/Android/SDK/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-dlltool.exe"
 		},
 		{
 			"name" : "CMAKE_EXECUTABLE_FORMAT",
@@ -635,7 +635,7 @@
 				}
 			],
 			"type" : "UNINITIALIZED",
-			"value" : "C:\\WorkSpace\\UbikiTouch\\adbcore\\.cxx\\Debug\\2w465x6h\\prefab\\x86_64\\prefab"
+			"value" : "D:\\WorkSpace\\superAppAndroid\\adbcore\\.cxx\\Debug\\2w465x6h\\prefab\\x86\\prefab"
 		},
 		{
 			"name" : "CMAKE_GENERATOR",
@@ -695,7 +695,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "C:/WorkSpace/UbikiTouch/adbcore/src/main/jni"
+			"value" : "D:/WorkSpace/superAppAndroid/adbcore/src/main/jni"
 		},
 		{
 			"name" : "CMAKE_INSTALL_PREFIX",
@@ -731,7 +731,7 @@
 				}
 			],
 			"type" : "UNINITIALIZED",
-			"value" : "C:\\WorkSpace\\UbikiTouch\\adbcore\\build\\intermediates\\cxx\\Debug\\2w465x6h\\obj\\x86_64"
+			"value" : "D:\\WorkSpace\\superAppAndroid\\adbcore\\build\\intermediates\\cxx\\Debug\\2w465x6h\\obj\\x86"
 		},
 		{
 			"name" : "CMAKE_LINKER",
@@ -747,7 +747,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/ld.lld.exe"
+			"value" : "D:/DevelopKits/Android/SDK/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/ld.lld.exe"
 		},
 		{
 			"name" : "CMAKE_MAKE_PROGRAM",
@@ -759,7 +759,7 @@
 				}
 			],
 			"type" : "UNINITIALIZED",
-			"value" : "C:\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe"
+			"value" : "D:\\DevelopKits\\Android\\SDK\\cmake\\3.22.1\\bin\\ninja.exe"
 		},
 		{
 			"name" : "CMAKE_MODULE_LINKER_FLAGS",
@@ -855,7 +855,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-nm.exe"
+			"value" : "D:/DevelopKits/Android/SDK/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-nm.exe"
 		},
 		{
 			"name" : "CMAKE_NUMBER_OF_MAKEFILES",
@@ -883,7 +883,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-objcopy.exe"
+			"value" : "D:/DevelopKits/Android/SDK/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-objcopy.exe"
 		},
 		{
 			"name" : "CMAKE_OBJDUMP",
@@ -899,7 +899,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-objdump.exe"
+			"value" : "D:/DevelopKits/Android/SDK/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-objdump.exe"
 		},
 		{
 			"name" : "CMAKE_PLATFORM_INFO_INITIALIZED",
@@ -963,7 +963,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-ranlib.exe"
+			"value" : "D:/DevelopKits/Android/SDK/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-ranlib.exe"
 		},
 		{
 			"name" : "CMAKE_READELF",
@@ -979,7 +979,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-readelf.exe"
+			"value" : "D:/DevelopKits/Android/SDK/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-readelf.exe"
 		},
 		{
 			"name" : "CMAKE_ROOT",
@@ -991,7 +991,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "C:/Android/Sdk/cmake/3.22.1/share/cmake-3.22"
+			"value" : "D:/DevelopKits/Android/SDK/cmake/3.22.1/share/cmake-3.22"
 		},
 		{
 			"name" : "CMAKE_RUNTIME_OUTPUT_DIRECTORY",
@@ -1003,7 +1003,7 @@
 				}
 			],
 			"type" : "UNINITIALIZED",
-			"value" : "C:\\WorkSpace\\UbikiTouch\\adbcore\\build\\intermediates\\cxx\\Debug\\2w465x6h\\obj\\x86_64"
+			"value" : "D:\\WorkSpace\\superAppAndroid\\adbcore\\build\\intermediates\\cxx\\Debug\\2w465x6h\\obj\\x86"
 		},
 		{
 			"name" : "CMAKE_SHARED_LINKER_FLAGS",
@@ -1211,7 +1211,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-strip.exe"
+			"value" : "D:/DevelopKits/Android/SDK/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-strip.exe"
 		},
 		{
 			"name" : "CMAKE_SYSTEM_NAME",
@@ -1247,7 +1247,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "C:/Android/Sdk/ndk/28.2.13676358/build/cmake/android.toolchain.cmake"
+			"value" : "D:/DevelopKits/Android/SDK/ndk/28.2.13676358/build/cmake/android.toolchain.cmake"
 		},
 		{
 			"name" : "CMAKE_VERBOSE_MAKEFILE",
@@ -1275,7 +1275,7 @@
 				}
 			],
 			"type" : "STATIC",
-			"value" : "C:/WorkSpace/UbikiTouch/adbcore/.cxx/Debug/2w465x6h/x86_64"
+			"value" : "D:/WorkSpace/superAppAndroid/adbcore/.cxx/Debug/2w465x6h/x86"
 		},
 		{
 			"name" : "adbcore_IS_TOP_LEVEL",
@@ -1299,7 +1299,7 @@
 				}
 			],
 			"type" : "STATIC",
-			"value" : "C:/WorkSpace/UbikiTouch/adbcore/src/main/jni"
+			"value" : "D:/WorkSpace/superAppAndroid/adbcore/src/main/jni"
 		},
 		{
 			"name" : "boringssl_DIR",
@@ -1311,7 +1311,7 @@
 				}
 			],
 			"type" : "PATH",
-			"value" : "C:/WorkSpace/UbikiTouch/adbcore/.cxx/Debug/2w465x6h/prefab/x86_64/prefab/lib/x86_64-linux-android/cmake/boringssl"
+			"value" : "D:/WorkSpace/superAppAndroid/adbcore/.cxx/Debug/2w465x6h/prefab/x86/prefab/lib/i686-linux-android/cmake/boringssl"
 		},
 		{
 			"name" : "cxx_DIR",
@@ -1323,7 +1323,7 @@
 				}
 			],
 			"type" : "PATH",
-			"value" : "C:/WorkSpace/UbikiTouch/adbcore/.cxx/Debug/2w465x6h/prefab/x86_64/prefab/lib/x86_64-linux-android/cmake/cxx"
+			"value" : "D:/WorkSpace/superAppAndroid/adbcore/.cxx/Debug/2w465x6h/prefab/x86/prefab/lib/i686-linux-android/cmake/cxx"
 		}
 	],
 	"kind" : "cache",

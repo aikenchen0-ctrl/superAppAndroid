@@ -8,7 +8,12 @@ public final class AispectRemoteModelAssignment {
     private static final String PLATFORM_ANDROID = "android";
     private static final String FEATURE_SCHEMA_ANDROID_V1 = "android-touch-cnn-v1";
     static final String FEATURE_SCHEMA_TIME_GRID_GROUPNORM_V1 = "aispect-time-grid-groupnorm-v1";
+    static final String FEATURE_SCHEMA_CAUSAL_TOUCH_V1 = "aispect-causal-touch-cnn-v1";
+    static final String FEATURE_SCHEMA_FIELDWISE_SIZE_V1 = "aispect-fieldwise-size-cnn-v1";
     static final String MODEL_TYPE_TIME_GRID_GROUPNORM_V1 = "time_grid_groupnorm_cnn_v1";
+    static final String MODEL_TYPE_CAUSAL_TOUCH_CNN_V1 = "causal_touch_cnn_v1";
+    static final String MODEL_TYPE_CAUSAL_TOUCH_JSON_V1 = "aispect-causal-touch-json-v1";
+    static final String MODEL_TYPE_FIELDWISE_SIZE_V1 = "aispect-fieldwise-size-json-v1";
 
     public final int schemaVersion;
     public final String assignmentId;
@@ -210,7 +215,9 @@ public final class AispectRemoteModelAssignment {
         return featureSchemaId.isEmpty()
                 ? schemaVersion == 0
                 : FEATURE_SCHEMA_ANDROID_V1.equals(featureSchemaId)
-                || FEATURE_SCHEMA_TIME_GRID_GROUPNORM_V1.equals(featureSchemaId);
+                || FEATURE_SCHEMA_TIME_GRID_GROUPNORM_V1.equals(featureSchemaId)
+                || FEATURE_SCHEMA_CAUSAL_TOUCH_V1.equals(featureSchemaId)
+                || FEATURE_SCHEMA_FIELDWISE_SIZE_V1.equals(featureSchemaId);
     }
 
     private boolean hasCompatibleLabels() {

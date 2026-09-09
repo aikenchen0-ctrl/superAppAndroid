@@ -17,7 +17,7 @@
 rule CXX_COMPILER__libadbcore.2eso_Debug
   depfile = $DEP_FILE
   deps = gcc
-  command = C:\Android\Sdk\ndk\28.2.13676358\toolchains\llvm\prebuilt\windows-x86_64\bin\clang++.exe --target=i686-none-linux-android26 --sysroot=C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -c $in
+  command = D:\DevelopKits\Android\SDK\ndk\28.2.13676358\toolchains\llvm\prebuilt\windows-x86_64\bin\clang++.exe --target=i686-none-linux-android26 --sysroot=D:/DevelopKits/Android/SDK/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -c $in
   description = Building CXX object $out
 
 
@@ -25,7 +25,7 @@ rule CXX_COMPILER__libadbcore.2eso_Debug
 # Rule for linking CXX executable.
 
 rule CXX_EXECUTABLE_LINKER__libadbcore.2eso_Debug
-  command = cmd.exe /C "$PRE_LINK && C:\Android\Sdk\ndk\28.2.13676358\toolchains\llvm\prebuilt\windows-x86_64\bin\clang++.exe --target=i686-none-linux-android26 --sysroot=C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot $FLAGS $LINK_FLAGS $in -o $TARGET_FILE $LINK_PATH $LINK_LIBRARIES && $POST_BUILD"
+  command = cmd.exe /C "$PRE_LINK && D:\DevelopKits\Android\SDK\ndk\28.2.13676358\toolchains\llvm\prebuilt\windows-x86_64\bin\clang++.exe --target=i686-none-linux-android26 --sysroot=D:/DevelopKits/Android/SDK/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot $FLAGS $LINK_FLAGS $in -o $TARGET_FILE $LINK_PATH $LINK_LIBRARIES && $POST_BUILD"
   description = Linking CXX executable $TARGET_FILE
   restat = $RESTAT
 
@@ -36,7 +36,7 @@ rule CXX_EXECUTABLE_LINKER__libadbcore.2eso_Debug
 rule CXX_COMPILER__adb_Debug
   depfile = $DEP_FILE
   deps = gcc
-  command = C:\Android\Sdk\ndk\28.2.13676358\toolchains\llvm\prebuilt\windows-x86_64\bin\clang++.exe --target=i686-none-linux-android26 --sysroot=C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -c $in
+  command = D:\DevelopKits\Android\SDK\ndk\28.2.13676358\toolchains\llvm\prebuilt\windows-x86_64\bin\clang++.exe --target=i686-none-linux-android26 --sysroot=D:/DevelopKits/Android/SDK/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -c $in
   description = Building CXX object $out
 
 
@@ -44,7 +44,7 @@ rule CXX_COMPILER__adb_Debug
 # Rule for linking CXX shared library.
 
 rule CXX_SHARED_LIBRARY_LINKER__adb_Debug
-  command = cmd.exe /C "$PRE_LINK && C:\Android\Sdk\ndk\28.2.13676358\toolchains\llvm\prebuilt\windows-x86_64\bin\clang++.exe --target=i686-none-linux-android26 --sysroot=C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot -fPIC $LANGUAGE_COMPILE_FLAGS $ARCH_FLAGS $LINK_FLAGS -shared $SONAME_FLAG$SONAME -o $TARGET_FILE $in $LINK_PATH $LINK_LIBRARIES && $POST_BUILD"
+  command = cmd.exe /C "$PRE_LINK && D:\DevelopKits\Android\SDK\ndk\28.2.13676358\toolchains\llvm\prebuilt\windows-x86_64\bin\clang++.exe --target=i686-none-linux-android26 --sysroot=D:/DevelopKits/Android/SDK/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot -fPIC $LANGUAGE_COMPILE_FLAGS $ARCH_FLAGS $LINK_FLAGS -shared $SONAME_FLAG$SONAME -o $TARGET_FILE $in $LINK_PATH $LINK_LIBRARIES && $POST_BUILD"
   description = Linking CXX shared library $TARGET_FILE
   restat = $RESTAT
 
@@ -61,7 +61,7 @@ rule CUSTOM_COMMAND
 # Rule for re-running cmake.
 
 rule RERUN_CMAKE
-  command = C:\Android\Sdk\cmake\3.22.1\bin\cmake.exe --regenerate-during-build -SC:\WorkSpace\UbikiTouch\adbcore\src\main\jni -BC:\WorkSpace\UbikiTouch\adbcore\.cxx\Debug\2w465x6h\x86
+  command = D:\DevelopKits\Android\SDK\cmake\3.22.1\bin\cmake.exe --regenerate-during-build -SD:\WorkSpace\superAppAndroid\adbcore\src\main\jni -BD:\WorkSpace\superAppAndroid\adbcore\.cxx\Debug\2w465x6h\x86
   description = Re-running CMake...
   generator = 1
 
@@ -70,7 +70,7 @@ rule RERUN_CMAKE
 # Rule for cleaning all built files.
 
 rule CLEAN
-  command = C:\Android\Sdk\cmake\3.22.1\bin\ninja.exe $FILE_ARG -t clean $TARGETS
+  command = D:\DevelopKits\Android\SDK\cmake\3.22.1\bin\ninja.exe $FILE_ARG -t clean $TARGETS
   description = Cleaning all built files...
 
 
@@ -78,6 +78,6 @@ rule CLEAN
 # Rule for printing all primary targets available.
 
 rule HELP
-  command = C:\Android\Sdk\cmake\3.22.1\bin\ninja.exe -t targets
+  command = D:\DevelopKits\Android\SDK\cmake\3.22.1\bin\ninja.exe -t targets
   description = All primary targets available:
 

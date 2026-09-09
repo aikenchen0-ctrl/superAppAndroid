@@ -1,1 +1,1 @@
-C:\WorkSpace\UbikiTouch\adbcore\src\main\jni\CMakeLists.txt
+D:\WorkSpace\superAppAndroid\adbcore\src\main\jni\CMakeLists.txt

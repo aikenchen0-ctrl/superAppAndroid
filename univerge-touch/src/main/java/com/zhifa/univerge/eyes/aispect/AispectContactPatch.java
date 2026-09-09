@@ -11,6 +11,11 @@ public final class AispectContactPatch {
     public final String source;
     public final boolean valid;
     public final boolean defaultApplied;
+    // Proxy values are diagnostic metadata and never replace legacy model inputs.
+    public final double confidence;
+    public final boolean proxyApplied;
+    public final double proxyMajorPx;
+    public final double proxyMinorPx;
     public final double xNorm;
     public final double yNorm;
     public final double covariance11;
@@ -27,6 +32,10 @@ public final class AispectContactPatch {
             String source,
             boolean valid,
             boolean defaultApplied,
+            double confidence,
+            boolean proxyApplied,
+            double proxyMajorPx,
+            double proxyMinorPx,
             double xNorm,
             double yNorm,
             double covariance11,
@@ -42,6 +51,10 @@ public final class AispectContactPatch {
         this.source = source;
         this.valid = valid;
         this.defaultApplied = defaultApplied;
+        this.confidence = confidence;
+        this.proxyApplied = proxyApplied;
+        this.proxyMajorPx = proxyMajorPx;
+        this.proxyMinorPx = proxyMinorPx;
         this.xNorm = xNorm;
         this.yNorm = yNorm;
         this.covariance11 = covariance11;
@@ -65,11 +78,6 @@ public final class AispectContactPatch {
         double sigmaY = DEFAULT_SIGMA_NORM;
         double orientation = 0;
 
-        if (major <= 0) {
-            major = positiveFinite(frame.toolMajor);
-            minor = positiveFinite(frame.toolMinor);
-        }
-
         if (major > 0 && minor > 0) {
             source = "ellipse_major_minor";
             valid = true;
@@ -78,11 +86,34 @@ public final class AispectContactPatch {
             sigmaY = Math.max(minor * 0.5, 1.0);
             orientation = finite(frame.orientation, 0);
         } else if (major > 0) {
-            source = "radius_from_major";
+            source = "touch_major_only_synthesized_minor";
             valid = true;
             defaultApplied = false;
             sigmaX = Math.max(major * 0.5, 1.0);
             sigmaY = sigmaX;
+        } else {
+            double proxyMajor = pressureProxyMajor(frame);
+            if (proxyMajor > 0) {
+                // Keep the legacy default covariance/raw fields unchanged. The estimate is
+                // exposed separately because pressure/size are not contact radii.
+                return fromNormalized(
+                        "pressure_proxy",
+                        false,
+                        true,
+                        frame.xNorm,
+                        frame.yNorm,
+                        DEFAULT_SIGMA_NORM,
+                        DEFAULT_SIGMA_NORM,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        true,
+                        proxyMajor,
+                        proxyMajor * 0.8
+                );
+            }
         }
 
         return fromPixelPatch(
@@ -98,7 +129,11 @@ public final class AispectContactPatch {
                 frame.height,
                 major,
                 minor,
-                finite(frame.orientation, 0)
+                finite(frame.orientation, 0),
+                valid ? 1.0 : 0.0,
+                false,
+                0,
+                0
         );
     }
 
@@ -115,6 +150,9 @@ public final class AispectContactPatch {
         double sigmaY = 0;
         double validCount = 0;
         double defaultCount = 0;
+        double proxyCount = 0;
+        double proxyMajor = 0;
+        double proxyMinor = 0;
         AispectContactPatch last = null;
         for (AispectTouchFrame frame : frames) {
             AispectContactPatch patch = fromFrame(frame);
@@ -132,6 +170,11 @@ public final class AispectContactPatch {
             if (patch.defaultApplied) {
                 defaultCount += 1;
             }
+            if (patch.proxyApplied) {
+                proxyCount += 1;
+                proxyMajor += patch.proxyMajorPx;
+                proxyMinor += patch.proxyMinorPx;
+            }
         }
         int count = frames.size();
         String source;
@@ -141,6 +184,8 @@ public final class AispectContactPatch {
             source = last.source;
         } else if (validCount > 0) {
             source = "mixed_contact_patch";
+        } else if (proxyCount > 0) {
+            source = proxyCount == count ? "pressure_proxy" : "mixed_contact_patch";
         } else {
             source = "unknown_default";
         }
@@ -148,6 +193,10 @@ public final class AispectContactPatch {
                 source,
                 valid,
                 defaultApplied,
+                valid ? 1.0 : 0.0,
+                proxyCount > 0,
+                proxyCount > 0 ? proxyMajor / proxyCount : 0,
+                proxyCount > 0 ? proxyMinor / proxyCount : 0,
                 x / count,
                 y / count,
                 cov11 / count,
@@ -163,7 +212,7 @@ public final class AispectContactPatch {
     }
 
     public static AispectContactPatch defaultPatch(double xNorm, double yNorm) {
-        return fromNormalized("unknown_default", false, true, xNorm, yNorm, DEFAULT_SIGMA_NORM, DEFAULT_SIGMA_NORM, 0, 0, 0, 0);
+        return fromNormalized("unknown_default", false, true, xNorm, yNorm, DEFAULT_SIGMA_NORM, DEFAULT_SIGMA_NORM, 0, 0, 0, 0, 0, false, 0, 0);
     }
 
     JSONObject toJson() throws JSONException {
@@ -172,6 +221,8 @@ public final class AispectContactPatch {
         json.put("source", source);
         json.put("valid", valid);
         json.put("defaultApplied", defaultApplied);
+        json.put("confidence", confidence);
+        json.put("proxyApplied", proxyApplied);
         json.put("x_norm", xNorm);
         json.put("y_norm", yNorm);
         JSONObject covariance = new JSONObject();
@@ -190,6 +241,11 @@ public final class AispectContactPatch {
         raw.put("minorPx", rawMinorPx);
         raw.put("orientationRad", rawOrientationRad);
         json.put("raw", raw);
+        JSONObject proxy = new JSONObject();
+        proxy.put("available", proxyApplied);
+        proxy.put("majorPx", proxyMajorPx);
+        proxy.put("minorPx", proxyMinorPx);
+        json.put("proxy", proxy);
         return json;
     }
 
@@ -204,7 +260,11 @@ public final class AispectContactPatch {
             double orientationRad,
             double rawMajorPx,
             double rawMinorPx,
-            double rawOrientationRad
+            double rawOrientationRad,
+            double confidence,
+            boolean proxyApplied,
+            double proxyMajorPx,
+            double proxyMinorPx
     ) {
         double cos = Math.cos(orientationRad);
         double sin = Math.sin(orientationRad);
@@ -213,7 +273,7 @@ public final class AispectContactPatch {
         double cov11 = cos * cos * varianceX + sin * sin * varianceY;
         double cov22 = sin * sin * varianceX + cos * cos * varianceY;
         double cov12 = sin * cos * (varianceX - varianceY);
-        return new AispectContactPatch(source, valid, defaultApplied, clampUnit(xNorm), clampUnit(yNorm), cov11, cov12, cov22, sigmaXNorm, sigmaYNorm, orientationRad, rawMajorPx, rawMinorPx, rawOrientationRad);
+        return new AispectContactPatch(source, valid, defaultApplied, confidence, proxyApplied, proxyMajorPx, proxyMinorPx, clampUnit(xNorm), clampUnit(yNorm), cov11, cov12, cov22, sigmaXNorm, sigmaYNorm, orientationRad, rawMajorPx, rawMinorPx, rawOrientationRad);
     }
 
     private static AispectContactPatch fromPixelPatch(
@@ -229,7 +289,11 @@ public final class AispectContactPatch {
             int height,
             double rawMajorPx,
             double rawMinorPx,
-            double rawOrientationRad
+            double rawOrientationRad,
+            double confidence,
+            boolean proxyApplied,
+            double proxyMajorPx,
+            double proxyMinorPx
     ) {
         double cos = Math.cos(orientationRad);
         double sin = Math.sin(orientationRad);
@@ -245,7 +309,7 @@ public final class AispectContactPatch {
         double cov22 = covPx22 / (safeHeight * safeHeight);
         double sigmaXNorm = sigmaXPx / safeWidth;
         double sigmaYNorm = sigmaYPx / safeHeight;
-        return new AispectContactPatch(source, valid, defaultApplied, clampUnit(xNorm), clampUnit(yNorm), cov11, cov12, cov22, sigmaXNorm, sigmaYNorm, orientationRad, rawMajorPx, rawMinorPx, rawOrientationRad);
+        return new AispectContactPatch(source, valid, defaultApplied, confidence, proxyApplied, proxyMajorPx, proxyMinorPx, clampUnit(xNorm), clampUnit(yNorm), cov11, cov12, cov22, sigmaXNorm, sigmaYNorm, orientationRad, rawMajorPx, rawMinorPx, rawOrientationRad);
     }
 
     private static double positiveFinite(double value) {
@@ -253,6 +317,18 @@ public final class AispectContactPatch {
             return 0;
         }
         return value;
+    }
+
+    private static double pressureProxyMajor(AispectTouchFrame frame) {
+        double pressure = positiveFinite(frame.pressure);
+        double size = positiveFinite(frame.size);
+        if (pressure <= 0 && size <= 0) {
+            return 0;
+        }
+        // Pressure/size are not contact radii. Keep this estimate separate and low confidence.
+        double signal = Math.max(Math.min(pressure, 1.0), Math.min(size, 1.0));
+        double shortSide = Math.min(Math.max(1, frame.width), Math.max(1, frame.height));
+        return Math.max(1.0, shortSide * (0.01 + 0.01 * signal));
     }
 
     private static double finite(double value, double fallback) {

@@ -51,6 +51,41 @@ public final class AispectTimeGridPredictionGateTest {
         Assert.assertFalse(allowed);
     }
 
+    @Test
+    public void appliesModelDeclaredCaptureDelayToCausalGate() throws Exception {
+        Method method = AispectCollectionController.class.getDeclaredMethod(
+                "canPublishCausalTimeGridPrediction",
+                AispectModels.ImpactFrame[].class,
+                long.class,
+                long.class,
+                long.class
+        );
+        method.setAccessible(true);
+        long downNanos = 1_000_000_000L;
+
+        Assert.assertFalse((Boolean) method.invoke(
+                null,
+                frames(downNanos),
+                downNanos,
+                downNanos + 39_000_000L,
+                40L
+        ));
+        Assert.assertTrue((Boolean) method.invoke(
+                null,
+                frames(downNanos),
+                downNanos,
+                downNanos + 40_000_000L,
+                40L
+        ));
+    }
+
+    @Test
+    public void derivesCausalDelayFromModelMetadata() {
+        Assert.assertEquals(25L, AispectCollectionController.causalPredictionDelayMs("press", 25L));
+        Assert.assertEquals(-1L, AispectCollectionController.causalPredictionDelayMs("release", 0L));
+        Assert.assertEquals(-1L, AispectCollectionController.causalPredictionDelayMs("press", 0L));
+    }
+
     private static AispectModels.ImpactFrame[] frames(long downNanos) {
         AispectModels.ImpactFrame[] frames = new AispectModels.ImpactFrame[11];
         for (int index = 0; index < frames.length; index++) {

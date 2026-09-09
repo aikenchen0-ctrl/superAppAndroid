@@ -6,3 +6,4 @@ internal object FloatingChatAiAutoReplyBridge {
         UniVergeAccessibilityService.instance?.requestFloatingChatAiAutoReply()
     }
 }
+

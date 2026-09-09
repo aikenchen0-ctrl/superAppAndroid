@@ -13,6 +13,8 @@ public final class AispectCausalPressFeatureBuilder {
     private static final String CONTRACT_TIME_GRID_IMU11_TOUCH7_MASK5 = "causal_time_grid_imu11_touch7_mask5_v3";
     private static final String CONTRACT_TIME_GRID_TOUCH7_MASK5_NO_GRAVITY = "causal_time_grid_touch7_mask5_no_gravity_v1";
     private static final String CONTRACT_TIME_GRID_IMU11_TOUCH7_MASK5_DELTA_GRAVITY = "causal_time_grid_imu11_touch7_mask5_delta_gravity_v1";
+    private static final String CONTRACT_TOUCH_RELATIVE = "causal_touch_relative_v1";
+    private static final String CONTRACT_TOUCH_RELATIVE_MASKED = "causal_touch_relative_masked_v1";
     private static final long[] TIME_GRID_OFFSETS_NANOS = new long[]{
             -15_000_000L,
             -10_000_000L,
@@ -59,6 +61,51 @@ public final class AispectCausalPressFeatureBuilder {
             "orientation_cos",
             "pointer_count",
             "touch_valid"
+    };
+    private static final String[] TOUCH_RELATIVE_FEATURE_NAMES = new String[]{
+            "x_norm",
+            "y_norm",
+            "userAcceleration.x",
+            "userAcceleration.y",
+            "userAcceleration.z",
+            "rotationRate.x",
+            "rotationRate.y",
+            "rotationRate.z",
+            "gravity.x",
+            "gravity.y",
+            "gravity.z",
+            "touch_log_axis_ratio",
+            "touch_log_long_relative",
+            "touch_log_short_relative",
+            "touch_log_size_relative",
+            "touch_delta_log_long",
+            "touch_delta_log_short",
+            "touch_delta_log_size",
+            "touch_valid"
+    };
+    private static final String[] TOUCH_RELATIVE_MASKED_FEATURE_NAMES = new String[]{
+            "x_norm",
+            "y_norm",
+            "userAcceleration.x",
+            "userAcceleration.y",
+            "userAcceleration.z",
+            "rotationRate.x",
+            "rotationRate.y",
+            "rotationRate.z",
+            "gravity.x",
+            "gravity.y",
+            "gravity.z",
+            "touch_log_axis_ratio",
+            "touch_log_long_relative",
+            "touch_log_short_relative",
+            "touch_log_size_relative",
+            "touch_delta_log_long",
+            "touch_delta_log_short",
+            "touch_delta_log_size",
+            "touch_valid",
+            "touch_major_available",
+            "touch_minor_available",
+            "touch_size_available"
     };
     private static final String[] IMU11_TOUCH7_MASK5_FEATURE_NAMES = new String[]{
             "x_norm",
@@ -137,21 +184,27 @@ public final class AispectCausalPressFeatureBuilder {
     }
 
     public static boolean isCausalFeatureContract(String featureContract) {
-        return CONTRACT_IMU12.equals(featureContract)
+        return AispectFieldwiseSizeFeatureBuilder.isFeatureContract(featureContract)
+                || CONTRACT_IMU12.equals(featureContract)
                 || CONTRACT_IMU11_TOUCH9.equals(featureContract)
                 || CONTRACT_TIME_GRID_IMU11.equals(featureContract)
                 || CONTRACT_TIME_GRID_IMU11_TOUCH9.equals(featureContract)
                 || CONTRACT_TIME_GRID_IMU11_TOUCH7_MASK5.equals(featureContract)
                 || CONTRACT_TIME_GRID_TOUCH7_MASK5_NO_GRAVITY.equals(featureContract)
-                || CONTRACT_TIME_GRID_IMU11_TOUCH7_MASK5_DELTA_GRAVITY.equals(featureContract);
+                || CONTRACT_TIME_GRID_IMU11_TOUCH7_MASK5_DELTA_GRAVITY.equals(featureContract)
+                || CONTRACT_TOUCH_RELATIVE.equals(featureContract)
+                || CONTRACT_TOUCH_RELATIVE_MASKED.equals(featureContract);
     }
 
     public static boolean isTimeGridFeatureContract(String featureContract) {
-        return CONTRACT_TIME_GRID_IMU11.equals(featureContract)
+        return AispectFieldwiseSizeFeatureBuilder.isFeatureContract(featureContract)
+                || CONTRACT_TIME_GRID_IMU11.equals(featureContract)
                 || CONTRACT_TIME_GRID_IMU11_TOUCH9.equals(featureContract)
                 || CONTRACT_TIME_GRID_IMU11_TOUCH7_MASK5.equals(featureContract)
                 || CONTRACT_TIME_GRID_TOUCH7_MASK5_NO_GRAVITY.equals(featureContract)
-                || CONTRACT_TIME_GRID_IMU11_TOUCH7_MASK5_DELTA_GRAVITY.equals(featureContract);
+                || CONTRACT_TIME_GRID_IMU11_TOUCH7_MASK5_DELTA_GRAVITY.equals(featureContract)
+                || CONTRACT_TOUCH_RELATIVE.equals(featureContract)
+                || CONTRACT_TOUCH_RELATIVE_MASKED.equals(featureContract);
     }
 
     /** 中文注释：只检查固定物理网格是否已经具备全部真实左右支撑，不执行特征构建。 */
@@ -201,6 +254,9 @@ public final class AispectCausalPressFeatureBuilder {
     }
 
     public static String[] featureNames(String featureContract) {
+        if (AispectFieldwiseSizeFeatureBuilder.isFeatureContract(featureContract)) {
+            return AispectFieldwiseSizeFeatureBuilder.featureNames();
+        }
         if (CONTRACT_IMU12.equals(featureContract)) {
             return IMU12_FEATURE_NAMES.clone();
         }
@@ -211,6 +267,12 @@ public final class AispectCausalPressFeatureBuilder {
         }
         if (CONTRACT_IMU11_TOUCH9.equals(featureContract) || CONTRACT_TIME_GRID_IMU11_TOUCH9.equals(featureContract)) {
             return IMU11_TOUCH9_FEATURE_NAMES.clone();
+        }
+        if (CONTRACT_TOUCH_RELATIVE.equals(featureContract)) {
+            return TOUCH_RELATIVE_FEATURE_NAMES.clone();
+        }
+        if (CONTRACT_TOUCH_RELATIVE_MASKED.equals(featureContract)) {
+            return TOUCH_RELATIVE_MASKED_FEATURE_NAMES.clone();
         }
         if (CONTRACT_TIME_GRID_IMU11_TOUCH7_MASK5.equals(featureContract)) {
             return IMU11_TOUCH7_MASK5_FEATURE_NAMES.clone();
@@ -236,7 +298,13 @@ public final class AispectCausalPressFeatureBuilder {
         }
         boolean includeTouchDetails = CONTRACT_IMU11_TOUCH9.equals(featureContract);
         boolean includeTouchValidity = CONTRACT_IMU12.equals(featureContract);
-        double[][] output = new double[frameIndices.length][includeTouchDetails ? 20 : (includeTouchValidity ? 12 : 11)];
+        boolean includeTouchRelative = CONTRACT_TOUCH_RELATIVE.equals(featureContract)
+                || CONTRACT_TOUCH_RELATIVE_MASKED.equals(featureContract);
+        boolean includeTouchRelativeMasks = CONTRACT_TOUCH_RELATIVE_MASKED.equals(featureContract);
+        double[][] output = new double[frameIndices.length][includeTouchRelativeMasks ? 22 : (includeTouchRelative ? 19 : (includeTouchDetails ? 20 : (includeTouchValidity ? 12 : 11)))];
+        List<AispectTouchFrame> orderedTouchFrames = includeTouchRelative
+                ? orderedTouchFrames(touchFrames)
+                : touchFrames;
         for (int index = 0; index < frameIndices.length; index++) {
             int offset = frameIndices[index] - firstFrameIndex;
             if (offset < 0 || offset >= frames.length || frames[offset] == null) {
@@ -257,14 +325,31 @@ public final class AispectCausalPressFeatureBuilder {
                 }
             }
             AispectTouchFrame touchFrame = latestTouchFrame(
-                    touchFrames,
+                    orderedTouchFrames,
                     imuFrame.receivedElapsedRealtimeNanos,
                     imuFrame.sensorTimestampElapsedRealtimeNanos
             );
             if (touchFrame != null && (touchFrame.width <= 0 || touchFrame.height <= 0)) {
                 return null;
             }
-            fillVector(output[index], imuFrame, touchFrame, includeTouchDetails, includeTouchValidity, false, false);
+            if (includeTouchRelative) {
+                int touchIndex = latestTouchFrameIndex(
+                        orderedTouchFrames,
+                        imuFrame.receivedElapsedRealtimeNanos,
+                        imuFrame.sensorTimestampElapsedRealtimeNanos
+                );
+                fillRelativeVector(
+                        output[index],
+                        imuFrame,
+                        orderedTouchFrames,
+                        touchIndex,
+                        imuFrame.receivedElapsedRealtimeNanos,
+                        imuFrame.sensorTimestampElapsedRealtimeNanos,
+                        includeTouchRelativeMasks
+                );
+            } else {
+                fillVector(output[index], imuFrame, touchFrame, includeTouchDetails, includeTouchValidity, false, false);
+            }
         }
         return output;
     }
@@ -275,6 +360,16 @@ public final class AispectCausalPressFeatureBuilder {
             long downEventElapsedRealtimeNanos,
             String featureContract
     ) {
+        if (AispectFieldwiseSizeFeatureBuilder.isFeatureContract(featureContract)) {
+            return AispectFieldwiseSizeFeatureBuilder.build(
+                    frames,
+                    touchFrames,
+                    downEventElapsedRealtimeNanos,
+                    featureContract,
+                    null,
+                    null
+            );
+        }
         if (!isTimeGridFeatureContract(featureContract)
                 || frames == null
                 || touchFrames == null
@@ -317,7 +412,13 @@ public final class AispectCausalPressFeatureBuilder {
         long maxGap = Math.max(10_000_000L, medianGap * 4L);
         boolean includeTouchDetails = CONTRACT_TIME_GRID_IMU11_TOUCH9.equals(featureContract);
         boolean includeTouchMasks = isTouchMaskTimeGridContract(featureContract);
-        double[][] output = new double[TIME_GRID_OFFSETS_NANOS.length][includeTouchMasks ? 23 : (includeTouchDetails ? 20 : 11)];
+        boolean includeTouchRelative = CONTRACT_TOUCH_RELATIVE.equals(featureContract)
+                || CONTRACT_TOUCH_RELATIVE_MASKED.equals(featureContract);
+        boolean includeTouchRelativeMasks = CONTRACT_TOUCH_RELATIVE_MASKED.equals(featureContract);
+        List<AispectTouchFrame> orderedTouchFrames = includeTouchRelative
+                ? orderedTouchFrames(touchFrames)
+                : touchFrames;
+        double[][] output = new double[TIME_GRID_OFFSETS_NANOS.length][includeTouchRelativeMasks ? 22 : (includeTouchRelative ? 19 : (includeTouchMasks ? 23 : (includeTouchDetails ? 20 : 11)))];
         for (int index = 0; index < TIME_GRID_OFFSETS_NANOS.length; index++) {
             long targetNanos = downEventElapsedRealtimeNanos + TIME_GRID_OFFSETS_NANOS[index];
             FrameBracket bracket = frameBracket(ordered, targetNanos);
@@ -332,19 +433,33 @@ public final class AispectCausalPressFeatureBuilder {
                     bracket.left.receivedElapsedRealtimeNanos,
                     bracket.right.receivedElapsedRealtimeNanos
             );
-            AispectTouchFrame touchFrame = latestTimeGridTouchFrame(touchFrames, availabilityReceipt, targetNanos);
+            AispectTouchFrame touchFrame = latestTimeGridTouchFrame(orderedTouchFrames, availabilityReceipt, targetNanos);
             if (touchFrame != null && (touchFrame.width <= 0 || touchFrame.height <= 0)) {
                 return null;
             }
-            fillVector(
-                    output[index],
-                    interpolate(bracket, targetNanos, availabilityReceipt),
-                    touchFrame,
-                    includeTouchDetails,
-                    false,
-                    true,
-                    includeTouchMasks
-            );
+            AispectModels.ImpactFrame interpolated = interpolate(bracket, targetNanos, availabilityReceipt);
+            if (includeTouchRelative) {
+                int touchIndex = latestTouchFrameIndex(orderedTouchFrames, availabilityReceipt, targetNanos);
+                fillRelativeVector(
+                        output[index],
+                        interpolated,
+                        orderedTouchFrames,
+                        touchIndex,
+                        availabilityReceipt,
+                        targetNanos,
+                        includeTouchRelativeMasks
+                );
+            } else {
+                fillVector(
+                        output[index],
+                        interpolated,
+                        touchFrame,
+                        includeTouchDetails,
+                        false,
+                        true,
+                        includeTouchMasks
+                );
+            }
         }
         return transformPoseInvariantTimeGrid(output, featureContract);
     }
@@ -365,21 +480,37 @@ public final class AispectCausalPressFeatureBuilder {
             return output;
         }
         if (CONTRACT_TIME_GRID_IMU11_TOUCH7_MASK5_DELTA_GRAVITY.equals(featureContract)) {
-            double[][] output = new double[source.length][23];
-            double[] previousGravity = null;
-            for (int rowIndex = 0; rowIndex < source.length; rowIndex++) {
-                System.arraycopy(source[rowIndex], 0, output[rowIndex], 0, 23);
-                double[] currentGravity = new double[]{source[rowIndex][8], source[rowIndex][9], source[rowIndex][10]};
-                for (int axis = 0; axis < 3; axis++) {
-                    output[rowIndex][8 + axis] = previousGravity == null
-                            ? 0.0
-                            : currentGravity[axis] - previousGravity[axis];
-                }
-                previousGravity = currentGravity;
-            }
-            return output;
+            return applyDeltaGravity(source);
         }
         return source;
+    }
+
+    static double[][] applyDeltaGravity(double[][] source) {
+        if (source == null) {
+            return null;
+        }
+        double[][] output = new double[source.length][];
+        double previousX = 0.0;
+        double previousY = 0.0;
+        double previousZ = 0.0;
+        boolean hasPrevious = false;
+        for (int rowIndex = 0; rowIndex < source.length; rowIndex++) {
+            if (source[rowIndex] == null || source[rowIndex].length < 11) {
+                return null;
+            }
+            output[rowIndex] = source[rowIndex].clone();
+            double currentX = source[rowIndex][8];
+            double currentY = source[rowIndex][9];
+            double currentZ = source[rowIndex][10];
+            output[rowIndex][8] = hasPrevious ? currentX - previousX : 0.0;
+            output[rowIndex][9] = hasPrevious ? currentY - previousY : 0.0;
+            output[rowIndex][10] = hasPrevious ? currentZ - previousZ : 0.0;
+            previousX = currentX;
+            previousY = currentY;
+            previousZ = currentZ;
+            hasPrevious = true;
+        }
+        return output;
     }
 
     private static AispectTouchFrame latestTouchFrame(
@@ -391,6 +522,7 @@ public final class AispectCausalPressFeatureBuilder {
             return null;
         }
         AispectTouchFrame selected = null;
+        long selectedEvent = Long.MIN_VALUE;
         long selectedReceipt = 0L;
         for (AispectTouchFrame candidate : touchFrames) {
             if (candidate == null || candidate.receivedElapsedRealtimeNanos <= 0L) {
@@ -398,8 +530,56 @@ public final class AispectCausalPressFeatureBuilder {
             }
             if (candidate.receivedElapsedRealtimeNanos <= imuReceivedElapsedRealtimeNanos
                     && candidate.eventElapsedRealtimeNanos <= imuSensorTimestampElapsedRealtimeNanos
-                    && candidate.receivedElapsedRealtimeNanos >= selectedReceipt) {
+                    && (candidate.eventElapsedRealtimeNanos > selectedEvent
+                    || (candidate.eventElapsedRealtimeNanos == selectedEvent
+                    && candidate.receivedElapsedRealtimeNanos > selectedReceipt))) {
                 selected = candidate;
+                selectedEvent = candidate.eventElapsedRealtimeNanos;
+                selectedReceipt = candidate.receivedElapsedRealtimeNanos;
+            }
+        }
+        return selected;
+    }
+
+    private static List<AispectTouchFrame> orderedTouchFrames(List<AispectTouchFrame> touchFrames) {
+        ArrayList<AispectTouchFrame> ordered = new ArrayList<>(touchFrames);
+        Collections.sort(ordered, new Comparator<AispectTouchFrame>() {
+            @Override
+            public int compare(AispectTouchFrame left, AispectTouchFrame right) {
+                int event = Long.compare(
+                        left.eventElapsedRealtimeNanos,
+                        right.eventElapsedRealtimeNanos
+                );
+                if (event != 0) {
+                    return event;
+                }
+                return Long.compare(
+                        left.receivedElapsedRealtimeNanos,
+                        right.receivedElapsedRealtimeNanos
+                );
+            }
+        });
+        return ordered;
+    }
+
+    private static int latestTouchFrameIndex(
+            List<AispectTouchFrame> touchFrames,
+            long imuReceivedElapsedRealtimeNanos,
+            long imuSensorTimestampElapsedRealtimeNanos
+    ) {
+        int selected = -1;
+        long selectedEvent = Long.MIN_VALUE;
+        long selectedReceipt = 0L;
+        for (int index = 0; index < touchFrames.size(); index++) {
+            AispectTouchFrame candidate = touchFrames.get(index);
+            if (candidate != null
+                    && candidate.receivedElapsedRealtimeNanos <= imuReceivedElapsedRealtimeNanos
+                    && candidate.eventElapsedRealtimeNanos <= imuSensorTimestampElapsedRealtimeNanos
+                    && (candidate.eventElapsedRealtimeNanos > selectedEvent
+                    || (candidate.eventElapsedRealtimeNanos == selectedEvent
+                    && candidate.receivedElapsedRealtimeNanos > selectedReceipt))) {
+                selected = index;
+                selectedEvent = candidate.eventElapsedRealtimeNanos;
                 selectedReceipt = candidate.receivedElapsedRealtimeNanos;
             }
         }
@@ -412,6 +592,7 @@ public final class AispectCausalPressFeatureBuilder {
             long targetElapsedRealtimeNanos
     ) {
         AispectTouchFrame selected = null;
+        long selectedEvent = Long.MIN_VALUE;
         long selectedReceipt = 0L;
         for (AispectTouchFrame candidate : touchFrames) {
             if (candidate == null
@@ -421,8 +602,11 @@ public final class AispectCausalPressFeatureBuilder {
             }
             if (candidate.receivedElapsedRealtimeNanos <= imuReceivedElapsedRealtimeNanos
                     && candidate.eventElapsedRealtimeNanos <= targetElapsedRealtimeNanos
-                    && candidate.receivedElapsedRealtimeNanos >= selectedReceipt) {
+                    && (candidate.eventElapsedRealtimeNanos > selectedEvent
+                    || (candidate.eventElapsedRealtimeNanos == selectedEvent
+                    && candidate.receivedElapsedRealtimeNanos > selectedReceipt))) {
                 selected = candidate;
+                selectedEvent = candidate.eventElapsedRealtimeNanos;
                 selectedReceipt = candidate.receivedElapsedRealtimeNanos;
             }
         }
@@ -532,6 +716,160 @@ public final class AispectCausalPressFeatureBuilder {
             this.left = left;
             this.right = right;
         }
+    }
+
+    private static void fillRelativeVector(
+            double[] output,
+            AispectModels.ImpactFrame imuFrame,
+            List<AispectTouchFrame> touchFrames,
+            int selectedTouchIndex,
+            long availabilityReceipt,
+            long targetNanos,
+            boolean includeMasks
+    ) {
+        AispectTouchFrame touchFrame = selectedTouchIndex >= 0
+                ? touchFrames.get(selectedTouchIndex)
+                : null;
+        if (touchFrame != null) {
+            output[0] = clamp(touchFrame.xNorm, 0.0, 1.0);
+            output[1] = clamp(touchFrame.yNorm, 0.0, 1.0);
+        }
+        output[2] = finite(imuFrame.x);
+        output[3] = finite(imuFrame.y);
+        output[4] = finite(imuFrame.z);
+        output[5] = finite(imuFrame.rotationRateX);
+        output[6] = finite(imuFrame.rotationRateY);
+        output[7] = finite(imuFrame.rotationRateZ);
+        output[8] = finite(imuFrame.gravityX);
+        output[9] = finite(imuFrame.gravityY);
+        output[10] = finite(imuFrame.gravityZ);
+        if (touchFrame == null) {
+            return;
+        }
+        double[] currentAxes = sortedTouchAxes(touchFrame, includeMasks);
+        double currentSize = usableTouchSize(touchFrame, includeMasks);
+        ArrayList<Double> longHistory = new ArrayList<>();
+        ArrayList<Double> shortHistory = new ArrayList<>();
+        ArrayList<Double> sizeHistory = new ArrayList<>();
+        double[] previousAxes = null;
+        double previousSize = 0.0;
+        int first = Math.max(0, selectedTouchIndex - 63);
+        for (int index = first; index <= selectedTouchIndex; index++) {
+            AispectTouchFrame candidate = touchFrames.get(index);
+            if (candidate.receivedElapsedRealtimeNanos > availabilityReceipt
+                    || candidate.eventElapsedRealtimeNanos > targetNanos) {
+                continue;
+            }
+            double[] axes = sortedTouchAxes(candidate, includeMasks);
+            double size = usableTouchSize(candidate, includeMasks);
+            if (axes != null) {
+                longHistory.add(axes[0]);
+                shortHistory.add(axes[1]);
+                if (index < selectedTouchIndex) {
+                    previousAxes = axes;
+                }
+            }
+            if (size > 0.0) {
+                sizeHistory.add(size);
+                if (index < selectedTouchIndex) {
+                    previousSize = size;
+                }
+            }
+        }
+        output[11] = currentAxes == null ? 0.0 : safeLogRatio(currentAxes[0], currentAxes[1]);
+        output[12] = currentAxes == null ? 0.0 : safeLogRatio(currentAxes[0], median(longHistory));
+        output[13] = currentAxes == null ? 0.0 : safeLogRatio(currentAxes[1], median(shortHistory));
+        output[14] = safeLogRatio(currentSize, median(sizeHistory));
+        output[15] = currentAxes == null || previousAxes == null
+                ? 0.0 : safeLogRatio(currentAxes[0], previousAxes[0]);
+        output[16] = currentAxes == null || previousAxes == null
+                ? 0.0 : safeLogRatio(currentAxes[1], previousAxes[1]);
+        output[17] = safeLogRatio(currentSize, previousSize);
+        output[18] = 1.0;
+        if (includeMasks) {
+            output[19] = touchFieldAvailable(touchFrame, 0) ? 1.0 : 0.0;
+            output[20] = touchFieldAvailable(touchFrame, 1) ? 1.0 : 0.0;
+            output[21] = touchFieldAvailable(touchFrame, 2) ? 1.0 : 0.0;
+        }
+    }
+
+    private static double[] sortedTouchAxes(AispectTouchFrame frame, boolean strict) {
+        if (strict && (!touchFieldAvailable(frame, 0) || !touchFieldAvailable(frame, 1))) {
+            return null;
+        }
+        if (frame == null
+                || !frame.touchMajorObserved
+                || !frame.touchMinorObserved
+                || (strict && frame.touchMajorSynthesizedOrUnknown)
+                || (strict && frame.touchMinorSynthesizedOrUnknown)) {
+            return null;
+        }
+        double major = positive(frame.touchMajor);
+        double minor = positive(frame.touchMinor);
+        if (major <= 0.0 || minor <= 0.0) {
+            return null;
+        }
+        return new double[]{Math.max(major, minor), Math.min(major, minor)};
+    }
+
+    // 触摸 size 只有在设备声明可用、确实观测到且未由未知回退合成时才进入模型。
+    private static double usableTouchSize(AispectTouchFrame frame, boolean strict) {
+        if (strict && !touchFieldAvailable(frame, 2)) {
+            return 0.0;
+        }
+        if (frame == null
+                || !frame.hasSizeRange
+                || !frame.sizeObserved
+                || frame.sizeSynthesizedOrUnknown) {
+            return 0.0;
+        }
+        return positive(frame.size);
+    }
+
+    private static boolean touchFieldAvailable(AispectTouchFrame frame, int field) {
+        if (frame == null) {
+            return false;
+        }
+        if (field == 0) {
+            return positive(frame.touchMajor) > 0.0
+                    && frame.touchMajorObserved
+                    && frame.hasTouchMajorRange
+                    && !frame.touchMajorSynthesizedOrUnknown;
+        }
+        if (field == 1) {
+            return positive(frame.touchMinor) > 0.0
+                    && frame.touchMinorObserved
+                    && frame.hasTouchMinorRange
+                    && !frame.touchMinorSynthesizedOrUnknown;
+        }
+        return positive(frame.size) > 0.0
+                && frame.sizeObserved
+                && frame.hasSizeRange
+                && !frame.sizeSynthesizedOrUnknown;
+    }
+
+    private static double median(List<Double> values) {
+        if (values.isEmpty()) {
+            return 0.0;
+        }
+        ArrayList<Double> ordered = new ArrayList<>(values);
+        Collections.sort(ordered);
+        int middle = ordered.size() / 2;
+        if ((ordered.size() & 1) == 1) {
+            return ordered.get(middle);
+        }
+        return (ordered.get(middle - 1) + ordered.get(middle)) * 0.5;
+    }
+
+    private static double safeLogRatio(double value, double baseline) {
+        if (value <= 0.000001 || baseline <= 0.000001) {
+            return 0.0;
+        }
+        return clamp(Math.log(value / baseline), -4.0, 4.0);
+    }
+
+    private static double positive(float value) {
+        return Float.isFinite(value) && value > 0.0f ? value : 0.0;
     }
 
     private static void fillVector(

@@ -1,32 +1,32 @@
 {
   "buildFiles": [
-    "C:\\WorkSpace\\UbikiTouch\\adbcore\\src\\main\\jni\\CMakeLists.txt"
+    "D:\\WorkSpace\\superAppAndroid\\adbcore\\src\\main\\jni\\CMakeLists.txt"
   ],
   "cleanCommandsComponents": [
     [
-      "C:\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe",
+      "D:\\DevelopKits\\Android\\SDK\\cmake\\3.22.1\\bin\\ninja.exe",
       "-C",
-      "C:\\WorkSpace\\UbikiTouch\\adbcore\\.cxx\\Debug\\2w465x6h\\x86_64",
+      "D:\\WorkSpace\\superAppAndroid\\adbcore\\.cxx\\Debug\\2w465x6h\\x86_64",
       "clean"
     ]
   ],
   "buildTargetsCommandComponents": [
-    "C:\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe",
+    "D:\\DevelopKits\\Android\\SDK\\cmake\\3.22.1\\bin\\ninja.exe",
     "-C",
-    "C:\\WorkSpace\\UbikiTouch\\adbcore\\.cxx\\Debug\\2w465x6h\\x86_64",
+    "D:\\WorkSpace\\superAppAndroid\\adbcore\\.cxx\\Debug\\2w465x6h\\x86_64",
     "{LIST_OF_TARGETS_TO_BUILD}"
   ],
   "libraries": {
     "adb::@6890427a1f51a3e7e1df": {
       "artifactName": "adb",
       "abi": "x86_64",
-      "output": "C:\\WorkSpace\\UbikiTouch\\adbcore\\build\\intermediates\\cxx\\Debug\\2w465x6h\\obj\\x86_64\\libadb.so",
+      "output": "D:\\WorkSpace\\superAppAndroid\\adbcore\\build\\intermediates\\cxx\\Debug\\2w465x6h\\obj\\x86_64\\libadb.so",
       "runtimeFiles": []
     },
     "libadbcore.so::@6890427a1f51a3e7e1df": {
       "artifactName": "libadbcore.so",
       "abi": "x86_64",
-      "output": "C:\\WorkSpace\\UbikiTouch\\adbcore\\build\\intermediates\\cxx\\Debug\\2w465x6h\\obj\\x86_64\\libadbcore.so",
+      "output": "D:\\WorkSpace\\superAppAndroid\\adbcore\\build\\intermediates\\cxx\\Debug\\2w465x6h\\obj\\x86_64\\libadbcore.so",
       "runtimeFiles": []
     }
   }

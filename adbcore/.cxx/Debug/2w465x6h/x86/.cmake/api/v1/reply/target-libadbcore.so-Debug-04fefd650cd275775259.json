@@ -2,7 +2,7 @@
 	"artifacts" : 
 	[
 		{
-			"path" : "C:/WorkSpace/UbikiTouch/adbcore/build/intermediates/cxx/Debug/2w465x6h/obj/x86/libadbcore.so"
+			"path" : "D:/WorkSpace/superAppAndroid/adbcore/build/intermediates/cxx/Debug/2w465x6h/obj/x86/libadbcore.so"
 		}
 	],
 	"backtrace" : 1,
@@ -95,7 +95,7 @@
 				{
 					"backtrace" : 2,
 					"isSystem" : true,
-					"path" : "C:/Users/Administrator/.gradle/caches/8.10.2/transforms/b0ebb6f8d6d3bb0005bb4c0188fa1a7d/transformed/libcxx-27.0.12077973/prefab/modules/cxx/include"
+					"path" : "D:/DevelopKits/Libs/caches/8.10.2/transforms/b0ebb6f8d6d3bb0005bb4c0188fa1a7d/transformed/libcxx-27.0.12077973/prefab/modules/cxx/include"
 				}
 			],
 			"language" : "CXX",
@@ -117,7 +117,7 @@
 			],
 			"sysroot" : 
 			{
-				"path" : "C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot"
+				"path" : "D:/DevelopKits/Android/SDK/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot"
 			}
 		}
 	],
@@ -141,7 +141,7 @@
 			},
 			{
 				"backtrace" : 2,
-				"fragment" : "C:\\Users\\Administrator\\.gradle\\caches\\8.10.2\\transforms\\b0ebb6f8d6d3bb0005bb4c0188fa1a7d\\transformed\\libcxx-27.0.12077973\\prefab\\modules\\cxx\\libs\\android.x86\\libcxx.a",
+				"fragment" : "D:\\DevelopKits\\Libs\\caches\\8.10.2\\transforms\\b0ebb6f8d6d3bb0005bb4c0188fa1a7d\\transformed\\libcxx-27.0.12077973\\prefab\\modules\\cxx\\libs\\android.x86\\libcxx.a",
 				"role" : "libraries"
 			},
 			{
@@ -152,7 +152,7 @@
 		"language" : "CXX",
 		"sysroot" : 
 		{
-			"path" : "C:/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot"
+			"path" : "D:/DevelopKits/Android/SDK/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot"
 		}
 	},
 	"name" : "libadbcore.so",
