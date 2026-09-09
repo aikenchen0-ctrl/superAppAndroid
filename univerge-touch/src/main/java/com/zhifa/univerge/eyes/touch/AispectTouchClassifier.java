@@ -5,6 +5,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Build;
 import android.view.MotionEvent;
+import android.util.Log;
 
 import com.zhifa.univerge.eyes.aispect.AispectCollectionController;
 import com.zhifa.univerge.eyes.aispect.AispectCanonicalModelRequest;
@@ -27,6 +28,7 @@ import org.json.JSONException;
 
 public final class AispectTouchClassifier implements AutoCloseable, AispectCollectionController.Listener {
     public static final String SDK_VERSION = "1.1.0";
+    private static final String TAG = "AispectTouch";
     private final AispectCollectionController controller;
     private final String remoteModelBaseUrl;
     private final String remoteModelAppId;
@@ -96,6 +98,11 @@ public final class AispectTouchClassifier implements AutoCloseable, AispectColle
                 controller.startRecognition();
             }
             running = controller.isRecognitionRunning();
+            AispectTouchModelInfo model = selectedModelInfo();
+            Log.d(TAG, "classifier_start running=" + running
+                    + " model=" + (model == null ? "null" : model.id)
+                    + " version=" + (model == null ? "" : model.version)
+                    + " featureContract=" + (model == null ? "" : model.featureContract));
             lastEmittedPredictionSequence = 0;
             scheduleDeviceRegistration();
             modelPreloadGate.schedule(modelUpdateExecutor, controller::preloadSelectedModel);
@@ -361,10 +368,26 @@ public final class AispectTouchClassifier implements AutoCloseable, AispectColle
             AispectTouchErrorCode code = status.selectedModelInfo == null
                     ? AispectTouchErrorCode.MODEL_UNAVAILABLE
                     : AispectTouchErrorCode.INFERENCE_FAILED;
-            listener.onTouchError(new AispectTouchError(code, new IllegalStateException("prediction unavailable")));
+            IllegalStateException cause = new IllegalStateException(
+                    "prediction unavailable event=" + status.lastEventKey
+                            + " detail=" + status.lastEventDetail
+                            + " touchEventPresent=" + (status.latestTouchEvent != null)
+                            + " sampleRate=" + status.latestSampleRateHz
+                            + " impact=" + status.latestImpactMaxAbsDelta
+            );
+            Log.e(TAG, "touch_error code=" + code + " " + cause.getMessage(), cause);
+            listener.onTouchError(new AispectTouchError(code, cause));
             return;
         }
-        listener.onTouchResult(AispectTouchResultMapper.fromPrediction(status.latestPrediction, status.latestTouchEvent));
+        AispectTouchResult result = AispectTouchResultMapper.fromPrediction(
+                status.latestPrediction, status.latestTouchEvent
+        );
+        Log.i(TAG, "touch_result label=" + result.classLabel
+                + " strength=" + result.strength
+                + " finger=" + result.fingerType
+                + " confidence=" + result.confidence
+                + " model=" + result.modelId);
+        listener.onTouchResult(result);
     }
 
     @Override
@@ -374,6 +397,9 @@ public final class AispectTouchClassifier implements AutoCloseable, AispectColle
 
     @Override
     public void onRecordFailed(Exception error, AispectCollectionController.Status status) {
+        Log.e(TAG, "touch_record_failed event="
+                + (status == null ? "null" : status.lastEventKey)
+                + " detail=" + (status == null ? "" : status.lastEventDetail), error);
         if (!closed && listener != null) {
             listener.onTouchError(new AispectTouchError(AispectTouchErrorCode.INFERENCE_FAILED, error));
         }
