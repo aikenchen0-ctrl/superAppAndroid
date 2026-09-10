@@ -42,8 +42,7 @@ class AccessibilityKeepAliveGuideActivity : ComponentActivity() {
                         service = service,
                         command = command,
                         copyCommand = { copyCommand(command) },
-                        close = { finish() }
-                    )
+                        close = { finish() })
                 }
             }
         }
@@ -74,10 +73,19 @@ private fun GuideContent(
         Text(text = "无障碍保活教程", style = MaterialTheme.typography.headlineSmall)
         Text(text = "本应用包名：$packageName")
         Text(text = "无障碍服务组件：$service", style = MaterialTheme.typography.bodySmall)
-        GuideSection("ROOT 方案", "开启开关后，应用先执行 su 检测。检测到 ROOT 时，通过 root shell 写入 accessibility_enabled 和 enabled_accessibility_services，并保留其他已启用的无障碍服务。每次打开应用都会再次校验并恢复。")
-        GuideSection("ADB 方案首次配置", "1. Android 11 及以上打开开发者选项和无线调试。\n2. 在无线调试中选择使用配对码配对设备，记录配对端口和配对码。\n3. 使用电脑上的 adb 工具完成配对，并保持设备与电脑在同一网络。\n4. 在本页复制命令执行；命令中的包名和服务名已经按本应用动态生成。\n5. 回到应用打开“无障碍保活”开关。已配对的 ADB 通道会在应用启动时尝试恢复服务。")
+        GuideSection(
+            "ROOT 方案",
+            "开启开关后，应用先执行 su 检测。检测到 ROOT 时，通过 root shell 写入 accessibility_enabled 和 enabled_accessibility_services，并保留其他已启用的无障碍服务。每次打开应用都会再次校验并恢复。"
+        )
+        GuideSection(
+            "ADB 方案首次配置",
+            "1. Android 11 及以上打开开发者选项和无线调试。\n2. 在无线调试中选择使用配对码配对设备，记录配对端口和配对码。\n3. 使用电脑上的 adb 工具完成配对，并保持设备与电脑在同一网络。\n4. 在本页复制命令执行；命令中的包名和服务名已经按本应用动态生成。\n5. 回到应用打开“无障碍保活”开关。已配对的 ADB 通道会在应用启动时尝试恢复服务。"
+        )
         Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 Text(text = "可复制的 ADB 命令", style = MaterialTheme.typography.titleMedium)
                 Text(text = command, style = MaterialTheme.typography.bodySmall)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -86,8 +94,14 @@ private fun GuideContent(
                 }
             }
         }
-        GuideSection("验证和撤销", "验证：adb shell settings get secure accessibility_enabled；adb shell settings get secure enabled_accessibility_services；也可以执行 adb shell dumpsys accessibility。撤销 ADB 权限请在系统的无线调试页面取消配对；撤销 ROOT 权限请在 ROOT 管理器中关闭本应用授权。")
-        GuideSection("实现细节与限制", "ADB 保活使用 AdbKeeper 的无线调试通道，权限级别是 ADB shell，不等于 root。Android 11 以下不支持无线调试配对；部分 ROM 会在重启或 Wi-Fi 切换后关闭无线调试。系统设置中手动关闭服务后，下一次应用启动且开关仍开启时会再次尝试恢复。")
+        GuideSection(
+            "验证和撤销",
+            "验证：adb shell settings get secure accessibility_enabled；adb shell settings get secure enabled_accessibility_services；也可以执行 adb shell dumpsys accessibility。撤销 ADB 权限请在系统的无线调试页面取消配对；撤销 ROOT 权限请在 ROOT 管理器中关闭本应用授权。"
+        )
+        GuideSection(
+            "实现细节与限制",
+            "ADB 保活使用 AdbKeeper 的无线调试通道，权限级别是 ADB shell，不等于 root。Android 11 以下不支持无线调试配对；部分 ROM 会在重启或 Wi-Fi 切换后关闭无线调试。系统设置中手动关闭服务后，下一次应用启动且开关仍开启时会再次尝试恢复。"
+        )
     }
 }
 

@@ -1,7 +1,5 @@
 package com.zhifaios.eyes.touch;
 
-import com.zhifa.univerge.eyes.touch.AispectTouchClassifier;
-
 import org.junit.Assert;
 import org.junit.Test;
 

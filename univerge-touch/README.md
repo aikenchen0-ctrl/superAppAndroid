@@ -23,7 +23,7 @@ For remote model management, set `remoteModelBaseUrl`, `remoteModelAppId`, and o
 
 ## Model Policy
 
-The library contains one legacy four-class fallback model. It remains available when no verified downloaded model is active. Historical, ablation, collection, and all-data-fit-only experimental models are intentionally excluded.
+The library contains one embedded causal four-class model. It remains available when no verified downloaded model is active. Historical, ablation, collection, legacy, and all-data-fit-only experimental models are intentionally excluded.
 
 Remote updates use the canonical assignment endpoint configured by:
 

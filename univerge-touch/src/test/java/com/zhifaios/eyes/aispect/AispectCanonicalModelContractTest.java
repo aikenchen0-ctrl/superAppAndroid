@@ -1,7 +1,5 @@
 package com.zhifaios.eyes.aispect;
 
-import com.zhifa.univerge.eyes.aispect.AispectCanonicalModelContract;
-
 import org.junit.Assert;
 import org.junit.Test;
 

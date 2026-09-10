@@ -1,9 +1,5 @@
 package com.zhifaios.eyes.aispect;
 
-import com.zhifa.univerge.eyes.aispect.AispectDownloadedModelStore;
-import com.zhifa.univerge.eyes.aispect.AispectRemoteModelAssignment;
-import com.zhifa.univerge.eyes.aispect.AispectRemoteModelUpdater;
-
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.Assert;

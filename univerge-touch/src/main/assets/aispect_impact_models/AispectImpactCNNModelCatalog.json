@@ -1,11 +1,5 @@
 [
   {
-    "displayName": "Legacy Fallback (旧版回退) · 21ch IMU+Patch",
-    "id": "lemon_tao_full4_enhanced_patch21_no_confidence",
-    "scalerResourceName": "AispectImpactCNNScaler_lemon_tao_full4_enhanced_patch21_no_confidence",
-    "weightsResourceName": "AispectImpactCNNWeights_lemon_tao_full4_enhanced_patch21_no_confidence"
-  },
-  {
     "displayName": "Causal Touch Relative (因果触摸相对) · 19ch IMU+Touch",
     "id": "causal_touch_relative_v1_all_devices_fit_20260904",
     "scalerResourceName": "AispectImpactCNNScaler_causal_touch_relative_v1_all_devices_fit_20260904",

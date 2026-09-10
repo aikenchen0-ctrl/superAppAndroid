@@ -6,10 +6,10 @@
 
 主要实现位于：
 
-- `univerge-touch/src/main/java/com/zhifa/univerge/eyes/touch/AispectTouchClassifier.java`
-- `univerge-touch/src/main/java/com/zhifa/univerge/eyes/aispect/AispectCollectionController.java`
-- `univerge-touch/src/main/java/com/zhifa/univerge/eyes/aispect/AispectImpactCNNClassifier.java`
-- `univerge-touch/src/main/java/com/zhifa/univerge/eyes/touch/AispectTouchResult.java`
+- `univerge-touch/src/main/java/com/zhifaios/eyes/touch/AispectTouchClassifier.java`
+- `univerge-touch/src/main/java/com/zhifaios/eyes/aispect/AispectCollectionController.java`
+- `univerge-touch/src/main/java/com/zhifaios/eyes/aispect/AispectImpactCNNClassifier.java`
+- `univerge-touch/src/main/java/com/zhifaios/eyes/touch/AispectTouchResult.java`
 
 ## 2. 模型作用
 
@@ -233,4 +233,3 @@ DRAG_START / DRAG / DRAG_END -> DRAG
 classifier.stop();
 classifier.close();
 ```
-

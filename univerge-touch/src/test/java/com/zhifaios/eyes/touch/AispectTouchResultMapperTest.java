@@ -1,11 +1,6 @@
 package com.zhifaios.eyes.touch;
 
-import com.zhifa.univerge.eyes.aispect.AispectModels;
-import com.zhifa.univerge.eyes.touch.AispectFingerType;
-import com.zhifa.univerge.eyes.touch.AispectTouchEventType;
-import com.zhifa.univerge.eyes.touch.AispectTouchResult;
-import com.zhifa.univerge.eyes.touch.AispectTouchResultMapper;
-import com.zhifa.univerge.eyes.touch.AispectTouchStrength;
+import com.zhifaios.eyes.aispect.AispectModels;
 
 import org.junit.Assert;
 import org.junit.Test;

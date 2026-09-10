@@ -1,8 +1,5 @@
 package com.zhifaios.eyes.aispect;
 
-import com.zhifa.univerge.eyes.aispect.AispectDeviceRegistrar;
-import com.zhifa.univerge.eyes.aispect.AispectModelHttpClient;
-
 import org.json.JSONObject;
 import org.junit.Assert;
 import org.junit.Test;

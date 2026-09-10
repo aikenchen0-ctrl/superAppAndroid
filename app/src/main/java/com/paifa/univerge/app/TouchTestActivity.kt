@@ -34,12 +34,12 @@ import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import com.zhifa.univerge.eyes.touch.AispectTouchEventType
-import com.zhifa.univerge.eyes.touch.AispectTouchClassifier
-import com.zhifa.univerge.eyes.touch.AispectTouchError
-import com.zhifa.univerge.eyes.touch.AispectTouchModelInfo
-import com.zhifa.univerge.eyes.touch.AispectTouchListener
-import com.zhifa.univerge.eyes.touch.AispectTouchResult
+import com.zhifaios.eyes.touch.AispectTouchEventType
+import com.zhifaios.eyes.touch.AispectTouchClassifier
+import com.zhifaios.eyes.touch.AispectTouchError
+import com.zhifaios.eyes.touch.AispectTouchModelInfo
+import com.zhifaios.eyes.touch.AispectTouchListener
+import com.zhifaios.eyes.touch.AispectTouchResult
 
 class TouchTestActivity : ComponentActivity() {
     private lateinit var classifier: AispectTouchClassifier

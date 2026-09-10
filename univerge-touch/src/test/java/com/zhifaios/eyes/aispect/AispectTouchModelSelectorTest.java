@@ -1,9 +1,5 @@
 package com.zhifaios.eyes.aispect;
 
-import com.zhifa.univerge.eyes.aispect.AispectDeviceCapabilityProfiler;
-import com.zhifa.univerge.eyes.aispect.AispectImpactCNNClassifier;
-import com.zhifa.univerge.eyes.aispect.AispectTouchModelSelector;
-
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -52,7 +48,7 @@ public final class AispectTouchModelSelectorTest {
     }
 
     @Test
-    public void prefersPublishedLemonTaoModelForFreshInstall() {
+    public void ignoresRemovedLemonTaoModelForFreshInstall() {
         List<AispectImpactCNNClassifier.ModelInfo> models = Arrays.asList(
                 model("lemon_tao_full4_enhanced_patch21_no_confidence"),
                 model("oneplus_four_class_after_recollect_hard_nearfull_weighted_old13_multichannel")
@@ -63,7 +59,7 @@ public final class AispectTouchModelSelectorTest {
                 models
         );
 
-        Assert.assertEquals("lemon_tao_full4_enhanced_patch21_no_confidence", modelId);
+        Assert.assertEquals("oneplus_four_class_after_recollect_hard_nearfull_weighted_old13_multichannel", modelId);
     }
 
     @Test

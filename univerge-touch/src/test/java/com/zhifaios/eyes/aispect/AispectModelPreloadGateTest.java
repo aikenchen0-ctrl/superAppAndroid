@@ -9,8 +9,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import com.zhifa.univerge.eyes.aispect.AispectModelPreloadGate;
-
 public final class AispectModelPreloadGateTest {
     @Test
     public void schedulesAtMostOnceForTheGateLifecycle() {

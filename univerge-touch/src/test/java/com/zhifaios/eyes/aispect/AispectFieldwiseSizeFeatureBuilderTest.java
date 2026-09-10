@@ -1,9 +1,5 @@
 package com.zhifaios.eyes.aispect;
 
-import com.zhifa.univerge.eyes.aispect.AispectFieldwiseSizeFeatureBuilder;
-import com.zhifa.univerge.eyes.aispect.AispectModels;
-import com.zhifa.univerge.eyes.aispect.AispectTouchFrame;
-
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.Assert;
