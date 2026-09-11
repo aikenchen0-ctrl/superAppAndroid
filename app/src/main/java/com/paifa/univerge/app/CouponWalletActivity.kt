@@ -87,10 +87,15 @@ private fun CouponWalletScreen(onBack: () -> Unit) {
 
 @Composable
 private fun WalletToolbar(onBack: () -> Unit) {
-    Box(modifier = Modifier.fillMaxWidth().height(56.dp)) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+    ) {
         IconButton(
-            onClick = onBack,
-            modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp)
+            onClick = onBack, modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 4.dp)
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -107,8 +112,9 @@ private fun WalletToolbar(onBack: () -> Unit) {
             textAlign = TextAlign.Center
         )
         IconButton(
-            onClick = {},
-            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 4.dp)
+            onClick = {}, modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 4.dp)
         ) {
             Icon(
                 imageVector = Icons.Filled.MoreVert,
@@ -126,10 +132,14 @@ private fun WalletEntry(label: String, icon: ImageVector) {
             .fillMaxWidth()
             .height(64.dp)
             .clickable(onClick = {})
-            .padding(horizontal = 20.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(imageVector = icon, contentDescription = null, tint = WalletPrimaryColor, modifier = Modifier.size(23.dp))
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = WalletPrimaryColor,
+            modifier = Modifier.size(23.dp)
+        )
         Spacer(modifier = Modifier.width(16.dp))
         Text(text = label, color = WalletPrimaryColor, fontSize = 16.sp)
         Spacer(modifier = Modifier.weight(1f))
