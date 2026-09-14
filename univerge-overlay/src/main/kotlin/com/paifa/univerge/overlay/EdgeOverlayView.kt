@@ -14,8 +14,11 @@ import android.os.Build
 import android.view.MotionEvent
 import android.view.View
 import com.paifa.univerge.core.gesture.BackGestureProgress
+import com.paifa.univerge.core.gesture.runtime.GestureSignal
+import com.paifa.univerge.core.gesture.runtime.SideGestureRecognizer
 import com.paifa.univerge.core.model.EdgeSide
 import com.paifa.univerge.core.model.GestureData
+import com.paifa.univerge.core.model.GestureAction
 import com.paifa.univerge.core.model.GestureType
 
 @SuppressLint("ViewConstructor")
@@ -34,8 +37,18 @@ class EdgeOverlayView(
     private val onBackGestureProgress: (BackGestureProgress) -> Unit = {},
     private val onBackGestureCommit: (BackGestureProgress, GestureData) -> Boolean = { _, _ -> false },
     private val onBackGestureEnd: (BackGestureProgress) -> Unit = {},
-    private val onBackGestureCancel: () -> Unit = {}
+    private val onBackGestureCancel: () -> Unit = {},
+    private val recognizerFactory: ((screenWidth: Float, screenHeight: Float) -> SideGestureRecognizer)? = null,
+    private val onGesturePreview: (GestureSignal.Preview) -> Unit = {},
+    private val onGestureCommit: (GestureSignal.Commit) -> Unit = {},
+    private val onGestureCancel: (GestureSignal.Cancel) -> Unit = {},
+    private val previewSink: GesturePreviewSink = GesturePreviewSink { },
+    private val onGestureFinished: () -> Unit = {},
+    private val actionBindings: Map<GestureType, GestureAction> = emptyMap(),
+    private val onGestureWithAction: ((GestureType, GestureAction, GestureData) -> Unit)? = null,
+    private val onBackGestureCommitWithAction: ((BackGestureProgress, GestureAction, GestureData) -> Boolean)? = null
 ) : View(context) {
+    private val previewFrameDispatcher = ViewGesturePreviewFrameDispatcher(this)
     private val touchPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
     }
@@ -57,13 +70,23 @@ class EdgeOverlayView(
             onBackGestureProgress(progress)
         },
         onBackGestureCommit = onBackGestureCommit,
+        onBackGestureCommitWithAction = onBackGestureCommitWithAction,
         onBackGestureEnd = onBackGestureEnd,
         onBackGestureCancel = {
             hideTouchFeedback()
             onBackGestureCancel()
         },
         density = resources.displayMetrics.density,
-        viewportHeightPx = { height.toFloat() }
+        viewportHeightPx = { height.toFloat() },
+        viewportWidthPx = { width.toFloat() },
+        recognizerFactory = recognizerFactory,
+        onGesturePreview = onGesturePreview,
+        onGestureCommit = onGestureCommit,
+        onGestureCancel = onGestureCancel,
+        previewSink = previewSink,
+        previewFrameDispatcher = previewFrameDispatcher,
+        actionBindings = actionBindings,
+        onGestureWithAction = onGestureWithAction
     )
     private var isTouching = false
 
@@ -99,18 +122,42 @@ class EdgeOverlayView(
     @SuppressLint("ClickableViewAccessibility")
     // 触摸事件统一交给 detector；这里只处理触摸反馈的收尾。
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        detector.onTouchEvent(event)
+        val handled = detector.onTouchEvent(event)
         when (event.actionMasked) {
             MotionEvent.ACTION_UP,
-            MotionEvent.ACTION_CANCEL -> hideTouchFeedback()
+            MotionEvent.ACTION_CANCEL,
+            MotionEvent.ACTION_POINTER_DOWN,
+            MotionEvent.ACTION_POINTER_UP -> {
+                hideTouchFeedback()
+                onGestureFinished()
+            }
         }
-        return true
+        return handled
+    }
+
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        super.onWindowFocusChanged(hasWindowFocus)
+        if (!hasWindowFocus) {
+            detector.onFocusLost()
+            hideTouchFeedback()
+            onGestureFinished()
+        }
+    }
+
+    override fun onDetachedFromWindow() {
+        detector.cancel()
+        hideTouchFeedback()
+        onGestureFinished()
+        super.onDetachedFromWindow()
     }
 
     // 宿主暂停服务或销毁窗口时调用，取消长按计时器等回调。
     fun cancelPendingCallbacks() {
         detector.cancel()
     }
+
+    val hasActiveGesture: Boolean
+        get() = detector.hasActiveSession
 
     private fun updatePaints() {
         touchPaint.color = edgeOverlayIndicatorColorArgb(
@@ -148,6 +195,31 @@ class EdgeOverlayView(
         const val HANDLE_VERTICAL_INSET_DP = 8f
         const val TOUCH_ALPHA_MULTIPLIER = 1.6f
         const val DEFAULT_TOUCH_OPACITY_PERCENT = 88
+    }
+}
+
+private class ViewGesturePreviewFrameDispatcher(
+    private val view: View
+) : GesturePreviewFrameDispatcher {
+    override var consumer: ((GestureSignal.Preview) -> Unit)? = null
+    private var pending: GestureSignal.Preview? = null
+    private var framePosted = false
+
+    override fun submit(preview: GestureSignal.Preview) {
+        pending = preview
+        if (framePosted) return
+        framePosted = true
+        view.postOnAnimation {
+            framePosted = false
+            val next = pending
+            pending = null
+            if (next != null) consumer?.invoke(next)
+        }
+    }
+
+    override fun cancel() {
+        pending = null
+        framePosted = false
     }
 }
 

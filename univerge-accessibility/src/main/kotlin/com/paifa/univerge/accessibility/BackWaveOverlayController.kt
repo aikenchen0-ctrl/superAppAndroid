@@ -50,6 +50,12 @@ internal class BackWaveOverlayController(
         return true
     }
 
+    /** Creates the non-touchable window before the first native MOVE arrives. */
+    fun prewarm() {
+        val height = context.resources.displayMetrics.heightPixels.coerceAtLeast(1)
+        ensureView(BackWaveAnchor(EdgeSide.LEFT, edgeX = 0, y = 0, height = height))
+    }
+
     fun finish(progress: BackGestureProgress, anchor: BackWaveAnchor, items: List<SideFunctionPanelItem>) {
         val fullScreenAnchor = anchor.copy(
             y = 0,
@@ -62,7 +68,11 @@ internal class BackWaveOverlayController(
             itemCount = items.size
         )
         ensureView(localizedAnchor)?.update(visibleState(progress, localizedAnchor, items))
-        dismiss()
+        waveView?.hide()
+    }
+
+    fun hide() {
+        waveView?.hide()
     }
 
     private fun visibleState(
@@ -98,7 +108,16 @@ internal class BackWaveOverlayController(
 
     private fun ensureView(anchor: BackWaveAnchor): BackWaveView? {
         val existing = waveView
-        if (existing != null && activeAnchor == anchor) return existing
+        if (existing != null) {
+            if (activeAnchor != anchor) {
+                activeAnchor = anchor
+                runCatching { windowManager.updateViewLayout(existing, layoutParams(anchor)) }
+                    .onFailure { error ->
+                        Log.w(TAG, "failed to update back wave anchor", error)
+                    }
+            }
+            return existing
+        }
         dismiss()
         activeAnchor = anchor
         val view = BackWaveView(context)
@@ -241,6 +260,11 @@ private class BackWaveView(context: Context) : View(context) {
 
     fun update(nextState: BackWaveState) {
         state = nextState
+        postInvalidateOnAnimation()
+    }
+
+    fun hide() {
+        state = BackWaveState.Hidden
         postInvalidateOnAnimation()
     }
 

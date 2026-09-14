@@ -82,6 +82,8 @@
     <string name="gesture_long_press">Long press</string>
     <string name="gesture_swipe_up">Swipe up</string>
     <string name="gesture_swipe_down">Swipe down</string>
+    <string name="gesture_swipe_left">Swipe left</string>
+    <string name="gesture_swipe_right">Swipe right</string>
     <string name="gesture_pull_inward">Pull inward</string>
     <string name="gesture_pull_inward_short">Short pull inward</string>
     <string name="gesture_pull_inward_long">Long pull inward</string>

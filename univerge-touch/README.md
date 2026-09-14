@@ -1,5 +1,11 @@
 # Aispect Touch Android SDK
 
+> Legacy compatibility copy. The current SuperApp does not include this directory in
+> `settings.gradle`; its runtime SDK source of truth is
+> `C:\\codeDev\\cnn\\sdk\\aispect-touch-android`, packaged into
+> `app/libs/aispect-touch-android-1.2.0.aar`. Keep this copy for historical reference
+> only and do not publish it as the current SDK.
+
 Reusable Android library for four-class touch classification:
 
 - `thumb_light`
@@ -23,7 +29,7 @@ For remote model management, set `remoteModelBaseUrl`, `remoteModelAppId`, and o
 
 ## Model Policy
 
-The library contains one embedded causal four-class model. It remains available when no verified downloaded model is active. Historical, ablation, collection, legacy, and all-data-fit-only experimental models are intentionally excluded.
+The library contains one legacy four-class fallback model. It remains available when no verified downloaded model is active. Historical, ablation, collection, and all-data-fit-only experimental models are intentionally excluded.
 
 Remote updates use the canonical assignment endpoint configured by:
 

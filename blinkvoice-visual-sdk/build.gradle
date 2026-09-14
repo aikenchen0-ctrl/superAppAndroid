@@ -20,6 +20,12 @@ android {
     kotlinOptions {
         jvmTarget = '1.8'
     }
+
+    // Bundle the platform-neutral contract/runtime into the distributable AAR while keeping
+    // blink-api independently buildable and testable as a plain Java library.
+    sourceSets {
+        main.java.srcDir file('../blink-api/src/main/java')
+    }
 }
 
 dependencies {

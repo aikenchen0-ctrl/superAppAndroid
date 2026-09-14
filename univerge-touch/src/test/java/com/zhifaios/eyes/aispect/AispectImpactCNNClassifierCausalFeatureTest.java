@@ -1,5 +1,10 @@
 package com.zhifaios.eyes.aispect;
 
+import com.zhifa.univerge.eyes.aispect.AispectImpactCNNClassifier;
+import com.zhifa.univerge.eyes.aispect.AispectModels;
+import com.zhifa.univerge.eyes.aispect.AispectSignalWindowBuilder;
+import com.zhifa.univerge.eyes.aispect.AispectTouchFrame;
+
 import org.junit.Assert;
 import org.junit.Test;
 

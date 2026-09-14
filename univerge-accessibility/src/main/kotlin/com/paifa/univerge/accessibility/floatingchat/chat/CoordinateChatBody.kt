@@ -176,6 +176,7 @@ internal fun CoordinateChatBody(
     onMessageDoubleClick: (FloatingChatMessage) -> Unit = {},
     onLongPressMessage: (FloatingChatMessage, Rect?) -> Unit,
     multiSelectMode: Boolean,
+    heavyDragEnabled: Boolean = true,
     selectedMessageIds: Map<String, Boolean>,
     remindedMessageIds: Map<String, Boolean>,
     favoriteMessageIds: Map<String, Boolean>,
@@ -435,8 +436,9 @@ internal fun CoordinateChatBody(
                 remindedMessageIds = remindedMessageIds,
                 favoriteMessageIds = favoriteMessageIds,
                 claimedPaymentMessageIds = claimedPaymentMessageIds,
-                onToggleMessageSelection = onToggleMessageSelection,
-                onMessageClick = { message ->
+                 onToggleMessageSelection = onToggleMessageSelection,
+                 heavyDragEnabled = heavyDragEnabled && !multiSelectMode,
+                 onMessageClick = { message ->
                     onBlankAreaTap()
                     if (homeOverviewVisible && !messageSupportsVoiceTranscription(message)) {
                         homeUnreadSummaryByMessageId[message.id]?.let(onHomeUnreadSelected)

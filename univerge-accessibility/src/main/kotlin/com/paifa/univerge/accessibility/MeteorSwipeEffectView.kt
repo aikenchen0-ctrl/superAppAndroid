@@ -45,14 +45,14 @@ internal class MeteorSwipeEffectController(
     /**
      * 立即停止绘制并移除效果窗口。
      *
-     * 该方法用于屏幕关闭、服务销毁或手势被取消等不需要等待淡出的场景；移除操作使用
-     * [runCatching]，以容忍窗口已经被系统回收的情况。
+     * 该方法用于屏幕关闭、服务销毁或手势被取消等不需要等待淡出的场景。使用非阻塞
+     * removeView，避免把 WindowManager teardown 压回输入回调线程。
      */
     fun dismissImmediately() {
         val view = effectView ?: return
         effectView = null
         view.stop()
-        runCatching { windowManager.removeViewImmediate(view) }
+        runCatching { windowManager.removeView(view) }
     }
 
     /**
@@ -65,7 +65,7 @@ internal class MeteorSwipeEffectController(
         val display = context.resources.displayMetrics
         val view = MeteorSwipeEffectView(context) {
             if (effectView === it) effectView = null
-            runCatching { windowManager.removeViewImmediate(it) }
+            runCatching { windowManager.removeView(it) }
         }
         return runCatching {
             windowManager.addView(view, WindowManager.LayoutParams(

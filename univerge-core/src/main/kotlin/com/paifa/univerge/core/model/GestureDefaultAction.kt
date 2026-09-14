@@ -10,6 +10,7 @@ object GestureDefaultAction {
             GestureType.PULL_INWARD_SHORT -> GestureAction.Back
             GestureType.PULL_INWARD_LONG -> GestureAction.Home
             GestureType.SWIPE_UP -> GestureAction.ExpandFloatingChat
+            GestureType.SWIPE_UP_HOLD -> GestureAction.Screenshot
             GestureType.SWIPE_DOWN -> GestureAction.CollapseFloatingChat
             else -> GestureAction.None
         }

@@ -13,13 +13,19 @@ class SwipeClassifier(
     private val diagonalMinAngle: Float = 25f,
     private val diagonalMaxAngle: Float = 65f,
     private val verticalSwipeRatio: Float = 2.75f,
-    private val diagonalPullsEnabled: Boolean = false
+    private val diagonalPullsEnabled: Boolean = false,
+    private val outwardTolerance: Float = 8f
 ) {
     // `dx`/`dy` 是结束点相对起点的位移，正负号同时受屏幕侧边影响。
     fun classify(side: EdgeSide, dx: Float, dy: Float): GestureType? {
         val absX = abs(dx)
         val absY = abs(dy)
         if (absX == 0f && absY == 0f) return null
+
+        // A meaningful outward component invalidates the edge gesture. Keep a
+        // small tolerance so a mostly vertical swipe can still be recognized
+        // when the initial contact is a few pixels away from the edge.
+        if (!isInwardSwipe(side, dx) && absX > outwardTolerance) return null
 
         if (isVerticalSwipe(absX, absY)) {
             return if (dy < 0) GestureType.SWIPE_UP else GestureType.SWIPE_DOWN

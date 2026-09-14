@@ -37,9 +37,14 @@ sealed class GestureAction(open val id: String) {
                 id == ExpandFloatingChat.id -> ExpandFloatingChat
                 id == CollapseFloatingChat.id -> CollapseFloatingChat
                 id == PlayVideo.id -> PlayVideo
-                id.startsWith("launch_app:") -> LaunchApp(id.removePrefix("launch_app:"))
+                id.startsWith("launch_app:") -> {
+                    val packageName = id.removePrefix("launch_app:")
+                    if (PACKAGE_NAME.matches(packageName)) LaunchApp(packageName) else None
+                }
                 else -> None
             }
         }
+
+        private val PACKAGE_NAME = Regex("[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)+")
     }
 }

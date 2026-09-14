@@ -82,6 +82,8 @@
     <string name="gesture_long_press">长按</string>
     <string name="gesture_swipe_up">上滑</string>
     <string name="gesture_swipe_down">下滑</string>
+    <string name="gesture_swipe_left">左滑</string>
+    <string name="gesture_swipe_right">右滑</string>
     <string name="gesture_pull_inward">向内拉动</string>
     <string name="gesture_pull_inward_short">短距离向内拉动</string>
     <string name="gesture_pull_inward_long">长距离向内拉动</string>

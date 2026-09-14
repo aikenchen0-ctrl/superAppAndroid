@@ -70,6 +70,7 @@ internal fun MessageCoordinatePane(
     onMessageDoubleClick: (FloatingChatMessage) -> Unit = {},
     onBlankAreaTap: () -> Unit,
     bubbleAppearance: BubbleAppearance = BubbleAppearance.TwoD,
+    heavyDragEnabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val messageIndexes = remember(messages) {
@@ -118,9 +119,10 @@ internal fun MessageCoordinatePane(
                         claimedPaymentMessageIds = claimedPaymentMessageIds,
                         onToggleMessageSelection = onToggleMessageSelection,
                         onMessageClick = onMessageClick,
-                        onMessageDoubleClick = onMessageDoubleClick,
-                        connectorState = connectorState,
-                        bubbleAppearance = bubbleAppearance
+                         onMessageDoubleClick = onMessageDoubleClick,
+                         connectorState = connectorState,
+                         bubbleAppearance = bubbleAppearance,
+                         heavyDragEnabled = heavyDragEnabled
                     )
                 }
             } else {
@@ -158,9 +160,10 @@ internal fun MessageCoordinatePane(
                     onGroupMemberAvatarRemoved = {
                         connectorState.removeGroupMemberAvatar(message.id)
                     },
-                    showOwnSenderName = outgoingMessageCarriesName(message, sendNameEnabledByAccountId),
-                    bubbleAppearance = bubbleAppearance
-                    )
+                     showOwnSenderName = outgoingMessageCarriesName(message, sendNameEnabledByAccountId),
+                     bubbleAppearance = bubbleAppearance,
+                     heavyDragEnabled = heavyDragEnabled
+                     )
                 }
             }
         }
@@ -188,8 +191,9 @@ private fun HomeOverviewMessageGroupRow(
     onToggleMessageSelection: (FloatingChatMessage) -> Unit,
     onMessageClick: (FloatingChatMessage) -> Unit,
     onMessageDoubleClick: (FloatingChatMessage) -> Unit,
-    connectorState: ConnectorCoordinateState
-    ,bubbleAppearance: BubbleAppearance
+    connectorState: ConnectorCoordinateState,
+    bubbleAppearance: BubbleAppearance,
+    heavyDragEnabled: Boolean
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         group.messages.forEachIndexed { offset, message ->
@@ -218,9 +222,10 @@ private fun HomeOverviewMessageGroupRow(
                     onBubbleBoundsChanged = { bounds -> connectorState.updateMessageBubble(message.id, bounds) },
                     onGroupMemberAvatarBoundsChanged = {},
                     onGroupMemberAvatarRemoved = {},
-                    showOwnSenderName = outgoingMessageCarriesName(message, sendNameEnabledByAccountId),
-                    bubbleAppearance = bubbleAppearance
-                )
+                     showOwnSenderName = outgoingMessageCarriesName(message, sendNameEnabledByAccountId),
+                     bubbleAppearance = bubbleAppearance,
+                     heavyDragEnabled = heavyDragEnabled
+                 )
             }
         }
     }

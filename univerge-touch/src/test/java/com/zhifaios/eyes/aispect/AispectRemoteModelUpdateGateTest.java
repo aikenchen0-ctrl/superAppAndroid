@@ -1,5 +1,7 @@
 package com.zhifaios.eyes.aispect;
 
+import com.zhifa.univerge.eyes.aispect.AispectRemoteModelUpdateGate;
+
 import org.junit.Assert;
 import org.junit.Test;
 

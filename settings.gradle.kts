@@ -22,9 +22,13 @@ dependencyResolutionManagement {
 
 rootProject.name = "UbikiTouch"
 include(":app")
+include(":blink-api")
 include(":univerge-core")
+include(":univerge-heavy-drag-core")
+include(":univerge-heavy-drag-android")
+include(":univerge-heavy-drag-compose")
 include(":univerge-overlay")
 include(":univerge-accessibility")
+include(":gesture-server")
 include(":benchmark")
 include(":adbcore")
-include(":univerge-touch")

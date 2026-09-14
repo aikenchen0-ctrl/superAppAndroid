@@ -5,7 +5,6 @@ import android.accessibilityservice.TouchInteractionController
 import android.graphics.Rect
 import android.graphics.Region
 import android.os.Build
-import android.os.Handler
 import android.util.Log
 import android.view.Display
 import android.view.MotionEvent
@@ -13,23 +12,32 @@ import android.view.ViewConfiguration
 import com.paifa.univerge.core.gesture.BackGestureOption
 import com.paifa.univerge.core.gesture.BackGestureProgress
 import com.paifa.univerge.core.gesture.hitTestBackGestureOption
-import com.paifa.univerge.core.gesture.SwipeClassifier
+import com.paifa.univerge.core.gesture.runtime.BottomBarConfig
+import com.paifa.univerge.core.gesture.runtime.BottomGestureRecognizer
+import com.paifa.univerge.core.gesture.runtime.ConfigSnapshot
+import com.paifa.univerge.core.gesture.runtime.GestureSignal
+import com.paifa.univerge.core.gesture.runtime.HotZoneSegment
+import com.paifa.univerge.core.gesture.runtime.PointerSample
+import com.paifa.univerge.core.gesture.runtime.SideGestureRecognizer
+import com.paifa.univerge.core.gesture.runtime.SideGestureThresholds
+import com.paifa.univerge.core.gesture.runtime.BottomGestureThresholds
+import com.paifa.univerge.core.model.GestureAction
 import com.paifa.univerge.core.model.EdgeSide
 import com.paifa.univerge.core.model.EdgeZoneConfig
 import com.paifa.univerge.core.model.GestureData
 import com.paifa.univerge.core.model.GestureType
 import kotlin.math.hypot
 import kotlin.math.roundToInt
+import java.util.concurrent.Executor
 
 internal class NativeEdgeGestureController(
     private val service: AccessibilityService,
-    private val mainHandler: Handler,
-    private val onGesture: (EdgeSide, GestureType, GestureData) -> Unit,
-    private val onGestureProgress: (EdgeSide, GestureData) -> Unit = { _, _ -> },
+    private val onGesture: (EdgeSide, GestureType, GestureAction, GestureData) -> Unit,
+    private val onGestureProgress: (EdgeSide, GestureAction, GestureData) -> Unit = { _, _, _ -> },
     private val onGestureEnd: () -> Unit = {},
-    private val onBottomGesture: (BottomGestureBarGestureType, GestureData) -> Unit,
+    private val onBottomGesture: (BottomGestureBarGestureType, GestureAction, GestureData) -> Unit,
     private val onBackGestureProgress: (NativeTouchInterceptRect, BackGestureProgress) -> Unit,
-    private val onBackGestureCommit: (NativeTouchInterceptRect, BackGestureProgress, GestureData) -> Boolean,
+    private val onBackGestureCommit: (NativeTouchInterceptRect, BackGestureProgress, GestureAction, GestureData) -> Boolean,
     private val onBackGestureEnd: (NativeTouchInterceptRect, BackGestureProgress) -> Unit,
     private val onBackGestureCancel: () -> Unit
 ) {
@@ -37,11 +45,22 @@ internal class NativeEdgeGestureController(
     private var callback: TouchInteractionController.Callback? = null
     private var config: NativeEdgeGestureConfig? = null
     private var floatingChatExpanded = false
-    private val classifier = SwipeClassifier()
     private val touchSlopPx = ViewConfiguration.get(service).scaledTouchSlop.toFloat()
+    private val previewData = GestureData(0f, 0f, 0f, 0f)
+    private var coreBridge: NativeGestureCoreBridge? = null
+    private var activeConfig: NativeEdgeGestureConfig? = null
+    private val sessionAbort = NativeGestureSessionAbort(
+        cancelCore = { coreBridge?.onCancel() },
+        cancelBackProgress = ::cancelBackProgressIfNeeded,
+        endPreview = onGestureEnd,
+        clearFields = ::resetGestureFields
+    )
 
     var isRunning: Boolean = false
         private set
+
+    val hasActiveGesture: Boolean
+        get() = coreBridge?.hasActiveGesture == true
 
     fun start(config: NativeEdgeGestureConfig): Boolean {
         if (Build.VERSION.SDK_INT < NATIVE_TOUCH_INTERACTION_MIN_SDK) return false
@@ -53,6 +72,7 @@ internal class NativeEdgeGestureController(
 
         if (isRunning) {
             this.config = config
+            coreBridge?.updateConfig(config)
             return applyNativeTouchPassthrough(config, floatingChatExpanded)
         }
 
@@ -65,10 +85,14 @@ internal class NativeEdgeGestureController(
         }
 
         return runCatching {
-            touchController.registerCallback({ command -> mainHandler.post(command) }, newCallback)
+            touchController.registerCallback(
+                Executor { command -> command.run() },
+                newCallback
+            )
             controller = touchController
             callback = newCallback
             this.config = config
+            coreBridge = NativeGestureCoreBridge(config)
             isRunning = true
             if (applyNativeTouchPassthrough(config, floatingChatExpanded)) {
                 true
@@ -77,6 +101,7 @@ internal class NativeEdgeGestureController(
                 controller = null
                 callback = null
                 this.config = null
+                coreBridge = null
                 isRunning = false
                 false
             }
@@ -86,7 +111,7 @@ internal class NativeEdgeGestureController(
     }
 
     fun stop() {
-        onGestureEnd()
+        abortActiveSession()
         val touchController = controller
         val registeredCallback = callback
         config?.let { currentConfig ->
@@ -103,9 +128,11 @@ internal class NativeEdgeGestureController(
         controller = null
         callback = null
         config = null
+        coreBridge = null
+        activeConfig = null
         floatingChatExpanded = false
         isRunning = false
-        resetGesture()
+        resetGestureFields()
     }
 
     fun setFloatingChatExpanded(expanded: Boolean) {
@@ -149,12 +176,18 @@ internal class NativeEdgeGestureController(
         touchController: TouchInteractionController,
         event: MotionEvent
     ) {
+        traceNativeBoundary(
+            action = event.actionMasked,
+            eventTime = event.eventTime,
+            controllerState = touchController.state
+        )
         if (event.actionMasked == MotionEvent.ACTION_DOWN) {
-            resetGesture()
+            // A lost UP/CANCEL must not leak the previous BackWave selection
+            // into the next transaction. Abort before accepting the new DOWN.
+            abortActiveSession()
         } else if (gestureDelegated) {
             if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) {
-                onGestureEnd()
-                resetGesture()
+                abortActiveSession()
             }
             return
         }
@@ -167,9 +200,11 @@ internal class NativeEdgeGestureController(
             MotionEvent.ACTION_MOVE -> handleMove(touchController, currentConfig, event)
             MotionEvent.ACTION_UP -> handleUp(touchController, currentConfig, event)
             MotionEvent.ACTION_CANCEL -> {
-                cancelBackProgressIfNeeded()
-                onGestureEnd()
-                resetGesture()
+                abortActiveSession()
+            }
+            MotionEvent.ACTION_POINTER_DOWN,
+            MotionEvent.ACTION_POINTER_UP -> {
+                abortActiveSession()
             }
             else -> Unit
         }
@@ -180,44 +215,41 @@ internal class NativeEdgeGestureController(
         config: NativeEdgeGestureConfig,
         event: MotionEvent
     ) {
-        val intercept = nativeEdgeGestureInterceptAt(
-            x = event.x,
-            y = event.y,
-            screenWidthPx = config.screenWidthPx,
-            screenHeightPx = config.screenHeightPx,
-            density = config.density,
-            leftConfigs = config.leftConfigs,
-            rightConfigs = config.rightConfigs
+        val bridge = coreBridge ?: NativeGestureCoreBridge(config).also { coreBridge = it }
+        val signal = bridge.onDown(
+            xPx = event.x,
+            yPx = event.y,
+            timeMillis = event.eventTime,
+            pointerId = event.getPointerId(0),
+            pointerCount = event.pointerCount
         )
-        if (intercept == null && nativeBottomGestureHitTest(event.x, event.y, config, floatingChatExpanded)) {
-            activeBottomGesture = true
-            activeSide = null
-            startX = event.x
-            startY = event.y
-            latestX = event.x
-            latestY = event.y
-            bottomLastMotionX = event.x
-            bottomLastMotionY = event.y
-            bottomLastMovementAtMillis = event.eventTime
-            bottomDownAtMillis = event.eventTime
-            bottomGestureDispatched = false
-            consumingGesture = true
-            latestBackProgress = null
-            sentBackCancel = false
-            return
-        }
-        if (intercept == null) {
+        if (signal === NativeCoreSignal.Ignored ||
+            (signal is NativeCoreSignal.Bottom && floatingChatExpanded)
+        ) {
+            bridge.onCancel()
             requestDelegatingOnce(touchController)
-            clearGestureTracking()
+            clearGestureTrackingFields()
             return
         }
-        activeSide = intercept.side
-        activeIntercept = intercept
+        activeConfig = config
         startX = event.x
         startY = event.y
         latestX = event.x
         latestY = event.y
-        consumingGesture = false
+        activeSide = (signal as? NativeCoreSignal.Side)?.side
+        activeIntercept = activeSide?.let { side ->
+            nativeEdgeGestureInterceptAt(
+                x = event.x,
+                y = event.y,
+                screenWidthPx = config.screenWidthPx,
+                screenHeightPx = config.screenHeightPx,
+                density = config.density,
+                leftConfigs = if (side == EdgeSide.LEFT) config.leftConfigs else emptyList(),
+                rightConfigs = if (side == EdgeSide.RIGHT) config.rightConfigs else emptyList()
+            )
+        }
+        activeBottomGesture = signal is NativeCoreSignal.Bottom
+        consumingGesture = activeBottomGesture
         latestBackProgress = null
         sentBackCancel = false
     }
@@ -227,28 +259,49 @@ internal class NativeEdgeGestureController(
         config: NativeEdgeGestureConfig,
         event: MotionEvent
     ) {
-        if (activeBottomGesture) {
-            handleBottomMove(event)
+        val signal = coreBridge?.onMove(
+            xPx = event.x,
+            yPx = event.y,
+            timeMillis = event.eventTime,
+            pointerId = event.getPointerId(0),
+            pointerCount = event.pointerCount
+        ) ?: NativeCoreSignal.Ignored
+        if (signal === NativeCoreSignal.Ignored) {
+            if (activeSide == null && !activeBottomGesture) {
+                requestDelegatingOnce(touchController)
+            }
             return
         }
-        val intercept = activeIntercept ?: run {
-            requestDelegatingOnce(touchController)
-            return
-        }
-        val side = intercept.side
         latestX = event.x
         latestY = event.y
+        if (signal is NativeCoreSignal.Bottom) {
+            if (signal.signal is GestureSignal.Preview) consumingGesture = true
+            if (signal.signal is GestureSignal.Cancel) {
+                abortActiveSession()
+            }
+            return
+        }
+        signal as NativeCoreSignal.Side
+        val side = signal.side
+        val intercept = activeIntercept ?: run {
+            coreBridge?.onCancel()
+            requestDelegatingOnce(touchController)
+            clearGestureTrackingFields()
+            return
+        }
+        val active = activeConfig ?: config
+        updatePreviewData(startX, startY, latestX, latestY)
+        val previewAction = (signal.signal as? GestureSignal.Preview)?.action ?: GestureAction.None
+        onGestureProgress(side, previewAction, previewData)
         val dx = latestX - startX
         val dy = latestY - startY
-        onGestureProgress(side, GestureData(startX, startY, latestX, latestY))
         val distance = hypot(dx, dy)
         val backProgress = backProgressFor(
             side = side,
-            config = config,
+            config = active,
             touchX = latestX,
             touchY = latestY
         )
-        val classified = classifier.classify(side, dx, dy)
 
         if (backProgress != null) {
             latestBackProgress = backProgress
@@ -261,15 +314,25 @@ internal class NativeEdgeGestureController(
             latestBackProgress = null
             sentBackCancel = true
             onBackGestureCancel()
-        } else if (!consumingGesture && classified != null && distance >= config.shortThresholdPx) {
-            consumingGesture = true
-        } else if (!consumingGesture && distance > touchSlopPx) {
+        }
+        when (signal.signal) {
+            is GestureSignal.Preview -> {
+                consumingGesture = true
+            }
+            is GestureSignal.Cancel -> {
+                abortActiveSession()
+                requestDelegatingOnce(touchController)
+                return
+            }
+            else -> Unit
+        }
+        if (!consumingGesture && distance > touchSlopPx) {
+            coreBridge?.onCancel()
             requestDelegatingOnce(touchController)
-            clearGestureTracking()
+            clearGestureTrackingFields()
             return
         }
-
-        if (!consumingGesture && classified != null && distance >= config.shortThresholdPx) {
+        if (!consumingGesture && signal.signal is GestureSignal.Preview) {
             consumingGesture = true
         }
     }
@@ -279,44 +342,56 @@ internal class NativeEdgeGestureController(
         config: NativeEdgeGestureConfig,
         event: MotionEvent
     ) {
-        if (activeBottomGesture) {
-            handleBottomUp(event)
-            resetGesture()
-            return
-        }
-        val intercept = activeIntercept ?: run {
-            requestDelegatingOnce(touchController)
-            resetGesture()
-            return
-        }
-        val side = intercept.side
+        val signal = coreBridge?.onUp(
+            xPx = event.x,
+            yPx = event.y,
+            timeMillis = event.eventTime,
+            pointerId = event.getPointerId(0),
+            pointerCount = event.pointerCount
+        ) ?: NativeCoreSignal.Ignored
         latestX = event.x
         latestY = event.y
+        if (signal is NativeCoreSignal.Bottom) {
+            val commit = signal.signal as? GestureSignal.Commit
+            if (commit != null) {
+                val type = bottomGestureTypeFor(commit.gesture)
+                if (type != null) onBottomGesture(type, commit.action, commit.data.toPx(activeConfig?.density ?: config.density))
+            }
+            onGestureEnd()
+            resetGestureFields()
+            return
+        }
+        if (signal !is NativeCoreSignal.Side) {
+            requestDelegatingOnce(touchController)
+            resetGestureFields()
+            return
+        }
+        val side = signal.side
+        val intercept = activeIntercept
+        val active = activeConfig ?: config
+        val commit = signal.signal as? GestureSignal.Commit
         onGestureEnd()
-        val dx = latestX - startX
-        val dy = latestY - startY
-        val distance = hypot(dx, dy)
-        val data = GestureData(startX, startY, latestX, latestY)
+        val data = commit?.data?.toPx(active.density)
+            ?: GestureData(startX, startY, latestX, latestY)
         val finalBackProgress = backProgressFor(
             side = side,
-            config = config,
+            config = active,
             touchX = latestX,
             touchY = latestY
         ) ?: latestBackProgress?.copy(selectedOption = BackGestureOption.None)
-        val classified = classifier.classify(side, dx, dy)
 
-        if (consumingGesture && finalBackProgress != null) {
+        if (commit != null && finalBackProgress != null && intercept != null) {
             onBackGestureEnd(intercept, finalBackProgress)
-            if (!onBackGestureCommit(intercept, finalBackProgress, data)) {
-                onGesture(side, finalBackProgress.gestureType, data)
+            if (!onBackGestureCommit(intercept, finalBackProgress, commit.action, data)) {
+                onGesture(side, commit.gesture, commit.action, data)
             }
-        } else if (consumingGesture && classified != null && distance >= config.shortThresholdPx) {
-            onGesture(side, classified, data)
+        } else if (commit != null) {
+            onGesture(side, commit.gesture, commit.action, data)
         } else {
             cancelBackProgressIfNeeded()
             requestDelegatingOnce(touchController)
         }
-        resetGesture()
+        resetGestureFields()
     }
 
     private fun backProgressFor(
@@ -351,60 +426,24 @@ internal class NativeEdgeGestureController(
         )
     }
 
-    private fun handleBottomMove(event: MotionEvent) {
-        latestX = event.x
-        latestY = event.y
-        val movedSinceLastMotion = kotlin.math.abs(latestX - bottomLastMotionX) >= BottomGestureBarNativeMotionSlopPx ||
-            kotlin.math.abs(latestY - bottomLastMotionY) >= BottomGestureBarNativeMotionSlopPx
-        if (movedSinceLastMotion) {
-            bottomLastMotionX = latestX
-            bottomLastMotionY = latestY
-            bottomLastMovementAtMillis = event.eventTime
-        }
-        if (bottomGestureDispatched) return
-        val gestureType = resolveBottomGestureBarGestureType(
-            deltaX = latestX - startX,
-            deltaY = latestY - startY,
-            gestureDurationMillis = event.eventTime - bottomDownAtMillis,
-            upwardStationaryMillis = event.eventTime - bottomLastMovementAtMillis
-        )
-        if (shouldDispatchBottomGestureDuringMove(gestureType)) {
-            bottomGestureDispatched = true
-            onBottomGesture(gestureType, GestureData(startX, startY, latestX, latestY))
-        }
-    }
-
-    private fun handleBottomUp(event: MotionEvent) {
-        latestX = event.x
-        latestY = event.y
-        if (bottomGestureDispatched) return
-        if (
-            kotlin.math.abs(latestX - bottomLastMotionX) >= BottomGestureBarNativeMotionSlopPx ||
-            kotlin.math.abs(latestY - bottomLastMotionY) >= BottomGestureBarNativeMotionSlopPx
-        ) {
-            bottomLastMovementAtMillis = event.eventTime
-        }
-        val gestureType = resolveBottomGestureBarGestureType(
-            deltaX = latestX - startX,
-            deltaY = latestY - startY,
-            gestureDurationMillis = event.eventTime - bottomDownAtMillis,
-            upwardStationaryMillis = event.eventTime - bottomLastMovementAtMillis
-        )
-        onBottomGesture(gestureType, GestureData(startX, startY, latestX, latestY))
-    }
-
     private fun requestDelegatingOnce(touchController: TouchInteractionController) {
         val platformIsDelegating = touchController.state == TouchInteractionController.STATE_DELEGATING
         if (!shouldRequestNativeTouchDelegation(gestureDelegated, platformIsDelegating)) {
             gestureDelegated = true
             return
         }
+        traceDelegationRequest(touchController.state)
+        var requestSucceeded = false
         try {
             touchController.requestDelegating()
+            requestSucceeded = true
         } catch (error: IllegalStateException) {
             Log.e(TAG, "native touch delegation rejected state=${touchController.state}", error)
         } finally {
-            gestureDelegated = true
+            gestureDelegated = shouldMarkNativeTouchDelegated(
+                requestSucceeded = requestSucceeded,
+                platformIsDelegating = touchController.state == TouchInteractionController.STATE_DELEGATING
+            )
         }
     }
 
@@ -414,27 +453,66 @@ internal class NativeEdgeGestureController(
         onBackGestureCancel()
     }
 
-    private fun resetGesture() {
-        clearGestureTracking()
+    private fun abortActiveSession(): Boolean = sessionAbort.abort(
+        coreActive = coreBridge?.hasActiveGesture == true,
+        backProgressActive = latestBackProgress != null,
+        previewActive = activeSide != null || activeBottomGesture || gestureDelegated
+    )
+
+    private fun traceNativeBoundary(
+        action: Int,
+        eventTime: Long,
+        controllerState: Int
+    ) {
+        if (!BuildConfig.DEBUG) return
+        if (
+            action != MotionEvent.ACTION_DOWN &&
+            action != MotionEvent.ACTION_UP &&
+            action != MotionEvent.ACTION_CANCEL
+        ) return
+        Log.d(
+            TAG,
+            "[DEBUG-native-event] action=$action eventTime=$eventTime " +
+                "callbackUptime=${android.os.SystemClock.uptimeMillis()} " +
+                "state=$controllerState gestureId=${coreBridge?.activeGestureId ?: 0L} " +
+                "delegated=$gestureDelegated"
+        )
+    }
+
+    private fun traceDelegationRequest(state: Int) {
+        if (!BuildConfig.DEBUG) return
+        Log.d(
+            TAG,
+            "[DEBUG-native-delegation] request state=$state " +
+                "gestureId=${coreBridge?.activeGestureId ?: 0L} " +
+                "uptime=${android.os.SystemClock.uptimeMillis()}"
+        )
+    }
+
+    private fun resetGestureFields() {
+        clearGestureTrackingFields()
         gestureDelegated = false
     }
 
-    private fun clearGestureTracking() {
+    private fun clearGestureTrackingFields() {
         activeSide = null
         activeIntercept = null
+        activeConfig = null
         startX = 0f
         startY = 0f
         latestX = 0f
         latestY = 0f
         consumingGesture = false
         activeBottomGesture = false
-        bottomLastMotionX = 0f
-        bottomLastMotionY = 0f
-        bottomLastMovementAtMillis = 0L
-        bottomDownAtMillis = 0L
-        bottomGestureDispatched = false
         latestBackProgress = null
         sentBackCancel = false
+    }
+
+    private fun updatePreviewData(startX: Float, startY: Float, endX: Float, endY: Float) {
+        previewData.startX = startX
+        previewData.startY = startY
+        previewData.endX = endX
+        previewData.endY = endY
     }
 
     private var activeSide: EdgeSide? = null
@@ -445,11 +523,6 @@ internal class NativeEdgeGestureController(
     private var latestY = 0f
     private var consumingGesture = false
     private var activeBottomGesture = false
-    private var bottomLastMotionX = 0f
-    private var bottomLastMotionY = 0f
-    private var bottomLastMovementAtMillis = 0L
-    private var bottomDownAtMillis = 0L
-    private var bottomGestureDispatched = false
     private var latestBackProgress: BackGestureProgress? = null
     private var sentBackCancel = false
     private var gestureDelegated = false
@@ -471,6 +544,11 @@ internal fun shouldRequestNativeTouchDelegation(
     return !alreadyDelegated && !platformIsDelegating
 }
 
+internal fun shouldMarkNativeTouchDelegated(
+    requestSucceeded: Boolean,
+    platformIsDelegating: Boolean
+): Boolean = requestSucceeded || platformIsDelegating
+
 internal data class NativeEdgeGestureConfig(
     val screenWidthPx: Int,
     val screenHeightPx: Int,
@@ -479,8 +557,252 @@ internal data class NativeEdgeGestureConfig(
     val rightConfigs: List<EdgeZoneConfig>,
     val shortThresholdPx: Float,
     val longThresholdPx: Float,
-    val bottomGestureWidthDp: Int = defaultBottomGestureBarWidthDp()
+    val bottomGestureWidthDp: Int = defaultBottomGestureBarWidthDp(),
+    val snapshotVersion: Long = 1L,
+    val sideActions: Map<EdgeSide, Map<GestureType, GestureAction>> = emptyMap(),
+    val bottomActions: Map<GestureType, GestureAction> = emptyMap()
 )
+
+internal sealed interface NativeCoreSignal {
+    data object Ignored : NativeCoreSignal
+    data class Side(val side: EdgeSide, val signal: GestureSignal) : NativeCoreSignal
+    data class Bottom(val signal: GestureSignal) : NativeCoreSignal
+}
+
+internal fun bottomGestureTypeFor(gestureType: GestureType): BottomGestureBarGestureType? = when (gestureType) {
+    GestureType.TAP -> BottomGestureBarGestureType.Tap
+    GestureType.SWIPE_UP -> BottomGestureBarGestureType.SwipeUp
+    GestureType.SWIPE_UP_HOLD -> BottomGestureBarGestureType.SwipeUpHold
+    GestureType.SWIPE_LEFT,
+    GestureType.SWIPE_RIGHT -> BottomGestureBarGestureType.SwipeHorizontal
+    GestureType.LONG_PRESS -> BottomGestureBarGestureType.LongPress
+    else -> null
+}
+
+private fun GestureData.toPx(density: Float): GestureData = GestureData(
+    startX = startX * density,
+    startY = startY * density,
+    endX = endX * density,
+    endY = endY * density,
+    gestureId = gestureId,
+    snapshotVersion = snapshotVersion,
+    zoneId = zoneId
+)
+
+/**
+ * Platform-free bridge owned by the native input adapter. It converts px events to
+ * core samples and keeps the active configuration immutable until the transaction ends.
+ */
+internal class NativeGestureCoreBridge(initialConfig: NativeEdgeGestureConfig) {
+    private var config = initialConfig
+    private var pendingConfig: NativeEdgeGestureConfig? = null
+    private var left = emptySideRecognizer(initialConfig, EdgeSide.LEFT)
+    private var right = emptySideRecognizer(initialConfig, EdgeSide.RIGHT)
+    private var bottom = emptyBottomRecognizer(initialConfig)
+    private var activeSide: EdgeSide? = null
+    private var activeBottom = false
+
+    val hasActiveGesture: Boolean
+        get() = activeSide != null || activeBottom
+
+    val activeGestureId: Long
+        get() = when {
+            activeSide != null -> recognizer(activeSide!!).activeGestureId
+            activeBottom -> bottom.activeGestureId
+            else -> 0L
+        }
+
+    init {
+        install(initialConfig)
+    }
+
+    fun updateConfig(next: NativeEdgeGestureConfig) {
+        if (activeSide != null || activeBottom) {
+            pendingConfig = next
+        } else {
+            install(next)
+        }
+    }
+
+    fun onDown(xPx: Float, yPx: Float, timeMillis: Long, pointerId: Int = 0, pointerCount: Int = 1): NativeCoreSignal {
+        if (activeSide != null || activeBottom) return NativeCoreSignal.Ignored
+        val sample = sample(xPx, yPx, timeMillis, pointerId, pointerCount)
+        val side = when {
+            left.hitTest(sample.xDp, sample.yDp) -> EdgeSide.LEFT
+            right.hitTest(sample.xDp, sample.yDp) -> EdgeSide.RIGHT
+            else -> null
+        }
+        if (side != null) {
+            activeSide = side
+            val signal = recognizer(side).onDown(sample)
+            return NativeCoreSignal.Side(side, signal)
+        }
+        if (bottom.hitTest(sample.xDp, sample.yDp)) {
+            activeBottom = true
+            return NativeCoreSignal.Bottom(bottom.onDown(sample))
+        }
+        return NativeCoreSignal.Ignored
+    }
+
+    fun onMove(xPx: Float, yPx: Float, timeMillis: Long, pointerId: Int = 0, pointerCount: Int = 1): NativeCoreSignal {
+        val sample = sample(xPx, yPx, timeMillis, pointerId, pointerCount)
+        val side = activeSide
+        if (side != null) return NativeCoreSignal.Side(side, recognizer(side).onMove(sample))
+        if (activeBottom) return NativeCoreSignal.Bottom(bottom.onMove(sample))
+        return NativeCoreSignal.Ignored
+    }
+
+    fun onHoldTimer(timeMillis: Long): NativeCoreSignal {
+        val side = activeSide
+        if (side != null) return NativeCoreSignal.Side(side, recognizer(side).onHoldTimer(timeMillis))
+        if (activeBottom) return NativeCoreSignal.Bottom(bottom.onHoldTimer(timeMillis))
+        return NativeCoreSignal.Ignored
+    }
+
+    fun onUp(xPx: Float, yPx: Float, timeMillis: Long, pointerId: Int = 0, pointerCount: Int = 1): NativeCoreSignal {
+        val sample = sample(xPx, yPx, timeMillis, pointerId, pointerCount)
+        val side = activeSide
+        if (side != null) {
+            val signal = recognizer(side).onUp(sample)
+            finish()
+            return NativeCoreSignal.Side(side, signal)
+        }
+        if (activeBottom) {
+            val signal = bottom.onUp(sample)
+            finish()
+            return NativeCoreSignal.Bottom(signal)
+        }
+        return NativeCoreSignal.Ignored
+    }
+
+    fun onCancel(): NativeCoreSignal {
+        val side = activeSide
+        if (side != null) {
+            val signal = recognizer(side).onCancel()
+            finish()
+            return NativeCoreSignal.Side(side, signal)
+        }
+        if (activeBottom) {
+            val signal = bottom.onCancel()
+            finish()
+            return NativeCoreSignal.Bottom(signal)
+        }
+        return NativeCoreSignal.Ignored
+    }
+
+    fun onFocusLost(): NativeCoreSignal {
+        val side = activeSide
+        if (side != null) {
+            val signal = recognizer(side).onFocusLost()
+            finish()
+            return NativeCoreSignal.Side(side, signal)
+        }
+        if (activeBottom) {
+            val signal = bottom.onFocusLost()
+            finish()
+            return NativeCoreSignal.Bottom(signal)
+        }
+        return NativeCoreSignal.Ignored
+    }
+
+    private fun install(next: NativeEdgeGestureConfig) {
+        config = next
+        pendingConfig = null
+        val snapshot = next.toCoreSnapshot()
+        left = SideGestureRecognizer(snapshot, EdgeSide.LEFT, next.screenWidthPx / next.density, next.screenHeightPx / next.density, sideThresholds(next))
+        right = SideGestureRecognizer(snapshot, EdgeSide.RIGHT, next.screenWidthPx / next.density, next.screenHeightPx / next.density, sideThresholds(next))
+        bottom = BottomGestureRecognizer(snapshot, bottomThresholds(next))
+    }
+
+    private fun finish() {
+        activeSide = null
+        activeBottom = false
+        pendingConfig?.let(::install)
+    }
+
+    private fun recognizer(side: EdgeSide): SideGestureRecognizer = if (side == EdgeSide.LEFT) left else right
+
+    private fun sample(xPx: Float, yPx: Float, timeMillis: Long, pointerId: Int, pointerCount: Int): PointerSample =
+        PointerSample(
+            xDp = xPx / config.density,
+            yDp = yPx / config.density,
+            timeMillis = timeMillis,
+            pointerId = pointerId,
+            pointerCount = pointerCount
+        )
+
+    private companion object {
+        fun NativeEdgeGestureConfig.toCoreSnapshot(): ConfigSnapshot {
+            val density = density.takeIf { it.isFinite() && it > 0f } ?: 1f
+            val screenWidthDp = screenWidthPx.coerceAtLeast(0) / density
+            val screenHeightDp = screenHeightPx.coerceAtLeast(0) / density
+            fun zone(config: EdgeZoneConfig): HotZoneSegment {
+                val value = config.sanitized()
+                return HotZoneSegment(
+                    startDp = screenHeightDp * value.topInsetPercent / 100f,
+                    lengthDp = screenHeightDp * (100 - value.topInsetPercent - value.bottomInsetPercent) / 100f,
+                    thicknessDp = value.thicknessDp.toFloat(),
+                    enabled = value.enabled,
+                    zoneId = value.zoneId,
+                    edgeInsetDp = value.edgeInsetDp.toFloat()
+                )
+            }
+            return ConfigSnapshot(
+                sideZones = mapOf(
+                    EdgeSide.LEFT to leftConfigs.map(::zone),
+                    EdgeSide.RIGHT to rightConfigs.map(::zone)
+                ),
+                bottomBar = BottomBarConfig(
+                    screenWidthDp = screenWidthDp,
+                    screenHeightDp = screenHeightDp,
+                    widthDp = bottomGestureWidthDp.toFloat(),
+                    heightDp = bottomGestureBarTouchHeightDp().toFloat()
+                ),
+                sideActions = sideActions,
+                bottomActions = bottomActions,
+                revision = snapshotVersion.coerceAtLeast(1L),
+                density = density
+            )
+        }
+
+        fun emptySideRecognizer(config: NativeEdgeGestureConfig, side: EdgeSide): SideGestureRecognizer =
+            SideGestureRecognizer(
+                side = side,
+                screenWidthDp = config.screenWidthPx / config.density,
+                screenHeightDp = config.screenHeightPx / config.density,
+                zones = emptyList(),
+                actions = emptyMap()
+            )
+
+        fun emptyBottomRecognizer(config: NativeEdgeGestureConfig): BottomGestureRecognizer =
+            BottomGestureRecognizer(
+                bar = BottomBarConfig(
+                    config.screenWidthPx / config.density,
+                    config.screenHeightPx / config.density,
+                    config.bottomGestureWidthDp.toFloat(),
+                    bottomGestureBarTouchHeightDp().toFloat()
+                ),
+                actions = emptyMap()
+            )
+
+        fun sideThresholds(config: NativeEdgeGestureConfig): SideGestureThresholds {
+            val density = config.density.coerceAtLeast(0.01f)
+            return SideGestureThresholds(
+                minPullDistanceDp = config.shortThresholdPx / density,
+                longPullDistanceDp = config.longThresholdPx / density,
+                minSwipeDistanceDp = config.shortThresholdPx / density
+            )
+        }
+
+        fun bottomThresholds(config: NativeEdgeGestureConfig): BottomGestureThresholds {
+            val density = config.density.coerceAtLeast(0.01f)
+            return BottomGestureThresholds(
+                minSwipeDistanceDp = 56f / density,
+                upwardHoldDurationMs = 500L
+            )
+        }
+    }
+}
 
 internal data class NativeEdgeGestureHit(
     val side: EdgeSide,
@@ -615,4 +937,3 @@ internal fun nativeGestureThresholdPx(thresholdDp: Int, density: Float): Float {
 }
 
 private const val NATIVE_GESTURE_THRESHOLD_RESPONSE_RATIO = 0.70f
-private const val BottomGestureBarNativeMotionSlopPx = 6f

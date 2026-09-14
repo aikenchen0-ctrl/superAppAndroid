@@ -6,18 +6,12 @@ import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.os.SystemClock
 import android.util.Log
-import android.util.Size
 import android.view.Gravity
 import android.view.Window
 import android.view.WindowManager
 import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.ImageProxy
-import androidx.camera.core.Preview
-import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -57,31 +51,26 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.blinkvoice.visual.api.BlinkCaptureOptions
 import com.blinkvoice.visual.api.BlinkCaptureResult
-import com.blinkvoice.visual.detector.BlinkDetector
-import com.blinkvoice.visual.events.BlinkEventClassifier
-import com.google.mediapipe.framework.image.BitmapImageBuilder
-import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
+import com.blinkvoice.visual.api.BlinkVoiceContinuousDetector
+import com.blinkvoice.visual.api.BlinkVoiceContinuousListener
+import com.blinkvoice.visual.api.BlinkVoiceFrame
 import com.paifa.univerge.accessibility.BlinkVoiceHeadlessExtraName
 import com.paifa.univerge.accessibility.FloatingChatBlinkVoiceBridge
 import com.paifa.univerge.accessibility.blinkVoiceCaptureAutoFinishOnEvent
 import com.paifa.univerge.accessibility.blinkVoiceRealtimeStatusLabel
 import com.paifa.univerge.accessibility.blinkVoiceStatusLogEntry
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 import kotlin.math.min
 import kotlin.math.roundToInt
 
 private const val TAG = "FloatingChatBlinkVoice"
 
-class FloatingChatBlinkVoiceActivity : ComponentActivity(), BlinkDetector.BlinkListener {
-    private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+class FloatingChatBlinkVoiceActivity : ComponentActivity(), BlinkVoiceContinuousListener {
     private val options: BlinkCaptureOptions = BlinkCaptureOptions.Builder()
         .setAutoFinishOnEvent(blinkVoiceCaptureAutoFinishOnEvent())
         .build()
-    private val classifier = BlinkEventClassifier(options)
     private lateinit var previewView: PreviewView
-    private var detector: BlinkDetector? = null
-    private var cameraProvider: ProcessCameraProvider? = null
+    private var continuousDetector: BlinkVoiceContinuousDetector? = null
+    private var latestFrame: BlinkVoiceFrame? = null
     private var statusText by mutableStateOf(blinkVoiceRealtimeStatusLabel(null))
     private var detailText by mutableStateOf("识别到单眨、双眨、长闭眼后会在下方记录")
     private val recognitionLogs = mutableStateListOf<String>()
@@ -166,34 +155,27 @@ class FloatingChatBlinkVoiceActivity : ComponentActivity(), BlinkDetector.BlinkL
         }
     }
 
-    override fun onResult(
-        result: FaceLandmarkerResult,
-        frameTimeMs: Long,
-        leftEyeEar: Float,
-        rightEyeEar: Float,
-        leftEyeClosed: Boolean,
-        rightEyeClosed: Boolean,
-        blinkCount: Int,
-        inferenceTimeMs: Long,
-        inputWidth: Int,
-        inputHeight: Int,
-        rotationDegrees: Int
-    ) {
-        @Suppress("UNUSED_VARIABLE")
-        val ignoredFrameTimeMs = frameTimeMs
-        val hasFace = result.faceLandmarks().isNotEmpty()
-        val now = SystemClock.elapsedRealtime()
-        val event = classifier.accept(now, hasFace, leftEyeEar, rightEyeEar)
-            ?.takeIf { options.eventTypes.contains(it.eventType) }
-
+    override fun onFrame(frame: BlinkVoiceFrame) {
+        latestFrame = frame
         runOnUiThread {
-            if (event != null) {
-                showRecognizedEvent(
-                    event = event,
-                    inferenceTimeMs = inferenceTimeMs,
-                    faceCount = result.faceLandmarks().size
-                )
+            if (frame.hasFace()) {
+                statusText = blinkVoiceRealtimeStatusLabel(frame.getLastEvent().takeIf { !it.isNullOrBlank() })
+                detailText = "左眼 ${frame.getLeftEla().formatEyeMetric()} · 右眼 ${frame.getRightEla().formatEyeMetric()} · 推理 ${frame.getInferenceMs().coerceAtLeast(0L)}ms"
+            } else {
+                statusText = blinkVoiceRealtimeStatusLabel(null)
+                detailText = "未检测到人脸，请保持手机正对面部"
             }
+        }
+    }
+
+    override fun onEvent(result: BlinkCaptureResult) {
+        val frame = latestFrame
+        runOnUiThread {
+            showRecognizedEvent(
+                event = result,
+                inferenceTimeMs = frame?.getInferenceMs() ?: 0L,
+                faceCount = if (frame?.hasFace() == true) 1 else 0
+            )
         }
     }
 
@@ -206,9 +188,8 @@ class FloatingChatBlinkVoiceActivity : ComponentActivity(), BlinkDetector.BlinkL
     }
 
     override fun onDestroy() {
-        cameraProvider?.unbindAll()
-        detector?.close()
-        cameraExecutor.shutdown()
+        continuousDetector?.close()
+        continuousDetector = null
         if (headlessMode) {
             FloatingChatBlinkVoiceBridge.clearHeadlessCaptureCloser(headlessCloseRequest)
         }
@@ -249,68 +230,22 @@ class FloatingChatBlinkVoiceActivity : ComponentActivity(), BlinkDetector.BlinkL
         statusText = "正在加载人脸模型"
         detailText = "请保持手机正对人脸"
         runCatching {
-            detector = BlinkDetector(this, this).also { blinkDetector ->
-                blinkDetector.setup()
-                blinkDetector.elaCloseThreshold = BlinkDetector.ELA_CLOSE_THRESHOLD
-            }
+            continuousDetector = BlinkVoiceContinuousDetector.Builder(
+                this,
+                this,
+                previewView,
+                this
+            )
+                .setOptions(options)
+                .setTargetResolution(640, 480)
+                .build()
+                .also { it.start() }
+            statusText = blinkVoiceRealtimeStatusLabel(null)
+            detailText = "支持单眨、双眨、长闭眼，识别记录保留在下方"
         }.onFailure { error ->
             Log.e(TAG, "failed to initialize BlinkVoice detector", error)
             statusText = "模型加载失败"
             detailText = "识别模型启动失败，请关闭后重试"
-            return
-        }
-
-        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
-        cameraProviderFuture.addListener({
-            runCatching {
-                bindCamera(cameraProviderFuture.get())
-            }.onFailure { error ->
-                Log.e(TAG, "failed to bind BlinkVoice camera", error)
-                statusText = "摄像头启动失败"
-                detailText = "当前摄像头不可用，请关闭后重试"
-            }
-        }, ContextCompat.getMainExecutor(this))
-    }
-
-    @Suppress("DEPRECATION")
-    private fun bindCamera(provider: ProcessCameraProvider) {
-        cameraProvider = provider
-        val preview = Preview.Builder().build().also { preview ->
-            preview.setSurfaceProvider(previewView.surfaceProvider)
-        }
-        val imageAnalysis = ImageAnalysis.Builder()
-            .setTargetResolution(Size(640, 480))
-            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
-            .build()
-            .also { analysis ->
-                analysis.setAnalyzer(cameraExecutor, ::processImage)
-            }
-        provider.unbindAll()
-        provider.bindToLifecycle(
-            this,
-            CameraSelector.DEFAULT_FRONT_CAMERA,
-            preview,
-            imageAnalysis
-        )
-        statusText = blinkVoiceRealtimeStatusLabel(null)
-        detailText = "支持单眨、双眨、长闭眼，识别记录保留在下方"
-    }
-
-    private fun processImage(imageProxy: ImageProxy) {
-        try {
-            val mpImage = BitmapImageBuilder(imageProxy.toBitmap()).build()
-            val timestampMs = imageProxy.imageInfo.timestamp / 1_000_000L
-            val rotationDegrees = imageProxy.imageInfo.rotationDegrees
-            detector?.detectAsync(mpImage, timestampMs, rotationDegrees)
-        } catch (error: Throwable) {
-            Log.w(TAG, "failed to process BlinkVoice frame", error)
-            runOnUiThread {
-                statusText = "画面处理失败"
-                detailText = "请保持手机稳定，或关闭后重试"
-            }
-        } finally {
-            imageProxy.close()
         }
     }
 
@@ -522,3 +457,6 @@ private fun BlinkVoiceFloatingCaptureContent(
 private fun confidencePercent(confidence: Float): Int {
     return (confidence.coerceIn(0f, 1f) * 100f).roundToInt()
 }
+
+private fun Float.formatEyeMetric(): String =
+    if (isFinite()) String.format(java.util.Locale.US, "%.3f", this) else "--"

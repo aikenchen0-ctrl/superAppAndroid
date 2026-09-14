@@ -22,6 +22,7 @@ import com.paifa.univerge.accessibility.BottomGestureBarGestureType
 import com.paifa.univerge.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.univerge.accessibility.defaultBottomGestureBarWidthDp
 import com.paifa.univerge.accessibility.resolveBottomGestureBarGestureType
+import com.paifa.univerge.core.gesture.runtime.nextGestureSessionId
 import com.paifa.univerge.core.model.GestureData
 import kotlin.math.abs
 
@@ -57,6 +58,7 @@ private fun Modifier.floatingChatBottomGestureBarInput(
 ): Modifier = pointerInput(onGesture) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        val gestureId = nextGestureSessionId()
         val startX = down.position.x
         val startY = down.position.y
         var latestX = startX
@@ -81,14 +83,37 @@ private fun Modifier.floatingChatBottomGestureBarInput(
                 val gestureType = resolveBottomGestureBarGestureType(latestX - startX, latestY - startY, change.uptimeMillis - down.uptimeMillis, change.uptimeMillis - lastMovementAtMillis)
                 if (gestureType == BottomGestureBarGestureType.SwipeUpHold) {
                     gestureDispatched = true
-                    onGesture(gestureType, GestureData(startX, startY, latestX, latestY))
+                    onGesture(
+                        gestureType,
+                        GestureData(
+                            startX = startX,
+                            startY = startY,
+                            endX = latestX,
+                            endY = latestY,
+                            gestureId = gestureId
+                        )
+                    )
                 }
             }
             change.consume()
             if (!change.pressed) {
                 onPressedChange(false)
                 if (!gestureDispatched) {
-                    onGesture(resolveBottomGestureBarGestureType(latestX - startX, latestY - startY, change.uptimeMillis - down.uptimeMillis, change.uptimeMillis - lastMovementAtMillis), GestureData(startX, startY, latestX, latestY))
+                    onGesture(
+                        resolveBottomGestureBarGestureType(
+                            latestX - startX,
+                            latestY - startY,
+                            change.uptimeMillis - down.uptimeMillis,
+                            change.uptimeMillis - lastMovementAtMillis
+                        ),
+                        GestureData(
+                            startX = startX,
+                            startY = startY,
+                            endX = latestX,
+                            endY = latestY,
+                            gestureId = gestureId
+                        )
+                    )
                 }
                 break
             }

@@ -9,24 +9,25 @@ import com.google.mediapipe.tasks.core.Delegate
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
-import kotlin.math.sqrt
-
 /**
- * Wraps MediaPipe FaceLandmarker and computes Eye Aspect Ratio (EAR) for blink detection.
- *
- * This is the original visual blink detector moved into the SDK module. The algorithmic
- * behavior is intentionally kept aligned with the app implementation.
+ * 封装 MediaPipe 人脸关键点检测，并把眼部 3D 关键点转换成 ELA 角度。
  */
 class BlinkDetector(
     private val context: Context,
-    private val listener: BlinkListener
+    listener: BlinkListener
 ) {
+    @Volatile
+    private var listener: BlinkListener = listener
 
     interface BlinkListener {
+        /**
+         * 返回每帧人脸关键点、左右眼 ELA、闭眼状态和推理耗时。
+         */
         fun onResult(
             result: FaceLandmarkerResult,
-            leftEar: Float,
-            rightEar: Float,
+            frameTimeMs: Long,
+            leftEla: Float,
+            rightEla: Float,
             leftClosed: Boolean,
             rightClosed: Boolean,
             blinkCount: Int,
@@ -35,18 +36,31 @@ class BlinkDetector(
             imageHeight: Int,
             rotationDegrees: Int
         )
+        /**
+         * 返回 MediaPipe 初始化或推理过程中的错误信息。
+         */
         fun onError(error: String)
     }
 
     companion object {
-        const val EAR_THRESHOLD = 0.22f
+        const val ELA_CLOSE_THRESHOLD = 10f
         const val MODEL_NAME = "face_landmarker.task"
     }
 
-    @Volatile var earThreshold: Float = EAR_THRESHOLD
+    @Volatile var elaCloseThreshold: Float = ELA_CLOSE_THRESHOLD
 
-    private val LEFT_EYE_EAR = intArrayOf(263, 387, 386, 362, 380, 374)
-    private val RIGHT_EYE_EAR = intArrayOf(33, 160, 158, 133, 153, 144)
+    /**
+     * 兼容早期 EAR 命名调用方的别名。数值已经是 ELA 角度，不再是 EAR 比值。
+     */
+    @Deprecated("Use elaCloseThreshold; the detector now uses ELA degrees.")
+    var earThreshold: Float
+        get() = elaCloseThreshold
+        set(value) {
+            elaCloseThreshold = value
+        }
+
+    private val LEFT_EYE_ELA = EyeLandmarks(263, 362, 386, 374)
+    private val RIGHT_EYE_ELA = EyeLandmarks(33, 133, 158, 153)
 
     private var faceLandmarker: FaceLandmarker? = null
     private var blinkCount = 0
@@ -58,14 +72,28 @@ class BlinkDetector(
     private var lastLeftClosed = false
     private var lastRightClosed = false
     private var eyeStateInitialized = false
+    private val pendingFrameMetadata = FrameMetadataStore()
 
     var loadTimeMs: Long = 0L
         private set
 
+    /**
+     * 设置是否输出检测层调试日志。
+     */
     fun setDebugLoggingEnabled(enabled: Boolean) {
         debugLoggingEnabled = enabled
     }
 
+    /**
+     * 预加载 detector 被正式检测页接管时，需要把空 listener 切换成宿主 listener。
+     */
+    fun setListener(listener: BlinkListener) {
+        this.listener = listener
+    }
+
+    /**
+     * 初始化 FaceLandmarker 模型和实时流推理参数。
+     */
     fun setup() {
         val t0 = SystemClock.elapsedRealtime()
         val baseOptionsBuilder = BaseOptions.builder()
@@ -91,35 +119,68 @@ class BlinkDetector(
         loadTimeMs = SystemClock.elapsedRealtime() - t0
     }
 
-    private var lastRotationDegrees: Int = 0
-    private var frameDispatchTime: Long = 0L
-
+    /**
+     * 异步提交一帧相机图像给 MediaPipe，并记录提交时间用于计算推理耗时。
+     */
     fun detectAsync(mpImage: MPImage, frameTime: Long, rotationDegrees: Int = 0) {
-        lastRotationDegrees = rotationDegrees
-        frameDispatchTime = SystemClock.elapsedRealtime()
-        faceLandmarker?.detectAsync(mpImage, frameTime)
+        val detector = faceLandmarker ?: return
+        val dispatchTimeMs = SystemClock.elapsedRealtime()
+        pendingFrameMetadata.record(mpImage, frameTime, rotationDegrees, dispatchTimeMs)
+        try {
+            detector.detectAsync(mpImage, frameTime)
+        } catch (error: Throwable) {
+            pendingFrameMetadata.take(mpImage)
+            throw error
+        }
     }
 
+    /**
+     * 释放 MediaPipe 检测器资源，避免相机页面关闭后继续占用模型。
+     */
     fun close() {
         faceLandmarker?.close()
         faceLandmarker = null
+        pendingFrameMetadata.clear()
     }
 
-    private fun handleResult(result: FaceLandmarkerResult, mpImage: MPImage) {
-        val inferenceMs = SystemClock.elapsedRealtime() - frameDispatchTime
+    /**
+     * 清空动作计数和调试状态，供连续检测器 stop/start 时复用已加载模型。
+     */
+    @Synchronized
+    fun reset() {
+        blinkCount = 0
+        wasBlinking = false
+        resultFrameCount = 0
+        lastHasFace = false
+        hasFaceStateInitialized = false
+        lastLeftClosed = false
+        lastRightClosed = false
+        eyeStateInitialized = false
+        pendingFrameMetadata.clear()
+    }
 
-        var leftEar = 0f
-        var rightEar = 0f
+    /**
+     * 处理 MediaPipe 返回的人脸关键点，计算左右眼 ELA 并给出基础闭眼状态。
+     */
+    private fun handleResult(result: FaceLandmarkerResult, mpImage: MPImage) {
+        val metadata = pendingFrameMetadata.take(mpImage) ?: run {
+            BlinkDebugLogger.warn(debugLoggingEnabled, "result_without_frame_metadata")
+            return
+        }
+        val inferenceMs = (SystemClock.elapsedRealtime() - metadata.getDispatchTimeMs()).coerceAtLeast(0L)
+
+        var leftEla = Float.NaN
+        var rightEla = Float.NaN
         var leftClosed = false
         var rightClosed = false
         val hasFace = result.faceLandmarks().isNotEmpty()
 
         if (hasFace) {
             val landmarks = result.faceLandmarks()[0]
-            leftEar = computeEar(landmarks, LEFT_EYE_EAR)
-            rightEar = computeEar(landmarks, RIGHT_EYE_EAR)
-            leftClosed = leftEar < earThreshold
-            rightClosed = rightEar < earThreshold
+            leftEla = computeEla(landmarks, LEFT_EYE_ELA)
+            rightEla = computeEla(landmarks, RIGHT_EYE_ELA)
+            leftClosed = isValidEla(leftEla) && leftEla < elaCloseThreshold
+            rightClosed = isValidEla(rightEla) && rightEla < elaCloseThreshold
 
             val bothClosed = leftClosed && rightClosed
             if (bothClosed && !wasBlinking) {
@@ -132,34 +193,38 @@ class BlinkDetector(
 
         logDetectionResult(
             hasFace,
-            leftEar,
-            rightEar,
+            leftEla,
+            rightEla,
             leftClosed,
             rightClosed,
             inferenceMs,
             mpImage.width,
             mpImage.height,
-            lastRotationDegrees
+            metadata.getRotationDegrees()
         )
 
         listener.onResult(
             result,
-            leftEar,
-            rightEar,
+            metadata.getFrameTimeMs(),
+            leftEla,
+            rightEla,
             leftClosed,
             rightClosed,
             blinkCount,
             inferenceMs,
             mpImage.width,
             mpImage.height,
-            lastRotationDegrees
+            metadata.getRotationDegrees()
         )
     }
 
+    /**
+     * 按人脸状态、闭眼状态和节流帧数输出检测层日志。
+     */
     private fun logDetectionResult(
         hasFace: Boolean,
-        leftEar: Float,
-        rightEar: Float,
+        leftEla: Float,
+        rightEla: Float,
         leftClosed: Boolean,
         rightClosed: Boolean,
         inferenceMs: Long,
@@ -183,10 +248,10 @@ class BlinkDetector(
         }
 
         if (eyeChanged) {
-            // 闭眼状态变化要立即输出，用于判断 EAR 阈值是否把睁眼/闭眼分错。
+            // 闭眼状态变化要立即输出，用于判断 ELA 阈值是否把睁眼/闭眼分错。
             BlinkDebugLogger.log(
                 debugLoggingEnabled,
-                "eye_state changed leftClosed=$leftClosed rightClosed=$rightClosed avgEar=${formatEar((leftEar + rightEar) / 2f)}"
+                "eye_state changed leftClosed=$leftClosed rightClosed=$rightClosed avgEla=${formatEla((leftEla + rightEla) / 2f)}"
             )
             lastLeftClosed = leftClosed
             lastRightClosed = rightClosed
@@ -197,44 +262,57 @@ class BlinkDetector(
             // 帧级日志只节流输出，避免 Logcat 被相机帧刷爆。
             BlinkDebugLogger.log(
                 debugLoggingEnabled,
-                "detect face=${if (hasFace) 1 else 0} leftEar=${formatEar(leftEar)} rightEar=${formatEar(rightEar)} " +
-                    "avgEar=${formatEar((leftEar + rightEar) / 2f)} th=${formatEar(earThreshold)} " +
+                "detect face=${if (hasFace) 1 else 0} leftEla=${formatEla(leftEla)} rightEla=${formatEla(rightEla)} " +
+                    "avgEla=${formatEla((leftEla + rightEla) / 2f)} th=${formatEla(elaCloseThreshold)} " +
                     "closed=$leftClosed/$rightClosed blinkCount=$blinkCount inferenceMs=$inferenceMs " +
                     "size=${imageWidth}x$imageHeight rotation=$rotationDegrees"
             )
         }
     }
 
-    private fun formatEar(value: Float): String {
-        return String.format(java.util.Locale.US, "%.3f", value)
+    /**
+     * 将 ELA 角度格式化成固定两位小数，保证日志可读。
+     */
+    private fun formatEla(value: Float): String {
+        return String.format(java.util.Locale.US, "%.2f", value)
     }
 
-    private fun computeEar(
+    /**
+     * 用上下眼睑平面法向量夹角计算单只眼睛的 ELA：角度越小，眼睛越闭合。
+     */
+    private fun computeEla(
         landmarks: List<com.google.mediapipe.tasks.components.containers.NormalizedLandmark>,
-        indices: IntArray
+        eye: EyeLandmarks
     ): Float {
-        if (indices.any { it >= landmarks.size }) return 0f
-        val p1 = landmarks[indices[0]]
-        val p2 = landmarks[indices[1]]
-        val p3 = landmarks[indices[2]]
-        val p4 = landmarks[indices[3]]
-        val p5 = landmarks[indices[4]]
-        val p6 = landmarks[indices[5]]
-
-        val vertical1 = dist(p2, p6)
-        val vertical2 = dist(p3, p5)
-        val horizontal = dist(p1, p4)
-
-        return if (horizontal < 1e-6f) 0f
-        else (vertical1 + vertical2) / (2.0f * horizontal)
+        if (!eye.isValidFor(landmarks.size)) return Float.NaN
+        val outer = pointOf(landmarks[eye.outerCorner])
+        val inner = pointOf(landmarks[eye.innerCorner])
+        val upper = pointOf(landmarks[eye.upperLid])
+        val lower = pointOf(landmarks[eye.lowerLid])
+        return EyelidAngleCalculator.computeAngleDegrees(
+            arrayOf(outer, inner, upper),
+            arrayOf(outer, inner, lower)
+        )
     }
 
-    private fun dist(
-        a: com.google.mediapipe.tasks.components.containers.NormalizedLandmark,
-        b: com.google.mediapipe.tasks.components.containers.NormalizedLandmark
-    ): Float {
-        val dx = a.x() - b.x()
-        val dy = a.y() - b.y()
-        return sqrt((dx * dx + dy * dy).toDouble()).toFloat()
+    private fun isValidEla(value: Float): Boolean {
+        return !value.isNaN() && !value.isInfinite() && value >= 0f && value <= 180f
+    }
+
+    private fun pointOf(
+        landmark: com.google.mediapipe.tasks.components.containers.NormalizedLandmark
+    ): EyelidAngleCalculator.Point3 {
+        return EyelidAngleCalculator.Point3(landmark.x(), landmark.y(), landmark.z())
+    }
+
+    private data class EyeLandmarks(
+        val outerCorner: Int,
+        val innerCorner: Int,
+        val upperLid: Int,
+        val lowerLid: Int
+    ) {
+        fun isValidFor(size: Int): Boolean {
+            return outerCorner < size && innerCorner < size && upperLid < size && lowerLid < size
+        }
     }
 }

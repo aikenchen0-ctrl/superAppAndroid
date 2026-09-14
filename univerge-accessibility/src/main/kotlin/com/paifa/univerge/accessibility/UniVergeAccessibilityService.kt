@@ -29,6 +29,7 @@ import com.paifa.univerge.core.model.FloatingChatThumbnailOrientation
 import com.paifa.univerge.core.model.GestureAction
 import com.paifa.univerge.core.model.GestureData
 import com.paifa.univerge.core.model.GestureType
+import com.paifa.univerge.core.model.gestureMappingOrder
 import com.paifa.univerge.core.sidefunction.SideFunctionConfig
 import com.paifa.univerge.core.sidefunction.DEFAULT_SIDE_FUNCTION_VERTICAL_SAFE_INSET_DP
 import com.paifa.univerge.core.sidefunction.sideFunctionGroupShiftY
@@ -36,6 +37,7 @@ import com.paifa.univerge.core.sidefunction.sideFunctionLayout
 import com.paifa.univerge.core.model.sanitizeEdgeInsetDp
 import com.paifa.univerge.core.overlay.ScreenInteractiveState
 import com.paifa.univerge.accessibility.floatingchat.shell.BottomPanelMode
+import com.paifa.univerge.accessibility.floatingchat.message.HeavyTextDropEvent
 import com.paifa.univerge.overlay.EdgeOutlineView
 import com.paifa.univerge.overlay.EdgeOverlayView
 import com.paifa.univerge.overlay.edgeOutlinePlacement
@@ -60,9 +62,11 @@ class UniVergeAccessibilityService : AccessibilityService() {
     private lateinit var meteorSwipeEffectController: MeteorSwipeEffectController
     private lateinit var pullDistancePreviewController: PullDistancePreviewController
     private lateinit var gestureHintOverlayController: GestureHintOverlayController
+    private lateinit var gestureServerSnapshotPublisher: GestureServerSnapshotPublisher
     private lateinit var nativeGestureExclusionOverlayController: NativeGestureExclusionOverlayController
     private lateinit var nativeBackGestureTakeoverController: NativeBackGestureTakeoverController
     private val overlays = mutableMapOf<OverlayKey, EdgeOverlayView>()
+    private val overlayPlacements = mutableMapOf<OverlayKey, MutableOverlayPlacement>()
     private val edgeOutlines = mutableMapOf<OverlayKey, EdgeOutlineView>()
     private var edgeConfigAdjustmentOutline: EdgeOutlineView? = null
     private var edgeConfigAdjustmentPreviewSide: EdgeSide? = null
@@ -71,8 +75,16 @@ class UniVergeAccessibilityService : AccessibilityService() {
     private var selectedSideFunctionIndex: Int? = null
     private val gestureHintClassifier = SwipeClassifier()
     private var nativeEdgeGestureController: NativeEdgeGestureController? = null
+    private var gestureInputOwnership = GestureInputOwnershipReport(emptyList())
     private var nativeBackTakeoverApplied = false
     private var nativeTouchInteractionRuntimeFailed = false
+    private var nativeGestureSnapshotVersion = 0L
+    private val gestureActionCommitGate = GestureActionCommitGate()
+    private val sideFunctionPreviewItemsCache = SideFunctionPreviewItemsCache()
+    private val gesturePreviewLabelCache = GesturePreviewLabelCache()
+    private var cachedSideFunctionActionIds: List<String> = emptyList()
+    private var pendingEdgeGeometryUpdate = false
+    private var pendingStructuralOverlayRefresh = false
     private var floatingChatExpanded = false
     private var floatingChatExternalActivityVisible = false
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -107,13 +119,32 @@ class UniVergeAccessibilityService : AccessibilityService() {
 
     private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         applyServiceRuntimeConfig()
-        if (isFloatingChatAppearancePreferenceKey(key)) {
+        publishGestureServerSnapshot()
+        if (key == "side_function_custom_action_ids") {
+            refreshSideFunctionPreviewItems()
+        }
+        refreshGesturePreviewLabels()
+        if (isGestureConfigVersionPreferenceKey(key)) {
+            return@OnSharedPreferenceChangeListener
+        } else if (isFloatingChatAppearancePreferenceKey(key)) {
             requestFloatingChatAppearanceRefresh()
         } else if (isBottomGestureBarPreferenceKey(key)) {
-            if (::bottomGestureBarOverlayController.isInitialized) {
-                bottomGestureBarOverlayController.recreate()
+            val geometryOnly = isBottomGestureBarGeometryPreferenceKey(key) &&
+                shouldCreateGestureOverlayWindows(resolvedGestureInputMode())
+            if (geometryOnly && ::bottomGestureBarOverlayController.isInitialized &&
+                bottomGestureBarOverlayController.updateGeometryInPlace()
+            ) {
+                syncBottomGestureBar(recreate = false)
+            } else {
+                syncBottomGestureBar(recreate = true)
+                requestOverlayRefresh()
             }
-            requestOverlayRefresh()
+        } else if (isEdgeGeometryPreferenceKey(key)) {
+            when (updateEdgeGestureOverlayLayouts()) {
+                EdgeOverlayGeometryUpdateDecision.UPDATE_IN_PLACE -> synchronizeCurrentEdgeOutlines()
+                EdgeOverlayGeometryUpdateDecision.DEFER -> pendingEdgeGeometryUpdate = true
+                EdgeOverlayGeometryUpdateDecision.RECREATE -> requestOverlayRefresh()
+            }
         } else {
             requestOverlayRefresh()
         }
@@ -163,6 +194,7 @@ class UniVergeAccessibilityService : AccessibilityService() {
         pullDistancePreviewController = PullDistancePreviewController(this, windowManager)
         gestureHintOverlayController = GestureHintOverlayController(this, windowManager)
         backWaveOverlayController = BackWaveOverlayController(this, windowManager)
+        gestureHintOverlayController.prewarm()
         nativeGestureExclusionOverlayController =
             NativeGestureExclusionOverlayController(this, windowManager)
         nativeBackGestureTakeoverController = NativeBackGestureTakeoverController(this)
@@ -176,7 +208,13 @@ class UniVergeAccessibilityService : AccessibilityService() {
             onBackGestureEnd = ::handleFloatingChatBackGestureEnd,
             onBackGestureCancel = ::handleFloatingChatBackGestureCancel,
             onExpandedChanged = ::handleFloatingChatExpandedChanged,
-            onOverlayRecreated = ::scheduleBottomGestureBarZOrderRefresh
+            onOverlayRecreated = ::scheduleBottomGestureBarZOrderRefresh,
+            onHeavyTextDrop = { event: HeavyTextDropEvent ->
+                Log.d(
+                    TAG,
+                    "heavy text drop target=${event.target.id} messageId=${event.message.id}"
+                )
+            }
         )
         favoriteLibraryOverlayController = FavoriteLibraryOverlayController(this, windowManager)
         finderPublishOverlayController = FinderPublishOverlayController(this, windowManager)
@@ -186,17 +224,27 @@ class UniVergeAccessibilityService : AccessibilityService() {
         leftSidebarOverlayController = LeftSidebarOverlayController(this, windowManager)
         FloatingChatLeftSidebarBridge.loadDisplayMode(this)
         preferences = UniVergePreferences(this)
+        gestureServerSnapshotPublisher = GestureServerSnapshotPublisher(this)
         actionExecutor = UniVergeActionExecutor(
             this,
             isHapticFeedbackEnabled = { preferences.hapticFeedback },
             floatingChatOverlayController = floatingChatOverlayController,
             videoDemoOverlayController = videoDemoOverlayController
         )
+        refreshSideFunctionPreviewItems()
+        refreshGesturePreviewLabels()
         bottomGestureBarOverlayController = BottomGestureBarOverlayController(
             context = this,
             windowManager = windowManager,
             preferences = preferences,
-            onGesture = ::executeConfiguredGestureAction
+            onGesture = { action, data ->
+                executeConfiguredGestureAction(
+                    action,
+                    data,
+                    GestureActionSource.Overlay
+                )
+            },
+            onGestureFinished = ::flushPendingStructuralOverlayRefresh
         )
         bottomGestureBarPreviewController = BottomGestureBarPreviewController(this, windowManager)
         bottomGestureBarIndicatorController =
@@ -204,6 +252,7 @@ class UniVergeAccessibilityService : AccessibilityService() {
         screenInteractiveState.updateFromSystem(isDeviceInteractive())
         preferences.registerChangeListener(preferenceListener)
         registerScreenReceiver()
+        publishGestureServerSnapshot()
         applyServiceRuntimeConfig()
         createOverlays()
         syncBottomGestureBar()
@@ -240,12 +289,14 @@ class UniVergeAccessibilityService : AccessibilityService() {
             bottomGestureBarOverlayController.recreate()
         }
         recreateOverlays()
+        publishGestureServerSnapshot()
     }
 
     override fun onDestroy() {
         Log.d(TAG, "service destroyed")
         instance = null
         isRunning = false
+        gestureActionCommitGate.clear()
         if (::preferences.isInitialized) {
             preferences.unregisterChangeListener(preferenceListener)
         }
@@ -292,6 +343,12 @@ class UniVergeAccessibilityService : AccessibilityService() {
         }
         if (::pullDistancePreviewController.isInitialized) {
             pullDistancePreviewController.dismiss()
+        }
+        if (::gestureHintOverlayController.isInitialized) {
+            gestureHintOverlayController.dispose()
+        }
+        if (::gestureServerSnapshotPublisher.isInitialized) {
+            gestureServerSnapshotPublisher.close()
         }
         removeFloatingChatOverlay()
         removeAllOverlays()
@@ -908,7 +965,14 @@ class UniVergeAccessibilityService : AccessibilityService() {
             return
         }
         Log.d(TAG, "recreate overlays")
+        if (hasActiveGestureSession()) {
+            pendingStructuralOverlayRefresh = true
+            Log.d(TAG, "defer overlay recreation while gesture is active")
+            return
+        }
         runCatching {
+            pendingEdgeGeometryUpdate = false
+            pendingStructuralOverlayRefresh = false
             removeAllOverlays(restoreNavigationProtection = false)
             actionExecutor = UniVergeActionExecutor(
                 this,
@@ -978,20 +1042,9 @@ class UniVergeAccessibilityService : AccessibilityService() {
             Log.w(TAG, "native back gesture takeover not applied error=$error")
         }
 
-        val finalPlan = gestureNavigationProtectionPlan(
-            sdkInt = Build.VERSION.SDK_INT,
-            screenWidthPx = screenWidth,
-            screenHeightPx = screenHeight,
-            density = density,
-            configs = configs,
-            resolvedMode = resolvedGestureInputMode(),
-            floatingChatOwnsSurface = floatingChatOwnsSurface
-        )
-        nativeGestureExclusionOverlayController.synchronize(
-            sourceWidthPx = screenWidth,
-            sourceHeightPx = screenHeight,
-            intercepts = finalPlan.systemExclusionIntercepts
-        )
+        // System gesture exclusion belongs to the real trigger views. A full-screen
+        // non-touch helper window must not become a second input surface.
+        nativeGestureExclusionOverlayController.remove()
     }
 
     private fun clearGestureNavigationProtection() {
@@ -1087,6 +1140,7 @@ class UniVergeAccessibilityService : AccessibilityService() {
             applyServiceRuntimeConfig()
             synchronizeGestureNavigationProtection(screenWidth, screenHeight)
             if (resolvedGestureInputMode() == ResolvedGestureInputMode.NativeTouchInteraction &&
+                shouldStartNativeEdgeInput(floatingChatExpanded, floatingChatExternalActivityVisible) &&
                 startNativeEdgeGestures(screenWidth, screenHeight)
             ) {
                 Log.d(TAG, "native gesture input active while floating chat is expanded")
@@ -1104,6 +1158,9 @@ class UniVergeAccessibilityService : AccessibilityService() {
         synchronizeGestureNavigationProtection(screenWidth, screenHeight)
         val resolvedInputMode = resolvedGestureInputMode()
         if (!shouldCreateGestureOverlayWindows(resolvedInputMode)) {
+            if (overlays.isNotEmpty()) {
+                removeEdgeGestureOverlays()
+            }
             val nativeGestureStarted = startNativeEdgeGestures(screenWidth, screenHeight)
             if (shouldSynchronizeEdgeIndicators(
                     mode = resolvedInputMode,
@@ -1124,6 +1181,7 @@ class UniVergeAccessibilityService : AccessibilityService() {
             Log.w(TAG, "native gesture input unavailable, falling back to slim overlay")
         }
         stopNativeEdgeGestures()
+        syncBottomGestureBar()
         EdgeSide.entries.forEach { side ->
             preferences.edgeConfigs(side).forEach { config ->
                 addEdgeGestureOverlay(config, screenWidth, screenHeight)
@@ -1140,18 +1198,24 @@ class UniVergeAccessibilityService : AccessibilityService() {
     ) {
         if (!config.enabled) return
         val side = config.side
+        if (gestureInputOwnership.ownerFor(GestureRegionKey.Side(side, config.zoneId)) == GestureInputOwner.NATIVE) {
+            return
+        }
         val params = createLayoutParams(
             config = config,
             screenWidth = screenWidth,
             screenHeight = screenHeight,
             touchTargetDp = touchTargetDp
         )
-        val backWaveAnchor = physicalEdgeBackWaveAnchor(
-            side = side,
-            screenWidthPx = screenWidth,
+        val placement = MutableOverlayPlacement(
+            x = params.x,
             y = params.y,
+            width = params.width,
             height = params.height
         )
+        val actionBindings = GestureType.entries.associateWith { gesture ->
+            preferences.actionFor(side, gesture)
+        }
         val overlay = EdgeOverlayView(
             context = this,
             side = side,
@@ -1161,38 +1225,59 @@ class UniVergeAccessibilityService : AccessibilityService() {
             longSwipeThresholdDp = preferences.longPullThresholdDp,
             minVerticalSwipeDistancePx = 96f * resources.displayMetrics.density,
             onGesture = { type, data ->
-                Log.d(TAG, "gesture side=${side.id} type=${type.id}")
+                Log.d(
+                    TAG,
+                    "[DEBUG-gesture-owner] owner=overlay-fallback side=${side.id} id=${data.gestureId} type=${type.id}"
+                )
+            },
+            actionBindings = actionBindings,
+            onGestureWithAction = { _, action, data ->
+                Log.d(
+                    TAG,
+                    "[DEBUG-gesture-owner] owner=overlay side=${side.id} id=${data.gestureId} action=${action.id}"
+                )
                 executeConfiguredGestureAction(
-                    preferences.actionFor(side, type),
-                    data.toScreenCoordinates(params.x, params.y)
+                    action,
+                    data.toScreenCoordinates(placement.x, placement.y),
+                    GestureActionSource.Overlay
                 )
             },
             onGestureProgress = { data ->
                 handleGesturePreview(
                     side = side,
-                    data = data.toScreenCoordinates(params.x, params.y)
+                    data = data.toScreenCoordinates(placement.x, placement.y)
                 )
             },
             onGestureEnd = ::handleGesturePreviewEnd,
             onBackGestureProgress = { progress ->
                 handleBackGestureProgress(
                     side,
-                    backWaveAnchor,
-                    progress.toScreenCoordinates(params.y)
+                    placement.backWaveAnchor(side, screenWidth),
+                    progress.toScreenCoordinates(placement.y)
                 )
             },
             onBackGestureCommit = { progress, data ->
                 handleBackGestureCommit(
                     side,
                     progress,
-                    data.toScreenCoordinates(params.x, params.y)
+                    data.toScreenCoordinates(placement.x, placement.y),
+                    source = GestureActionSource.Overlay
+                )
+            },
+            onBackGestureCommitWithAction = { progress, action, data ->
+                handleBackGestureCommit(
+                    side,
+                    progress,
+                    data.toScreenCoordinates(placement.x, placement.y),
+                    action,
+                    source = GestureActionSource.Overlay
                 )
             },
             onBackGestureEnd = { progress ->
                 handleBackGestureEnd(
                     side,
-                    backWaveAnchor,
-                    progress.toScreenCoordinates(params.y)
+                    placement.backWaveAnchor(side, screenWidth),
+                    progress.toScreenCoordinates(placement.y)
                 )
             },
             onBackGestureCancel = {
@@ -1201,11 +1286,14 @@ class UniVergeAccessibilityService : AccessibilityService() {
                 }
                 backWavePresentedForGesture = false
                 gestureHintOverlayController.hide()
-            }
+            },
+            onGestureFinished = ::handleEdgeOverlayGestureFinished
         )
         runCatching {
             windowManager.addView(overlay, params)
-            overlays[OverlayKey(side, config.zoneId)] = overlay
+            val key = OverlayKey(side, config.zoneId)
+            overlays[key] = overlay
+            overlayPlacements[key] = placement
             Log.d(
                 TAG,
                 "overlay added side=${side.id} zone=${config.zoneId} width=${params.width} height=${params.height} x=${params.x} y=${params.y}"
@@ -1222,22 +1310,20 @@ class UniVergeAccessibilityService : AccessibilityService() {
     ) {
         if (!shouldShowBackWave(side, progress.gestureType)) {
             if (::backWaveOverlayController.isInitialized) {
-                backWaveOverlayController.dismiss()
+                backWaveOverlayController.hide()
             }
             backWavePresentedForGesture = false
             selectedSideFunctionIndex = null
             return
         }
-        val items = sideFunctionItems()
+        val items = sideFunctionPreviewItemsCache.snapshot()
         selectedSideFunctionIndex = sideFunctionSelectionIndex(
             progress = progress,
             itemCount = items.size,
             density = resources.displayMetrics.density,
             viewportHeightPx = resources.displayMetrics.heightPixels.toFloat()
         )
-        val actionIds = SideFunctionConfig.fromCustomActionIds(
-            preferences.sideFunctionCustomActionIds
-        ).allActionIds
+        val actionIds = cachedSideFunctionActionIds
         selectedSideFunctionIndex
             ?.let(actionIds::getOrNull)
             ?.let { actionId -> gestureHintOverlayController.show(gestureHintLabel(actionId)) }
@@ -1254,23 +1340,24 @@ class UniVergeAccessibilityService : AccessibilityService() {
     private fun handleBackGestureCommit(
         side: EdgeSide,
         progress: BackGestureProgress,
-        data: GestureData
+        data: GestureData,
+        capturedAction: GestureAction? = null,
+        source: GestureActionSource = GestureActionSource.Command
     ): Boolean {
         val optionWasPresented = backWavePresentedForGesture
         backWavePresentedForGesture = false
         val index = selectedSideFunctionIndex
         selectedSideFunctionIndex = null
-        val ids =
-            SideFunctionConfig.fromCustomActionIds(preferences.sideFunctionCustomActionIds).allActionIds
+        val ids = cachedSideFunctionActionIds
         val selectedActionId = index?.let(ids::getOrNull)
         if (optionWasPresented && selectedActionId != null) {
-            executeSideFunction(selectedActionId, data)
+            executeSideFunction(selectedActionId, data, source)
             return true
         }
         if (!::preferences.isInitialized) return false
-        val action = preferences.actionFor(side, progress.gestureType)
+        val action = capturedAction ?: preferences.actionFor(side, progress.gestureType)
         if (action == GestureAction.None) return false
-        executeConfiguredGestureAction(action, data)
+        executeConfiguredGestureAction(action, data, source)
         return true
     }
 
@@ -1281,13 +1368,17 @@ class UniVergeAccessibilityService : AccessibilityService() {
     ) {
         if (!shouldShowBackWave(side, progress.gestureType)) {
             if (::backWaveOverlayController.isInitialized) {
-                backWaveOverlayController.dismiss()
+                backWaveOverlayController.hide()
             }
             backWavePresentedForGesture = false
             selectedSideFunctionIndex = null
             return
         }
-        backWaveOverlayController.finish(progress, anchor, sideFunctionItems())
+        backWaveOverlayController.finish(
+            progress,
+            anchor,
+            sideFunctionPreviewItemsCache.snapshot()
+        )
     }
 
     private fun handleMeteorGestureProgress(side: EdgeSide, data: GestureData) {
@@ -1315,9 +1406,13 @@ class UniVergeAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun handleGesturePreview(side: EdgeSide, data: GestureData) {
+    private fun handleGesturePreview(
+        side: EdgeSide,
+        data: GestureData,
+        capturedAction: GestureAction? = null
+    ) {
         handleMeteorGestureProgress(side, data)
-        val action = gestureHintClassifier.classify(
+        val action = capturedAction ?: gestureHintClassifier.classify(
             side = side,
             dx = data.endX - data.startX,
             dy = data.endY - data.startY
@@ -1332,9 +1427,13 @@ class UniVergeAccessibilityService : AccessibilityService() {
     private fun handleGesturePreviewEnd() {
         handleMeteorGestureEnd()
         gestureHintOverlayController.hide()
+        flushPendingStructuralOverlayRefresh()
     }
 
-    private fun gestureHintLabel(action: GestureAction): String = when (action) {
+    private fun gestureHintLabel(action: GestureAction): String =
+        gesturePreviewLabelCache.label(action) { resolveGestureHintLabel(action) }
+
+    private fun resolveGestureHintLabel(action: GestureAction): String = when (action) {
         GestureAction.Back -> "返回"
         GestureAction.Home -> "主页"
         GestureAction.Recents -> "最近任务"
@@ -1373,8 +1472,15 @@ class UniVergeAccessibilityService : AccessibilityService() {
         data: GestureData
     ) {
         if (!::preferences.isInitialized || !::actionExecutor.isInitialized) return
-        Log.d(TAG, "floating chat internal gesture side=${side.id} type=${gestureType.id}")
-        executeConfiguredGestureAction(preferences.actionFor(side, gestureType), data)
+        Log.d(
+            TAG,
+            "[DEBUG-gesture-owner] owner=compose side=${side.id} id=${data.gestureId} type=${gestureType.id}"
+        )
+        executeConfiguredGestureAction(
+            preferences.actionFor(side, gestureType),
+            data,
+            GestureActionSource.Compose
+        )
     }
 
     private fun handleFloatingChatBottomGesture(
@@ -1383,10 +1489,41 @@ class UniVergeAccessibilityService : AccessibilityService() {
     ) {
         if (!::preferences.isInitialized || !::actionExecutor.isInitialized) return
         Log.d(TAG, "floating chat internal bottom gesture type=${gestureType.id}")
-        executeConfiguredGestureAction(preferences.bottomGestureBarActionFor(gestureType), data)
+        executeConfiguredGestureAction(
+            preferences.bottomGestureBarActionFor(gestureType),
+            data,
+            GestureActionSource.ComposeBottom
+        )
     }
 
-    private fun executeConfiguredGestureAction(action: GestureAction, data: GestureData) {
+    private fun executeConfiguredGestureAction(
+        action: GestureAction,
+        data: GestureData,
+        source: GestureActionSource = GestureActionSource.Command
+    ) {
+        if (!isGestureActionSourceAllowed(
+                source = source,
+                floatingChatExpanded = floatingChatExpanded,
+                externalActivityVisible = floatingChatExternalActivityVisible
+            )
+        ) {
+            Log.w(
+                TAG,
+                "[DEBUG-gesture-owner] stale owner rejected owner=$source id=${data.gestureId} action=${action.id}"
+            )
+            return
+        }
+        if (!gestureActionCommitGate.accept(data.gestureId)) {
+            Log.w(
+                TAG,
+                "[DEBUG-gesture-terminal] duplicate action ignored id=${data.gestureId} action=${action.id}"
+            )
+            return
+        }
+        Log.d(
+            TAG,
+            "[DEBUG-gesture-terminal] action accepted id=${data.gestureId} action=${action.id}"
+        )
         if (shouldRestoreFloatingChatFromExternalActivity(
                 action,
                 floatingChatExternalActivityVisible
@@ -1398,10 +1535,9 @@ class UniVergeAccessibilityService : AccessibilityService() {
         actionExecutor.execute(action, data)
     }
 
-    private fun sideFunctionItems(): List<SideFunctionPanelItem> {
-        val ids =
-            SideFunctionConfig.fromCustomActionIds(preferences.sideFunctionCustomActionIds).allActionIds
-        val labels = sideFunctionPanelLabels(preferences.sideFunctionCustomActionIds) { actionId ->
+    private fun sideFunctionItems(customActionIds: List<String> = preferences.sideFunctionCustomActionIds): List<SideFunctionPanelItem> {
+        val ids = SideFunctionConfig.fromCustomActionIds(customActionIds).allActionIds
+        val labels = sideFunctionPanelLabels(customActionIds) { actionId ->
             when (val action = GestureAction.fromId(actionId)) {
                 GestureAction.Home -> "主页"
                 GestureAction.Recents -> "最近任务"
@@ -1435,8 +1571,25 @@ class UniVergeAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun executeSideFunction(actionId: String, data: GestureData) {
+    private fun executeSideFunction(
+        actionId: String,
+        data: GestureData,
+        source: GestureActionSource = GestureActionSource.Command
+    ) {
+        if (!isGestureActionSourceAllowed(
+                source = source,
+                floatingChatExpanded = floatingChatExpanded,
+                externalActivityVisible = floatingChatExternalActivityVisible
+            )
+        ) {
+            Log.w(
+                TAG,
+                "[DEBUG-gesture-owner] stale side-function owner rejected owner=$source id=${data.gestureId}"
+            )
+            return
+        }
         if (actionId == SideFunctionConfig.CLOSE_ALL_ACTION_ID) {
+            if (!gestureActionCommitGate.accept(data.gestureId)) return
             actionExecutor.performHapticFeedback()
             floatingChatOverlayController.dismiss()
             videoDemoOverlayController.dismissImmediately()
@@ -1444,7 +1597,7 @@ class UniVergeAccessibilityService : AccessibilityService() {
             backWaveOverlayController.dismiss()
             return
         }
-        executeConfiguredGestureAction(GestureAction.fromId(actionId), data)
+        executeConfiguredGestureAction(GestureAction.fromId(actionId), data, source)
     }
 
     private fun handleFloatingChatBackGestureProgress(
@@ -1459,7 +1612,12 @@ class UniVergeAccessibilityService : AccessibilityService() {
         progress: BackGestureProgress,
         data: GestureData
     ): Boolean {
-        return handleBackGestureCommit(side, progress, data)
+        return handleBackGestureCommit(
+            side,
+            progress,
+            data,
+            source = GestureActionSource.Compose
+        )
     }
 
     private fun handleFloatingChatBackGestureEnd(
@@ -1471,7 +1629,7 @@ class UniVergeAccessibilityService : AccessibilityService() {
 
     private fun handleFloatingChatBackGestureCancel() {
         if (::backWaveOverlayController.isInitialized) {
-            backWaveOverlayController.dismiss()
+            backWaveOverlayController.hide()
         }
         backWavePresentedForGesture = false
         selectedSideFunctionIndex = null
@@ -1493,7 +1651,9 @@ class UniVergeAccessibilityService : AccessibilityService() {
             removeEdgeGestureOverlays()
             syncBottomGestureBar()
             applyServiceRuntimeConfig()
-            if (resolvedGestureInputMode() == ResolvedGestureInputMode.NativeTouchInteraction) {
+            if (resolvedGestureInputMode() == ResolvedGestureInputMode.NativeTouchInteraction &&
+                shouldStartNativeEdgeInput(floatingChatExpanded, floatingChatExternalActivityVisible)
+            ) {
                 if (startNativeEdgeGestures(screenWidth, screenHeight)) {
                     Log.d(TAG, "native gesture input kept while floating chat is expanded")
                     return
@@ -1514,7 +1674,9 @@ class UniVergeAccessibilityService : AccessibilityService() {
             requestOverlayRefresh()
             return
         }
-        if (startNativeEdgeGestures(screenWidth, screenHeight)) {
+        if (shouldStartNativeEdgeInput(floatingChatExpanded, floatingChatExternalActivityVisible) &&
+            startNativeEdgeGestures(screenWidth, screenHeight)
+        ) {
             Log.d(TAG, "native gesture input resumed after floating chat collapse")
         } else {
             nativeTouchInteractionRuntimeFailed = true
@@ -1529,16 +1691,23 @@ class UniVergeAccessibilityService : AccessibilityService() {
         val density = resources.displayMetrics.density
         val controller = nativeEdgeGestureController ?: NativeEdgeGestureController(
             service = this,
-            mainHandler = mainHandler,
-            onGesture = { side, type, data ->
-                Log.d(TAG, "native gesture side=${side.id} type=${type.id}")
-                executeConfiguredGestureAction(preferences.actionFor(side, type), data)
+            onGesture = { side, type, action, data ->
+                Log.d(
+                    TAG,
+                    "[DEBUG-gesture-owner] owner=native side=${side.id} id=${data.gestureId} type=${type.id}"
+                )
+                executeConfiguredGestureAction(action, data, GestureActionSource.Native)
             },
-            onGestureProgress = ::handleGesturePreview,
+            onGestureProgress = { side, action, data ->
+                handleGesturePreview(side, data, action)
+            },
             onGestureEnd = ::handleGesturePreviewEnd,
-            onBottomGesture = { type, data ->
-                Log.d(TAG, "native bottom gesture type=${type.id}")
-                executeConfiguredGestureAction(preferences.bottomGestureBarActionFor(type), data)
+            onBottomGesture = { type, action, data ->
+                Log.d(
+                    TAG,
+                    "[DEBUG-gesture-owner] owner=native-bottom id=${data.gestureId} type=${type.id}"
+                )
+                executeConfiguredGestureAction(action, data, GestureActionSource.NativeBottom)
             },
             onBackGestureProgress = { intercept, progress ->
                 handleBackGestureProgress(
@@ -1547,8 +1716,14 @@ class UniVergeAccessibilityService : AccessibilityService() {
                     progress
                 )
             },
-            onBackGestureCommit = { intercept, progress, data ->
-                handleBackGestureCommit(intercept.side, progress, data)
+            onBackGestureCommit = { intercept, progress, action, data ->
+                handleBackGestureCommit(
+                    intercept.side,
+                    progress,
+                    data,
+                    action,
+                    GestureActionSource.Native
+                )
             },
             onBackGestureEnd = { intercept, progress ->
                 handleBackGestureEnd(
@@ -1565,7 +1740,23 @@ class UniVergeAccessibilityService : AccessibilityService() {
                 floatingChatExternalActivityVisible
             )
         )
-        return controller.start(
+        nativeGestureSnapshotVersion = maxOf(
+            nativeGestureSnapshotVersion,
+            preferences.gestureConfigVersion,
+            1L
+        )
+        val sideActions = EdgeSide.entries.associateWith { side ->
+            gestureMappingOrder().associateWith { gesture -> preferences.actionFor(side, gesture) }
+        }
+        val bottomActions = mapOf(
+            GestureType.TAP to preferences.bottomGestureBarActionFor(BottomGestureBarGestureType.Tap),
+            GestureType.SWIPE_UP to preferences.bottomGestureBarActionFor(BottomGestureBarGestureType.SwipeUp),
+            GestureType.SWIPE_UP_HOLD to preferences.bottomGestureBarActionFor(BottomGestureBarGestureType.SwipeUpHold),
+            GestureType.SWIPE_LEFT to preferences.bottomGestureBarActionFor(BottomGestureBarGestureType.SwipeHorizontal),
+            GestureType.SWIPE_RIGHT to preferences.bottomGestureBarActionFor(BottomGestureBarGestureType.SwipeHorizontal),
+            GestureType.LONG_PRESS to preferences.bottomGestureBarActionFor(BottomGestureBarGestureType.LongPress)
+        )
+        val started = controller.start(
             NativeEdgeGestureConfig(
                 screenWidthPx = screenWidth,
                 screenHeightPx = screenHeight,
@@ -1580,13 +1771,58 @@ class UniVergeAccessibilityService : AccessibilityService() {
                     preferences.longPullThresholdDp,
                     density
                 ),
-                bottomGestureWidthDp = preferences.bottomGestureBarWidthDp
+                bottomGestureWidthDp = preferences.bottomGestureBarWidthDp,
+                snapshotVersion = nativeGestureSnapshotVersion,
+                sideActions = sideActions,
+                bottomActions = bottomActions
             )
         )
+        refreshGestureInputOwnership(
+            screenWidth = screenWidth,
+            screenHeight = screenHeight,
+            nativeStarted = started,
+            nativeFailureReason = "native touch interaction unavailable"
+        )
+        if (started) {
+            backWaveOverlayController.prewarm()
+            syncBottomGestureBar()
+        }
+        return started
+    }
+
+    private fun refreshSideFunctionPreviewItems() {
+        if (!::preferences.isInitialized) return
+        val customActionIds = preferences.sideFunctionCustomActionIds
+        cachedSideFunctionActionIds = SideFunctionConfig.fromCustomActionIds(customActionIds).allActionIds
+        sideFunctionPreviewItemsCache.replace(sideFunctionItems(customActionIds))
+    }
+
+    private fun refreshGesturePreviewLabels() {
+        if (!::preferences.isInitialized) return
+        val actions = buildSet {
+            EdgeSide.entries.forEach { side ->
+                GestureType.entries.forEach { gesture -> add(preferences.actionFor(side, gesture)) }
+            }
+            BottomGestureBarGestureType.entries.forEach { gesture ->
+                add(preferences.bottomGestureBarActionFor(gesture))
+            }
+            SideFunctionConfig.fromCustomActionIds(preferences.sideFunctionCustomActionIds)
+                .allActionIds
+                .forEach { actionId -> add(GestureAction.fromId(actionId)) }
+        }
+        gesturePreviewLabelCache.replace(actions.associateWith(::resolveGestureHintLabel))
     }
 
     private fun stopNativeEdgeGestures() {
         nativeEdgeGestureController?.stop()
+        if (::preferences.isInitialized) {
+            val (screenWidth, screenHeight) = currentDisplaySize()
+            refreshGestureInputOwnership(
+                screenWidth = screenWidth,
+                screenHeight = screenHeight,
+                nativeStarted = false
+            )
+        }
         handleMeteorGestureEnd()
     }
 
@@ -1742,6 +1978,7 @@ class UniVergeAccessibilityService : AccessibilityService() {
         }
         if (!::windowManager.isInitialized) {
             overlays.clear()
+            overlayPlacements.clear()
             return
         }
         overlays.values.forEach { overlay ->
@@ -1750,6 +1987,84 @@ class UniVergeAccessibilityService : AccessibilityService() {
                 .onFailure { Log.w(TAG, "failed to remove gesture overlay", it) }
         }
         overlays.clear()
+        overlayPlacements.clear()
+    }
+
+    private fun updateEdgeGestureOverlayLayouts(): EdgeOverlayGeometryUpdateDecision {
+        if (!::windowManager.isInitialized || !::preferences.isInitialized) {
+            return EdgeOverlayGeometryUpdateDecision.RECREATE
+        }
+        if (!shouldCreateGestureOverlayWindows(resolvedGestureInputMode())) {
+            return EdgeOverlayGeometryUpdateDecision.RECREATE
+        }
+        val requestedConfigs = EdgeSide.entries
+            .flatMap(preferences::edgeConfigs)
+            .filter { config ->
+                config.enabled &&
+                    gestureInputOwnership.ownerFor(GestureRegionKey.Side(config.side, config.zoneId)) !=
+                    GestureInputOwner.NATIVE
+            }
+        val requestedKeys = requestedConfigs.map { OverlayKey(it.side, it.zoneId) }.toSet()
+        val existingKeys = overlays.keys.toSet()
+        val activeGestureCount = overlays.values.count(EdgeOverlayView::hasActiveGesture)
+        val decision = decideEdgeOverlayGeometryUpdate(
+            sameZoneSet = existingKeys == requestedKeys,
+            activeGestureCount = activeGestureCount,
+            inputOwnerChanged = false,
+            windowTypeChanged = false
+        )
+        if (decision != EdgeOverlayGeometryUpdateDecision.UPDATE_IN_PLACE) return decision
+
+        val (screenWidth, screenHeight) = currentDisplaySize()
+        requestedConfigs.forEach { config ->
+            val key = OverlayKey(config.side, config.zoneId)
+            val overlay = overlays[key] ?: return EdgeOverlayGeometryUpdateDecision.RECREATE
+            val params = createLayoutParams(config, screenWidth, screenHeight)
+            runCatching { windowManager.updateViewLayout(overlay, params) }
+                .getOrElse {
+                    Log.w(TAG, "failed to update gesture overlay side=${config.side.id} zone=${config.zoneId}", it)
+                    return EdgeOverlayGeometryUpdateDecision.RECREATE
+                }
+            overlayPlacements[key]?.updateFrom(params)
+        }
+        return EdgeOverlayGeometryUpdateDecision.UPDATE_IN_PLACE
+    }
+
+    private fun handleEdgeOverlayGestureFinished() {
+        if (pendingEdgeGeometryUpdate) when (updateEdgeGestureOverlayLayouts()) {
+            EdgeOverlayGeometryUpdateDecision.UPDATE_IN_PLACE -> {
+                pendingEdgeGeometryUpdate = false
+                synchronizeCurrentEdgeOutlines()
+            }
+            EdgeOverlayGeometryUpdateDecision.RECREATE -> {
+                pendingEdgeGeometryUpdate = false
+                requestOverlayRefresh()
+            }
+            EdgeOverlayGeometryUpdateDecision.DEFER -> Unit
+        }
+        flushPendingStructuralOverlayRefresh()
+    }
+
+    private fun flushPendingStructuralOverlayRefresh() {
+        mainHandler.post {
+            if (!pendingStructuralOverlayRefresh || hasActiveGestureSession()) return@post
+            pendingStructuralOverlayRefresh = false
+            recreateOverlays()
+        }
+    }
+
+    private fun hasActiveGestureSession(): Boolean =
+        overlays.values.any(EdgeOverlayView::hasActiveGesture) ||
+            nativeEdgeGestureController?.hasActiveGesture == true ||
+            bottomGestureBarOverlayControllerOrNull()?.hasActiveGesture == true
+
+    private fun bottomGestureBarOverlayControllerOrNull(): BottomGestureBarOverlayController? =
+        if (::bottomGestureBarOverlayController.isInitialized) bottomGestureBarOverlayController else null
+
+    private fun synchronizeCurrentEdgeOutlines() {
+        if (!::preferences.isInitialized) return
+        val (screenWidth, screenHeight) = currentDisplaySize()
+        synchronizeEdgeOutlines(screenWidth, screenHeight)
     }
 
     private fun synchronizeEdgeOutlines(screenWidth: Int, screenHeight: Int) {
@@ -1861,16 +2176,19 @@ class UniVergeAccessibilityService : AccessibilityService() {
             .onFailure { Log.w(TAG, "failed to remove edge configuration preview", it) }
     }
 
-    private fun syncBottomGestureBar() {
+    private fun syncBottomGestureBar(recreate: Boolean = false) {
         if (!::bottomGestureBarOverlayController.isInitialized) return
-        val barVisible = bottomGestureBarExternalOverlayVisibleForFloatingChat(floatingChatExpanded)
-        if (barVisible) {
-            bottomGestureBarOverlayController.show()
+        val surfaceAvailable = bottomGestureBarExternalOverlayVisibleForFloatingChat(floatingChatExpanded)
+        val nativeOwnsBottom = surfaceAvailable &&
+            gestureInputOwnership.ownerFor(GestureRegionKey.Bottom) == GestureInputOwner.NATIVE
+        if (surfaceAvailable && !nativeOwnsBottom) {
+            if (recreate) bottomGestureBarOverlayController.recreate()
+            else bottomGestureBarOverlayController.show()
         } else {
             bottomGestureBarOverlayController.remove()
         }
         if (::bottomGestureBarIndicatorController.isInitialized) {
-            if (shouldShowBottomGestureBarIndicator(preferences.showIndicators, barVisible)) {
+            if (shouldShowBottomGestureBarIndicator(preferences.showIndicators, surfaceAvailable)) {
                 bottomGestureBarIndicatorController.show(preferences.bottomGestureBarWidthDp)
             } else {
                 bottomGestureBarIndicatorController.dismiss()
@@ -1881,13 +2199,78 @@ class UniVergeAccessibilityService : AccessibilityService() {
     private fun scheduleBottomGestureBarZOrderRefresh() {
         mainHandler.post {
             if (::bottomGestureBarOverlayController.isInitialized) {
-                if (bottomGestureBarExternalOverlayVisibleForFloatingChat(floatingChatExpanded)) {
+                if (bottomGestureBarExternalOverlayVisibleForFloatingChat(floatingChatExpanded) &&
+                    gestureInputOwnership.ownerFor(GestureRegionKey.Bottom) != GestureInputOwner.NATIVE
+                ) {
                     bottomGestureBarOverlayController.recreate()
                 } else {
                     bottomGestureBarOverlayController.remove()
                 }
             }
         }
+    }
+
+    private fun publishGestureServerSnapshot() {
+        if (!::preferences.isInitialized || !::gestureServerSnapshotPublisher.isInitialized) return
+        val (screenWidth, screenHeight) = currentDisplaySize()
+        val revision = gestureServerSnapshotPublisher.revisionFor(preferences.gestureConfigVersion)
+        gestureServerSnapshotPublisher.publish(
+            gestureServerSnapshotFromPreferences(
+                preferences = preferences,
+                screenWidthPx = screenWidth,
+                screenHeightPx = screenHeight,
+                density = resources.displayMetrics.density,
+                revision = revision
+            )
+        )
+    }
+
+    private fun refreshGestureInputOwnership(
+        screenWidth: Int,
+        screenHeight: Int,
+        nativeStarted: Boolean,
+        nativeFailureReason: String = "native input unavailable"
+    ) {
+        if (!::preferences.isInitialized) return
+        val sideConfigs = EdgeSide.entries.flatMap(preferences::edgeConfigs)
+            .filter(EdgeZoneConfig::enabled)
+        val sideRects = edgeGestureInterceptRects(
+            screenWidthPx = screenWidth,
+            screenHeightPx = screenHeight,
+            density = resources.displayMetrics.density,
+            configs = sideConfigs
+        ).associateBy { GestureRegionKey.Side(it.side, it.zoneId) }
+        val requested = sideConfigs.map { config ->
+            val key = GestureRegionKey.Side(config.side, config.zoneId)
+            GestureInputRegion(key, sideRects[key]?.toGestureInputRect())
+        }.toMutableList()
+        if (bottomGestureBarExternalOverlayVisibleForFloatingChat(floatingChatExpanded)) {
+            val bottomRect = nativeBottomGestureInterceptRect(
+                NativeEdgeGestureConfig(
+                    screenWidthPx = screenWidth,
+                    screenHeightPx = screenHeight,
+                    density = resources.displayMetrics.density,
+                    leftConfigs = emptyList(),
+                    rightConfigs = emptyList(),
+                    shortThresholdPx = 0f,
+                    longThresholdPx = 0f,
+                    bottomGestureWidthDp = preferences.bottomGestureBarWidthDp
+                ),
+                floatingChatExpanded = floatingChatExpanded
+            )
+            requested += GestureInputRegion(
+                GestureRegionKey.Bottom,
+                bottomRect?.toGestureInputRect()
+            )
+        }
+        val nativeResults = requested.map { region ->
+            if (nativeStarted) {
+                NativeInputRegistration.success(region.key, region.rect)
+            } else {
+                NativeInputRegistration.failure(region.key, nativeFailureReason, region.rect)
+            }
+        }
+        gestureInputOwnership = GestureInputOwnershipReport.resolve(requested, nativeResults)
     }
 
     private fun showFloatingChatOverlayIfAllowed() {
@@ -1982,6 +2365,23 @@ class UniVergeAccessibilityService : AccessibilityService() {
         val side: EdgeSide,
         val zoneId: Int
     )
+
+    private data class MutableOverlayPlacement(
+        var x: Int,
+        var y: Int,
+        var width: Int,
+        var height: Int
+    ) {
+        fun updateFrom(params: WindowManager.LayoutParams) {
+            x = params.x
+            y = params.y
+            width = params.width
+            height = params.height
+        }
+
+        fun backWaveAnchor(side: EdgeSide, screenWidthPx: Int): BackWaveAnchor =
+            physicalEdgeBackWaveAnchor(side, screenWidthPx, y, height)
+    }
 }
 
 internal fun gestureOverlayThicknessDp(configuredThicknessDp: Int): Int {

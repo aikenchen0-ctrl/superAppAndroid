@@ -51,6 +51,10 @@ import com.paifa.univerge.accessibility.floatingchat.chat.rootBoundsFromPosition
 import com.paifa.univerge.core.model.FloatingChatContact
 import com.paifa.univerge.core.model.FloatingChatMessage
 import com.paifa.univerge.core.model.FloatingChatMessagePresentation
+import com.paifa.univerge.core.model.FloatingChatMessageType
+import com.paifa.univerge.heavydrag.compose.LocalHeavyDragCoordinator
+import com.paifa.univerge.heavydrag.compose.heavyDraggable
+import com.paifa.univerge.heavydrag.core.HeavyDragCoordinator
 
 internal class MessageBoundsHolder {
     var value: Rect? = null
@@ -62,6 +66,11 @@ internal class MessageBoundsHolder {
         onChanged(bounds)
         return true
     }
+}
+
+internal fun messageUsesTestHeavyDrag(message: FloatingChatMessage): Boolean {
+    return message.type == FloatingChatMessageType.Text &&
+        message.presentation != FloatingChatMessagePresentation.System
 }
 
 @Composable
@@ -91,7 +100,8 @@ internal fun MessageRow(
     onGroupMemberAvatarRemoved: () -> Unit,
     detailedBubble: Boolean = usesDetailedMessageBubble(homeOverviewVisible, selectedThread),
     showOwnSenderName: Boolean = false,
-    bubbleAppearance: BubbleAppearance = BubbleAppearance.TwoD
+    bubbleAppearance: BubbleAppearance = BubbleAppearance.TwoD,
+    heavyDragEnabled: Boolean = true
 ) {
     val groupMemberContact = remember(
         message,
@@ -175,6 +185,7 @@ internal fun MessageRow(
             senderNickname = senderNickname,
             showSenderNickname = showSenderNickname,
             bubbleAppearance = bubbleAppearance,
+            heavyDragEnabled = heavyDragEnabled,
             modifier = if (groupMemberContact != null && placement == MessageHorizontalPlacement.Start) {
                 Modifier.weight(1f, fill = false)
             } else {
@@ -213,6 +224,7 @@ internal fun MessageBlock(
     senderNickname: String,
     showSenderNickname: Boolean,
     bubbleAppearance: BubbleAppearance = BubbleAppearance.TwoD,
+    heavyDragEnabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val bubbleClickSource = remember { MutableInteractionSource() }
@@ -246,6 +258,32 @@ internal fun MessageBlock(
     val threeDimensionalAccent = messageThreeDimensionalAccent(message)
     val aiDraftDashedBubble = aiDraftMessageUsesGreenDashedBubble(message)
     val usesDemoBubble = messageTypeUsesImModuleBubble(message.type) && !isSystem
+    val heavyDragCoordinator: HeavyDragCoordinator? = LocalHeavyDragCoordinator.current
+    fun performBubbleClick() {
+        if (multiSelectMode) {
+            onToggleSelection()
+        } else if (homeOverviewVisible) {
+            onClick()
+        } else if (usesBubbleChrome) {
+            onLongPressMessage(message, currentBounds.value)
+        } else {
+            onClick()
+        }
+    }
+    val heavyDragModifier = if (
+        heavyDragCoordinator != null &&
+        heavyDragEnabled &&
+        messageUsesTestHeavyDrag(message)
+    ) {
+        Modifier.heavyDraggable(
+            coordinator = heavyDragCoordinator,
+            sourceId = message.id,
+            payload = message,
+            onClick = { performBubbleClick() }
+        )
+    } else {
+        Modifier
+    }
     Column(
         modifier = modifier,
         horizontalAlignment = when {
@@ -258,7 +296,7 @@ internal fun MessageBlock(
             Box(modifier = Modifier.padding(top = if (isSystem) 0.dp else 8.dp)) {
                 if (usesBubbleChrome) {
                     Box(
-                        modifier = Modifier
+                        modifier = heavyDragModifier
                             .shadow(
                                 elevation = if (usesThreeDimensionalBubble) 3.dp else if (usesDemoBubble) 1.dp else 2.dp,
                                 shape = bubbleShape,
@@ -334,17 +372,7 @@ internal fun MessageBlock(
                             .combinedClickable(
                                 interactionSource = bubbleClickSource,
                                 indication = null,
-                                onClick = {
-                                    if (multiSelectMode) {
-                                        onToggleSelection()
-                                    } else if (homeOverviewVisible) {
-                                        onClick()
-                                    } else if (usesBubbleChrome) {
-                                        onLongPressMessage(message, currentBounds.value)
-                                    } else {
-                                        onClick()
-                                    }
-                                },
+                                onClick = ::performBubbleClick,
                                 onDoubleClick = onDoubleClick,
                                 onLongClick = { onLongPressMessage(message, currentBounds.value) }
                             )
@@ -390,7 +418,7 @@ internal fun MessageBlock(
                     }
                 } else {
                     Box(
-                        modifier = Modifier
+                        modifier = heavyDragModifier
                             .onGloballyPositioned { coordinates ->
                                 updateCurrentBounds(
                                     rootBoundsFromPosition(
@@ -403,17 +431,7 @@ internal fun MessageBlock(
                             .combinedClickable(
                                 interactionSource = bubbleClickSource,
                                 indication = null,
-                                onClick = {
-                                    if (multiSelectMode) {
-                                        onToggleSelection()
-                                    } else if (homeOverviewVisible) {
-                                        onClick()
-                                    } else if (usesBubbleChrome) {
-                                        onLongPressMessage(message, currentBounds.value)
-                                    } else {
-                                        onClick()
-                                    }
-                                },
+                                onClick = ::performBubbleClick,
                                 onDoubleClick = onDoubleClick,
                                 onLongClick = { onLongPressMessage(message, currentBounds.value) }
                             )

@@ -7,7 +7,6 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.Rect
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.DisplayMetrics
@@ -18,6 +17,10 @@ import android.view.View
 import android.view.WindowManager
 import com.paifa.univerge.core.model.GestureAction
 import com.paifa.univerge.core.model.GestureData
+import com.paifa.univerge.core.model.GestureType
+import com.paifa.univerge.core.gesture.runtime.BottomBarConfig
+import com.paifa.univerge.core.gesture.runtime.BottomGestureRecognizer
+import com.paifa.univerge.core.gesture.runtime.GestureSignal
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -201,26 +204,70 @@ internal class BottomGestureBarOverlayController(
     private val context: Context,
     private val windowManager: WindowManager,
     private val preferences: UniVergePreferences,
-    private val onGesture: (GestureAction, GestureData) -> Unit
+    private val onGesture: (GestureAction, GestureData) -> Unit,
+    private val onGestureFinished: () -> Unit = {}
 ) {
     private var gestureBarView: BottomGestureBarView? = null
+    private var gestureBarLayoutParams: WindowManager.LayoutParams? = null
+    private var pendingRecreate = false
+    private var pendingGeometry: BottomBarConfig? = null
+
+    val hasActiveGesture: Boolean
+        get() = gestureBarView?.hasActiveGesture == true
 
     fun show() {
         if (gestureBarView != null) return
-        val view = BottomGestureBarView(context) { gestureType, data ->
-            onGesture(preferences.bottomGestureBarActionFor(gestureType), data)
-        }
+        val density = context.resources.displayMetrics.density.coerceAtLeast(0.01f)
+        val metrics = context.resources.displayMetrics
+        val widthDp = sanitizeBottomGestureBarWidthDp(preferences.bottomGestureBarWidthDp).toFloat()
+        val recognizer = BottomGestureRecognizer(
+            bar = BottomBarConfig(
+                screenWidthDp = metrics.widthPixels / density,
+                screenHeightDp = metrics.heightPixels / density,
+                widthDp = widthDp,
+                heightDp = BottomGestureBarTouchHeightDp.toFloat()
+            ),
+            actions = bottomGestureCoreActions(),
+            snapshotVersion = 1L
+        )
+        val view = BottomGestureBarView(
+            context = context,
+            recognizer = recognizer,
+            density = density,
+            onGesture = { action, data -> onGesture(action, data) },
+            onGestureFinished = {
+                flushPendingChanges()
+                onGestureFinished()
+            }
+        )
+        val params = layoutParams()
         runCatching {
-            windowManager.addView(view, layoutParams())
+            windowManager.addView(view, params)
             gestureBarView = view
+            gestureBarLayoutParams = params
         }.onFailure { error ->
             Log.w(TAG, "failed to add bottom gesture bar", error)
         }
     }
 
     fun recreate() {
+        if (hasActiveGesture) {
+            pendingRecreate = true
+            return
+        }
         remove()
         show()
+    }
+
+    /** Applies only bottom geometry; action bindings remain captured by the active recognizer. */
+    fun updateGeometryInPlace(): Boolean {
+        val view = gestureBarView ?: return false
+        val next = bottomBarConfig()
+        if (hasActiveGesture) {
+            pendingGeometry = next
+            return true
+        }
+        return applyGeometry(view, next)
     }
 
     fun remove() {
@@ -231,6 +278,47 @@ internal class BottomGestureBarOverlayController(
             Log.w(TAG, "failed to remove bottom gesture bar", error)
         }
         gestureBarView = null
+        gestureBarLayoutParams = null
+        pendingRecreate = false
+        pendingGeometry = null
+    }
+
+    private fun flushPendingChanges() {
+        if (hasActiveGesture) return
+        if (pendingRecreate) {
+            pendingRecreate = false
+            remove()
+            show()
+            return
+        }
+        val next = pendingGeometry ?: return
+        pendingGeometry = null
+        gestureBarView?.let { applyGeometry(it, next) }
+    }
+
+    private fun applyGeometry(view: BottomGestureBarView, next: BottomBarConfig): Boolean {
+        val currentParams = gestureBarLayoutParams ?: return false
+        val nextParams = layoutParams()
+        return runCatching {
+            check(view.updateGeometry(next))
+            currentParams.copyFrom(nextParams)
+            windowManager.updateViewLayout(view, currentParams)
+            true
+        }.getOrElse { error ->
+            Log.w(TAG, "failed to update bottom gesture geometry", error)
+            false
+        }
+    }
+
+    private fun bottomBarConfig(): BottomBarConfig {
+        val density = context.resources.displayMetrics.density.coerceAtLeast(0.01f)
+        val metrics = context.resources.displayMetrics
+        return BottomBarConfig(
+            screenWidthDp = metrics.widthPixels / density,
+            screenHeightDp = metrics.heightPixels / density,
+            widthDp = sanitizeBottomGestureBarWidthDp(preferences.bottomGestureBarWidthDp).toFloat(),
+            heightDp = BottomGestureBarTouchHeightDp.toFloat()
+        )
     }
 
     private fun layoutParams(): WindowManager.LayoutParams {
@@ -250,6 +338,15 @@ internal class BottomGestureBarOverlayController(
             y = (bottomGestureBarBottomInsetDp() * density).toInt()
         }
     }
+
+    private fun bottomGestureCoreActions(): Map<GestureType, GestureAction> = mapOf(
+        GestureType.TAP to preferences.bottomGestureBarActionFor(BottomGestureBarGestureType.Tap),
+        GestureType.SWIPE_UP to preferences.bottomGestureBarActionFor(BottomGestureBarGestureType.SwipeUp),
+        GestureType.SWIPE_UP_HOLD to preferences.bottomGestureBarActionFor(BottomGestureBarGestureType.SwipeUpHold),
+        GestureType.SWIPE_LEFT to preferences.bottomGestureBarActionFor(BottomGestureBarGestureType.SwipeHorizontal),
+        GestureType.SWIPE_RIGHT to preferences.bottomGestureBarActionFor(BottomGestureBarGestureType.SwipeHorizontal),
+        GestureType.LONG_PRESS to preferences.bottomGestureBarActionFor(BottomGestureBarGestureType.LongPress)
+    )
 
     private companion object {
         const val TAG = "UbikiTouch"
@@ -395,7 +492,10 @@ internal fun bottomGestureBarTouchHeightDp(): Int = BottomGestureBarTouchHeightD
 @SuppressLint("ViewConstructor")
 private class BottomGestureBarView(
     context: Context,
-    private val onGesture: (BottomGestureBarGestureType, GestureData) -> Unit
+    private val recognizer: BottomGestureRecognizer,
+    private val density: Float,
+    private val onGesture: (GestureAction, GestureData) -> Unit,
+    private val onGestureFinished: () -> Unit
 ) : View(context) {
     private val idlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(190, 25, 35, 45)
@@ -403,19 +503,16 @@ private class BottomGestureBarView(
     private val pressedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(255, 25, 35, 45)
     }
-    private var downX = 0f
-    private var downY = 0f
-    private var lastMotionX = 0f
-    private var lastMotionY = 0f
-    private var lastMovementAtMillis = 0L
-    private var downAtMillis = 0L
     private var pressed = false
+
+    val hasActiveGesture: Boolean
+        get() = recognizer.hasActiveGesture
+
+    fun updateGeometry(next: BottomBarConfig): Boolean = recognizer.updateGeometry(next)
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
         super.onSizeChanged(width, height, oldWidth, oldHeight)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            systemGestureExclusionRects = listOf(Rect(0, 0, width, height))
-        }
+        systemGestureExclusionRects = listOf(Rect(0, 0, width, height))
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -438,61 +535,82 @@ private class BottomGestureBarView(
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        val xDp = event.rawX / density
+        val yDp = event.rawY / density
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                downX = event.rawX
-                downY = event.rawY
-                lastMotionX = event.rawX
-                lastMotionY = event.rawY
-                lastMovementAtMillis = event.eventTime
-                downAtMillis = event.eventTime
+                recognizer.onDown(
+                    xDp = xDp,
+                    yDp = yDp,
+                    timeMillis = event.eventTime,
+                    pointerId = event.getPointerId(0),
+                    pointerCount = event.pointerCount
+                )
                 pressed = true
                 invalidate()
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
-                if (
-                    abs(event.rawX - lastMotionX) >= BottomGestureBarMotionSlopPx ||
-                    abs(event.rawY - lastMotionY) >= BottomGestureBarMotionSlopPx
-                ) {
-                    lastMotionX = event.rawX
-                    lastMotionY = event.rawY
-                    lastMovementAtMillis = event.eventTime
-                }
+                recognizer.onMove(
+                    xDp = xDp,
+                    yDp = yDp,
+                    timeMillis = event.eventTime,
+                    pointerId = event.getPointerId(0),
+                    pointerCount = event.pointerCount
+                )
                 return true
             }
             MotionEvent.ACTION_UP -> {
-                if (
-                    abs(event.rawX - lastMotionX) >= BottomGestureBarMotionSlopPx ||
-                    abs(event.rawY - lastMotionY) >= BottomGestureBarMotionSlopPx
-                ) {
-                    lastMovementAtMillis = event.eventTime
-                }
-                val data = GestureData(
-                    startX = downX,
-                    startY = downY,
-                    endX = event.rawX,
-                    endY = event.rawY
-                )
-                val gestureType = resolveBottomGestureBarGestureType(
-                    deltaX = event.rawX - downX,
-                    deltaY = event.rawY - downY,
-                    gestureDurationMillis = event.eventTime - downAtMillis,
-                    upwardStationaryMillis = event.eventTime - lastMovementAtMillis
+                val signal = recognizer.onUp(
+                    xDp = xDp,
+                    yDp = yDp,
+                    timeMillis = event.eventTime,
+                    pointerId = event.getPointerId(0),
+                    pointerCount = event.pointerCount
                 )
                 pressed = false
                 invalidate()
-                performClick()
-                post { onGesture(gestureType, data) }
+                if (signal is GestureSignal.Commit) {
+                    performClick()
+                    onGesture(signal.action, signal.data.toScreenData(density))
+                }
+                onGestureFinished()
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
+                recognizer.onCancel()
                 pressed = false
                 invalidate()
+                onGestureFinished()
+                return true
+            }
+            MotionEvent.ACTION_POINTER_DOWN,
+            MotionEvent.ACTION_POINTER_UP -> {
+                recognizer.onCancel()
+                pressed = false
+                invalidate()
+                onGestureFinished()
                 return true
             }
         }
         return true
+    }
+
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        super.onWindowFocusChanged(hasWindowFocus)
+        if (!hasWindowFocus) {
+            recognizer.onFocusLost()
+            pressed = false
+            invalidate()
+            onGestureFinished()
+        }
+    }
+
+    override fun onDetachedFromWindow() {
+        recognizer.onCancel()
+        pressed = false
+        onGestureFinished()
+        super.onDetachedFromWindow()
     }
 
     override fun performClick(): Boolean {
@@ -504,6 +622,16 @@ private class BottomGestureBarView(
         const val BottomGestureBarVisualWidthDp = 92f
         const val BottomGestureBarVisualHeightDp = 5f
     }
+
+    private fun GestureData.toScreenData(density: Float): GestureData = GestureData(
+        startX = startX * density,
+        startY = startY * density,
+        endX = endX * density,
+        endY = endY * density,
+        gestureId = gestureId,
+        snapshotVersion = snapshotVersion,
+        zoneId = zoneId
+    )
 }
 
 private class BottomGestureBarPreviewView(context: Context, outlineColor: Int) : View(context) {

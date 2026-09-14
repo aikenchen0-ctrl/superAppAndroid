@@ -104,6 +104,11 @@ internal fun nativeTouchRecoveryNeeded(
     return !controllerRunning
 }
 
+internal fun shouldStartNativeEdgeInput(
+    floatingChatExpanded: Boolean,
+    externalActivityVisible: Boolean
+): Boolean = !floatingChatOwnsGestureSurface(floatingChatExpanded, externalActivityVisible)
+
 internal fun floatingChatOwnsGestureSurface(
     floatingChatExpanded: Boolean,
     externalActivityVisible: Boolean

@@ -34,6 +34,7 @@ public final class BlinkVoiceCapture {
         intent.putExtra(BlinkCaptureActivity.EXTRA_AUTO_FINISH_ON_EVENT, safeOptions.isAutoFinishOnEvent());
         intent.putExtra(BlinkCaptureActivity.EXTRA_DEBUG_LOGGING_ENABLED, safeOptions.isDebugLoggingEnabled());
         intent.putExtra(BlinkCaptureActivity.EXTRA_DEBUG_OVERLAY_ENABLED, safeOptions.isDebugOverlayEnabled());
+        intent.putExtra(BlinkCaptureActivity.EXTRA_MAX_ANALYSIS_FPS, safeOptions.getMaxAnalysisFps());
         intent.putStringArrayListExtra(BlinkCaptureActivity.EXTRA_EVENT_TYPES, eventTypeNames);
         return intent;
     }

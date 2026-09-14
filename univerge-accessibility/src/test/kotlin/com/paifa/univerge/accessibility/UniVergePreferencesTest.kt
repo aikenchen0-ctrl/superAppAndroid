@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import com.paifa.univerge.core.model.EdgeSide
 import com.paifa.univerge.core.model.EdgeZoneConfig
+import com.paifa.univerge.core.model.GestureAction
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -50,6 +51,23 @@ class UniVergePreferencesTest {
         val reloaded = UniVergePreferences(context)
         assertEquals(32, reloaded.edgeInsetDp(EdgeSide.LEFT))
         assertEquals(48, reloaded.edgeInsetDp(EdgeSide.RIGHT))
+    }
+
+    @Test(timeout = 60_000L)
+    fun gestureConfigVersionAdvancesForGeometryAndActionChanges() {
+        val preferences = UniVergePreferences(context)
+        val initial = preferences.gestureConfigVersion
+
+        preferences.setEdgeConfigs(
+            EdgeSide.LEFT,
+            listOf(EdgeZoneConfig.defaultFor(EdgeSide.LEFT, zoneId = 0).copy(thicknessDp = 28))
+        )
+        val afterGeometry = preferences.gestureConfigVersion
+        preferences.setAction(EdgeSide.LEFT, com.paifa.univerge.core.model.GestureType.SWIPE_UP, GestureAction.Home)
+        val afterAction = preferences.gestureConfigVersion
+
+        assertEquals(true, afterGeometry > initial)
+        assertEquals(true, afterAction > afterGeometry)
     }
 
     @Test(timeout = 60_000L)

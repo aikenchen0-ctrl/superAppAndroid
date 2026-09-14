@@ -52,8 +52,10 @@ android {
 
 dependencies {
     implementation(project(":univerge-accessibility"))
+    implementation(project(":gesture-server"))
     implementation(project(":adbcore"))
-    implementation(project(":univerge-touch"))
+    implementation(project(":univerge-heavy-drag-compose"))
+    implementation(files("libs/aispect-touch-android-1.2.0.aar"))
     implementation(files("libs/blinkvoice-visual-sdk-release.aar"))
 
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))

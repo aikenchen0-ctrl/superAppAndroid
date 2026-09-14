@@ -208,6 +208,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.Surface as MaterialSurface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -266,6 +267,8 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.viewinterop.AndroidView
+import com.paifa.univerge.heavydrag.android.HeavyDragRuntime
+import com.paifa.univerge.heavydrag.compose.HeavyDragHost
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -562,6 +565,8 @@ internal fun FloatingChatOverlay(
     onPersistGroupProfile: (LocalGroupProfile) -> Unit = {},
     onThreadContextChanged: (ChatThreadSelection, String) -> Unit = { _, _ -> },
     onOpenExternalDocument: (FloatingChatMessage) -> Boolean = { false },
+    onTextMessageDroppedToAiKnowledgeBase: (FloatingChatMessage) -> Unit = {},
+    onTextMessageDroppedToIntentTaskGenerator: (FloatingChatMessage) -> Unit = {},
     onPreviewChromeChanged: (Boolean) -> Unit = {},
     edgeGestureShortThresholdDp: Int = FloatingChatInternalEdgeGestureDefaults.ShortThresholdDp,
     edgeGestureLongThresholdDp: Int = FloatingChatInternalEdgeGestureDefaults.LongThresholdDp,
@@ -580,6 +585,11 @@ internal fun FloatingChatOverlay(
     onCollapse: () -> Unit
 ) {
     val context = LocalContext.current
+    val heavyDragLease = remember(context) { HeavyDragRuntimeProvider.acquire(context) }
+    val runtime: HeavyDragRuntime? = heavyDragLease?.runtime
+    DisposableEffect(heavyDragLease) {
+        onDispose { heavyDragLease?.close() }
+    }
     val density = LocalDensity.current
     val clipboardManager = LocalClipboardManager.current
     val focusManager = LocalFocusManager.current
@@ -678,6 +688,13 @@ internal fun FloatingChatOverlay(
     var paymentReadback by remember { mutableStateOf(PaymentReadback()) }
     var paymentOperationStatus by remember { mutableStateOf<String?>(null) }
     var paymentOperationInProgress by remember { mutableStateOf(false) }
+    var heavyTextDropFeedback by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(heavyTextDropFeedback) {
+        if (heavyTextDropFeedback != null) {
+            delay(2200L)
+            heavyTextDropFeedback = null
+        }
+    }
     val paymentIdempotencyRegistry = remember { PaymentIdempotencyRegistry() }
     var forwardMessage by remember { mutableStateOf<FloatingChatMessage?>(null) }
     var forwardModeMessages by remember { mutableStateOf<List<FloatingChatMessage>>(emptyList()) }
@@ -1655,6 +1672,30 @@ internal fun FloatingChatOverlay(
         onPreviewChromeChanged = onPreviewChromeChanged
     )
     val currentOnBottomGesture by rememberUpdatedState(onBottomGesture)
+    val heavyTextDragEnabled = bottomPanelMode == BottomPanelMode.None &&
+        !multiSelectMode &&
+        pendingVoiceRecording == null &&
+        longPressMessage == null &&
+        revokeConfirmationMessage == null &&
+        asideAnalysisState == null &&
+        textZoomMessage == null &&
+        paymentDetailMessage == null &&
+        chatHistoryPreviewMessage == null &&
+        forwardMessage == null &&
+        forwardModeMessages.isEmpty() &&
+        pendingForwardMessages.isEmpty() &&
+        aiDraftActionMessage == null &&
+        aiDraftEditMessage == null &&
+        favoritePreviewItem == null &&
+        favoriteLongPressItem == null &&
+        contactEditorTarget == null &&
+        contactRemarkDialogTarget == null &&
+        groupInfoWorkspaceTarget == null &&
+        accountEditorTarget == null &&
+        runtimeState.previewSession == null &&
+        runtimeState.documentPreviewMessage == null &&
+        mediaOverlayState.actionMessage == null
+    val runtimeContent: @Composable () -> Unit = {
     FloatingChatRuntimeSections(
         modifier = Modifier
             .fillMaxSize()
@@ -1863,6 +1904,7 @@ internal fun FloatingChatOverlay(
                 longPressAnchorBounds = bounds
             },
             multiSelectMode = multiSelectMode,
+            heavyDragEnabled = heavyTextDragEnabled,
             selectedMessageIds = selectedMessageIds,
             remindedMessageIds = reminderMessageIds,
             favoriteMessageIds = favoriteMessageIds,
@@ -3099,6 +3141,21 @@ internal fun FloatingChatOverlay(
                 }
             )
         }
+        HeavyTextDropTargetsOverlay(
+            enabled = heavyTextDragEnabled,
+            feedback = heavyTextDropFeedback,
+            onDropToAiKnowledgeBase = { message ->
+                heavyTextDropFeedback = "已记录到 AI 知识库（测试）"
+                onTextMessageDroppedToAiKnowledgeBase(message)
+            },
+            onDropToIntentTaskGenerator = { message ->
+                heavyTextDropFeedback = "已记录到理解意图生成任务（测试）"
+                onTextMessageDroppedToIntentTaskGenerator(message)
+            },
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(52f)
+        )
         FloatingChatExpandedBottomGestureBar(
             onGesture = currentOnBottomGesture,
             modifier = Modifier
@@ -3374,4 +3431,12 @@ internal fun FloatingChatOverlay(
         )
         }
     )
+    }
+    if (runtime != null) {
+        HeavyDragHost(runtime = runtime, modifier = Modifier.fillMaxSize()) {
+            runtimeContent()
+        }
+    } else {
+        runtimeContent()
+    }
 }

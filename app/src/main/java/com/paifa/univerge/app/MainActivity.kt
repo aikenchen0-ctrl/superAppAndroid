@@ -138,7 +138,8 @@ class MainActivity : ComponentActivity() {
                         scrmSettingsManager = scrmSettingsManager,
                         launchableApps = launchableApps,
                         keepAliveController = AccessibilityKeepAliveController(
-                            this@MainActivity, preferences
+                            this@MainActivity,
+                            preferences
                         ),
                         accessibilityServiceEnabled = accessibilityServiceEnabled,
                         refreshAccessibilityServiceStatus = {
@@ -153,7 +154,8 @@ class MainActivity : ComponentActivity() {
                         },
                         openAppBackgroundSettings = {
                             openAppBackgroundSettings()
-                        })
+                        }
+                    )
                 }
             }
         }
@@ -165,7 +167,8 @@ class MainActivity : ComponentActivity() {
         if (::keepAlivePreferences.isInitialized && keepAlivePreferences.accessibilityKeepAliveEnabled) {
             lifecycleScope.launch {
                 AccessibilityKeepAliveController(
-                    this@MainActivity, keepAlivePreferences
+                    this@MainActivity,
+                    keepAlivePreferences
                 ).ensureEnabled()
             }
         }
@@ -191,7 +194,8 @@ class MainActivity : ComponentActivity() {
             Intent(Settings.ACTION_SETTINGS)
         }
         // `runCatching` 把可能抛出的异常包装为 Result；失败时退回到应用详情页。
-        runCatching { startActivity(intent) }.onFailure { openAppBackgroundSettings() }
+        runCatching { startActivity(intent) }
+            .onFailure { openAppBackgroundSettings() }
     }
 
     /** 打开当前应用的系统详情页；部分厂商把后台限制入口放在这里。 */
@@ -200,7 +204,8 @@ class MainActivity : ComponentActivity() {
             Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
             Uri.fromParts("package", packageName, null)
         )
-        runCatching { startActivity(intent) }.onFailure { startActivity(Intent(Settings.ACTION_SETTINGS)) }
+        runCatching { startActivity(intent) }
+            .onFailure { startActivity(Intent(Settings.ACTION_SETTINGS)) }
     }
 }
 
@@ -236,18 +241,23 @@ private fun GlobalControlsScreen(onBack: () -> Unit) {
 
     fun showPullDistancePreview() {
         UniVergeAccessibilityService.instance?.showPullDistancePreview(
-            shortDistanceDp = shortPullThreshold, longDistanceDp = longPullThreshold
+            shortDistanceDp = shortPullThreshold,
+            longDistanceDp = longPullThreshold
         )
     }
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("全局控制") }, navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "返回")
+            TopAppBar(
+                title = { Text("全局控制") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "返回")
+                    }
                 }
-            })
-        }) { paddingValues ->
+            )
+        }
+    ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -300,7 +310,8 @@ private fun GlobalControlsScreen(onBack: () -> Unit) {
                         longPullThreshold = preferences.longPullThresholdDp
                         showPullDistancePreview()
                         refreshOverlays()
-                    })
+                    }
+                )
             }
         }
     }
@@ -344,7 +355,8 @@ private fun HomeDashboardScreen(
     }
 
     ModalNavigationDrawer(
-        drawerState = drawerState, drawerContent = {
+        drawerState = drawerState,
+        drawerContent = {
             ModalDrawerSheet(
                 modifier = Modifier
                     .fillMaxHeight()
@@ -391,13 +403,17 @@ private fun HomeDashboardScreen(
                     }
                     HorizontalDivider()
                     DrawerNavigationRow(
-                        label = "全局控制", icon = Icons.Outlined.Tune, onClick = {
+                        label = "全局控制",
+                        icon = Icons.Outlined.Tune,
+                        onClick = {
                             context.startActivity(
                                 Intent(
-                                    context, GlobalControlsActivity::class.java
+                                    context,
+                                    GlobalControlsActivity::class.java
                                 )
                             )
-                        })
+                        }
+                    )
                     HorizontalDivider()
                     OutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
@@ -407,7 +423,8 @@ private fun HomeDashboardScreen(
                         Text("电池白名单", modifier = Modifier.padding(start = 8.dp))
                     }
                     OutlinedButton(
-                        modifier = Modifier.fillMaxWidth(), onClick = openAppBackgroundSettings
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = openAppBackgroundSettings
                     ) {
                         Icon(Icons.Outlined.PowerSettingsNew, contentDescription = null)
                         Text("后台自启动", modifier = Modifier.padding(start = 8.dp))
@@ -415,7 +432,8 @@ private fun HomeDashboardScreen(
                     TextButton(onClick = {
                         context.startActivity(
                             Intent(
-                                context, AccessibilityKeepAliveGuideActivity::class.java
+                                context,
+                                AccessibilityKeepAliveGuideActivity::class.java
                             )
                         )
                     }) {
@@ -423,30 +441,35 @@ private fun HomeDashboardScreen(
                     }
                 }
             }
-        }) {
+        }
+    ) {
         Scaffold(
             topBar = {
-                TopAppBar(title = {
-                    Column {
-                        Text(
-                            text = stringResource(R.string.app_name),
-                            style = MaterialTheme.typography.titleLarge
-                        )
-                        Text(
-                            text = "新一代AI全域企业助手",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text(
+                                text = stringResource(R.string.app_name),
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                            Text(
+                                text = "新一代AI全域企业助手",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = {
+                            refreshStatus()
+                            scope.launch { drawerState.open() }
+                        }) {
+                            Icon(Icons.Outlined.Menu, contentDescription = "菜单")
+                        }
                     }
-                }, navigationIcon = {
-                    IconButton(onClick = {
-                        refreshStatus()
-                        scope.launch { drawerState.open() }
-                    }) {
-                        Icon(Icons.Outlined.Menu, contentDescription = "菜单")
-                    }
-                })
-            }) { paddingValues ->
+                )
+            }
+        ) { paddingValues ->
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -494,21 +517,24 @@ private fun HomeDashboardScreen(
                             title = "临时暂停",
                             description = "配置免打扰分钟和固定时间段",
                             icon = Icons.Outlined.PauseCircleOutline,
-                            intentFactory = { Intent(context, PauseSettingsActivity::class.java) })
+                            intentFactory = { Intent(context, PauseSettingsActivity::class.java) }
+                        )
                     }
                     item {
                         NavigationCard(
                             title = "应用黑名单",
                             description = "进入黑名单应用时会自动关闭侧边栏",
                             icon = Icons.Outlined.AppBlocking,
-                            intentFactory = { Intent(context, BlockedAppsActivity::class.java) })
+                            intentFactory = { Intent(context, BlockedAppsActivity::class.java) }
+                        )
                     }
                     item {
                         NavigationCard(
                             title = "侧边功能",
                             description = "配置边缘手势拉出后的快捷功能列表",
                             icon = Icons.Outlined.DragIndicator,
-                            intentFactory = { Intent(context, SideFunctionsActivity::class.java) })
+                            intentFactory = { Intent(context, SideFunctionsActivity::class.java) }
+                        )
                     }
                     item {
                         GlobalPanel(
@@ -544,7 +570,8 @@ private fun HomeDashboardScreen(
                             shortPullThreshold = preferences.shortPullThresholdDp,
                             onShortPullThresholdChange = { preferences.shortPullThresholdDp = it },
                             longPullThreshold = preferences.longPullThresholdDp,
-                            onLongPullThresholdChange = { preferences.longPullThresholdDp = it })
+                            onLongPullThresholdChange = { preferences.longPullThresholdDp = it }
+                        )
                     }
                     item { ScrmSettingsPanel(manager = scrmSettingsManager) }
                 }
@@ -560,7 +587,8 @@ private fun DebugFloatingChatExpandButton() {
     Button(
         onClick = {
             UniVergeAccessibilityService.instance?.requestFloatingChatExpandForDebug()
-        }) {
+        }
+    ) {
         Text("展开聊天")
     }
 }
@@ -570,9 +598,11 @@ private fun DebugHapticTestButton() {
     val context = LocalContext.current
 
     Button(
-        modifier = Modifier.fillMaxWidth(), onClick = {
+        modifier = Modifier.fillMaxWidth(),
+        onClick = {
             context.startActivity(Intent(context, TouchTestActivity::class.java))
-        }) {
+        }
+    ) {
         Text("触感测试")
     }
 }
@@ -601,7 +631,9 @@ private fun MainScreen(
 
     // LazyColumn 是可滚动的竖向列表，只组合当前屏幕附近的内容，适合较长的设置页。
     LazyColumn(
-        modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)
+        modifier = Modifier
+            .fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
             Row(
@@ -617,14 +649,16 @@ private fun MainScreen(
                 title = "连接微信服务",
                 description = "配置微信后台服务器，启用悬浮聊天中的微信收发能力",
                 icon = Icons.Outlined.ChatBubbleOutline,
-                intentFactory = { Intent(context, WeChatServiceActivity::class.java) })
+                intentFactory = { Intent(context, WeChatServiceActivity::class.java) }
+            )
         }
         item {
             NavigationCard(
                 title = "微信聊天外观",
                 description = "调整悬浮微信聊天的背景颜色、毛玻璃和透明效果",
                 icon = Icons.Outlined.Palette,
-                intentFactory = { Intent(context, WeChatChatAppearanceActivity::class.java) })
+                intentFactory = { Intent(context, WeChatChatAppearanceActivity::class.java) }
+            )
         }
         item {
             Text(
@@ -639,21 +673,24 @@ private fun MainScreen(
                 title = "免打扰",
                 description = "设置临时免打扰时长和固定免打扰时间段",
                 icon = Icons.Outlined.DoNotDisturbOn,
-                intentFactory = { Intent(context, PauseSettingsActivity::class.java) })
+                intentFactory = { Intent(context, PauseSettingsActivity::class.java) }
+            )
         }
         item {
             NavigationCard(
                 title = "应用黑名单",
                 description = "进入黑名单应用时会自动关闭侧边栏",
                 icon = Icons.Outlined.AppBlocking,
-                intentFactory = { Intent(context, BlockedAppsActivity::class.java) })
+                intentFactory = { Intent(context, BlockedAppsActivity::class.java) }
+            )
         }
         item {
             NavigationCard(
                 title = "侧边功能",
                 description = "配置边缘手势拉出后的快捷功能列表",
                 icon = Icons.Outlined.DragIndicator,
-                intentFactory = { Intent(context, SideFunctionsActivity::class.java) })
+                intentFactory = { Intent(context, SideFunctionsActivity::class.java) }
+            )
         }
         // 用于占位，给最后一项保留舒适的滚动操作空间。
         item { Text(text = "", modifier = Modifier.height(60.dp)) }
@@ -670,7 +707,8 @@ private fun MainScreen(
                 actionRevision += 1
                 refreshOverlays()
                 pickerTarget = null
-            })
+            }
+        )
     }
 
     // 底部手势条与左右边缘手势共用动作选择器，但使用各自的设置读取/写入方法。
@@ -683,7 +721,8 @@ private fun MainScreen(
                 preferences.setBottomGestureBarAction(gestureType, action)
                 actionRevision += 1
                 bottomGesturePickerTarget = null
-            })
+            }
+        )
     }
 }
 
@@ -693,7 +732,9 @@ private fun MainScreen(
  * `pausedUntilEpochMs` 是 Unix 时间戳（毫秒），不是“还剩多少毫秒”。
  */
 private fun PausePanel(
-    pausedUntilEpochMs: Long, onPauseFor: (Long) -> Unit, onResumeNow: () -> Unit
+    pausedUntilEpochMs: Long,
+    onPauseFor: (Long) -> Unit,
+    onResumeNow: () -> Unit
 ) {
     val now = System.currentTimeMillis()
     // `coerceAtLeast` 将负数钳制为 0，避免暂停到期后显示负的剩余时间。
@@ -706,7 +747,8 @@ private fun PausePanel(
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -735,7 +777,8 @@ private fun PausePanel(
                 }
             }
             OutlinedButton(
-                enabled = remainingMs > 0L, onClick = onResumeNow
+                enabled = remainingMs > 0L,
+                onClick = onResumeNow
             ) {
                 Text(text = stringResource(id = R.string.resume_now))
             }
@@ -763,7 +806,8 @@ private fun BlockedAppsPanel(
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = stringResource(id = R.string.blocked_apps_title),
@@ -774,7 +818,8 @@ private fun BlockedAppsPanel(
                     stringResource(id = R.string.foreground_unknown)
                 } else {
                     stringResource(id = R.string.foreground_package, currentPackage)
-                }, style = MaterialTheme.typography.bodySmall
+                },
+                style = MaterialTheme.typography.bodySmall
             )
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(onClick = onRefreshForeground) {
@@ -782,7 +827,8 @@ private fun BlockedAppsPanel(
                 }
                 Button(
                     enabled = currentPackage.isNotBlank(),
-                    onClick = { onAddPackage(currentPackage) }) {
+                    onClick = { onAddPackage(currentPackage) }
+                ) {
                     Text(text = stringResource(id = R.string.block_current))
                 }
             }
@@ -791,12 +837,15 @@ private fun BlockedAppsPanel(
                 value = packageInput,
                 onValueChange = { packageInput = it },
                 singleLine = true,
-                label = { Text(text = stringResource(id = R.string.package_name)) })
+                label = { Text(text = stringResource(id = R.string.package_name)) }
+            )
             Button(
-                enabled = packageInput.isNotBlank(), onClick = {
+                enabled = packageInput.isNotBlank(),
+                onClick = {
                     onAddPackage(packageInput)
                     packageInput = ""
-                }) {
+                }
+            ) {
                 Text(text = stringResource(id = R.string.add_package))
             }
             OutlinedButton(onClick = { showAppPicker = true }) {
@@ -838,18 +887,23 @@ private fun BlockedAppsPanel(
             onSelect = { app ->
                 onAddPackage(app.packageName)
                 showAppPicker = false
-            })
+            }
+        )
     }
 }
 
 @Composable
 /** 显示无障碍服务是否运行，并提供跳转到系统设置的操作入口。 */
 private fun AccessibilityKeepAlivePanel(
-    enabled: Boolean, status: String?, onEnabledChange: (Boolean) -> Unit, openGuide: () -> Unit
+    enabled: Boolean,
+    status: String?,
+    onEnabledChange: (Boolean) -> Unit,
+    openGuide: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -857,7 +911,8 @@ private fun AccessibilityKeepAlivePanel(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(
-                    modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(text = "无障碍保活", style = MaterialTheme.typography.titleMedium)
                     Text(
@@ -887,7 +942,8 @@ private fun StatusPanel(
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = stringResource(id = R.string.service_title),
@@ -947,10 +1003,13 @@ private fun GlobalPanel(
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             SwitchRow(
-                stringResource(id = R.string.enable_edge_bars), globalEnabled, onGlobalEnabledChange
+                stringResource(id = R.string.enable_edge_bars),
+                globalEnabled,
+                onGlobalEnabledChange
             )
             SwitchRow(
                 stringResource(id = R.string.show_indicators),
@@ -1009,7 +1068,8 @@ internal fun EdgeConfigPanel(
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(text = title, style = MaterialTheme.typography.titleMedium)
             draftConfigs.forEachIndexed { index, config ->
@@ -1035,21 +1095,26 @@ internal fun EdgeConfigPanel(
                     },
                     onRemove = {
                         val updatedConfigs = normalizeEdgeConfigs(
-                            side, draftConfigs.filterIndexed { itemIndex, _ -> itemIndex != index })
+                            side,
+                            draftConfigs.filterIndexed { itemIndex, _ -> itemIndex != index }
+                        )
                         draftConfigs = updatedConfigs
                         onConfigsChange(updatedConfigs)
-                    })
+                    }
+                )
             }
             OutlinedButton(
                 enabled = draftConfigs.size < EdgeZoneConfig.MAX_ZONES_PER_SIDE,
                 modifier = Modifier.align(Alignment.CenterHorizontally),
                 onClick = {
                     val updatedConfigs = normalizeEdgeConfigs(
-                        side, draftConfigs + EdgeZoneConfig.defaultFor(side, draftConfigs.size)
+                        side,
+                        draftConfigs + EdgeZoneConfig.defaultFor(side, draftConfigs.size)
                     )
                     draftConfigs = updatedConfigs
                     onConfigsChange(updatedConfigs)
-                }) {
+                }
+            ) {
                 Icon(imageVector = Icons.Outlined.Add, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(text = stringResource(id = R.string.add_edge_zone))
@@ -1076,7 +1141,8 @@ private fun EdgeZoneConfigSection(
         ) {
             Text(text = title, style = MaterialTheme.typography.titleSmall)
             TextButton(
-                enabled = canRemove, onClick = onRemove
+                enabled = canRemove,
+                onClick = onRemove
             ) {
                 Icon(imageVector = Icons.Outlined.Delete, contentDescription = null)
                 Spacer(modifier = Modifier.width(4.dp))
@@ -1092,7 +1158,8 @@ private fun EdgeZoneConfigSection(
                     config.copy(enabled = it).sanitized(),
                     edgeConfigAdjustmentMode(isFinished = true)
                 )
-            })
+            }
+        )
         SliderRow(
             title = stringResource(id = R.string.edge_thickness),
             value = config.thicknessDp,
@@ -1155,11 +1222,14 @@ private fun EdgeZoneConfigSection(
  * 这条链式写法从上到下依次执行 `take`、`mapIndexed`、`ifEmpty`。
  */
 private fun normalizeEdgeConfigs(
-    side: EdgeSide, configs: List<EdgeZoneConfig>
+    side: EdgeSide,
+    configs: List<EdgeZoneConfig>
 ): List<EdgeZoneConfig> {
-    return configs.take(EdgeZoneConfig.MAX_ZONES_PER_SIDE).mapIndexed { index, config ->
-        config.copy(side = side, zoneId = index).sanitized()
-    }
+    return configs
+        .take(EdgeZoneConfig.MAX_ZONES_PER_SIDE)
+        .mapIndexed { index, config ->
+            config.copy(side = side, zoneId = index).sanitized()
+        }
 }
 
 @Composable
@@ -1177,7 +1247,8 @@ internal fun GestureMappingPanel(
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(text = title, style = MaterialTheme.typography.titleMedium)
             gestures.forEachIndexed { index, gestureType ->
@@ -1188,7 +1259,8 @@ internal fun GestureMappingPanel(
                 GestureActionRow(
                     label = gestureLabel(gestureType),
                     action = action,
-                    onClick = { onPickAction(gestureType) })
+                    onClick = { onPickAction(gestureType) }
+                )
                 if (index != gestures.lastIndex) {
                     HorizontalDivider()
                 }
@@ -1200,7 +1272,9 @@ internal fun GestureMappingPanel(
 @Composable
 /** 一行“手势名称 + 当前动作 + 修改按钮”的可复用布局。 */
 private fun GestureActionRow(
-    label: String, action: GestureAction, onClick: () -> Unit
+    label: String,
+    action: GestureAction,
+    onClick: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1238,54 +1312,66 @@ internal fun ActionPickerDialog(
     var launchPackage by remember { mutableStateOf((current as? GestureAction.LaunchApp)?.packageName.orEmpty()) }
     var showLaunchAppPicker by remember { mutableStateOf(false) }
 
-    AlertDialog(onDismissRequest = onDismiss, confirmButton = {}, dismissButton = {
-        TextButton(onClick = onDismiss) {
-            Text(text = stringResource(id = R.string.cancel))
-        }
-    }, title = { Text(text = stringResource(id = R.string.choose_action)) }, text = {
-        LazyColumn(
-            modifier = Modifier.heightIn(max = 420.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            GestureActionCatalog.systemActions.forEach { action ->
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(id = R.string.cancel))
+            }
+        },
+        title = { Text(text = stringResource(id = R.string.choose_action)) },
+        text = {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 420.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                GestureActionCatalog.systemActions.forEach { action ->
+                    item {
+                        Button(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { onSelect(action) }
+                        ) {
+                            val label = actionLabel(action)
+                            val text = if (action.id == current.id) {
+                                stringResource(id = R.string.current_value, label)
+                            } else {
+                                label
+                            }
+                            Text(text = text)
+                        }
+                    }
+                }
+                item { HorizontalDivider() }
+                item {
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { showLaunchAppPicker = true }
+                    ) {
+                        Text(text = stringResource(id = R.string.pick_launch_app))
+                    }
+                }
+                item {
+                    OutlinedTextField(
+                        modifier = Modifier.fillMaxWidth(),
+                        value = launchPackage,
+                        onValueChange = { launchPackage = it },
+                        singleLine = true,
+                        label = { Text(text = stringResource(id = R.string.launch_package)) }
+                    )
+                }
                 item {
                     Button(
-                        modifier = Modifier.fillMaxWidth(), onClick = { onSelect(action) }) {
-                        val label = actionLabel(action)
-                        val text = if (action.id == current.id) {
-                            stringResource(id = R.string.current_value, label)
-                        } else {
-                            label
-                        }
-                        Text(text = text)
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = launchPackage.isNotBlank(),
+                        onClick = { onSelect(GestureAction.LaunchApp(launchPackage.trim())) }
+                    ) {
+                        Text(text = stringResource(id = R.string.use_launch_package))
                     }
                 }
             }
-            item { HorizontalDivider() }
-            item {
-                OutlinedButton(
-                    modifier = Modifier.fillMaxWidth(), onClick = { showLaunchAppPicker = true }) {
-                    Text(text = stringResource(id = R.string.pick_launch_app))
-                }
-            }
-            item {
-                OutlinedTextField(
-                    modifier = Modifier.fillMaxWidth(),
-                    value = launchPackage,
-                    onValueChange = { launchPackage = it },
-                    singleLine = true,
-                    label = { Text(text = stringResource(id = R.string.launch_package)) })
-            }
-            item {
-                Button(
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = launchPackage.isNotBlank(),
-                    onClick = { onSelect(GestureAction.LaunchApp(launchPackage.trim())) }) {
-                    Text(text = stringResource(id = R.string.use_launch_package))
-                }
-            }
         }
-    })
+    )
 
     if (showLaunchAppPicker) {
         AppPickerDialog(
@@ -1295,7 +1381,8 @@ internal fun ActionPickerDialog(
             onSelect = { app ->
                 onSelect(GestureAction.LaunchApp(app.packageName))
                 showLaunchAppPicker = false
-            })
+            }
+        )
     }
 }
 
@@ -1317,51 +1404,62 @@ private fun AppPickerDialog(
             launchableApps
         } else {
             launchableApps.filter {
-                it.label.lowercase().contains(normalized) || it.packageName.lowercase()
-                    .contains(normalized)
+                it.label.lowercase().contains(normalized) ||
+                        it.packageName.lowercase().contains(normalized)
             }
         }
     }
 
-    AlertDialog(onDismissRequest = onDismiss, confirmButton = {}, dismissButton = {
-        TextButton(onClick = onDismiss) {
-            Text(text = stringResource(id = R.string.cancel))
-        }
-    }, title = { Text(text = title) }, text = {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = query,
-                onValueChange = { query = it },
-                singleLine = true,
-                label = { Text(text = stringResource(id = R.string.search_app)) })
-            LazyColumn(
-                modifier = Modifier.heightIn(max = 340.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                filteredApps.take(40).forEach { app ->
-                    item {
-                        Button(
-                            modifier = Modifier.fillMaxWidth(), onClick = { onSelect(app) }) {
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                Text(text = app.label)
-                                Text(
-                                    text = app.packageName,
-                                    style = MaterialTheme.typography.bodySmall
-                                )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(id = R.string.cancel))
+            }
+        },
+        title = { Text(text = title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = query,
+                    onValueChange = { query = it },
+                    singleLine = true,
+                    label = { Text(text = stringResource(id = R.string.search_app)) }
+                )
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 340.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    filteredApps.take(40).forEach { app ->
+                        item {
+                            Button(
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = { onSelect(app) }
+                            ) {
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    Text(text = app.label)
+                                    Text(
+                                        text = app.packageName,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
         }
-    })
+    )
 }
 
 @Composable
 /** 把文字和 Switch 组合为一行，减少各设置面板中的重复布局代码。 */
 private fun SwitchRow(
-    label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1375,7 +1473,10 @@ private fun SwitchRow(
 
 @Composable
 private fun DrawerSwitchRow(
-    label: String, icon: ImageVector, checked: Boolean, onCheckedChange: (Boolean) -> Unit
+    label: String,
+    icon: ImageVector,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1383,7 +1484,9 @@ private fun DrawerSwitchRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary
         )
         Text(text = label, modifier = Modifier.weight(1f))
         Switch(checked = checked, onCheckedChange = onCheckedChange)
@@ -1392,7 +1495,9 @@ private fun DrawerSwitchRow(
 
 @Composable
 private fun DrawerNavigationRow(
-    label: String, icon: ImageVector, onClick: () -> Unit
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit
 ) {
     var lastClickAt by remember { mutableStateOf(0L) }
     Row(
@@ -1408,9 +1513,12 @@ private fun DrawerNavigationRow(
             }
             .padding(horizontal = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically) {
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Icon(
-            imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary
         )
         Text(text = label, modifier = Modifier.weight(1f))
         Icon(
@@ -1436,7 +1544,8 @@ private fun SliderRow(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
-            modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(text = title)
             Text(text = "$value$suffix")
@@ -1451,7 +1560,8 @@ private fun SliderRow(
 }
 
 internal enum class EdgeConfigAdjustmentMode {
-    Preview, Persist
+    Preview,
+    Persist
 }
 
 internal fun edgeConfigAdjustmentMode(isFinished: Boolean): EdgeConfigAdjustmentMode {
@@ -1468,7 +1578,10 @@ private fun gestureLabel(type: GestureType): String {
         GestureType.DOUBLE_TAP -> stringResource(id = R.string.gesture_double_tap)
         GestureType.LONG_PRESS -> stringResource(id = R.string.gesture_long_press)
         GestureType.SWIPE_UP -> stringResource(id = R.string.gesture_swipe_up)
+        GestureType.SWIPE_UP_HOLD -> stringResource(id = R.string.bottom_gesture_swipe_up_hold)
         GestureType.SWIPE_DOWN -> stringResource(id = R.string.gesture_swipe_down)
+        GestureType.SWIPE_LEFT -> stringResource(id = R.string.gesture_swipe_left)
+        GestureType.SWIPE_RIGHT -> stringResource(id = R.string.gesture_swipe_right)
         GestureType.PULL_INWARD -> stringResource(id = R.string.gesture_pull_inward)
         GestureType.PULL_INWARD_SHORT -> stringResource(id = R.string.gesture_pull_inward_short)
         GestureType.PULL_INWARD_LONG -> stringResource(id = R.string.gesture_pull_inward_long)
@@ -1510,7 +1623,8 @@ internal fun BottomGestureBarPanel(
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
                 text = stringResource(id = R.string.bottom_gesture_bar_title),
@@ -1534,7 +1648,8 @@ internal fun BottomGestureBarPanel(
                     GestureActionRow(
                         label = bottomGestureLabel(gestureType),
                         action = action,
-                        onClick = { onPickAction(gestureType) })
+                        onClick = { onPickAction(gestureType) }
+                    )
                     if (index != gestures.lastIndex) {
                         HorizontalDivider()
                     }
@@ -1558,7 +1673,8 @@ internal fun FloatingChatAppearancePanel(
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             FloatingChatAppearancePreview(
                 frostedBackgroundEnabled = frostedBackgroundEnabled,
@@ -1567,7 +1683,8 @@ internal fun FloatingChatAppearancePanel(
                 backgroundColorRgb = backgroundColorRgb
             )
             FloatingChatBackgroundColorPicker(
-                selectedColorRgb = backgroundColorRgb, onColorSelected = onBackgroundColorRgbChange
+                selectedColorRgb = backgroundColorRgb,
+                onColorSelected = onBackgroundColorRgbChange
             )
             SwitchRow(
                 label = stringResource(id = R.string.floating_chat_frosted_background),
@@ -1595,7 +1712,8 @@ internal fun FloatingChatAppearancePanel(
 @Composable
 /** 显示预设背景色圆点，并允许恢复默认颜色。 */
 private fun FloatingChatBackgroundColorPicker(
-    selectedColorRgb: Int, onColorSelected: (Int) -> Unit
+    selectedColorRgb: Int,
+    onColorSelected: (Int) -> Unit
 ) {
     val selected = sanitizeFloatingChatBackgroundColorRgb(selectedColorRgb)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1621,7 +1739,8 @@ private fun FloatingChatBackgroundColorPicker(
                             ),
                             shape = selectedShape
                         )
-                        .clickable { onColorSelected(colorRgb) })
+                        .clickable { onColorSelected(colorRgb) }
+                )
             }
         }
         OutlinedButton(onClick = { onColorSelected(defaultFloatingChatBackgroundColorRgb()) }) {
@@ -1699,7 +1818,8 @@ private fun FloatingChatAppearancePreview(
                 .background(
                     selectedBackgroundColor.copy(
                         alpha = (0.48f + blurAlpha * 0.34f).coerceIn(
-                            0f, 1f
+                            0f,
+                            1f
                         )
                     )
                 )
@@ -1747,7 +1867,8 @@ private fun actionLabel(action: GestureAction): String {
         GestureAction.CollapseFloatingChat -> stringResource(id = R.string.action_collapse_floating_chat)
         GestureAction.PlayVideo -> stringResource(id = R.string.action_play_video)
         is GestureAction.LaunchApp -> stringResource(
-            id = R.string.action_launch_app, action.packageName
+            id = R.string.action_launch_app,
+            action.packageName
         )
     }
 }
@@ -1768,7 +1889,8 @@ private fun formatRemainingTimeLabel(remainingMs: Long): String {
 
 /** 选择器中展示的应用：人类可读名称与 Android 唯一包名。 */
 internal data class LaunchableApp(
-    val label: String, val packageName: String
+    val label: String,
+    val packageName: String
 )
 
 /**
@@ -1787,17 +1909,16 @@ internal fun ComponentActivity.loadLaunchableApps(): List<LaunchableApp> {
             PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong())
         )
     } else {
-        @Suppress("DEPRECATION") packageManager.queryIntentActivities(
-            launcherIntent,
-            PackageManager.MATCH_DEFAULT_ONLY
-        )
+        @Suppress("DEPRECATION")
+        packageManager.queryIntentActivities(launcherIntent, PackageManager.MATCH_DEFAULT_ONLY)
     }
 
     return resolveInfos.mapNotNull { info ->
         // `?: return@mapNotNull null` 表示没有包名时跳过当前元素，而不是退出整个函数。
         val packageName = info.activityInfo?.packageName ?: return@mapNotNull null
-        val label =
-            info.loadLabel(packageManager)?.toString()?.takeIf { it.isNotBlank() } ?: packageName
+        val label = info.loadLabel(packageManager)?.toString()
+            ?.takeIf { it.isNotBlank() }
+            ?: packageName
         LaunchableApp(label = label, packageName = packageName)
     }
         // 去重后按应用名称（忽略大小写）排序，方便在选择器中浏览。

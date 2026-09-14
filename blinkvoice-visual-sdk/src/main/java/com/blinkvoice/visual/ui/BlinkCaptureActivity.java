@@ -28,14 +28,18 @@ import com.blinkvoice.visual.api.BlinkCaptureOptions;
 import com.blinkvoice.visual.api.BlinkCaptureResult;
 import com.blinkvoice.visual.api.BlinkEventType;
 import com.blinkvoice.visual.debug.BlinkDebugLogger;
+import com.blinkvoice.visual.debug.BlinkTraceFormatter;
 import com.blinkvoice.visual.detector.BlinkDetector;
 import com.blinkvoice.visual.events.BlinkClassifierDebugSnapshot;
 import com.blinkvoice.visual.events.BlinkEventClassifier;
+import com.blinkvoice.visual.performance.AnalysisFrameGate;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.mediapipe.framework.image.BitmapImageBuilder;
 import com.google.mediapipe.framework.image.MPImage;
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.EnumSet;
 import java.util.Locale;
 import java.util.Set;
@@ -54,6 +58,7 @@ public class BlinkCaptureActivity extends ComponentActivity implements BlinkDete
     public static final String EXTRA_EVENT_TYPES = "com.blinkvoice.visual.EVENT_TYPES";
     public static final String EXTRA_DEBUG_LOGGING_ENABLED = "com.blinkvoice.visual.DEBUG_LOGGING_ENABLED";
     public static final String EXTRA_DEBUG_OVERLAY_ENABLED = "com.blinkvoice.visual.DEBUG_OVERLAY_ENABLED";
+    public static final String EXTRA_MAX_ANALYSIS_FPS = "com.blinkvoice.visual.MAX_ANALYSIS_FPS";
 
     public static final String RESULT_EVENT_TYPE = "com.blinkvoice.visual.RESULT_EVENT_TYPE";
     public static final String RESULT_START_TIME_MS = "com.blinkvoice.visual.RESULT_START_TIME_MS";
@@ -63,6 +68,7 @@ public class BlinkCaptureActivity extends ComponentActivity implements BlinkDete
     public static final String RESULT_CANCEL_REASON = "com.blinkvoice.visual.RESULT_CANCEL_REASON";
 
     private static final String TAG = "BlinkVoiceCapture";
+    private static final String TRACE_TAG = "BlinkVoiceTrace";
     private static final int REQUEST_CAMERA_PERMISSION = 1001;
     private static final int MAX_CAMERA_BIND_ATTEMPTS = 3;
     private static final long CAMERA_BIND_RETRY_DELAY_MS = 250L;
@@ -78,9 +84,20 @@ public class BlinkCaptureActivity extends ComponentActivity implements BlinkDete
     private Set<BlinkEventType> targetEvents;
     private boolean finishedWithEvent = false;
     private ProcessCameraProvider cameraProvider;
+    private AnalysisFrameGate frameGate;
     private int cameraBindAttempts = 0;
     private int analyzerFrameCount = 0;
     private long lastDebugOverlayUpdateMs = 0L;
+    private String traceSessionId;
+    private int traceFrameIndex = 0;
+    private long lastTraceFrameTimeMs = -1L;
+    private long captureStartElapsedMs = 0L;
+    private int eventCount = 0;
+    private boolean detectorReady = false;
+    private boolean cameraProviderReady = false;
+    private boolean cameraBound = false;
+    private boolean firstFrameLogged = false;
+    private boolean firstResultLogged = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -88,6 +105,9 @@ public class BlinkCaptureActivity extends ComponentActivity implements BlinkDete
         mainHandler = new Handler(Looper.getMainLooper());
         cameraExecutor = Executors.newSingleThreadExecutor();
         options = readOptions();
+        frameGate = new AnalysisFrameGate(options.getMaxAnalysisFps());
+        captureStartElapsedMs = SystemClock.elapsedRealtime();
+        traceSessionId = new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new Date());
         targetEvents = options.getEventTypes();
         classifier = new BlinkEventClassifier(options);
         logDebug("capture_start closeTh=" + options.getEarCloseThreshold()
@@ -96,9 +116,11 @@ public class BlinkCaptureActivity extends ComponentActivity implements BlinkDete
                 + " longClose=" + options.getLongCloseMinMs()
                 + " short=[" + options.getMinShortBlinkMs() + "," + options.getMaxShortBlinkMs() + "]"
                 + " noFaceReset=" + options.getNoFaceResetMs()
+                + " maxFps=" + options.getMaxAnalysisFps()
                 + " autoFinish=" + options.isAutoFinishOnEvent()
                 + " overlay=" + options.isDebugOverlayEnabled()
                 + " target=" + targetEvents);
+        logTraceMarker(0, "start", "SDK_CAPTURE", "autoFinish=" + options.isAutoFinishOnEvent());
         setContentView(createContentView());
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
@@ -116,7 +138,7 @@ public class BlinkCaptureActivity extends ComponentActivity implements BlinkDete
         ));
 
         statusText = new TextView(this);
-        statusText.setText("BlinkVoice starting...");
+        statusText.setText(ContinuousCaptureStatusFormatter.format(null, 0, 0L));
         statusText.setTextColor(Color.WHITE);
         statusText.setTextSize(18f);
         statusText.setGravity(Gravity.CENTER);
@@ -158,19 +180,29 @@ public class BlinkCaptureActivity extends ComponentActivity implements BlinkDete
 
     private BlinkCaptureOptions readOptions() {
         Intent intent = getIntent();
+        boolean launchedWithoutSdkOptions = intent == null || !intent.hasExtra(EXTRA_AUTO_FINISH_ON_EVENT);
         BlinkCaptureOptions.Builder builder = new BlinkCaptureOptions.Builder()
-                .setEarCloseThreshold(intent.getFloatExtra(EXTRA_EAR_CLOSE_THRESHOLD, 0.22f))
-                .setEarOpenThreshold(intent.getFloatExtra(EXTRA_EAR_OPEN_THRESHOLD, 0.25f))
-                .setDoubleBlinkWindowMs(intent.getLongExtra(EXTRA_DOUBLE_BLINK_WINDOW_MS, 650L))
-                .setLongCloseMinMs(intent.getLongExtra(EXTRA_LONG_CLOSE_MIN_MS, 500L))
-                .setMinShortBlinkMs(intent.getLongExtra(EXTRA_MIN_SHORT_BLINK_MS, 30L))
-                .setMaxShortBlinkMs(intent.getLongExtra(EXTRA_MAX_SHORT_BLINK_MS, 260L))
-                .setNoFaceResetMs(intent.getLongExtra(EXTRA_NO_FACE_RESET_MS, 500L))
-                .setAutoFinishOnEvent(intent.getBooleanExtra(EXTRA_AUTO_FINISH_ON_EVENT, true))
-                .setDebugLoggingEnabled(intent.getBooleanExtra(EXTRA_DEBUG_LOGGING_ENABLED, false))
-                .setDebugOverlayEnabled(intent.getBooleanExtra(EXTRA_DEBUG_OVERLAY_ENABLED, true));
+                .setEarCloseThreshold(intent != null ? intent.getFloatExtra(EXTRA_EAR_CLOSE_THRESHOLD, 10f) : 10f)
+                .setEarOpenThreshold(intent != null ? intent.getFloatExtra(EXTRA_EAR_OPEN_THRESHOLD, 14f) : 14f)
+                .setDoubleBlinkWindowMs(intent != null ? intent.getLongExtra(EXTRA_DOUBLE_BLINK_WINDOW_MS, 650L) : 650L)
+                .setLongCloseMinMs(intent != null ? intent.getLongExtra(EXTRA_LONG_CLOSE_MIN_MS, 275L) : 275L)
+                .setMinShortBlinkMs(intent != null ? intent.getLongExtra(EXTRA_MIN_SHORT_BLINK_MS, 30L) : 30L)
+                .setMaxShortBlinkMs(intent != null ? intent.getLongExtra(EXTRA_MAX_SHORT_BLINK_MS, 250L) : 250L)
+                .setNoFaceResetMs(intent != null ? intent.getLongExtra(EXTRA_NO_FACE_RESET_MS, 500L) : 500L)
+                .setAutoFinishOnEvent(intent != null
+                        ? intent.getBooleanExtra(EXTRA_AUTO_FINISH_ON_EVENT, false)
+                        : false)
+                .setDebugLoggingEnabled(intent != null
+                        ? intent.getBooleanExtra(EXTRA_DEBUG_LOGGING_ENABLED, launchedWithoutSdkOptions)
+                        : true)
+                .setDebugOverlayEnabled(intent != null
+                        ? intent.getBooleanExtra(EXTRA_DEBUG_OVERLAY_ENABLED, true)
+                        : true)
+                .setMaxAnalysisFps(intent != null
+                        ? intent.getIntExtra(EXTRA_MAX_ANALYSIS_FPS, 20)
+                        : 20);
 
-        ArrayList<String> names = intent.getStringArrayListExtra(EXTRA_EVENT_TYPES);
+        ArrayList<String> names = intent != null ? intent.getStringArrayListExtra(EXTRA_EVENT_TYPES) : null;
         if (names != null && !names.isEmpty()) {
             EnumSet<BlinkEventType> events = EnumSet.noneOf(BlinkEventType.class);
             for (String name : names) {
@@ -188,29 +220,62 @@ public class BlinkCaptureActivity extends ComponentActivity implements BlinkDete
     }
 
     private void startDetection() {
-        detector = new BlinkDetector(this, this);
-        detector.setDebugLoggingEnabled(options.isDebugLoggingEnabled());
-        try {
-            detector.setup();
-            detector.setEarThreshold(options.getEarCloseThreshold());
-            logDebug("detector_ready loadMs=" + detector.getLoadTimeMs());
-        } catch (Exception e) {
-            warnDebug("cancel reason=Model load failed error=" + e.getClass().getSimpleName());
-            finishCanceled("Model load failed");
-            return;
-        }
+        captureStartElapsedMs = SystemClock.elapsedRealtime();
+        detectorReady = false;
+        cameraProviderReady = false;
+        cameraBound = false;
+        firstFrameLogged = false;
+        firstResultLogged = false;
+        analyzerFrameCount = 0;
+        cameraBindAttempts = 0;
+        frameGate.reset();
+        logDebug("startup_begin maxFps=" + options.getMaxAnalysisFps());
+
+        cameraExecutor.execute(() -> {
+            BlinkDetector createdDetector = new BlinkDetector(this, this);
+            createdDetector.setDebugLoggingEnabled(options.isDebugLoggingEnabled());
+            try {
+                createdDetector.setup();
+                createdDetector.setElaCloseThreshold(options.getEarCloseThreshold());
+                mainHandler.post(() -> {
+                    if (isFinishing() || isDestroyed()) {
+                        createdDetector.close();
+                        return;
+                    }
+                    detector = createdDetector;
+                    detectorReady = true;
+                    logDebug("detector_ready loadMs=" + createdDetector.getLoadTimeMs()
+                            + " elapsedMs=" + elapsedSinceCaptureStart());
+                    bindCameraIfReady();
+                });
+            } catch (Exception e) {
+                mainHandler.post(() -> {
+                    warnDebug("cancel reason=Model load failed error=" + e.getClass().getSimpleName());
+                    finishCanceled("Model load failed");
+                });
+            }
+        });
 
         ListenableFuture<ProcessCameraProvider> cameraProviderFuture = ProcessCameraProvider.getInstance(this);
         cameraProviderFuture.addListener(() -> {
             try {
                 cameraProvider = cameraProviderFuture.get();
-                bindCameraWithRetry();
+                cameraProviderReady = true;
+                logDebug("camera_provider_ready elapsedMs=" + elapsedSinceCaptureStart());
+                bindCameraIfReady();
             } catch (Exception e) {
                 Log.e(TAG, "Camera provider unavailable", e);
                 warnDebug("cancel reason=Camera provider unavailable error=" + e.getClass().getSimpleName());
                 finishCanceled("Camera unavailable");
             }
         }, ContextCompat.getMainExecutor(this));
+    }
+
+    private void bindCameraIfReady() {
+        if (cameraBound || !detectorReady || !cameraProviderReady || cameraProvider == null || isFinishing()) {
+            return;
+        }
+        bindCameraWithRetry();
     }
 
     private void bindCameraWithRetry() {
@@ -233,9 +298,11 @@ public class BlinkCaptureActivity extends ComponentActivity implements BlinkDete
                     preview,
                     analysis
             );
-            statusText.setText("Blink once, blink twice, or close eyes");
+            cameraBound = true;
+            statusText.setText(ContinuousCaptureStatusFormatter.format(null, eventCount, 0L));
             Log.d(TAG, "Camera bound on attempt " + cameraBindAttempts);
-            logDebug("camera_bound attempt=" + cameraBindAttempts);
+            logDebug("camera_bound attempt=" + cameraBindAttempts
+                    + " elapsedMs=" + elapsedSinceCaptureStart());
         } catch (Exception e) {
             Log.e(TAG, "Camera binding failed on attempt " + cameraBindAttempts, e);
             warnDebug("camera_bind_failed attempt=" + cameraBindAttempts
@@ -251,9 +318,17 @@ public class BlinkCaptureActivity extends ComponentActivity implements BlinkDete
 
     private void processImage(ImageProxy imageProxy) {
         try {
-            MPImage mpImage = new BitmapImageBuilder(imageProxy.toBitmap()).build();
             long frameTimeMs = imageProxy.getImageInfo().getTimestamp() / 1_000_000L;
+            if (!frameGate.shouldAnalyze(frameTimeMs)) {
+                return;
+            }
             int rotation = imageProxy.getImageInfo().getRotationDegrees();
+            if (!firstFrameLogged) {
+                firstFrameLogged = true;
+                logDebug("first_frame elapsedMs=" + elapsedSinceCaptureStart()
+                        + " size=" + imageProxy.getWidth() + "x" + imageProxy.getHeight());
+            }
+            MPImage mpImage = new BitmapImageBuilder(imageProxy.toBitmap()).build();
             analyzerFrameCount++;
             if (options.isDebugLoggingEnabled() && analyzerFrameCount % 10 == 0) {
                 // 帧入口日志用于确认 CameraX analyzer 是否持续把画面送进 SDK。
@@ -270,8 +345,9 @@ public class BlinkCaptureActivity extends ComponentActivity implements BlinkDete
     @Override
     public void onResult(
             @NonNull FaceLandmarkerResult result,
-            float leftEar,
-            float rightEar,
+            long frameTimeMs,
+            float leftEla,
+            float rightEla,
             boolean leftClosed,
             boolean rightClosed,
             int blinkCount,
@@ -281,17 +357,42 @@ public class BlinkCaptureActivity extends ComponentActivity implements BlinkDete
             int rotationDegrees
     ) {
         boolean hasFace = !result.faceLandmarks().isEmpty();
+        if (!firstResultLogged) {
+            firstResultLogged = true;
+            logDebug("first_result elapsedMs=" + elapsedSinceCaptureStart()
+                    + " inferenceMs=" + inferenceMs
+                    + " hasFace=" + hasFace);
+        }
         BlinkCaptureResult event = classifier.accept(
-                SystemClock.elapsedRealtime(),
+                frameTimeMs,
                 hasFace,
-                leftEar,
-                rightEar
+                leftEla,
+                rightEla
         );
         BlinkClassifierDebugSnapshot snapshot = classifier.getDebugSnapshot();
+        boolean targetEventDetected = event != null && targetEvents.contains(event.getEventType());
+        int currentEventCount = eventCount;
+        long eventElapsedMs = 0L;
+        if (targetEventDetected) {
+            eventCount++;
+            currentEventCount = eventCount;
+            eventElapsedMs = Math.max(0L, SystemClock.elapsedRealtime() - captureStartElapsedMs);
+        }
+        logTraceFrame(
+                frameTimeMs,
+                hasFace,
+                leftEla,
+                rightEla,
+                leftClosed,
+                rightClosed,
+                inferenceMs,
+                snapshot,
+                event
+        );
         updateDebugOverlay(
                 hasFace,
-                leftEar,
-                rightEar,
+                leftEla,
+                rightEla,
                 leftClosed,
                 rightClosed,
                 blinkCount,
@@ -305,12 +406,12 @@ public class BlinkCaptureActivity extends ComponentActivity implements BlinkDete
             return;
         }
 
-        if (!targetEvents.contains(event.getEventType())) {
+        if (!targetEventDetected) {
             // 返回链路日志用于区分“分类器没识别到”和“识别到了但被事件过滤掉”。
             updateDebugOverlay(
                     hasFace,
-                    leftEar,
-                    rightEar,
+                    leftEla,
+                    rightEla,
                     leftClosed,
                     rightClosed,
                     blinkCount,
@@ -323,8 +424,10 @@ public class BlinkCaptureActivity extends ComponentActivity implements BlinkDete
             return;
         }
 
+        int displayCount = currentEventCount;
+        long displayElapsedMs = eventElapsedMs;
         runOnUiThread(() -> {
-            statusText.setText("Event: " + event.getEventType().name());
+            statusText.setText(ContinuousCaptureStatusFormatter.format(event, displayCount, displayElapsedMs));
             if (options.isAutoFinishOnEvent()) {
                 logDebug("activity finish_event type=" + event.getEventType().name()
                         + " duration=" + event.getDurationMs()
@@ -333,6 +436,7 @@ public class BlinkCaptureActivity extends ComponentActivity implements BlinkDete
             } else {
                 logDebug("activity event_detected type=" + event.getEventType().name()
                         + " duration=" + event.getDurationMs()
+                        + " count=" + displayCount
                         + " autoFinish=false");
             }
         });
@@ -340,8 +444,8 @@ public class BlinkCaptureActivity extends ComponentActivity implements BlinkDete
 
     private void updateDebugOverlay(
             boolean hasFace,
-            float leftEar,
-            float rightEar,
+            float leftEla,
+            float rightEla,
             boolean leftClosed,
             boolean rightClosed,
             int blinkCount,
@@ -361,7 +465,7 @@ public class BlinkCaptureActivity extends ComponentActivity implements BlinkDete
         }
         lastDebugOverlayUpdateMs = now;
 
-        float avgEar = (leftEar + rightEar) / 2f;
+        float avgEla = (leftEla + rightEla) / 2f;
         String eyeState;
         if (!hasFace) {
             eyeState = "NO_FACE";
@@ -374,15 +478,15 @@ public class BlinkCaptureActivity extends ComponentActivity implements BlinkDete
         String eventText = event != null ? event.getEventType().name() : snapshot.getLastEvent();
         String overlay = "BV Debug\n"
                 + "face: " + (hasFace ? "YES" : "NO") + "  eye: " + eyeState + "\n"
-                + "EAR L/R/AVG: " + formatFloat(leftEar) + " / " + formatFloat(rightEar)
-                + " / " + formatFloat(avgEar) + "\n"
+                + "ELA L/R/AVG: " + formatFloat(leftEla) + " / " + formatFloat(rightEla)
+                + " / " + formatFloat(avgEla) + "\n"
                 + "threshold: close<" + formatFloat(options.getEarCloseThreshold())
                 + " open>" + formatFloat(options.getEarOpenThreshold()) + "\n"
                 + "seenOpen: " + (snapshot.hasSeenOpenEyes() ? "YES" : "NO")
                 + "  phase: " + snapshot.getPhase() + "\n"
                 + "closedMs: " + snapshot.getClosedDurationMs()
                 + "  wait2Ms: " + snapshot.getPendingBlinkElapsedMs() + "\n"
-                + "event: " + eventText + "  blinks: " + blinkCount + "\n"
+                + "event: " + eventText + "  tests: " + eventCount + "  blinks: " + blinkCount + "\n"
                 + "infer: " + inferenceMs + "ms\n"
                 + "last: " + reason;
 
@@ -442,6 +546,7 @@ public class BlinkCaptureActivity extends ComponentActivity implements BlinkDete
 
     @Override
     protected void onDestroy() {
+        logTraceMarker(99, "end", "SDK_CAPTURE", "activity_destroy");
         if (mainHandler != null) {
             mainHandler.removeCallbacksAndMessages(null);
         }
@@ -455,6 +560,62 @@ public class BlinkCaptureActivity extends ComponentActivity implements BlinkDete
             cameraExecutor.shutdown();
         }
         super.onDestroy();
+    }
+
+    private void logTraceFrame(
+            long frameTimeMs,
+            boolean hasFace,
+            float leftEla,
+            float rightEla,
+            boolean leftClosed,
+            boolean rightClosed,
+            long inferenceMs,
+            BlinkClassifierDebugSnapshot snapshot,
+            BlinkCaptureResult event
+    ) {
+        if (!isTraceLoggingEnabled()) {
+            return;
+        }
+
+        long deltaMs = lastTraceFrameTimeMs < 0L ? 0L : frameTimeMs - lastTraceFrameTimeMs;
+        lastTraceFrameTimeMs = frameTimeMs;
+        traceFrameIndex++;
+        String eventName = event != null ? event.getEventType().name() : "-";
+        Log.d(TRACE_TAG, BlinkTraceFormatter.formatFrame(
+                traceSessionId,
+                traceFrameIndex,
+                frameTimeMs,
+                deltaMs,
+                hasFace,
+                leftEla,
+                rightEla,
+                leftClosed,
+                rightClosed,
+                snapshot.getPhase(),
+                snapshot.getLastReason(),
+                snapshot.getClosedDurationMs(),
+                snapshot.getPendingBlinkElapsedMs(),
+                eventName,
+                inferenceMs
+        ));
+    }
+
+    private void logTraceMarker(int stepIndex, String marker, String action, String note) {
+        if (!isTraceLoggingEnabled()) {
+            return;
+        }
+        Log.d(TRACE_TAG, BlinkTraceFormatter.formatMarker(traceSessionId, stepIndex, marker, action, note));
+    }
+
+    private boolean isTraceLoggingEnabled() {
+        return options != null && options.isDebugLoggingEnabled() && !options.isAutoFinishOnEvent();
+    }
+
+    private long elapsedSinceCaptureStart() {
+        if (captureStartElapsedMs <= 0L) {
+            return 0L;
+        }
+        return SystemClock.elapsedRealtime() - captureStartElapsedMs;
     }
 
     private void logDebug(String message) {

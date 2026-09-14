@@ -46,6 +46,8 @@ import com.paifa.univerge.accessibility.floatingchat.moments.toLocalMomentPost
 import com.paifa.univerge.accessibility.floatingchat.components.FloatingWorkspaceMotion
 import com.paifa.univerge.accessibility.floatingchat.shell.FloatingChatOverlayRuntimeState
 import com.paifa.univerge.accessibility.floatingchat.shell.BottomPanelMode
+import com.paifa.univerge.accessibility.floatingchat.message.HeavyTextDropEvent
+import com.paifa.univerge.accessibility.floatingchat.message.HeavyTextDropTargetKind
 import com.paifa.univerge.accessibility.floatingchat.shell.floatingChatInternalEdgeGestureTouchTargetDp
 import com.paifa.univerge.accessibility.scrm.ScrmAdminBootstrapResult
 import com.paifa.univerge.accessibility.scrm.ScrmAuthenticationException
@@ -93,7 +95,8 @@ internal class FloatingChatOverlayController(
     private val onBackGestureEnd: (EdgeSide, BackGestureProgress) -> Unit = { _, _ -> },
     private val onBackGestureCancel: () -> Unit = {},
     private val onExpandedChanged: (Boolean) -> Unit = {},
-    private val onOverlayRecreated: () -> Unit = {}
+    private val onOverlayRecreated: () -> Unit = {},
+    private val onHeavyTextDrop: (HeavyTextDropEvent) -> Unit = {}
 ) {
     private var composeView: ComposeView? = null
     private var composeOwner: AccessibilityOverlayComposeOwner? = null
@@ -632,9 +635,25 @@ internal class FloatingChatOverlayController(
                             } else if (previousThread != selectedThread) {
                                 refreshLocalMessagesFromStore()
                             }
-                        },
-                        onOpenExternalDocument = ::openExternalDocument,
-                        onPreviewChromeChanged = ::setPreviewChromeVisible,
+                         },
+                         onOpenExternalDocument = ::openExternalDocument,
+                         onTextMessageDroppedToAiKnowledgeBase = { message ->
+                             onHeavyTextDrop(
+                                 HeavyTextDropEvent(
+                                     target = HeavyTextDropTargetKind.AiKnowledgeBase,
+                                     message = message
+                                 )
+                             )
+                         },
+                         onTextMessageDroppedToIntentTaskGenerator = { message ->
+                             onHeavyTextDrop(
+                                 HeavyTextDropEvent(
+                                     target = HeavyTextDropTargetKind.IntentTaskGenerator,
+                                     message = message
+                                 )
+                             )
+                         },
+                         onPreviewChromeChanged = ::setPreviewChromeVisible,
                         edgeGestureShortThresholdDp = preferences.shortPullThresholdDp,
                         edgeGestureLongThresholdDp = preferences.longPullThresholdDp,
                         leftEdgeConfigs = leftEdgeConfigs,

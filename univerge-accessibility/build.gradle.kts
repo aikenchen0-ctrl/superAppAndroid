@@ -99,7 +99,10 @@ android {
 
 dependencies {
     api(project(":univerge-core"))
+    implementation(project(":gesture-server"))
     implementation(project(":univerge-overlay"))
+    api(project(":univerge-heavy-drag-android"))
+    implementation(project(":univerge-heavy-drag-compose"))
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.compose.foundation:foundation")

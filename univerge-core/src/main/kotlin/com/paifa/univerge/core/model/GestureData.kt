@@ -4,10 +4,16 @@
  */
 package com.paifa.univerge.core.model
 
-// 这是跨模块传递手势信息的轻量值对象，不保存 Android View 状态。
+// 这是跨模块传递手势信息的轻量值对象，不保存 Android View 状态；终端事件还携带事务元数据。
 data class GestureData(
-    val startX: Float = 0f,
-    val startY: Float = 0f,
-    val endX: Float = 0f,
-    val endY: Float = 0f
+    var startX: Float = 0f,
+    var startY: Float = 0f,
+    var endX: Float = 0f,
+    var endY: Float = 0f,
+    /** Stable transaction identity copied from the core terminal signal. */
+    val gestureId: Long = 0L,
+    /** Configuration revision captured when the transaction started. */
+    val snapshotVersion: Long = 0L,
+    /** Matched physical hot-zone id, or -1 when the source has no zone. */
+    val zoneId: Int = -1
 )

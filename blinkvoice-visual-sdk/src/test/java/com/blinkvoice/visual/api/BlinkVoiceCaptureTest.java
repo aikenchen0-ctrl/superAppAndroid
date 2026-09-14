@@ -19,26 +19,28 @@ public class BlinkVoiceCaptureTest {
     @Test
     public void createIntentTargetsCaptureActivityAndCarriesOptions() {
         BlinkCaptureOptions options = new BlinkCaptureOptions.Builder()
-                .setEarCloseThreshold(0.20f)
-                .setEarOpenThreshold(0.24f)
+                .setEarCloseThreshold(9f)
+                .setEarOpenThreshold(13f)
                 .setDoubleBlinkWindowMs(420L)
                 .setLongCloseMinMs(900L)
                 .setAutoFinishOnEvent(false)
                 .setDebugLoggingEnabled(true)
                 .setDebugOverlayEnabled(false)
+                .setMaxAnalysisFps(15)
                 .setEventTypes(EnumSet.of(BlinkEventType.DOUBLE_BLINK))
                 .build();
 
         Intent intent = BlinkVoiceCapture.createIntent(RuntimeEnvironment.getApplication(), options);
 
         assertEquals(BlinkCaptureActivity.class.getName(), intent.getComponent().getClassName());
-        assertEquals(0.20f, intent.getFloatExtra(BlinkCaptureActivity.EXTRA_EAR_CLOSE_THRESHOLD, 0f), 0.0001f);
-        assertEquals(0.24f, intent.getFloatExtra(BlinkCaptureActivity.EXTRA_EAR_OPEN_THRESHOLD, 0f), 0.0001f);
+        assertEquals(9f, intent.getFloatExtra(BlinkCaptureActivity.EXTRA_EAR_CLOSE_THRESHOLD, 0f), 0.0001f);
+        assertEquals(13f, intent.getFloatExtra(BlinkCaptureActivity.EXTRA_EAR_OPEN_THRESHOLD, 0f), 0.0001f);
         assertEquals(420L, intent.getLongExtra(BlinkCaptureActivity.EXTRA_DOUBLE_BLINK_WINDOW_MS, 0L));
         assertEquals(900L, intent.getLongExtra(BlinkCaptureActivity.EXTRA_LONG_CLOSE_MIN_MS, 0L));
         assertEquals(false, intent.getBooleanExtra(BlinkCaptureActivity.EXTRA_AUTO_FINISH_ON_EVENT, true));
         assertEquals(true, intent.getBooleanExtra(BlinkCaptureActivity.EXTRA_DEBUG_LOGGING_ENABLED, false));
         assertEquals(false, intent.getBooleanExtra(BlinkCaptureActivity.EXTRA_DEBUG_OVERLAY_ENABLED, true));
+        assertEquals(15, intent.getIntExtra(BlinkCaptureActivity.EXTRA_MAX_ANALYSIS_FPS, 0));
         assertEquals(
                 BlinkEventType.DOUBLE_BLINK.name(),
                 intent.getStringArrayListExtra(BlinkCaptureActivity.EXTRA_EVENT_TYPES).get(0)
@@ -57,6 +59,47 @@ public class BlinkVoiceCaptureTest {
         BlinkCaptureOptions options = new BlinkCaptureOptions.Builder().build();
 
         assertTrue(options.isDebugOverlayEnabled());
+    }
+
+    @Test
+    public void maxAnalysisFpsDefaultsToTwentyAndCanBeDisabled() {
+        BlinkCaptureOptions defaultOptions = new BlinkCaptureOptions.Builder().build();
+        BlinkCaptureOptions unthrottledOptions = new BlinkCaptureOptions.Builder()
+                .setMaxAnalysisFps(-1)
+                .build();
+
+        assertEquals(20, defaultOptions.getMaxAnalysisFps());
+        assertEquals(0, unthrottledOptions.getMaxAnalysisFps());
+    }
+
+    @Test
+    public void defaultTimingThresholdsUseTunedDurations() {
+        BlinkCaptureOptions options = new BlinkCaptureOptions.Builder().build();
+
+        assertEquals(275L, options.getLongCloseMinMs());
+        assertEquals(30L, options.getMinShortBlinkMs());
+        assertEquals(250L, options.getMaxShortBlinkMs());
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsNonFiniteElaThreshold() {
+        new BlinkCaptureOptions.Builder().setEarCloseThreshold(Float.NaN).build();
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsOpenThresholdBelowCloseThreshold() {
+        new BlinkCaptureOptions.Builder()
+                .setEarCloseThreshold(20f)
+                .setEarOpenThreshold(10f)
+                .build();
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsInvalidTimingRange() {
+        new BlinkCaptureOptions.Builder()
+                .setMinShortBlinkMs(300L)
+                .setMaxShortBlinkMs(200L)
+                .build();
     }
 
     @Test

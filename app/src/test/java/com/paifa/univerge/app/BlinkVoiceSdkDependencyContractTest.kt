@@ -53,8 +53,33 @@ class BlinkVoiceSdkDependencyContractTest {
             "app/src/main/java/com/paifa/univerge/app/FloatingChatBlinkVoiceActivity.kt"
         ).readText()
 
-        assertTrue(activitySource.contains("elaCloseThreshold = BlinkDetector.ELA_CLOSE_THRESHOLD"))
+        assertTrue(activitySource.contains("BlinkVoiceContinuousDetector"))
+        assertFalse(activitySource.contains("BlinkDetector.ELA_CLOSE_THRESHOLD"))
         assertFalse(activitySource.contains("elaCloseThreshold = options.earCloseThreshold"))
+    }
+
+    @Test
+    fun blinkHostsDependOnlyOnContinuousApiAndDomainTypes() {
+        val hostSources = listOf(
+            projectFile(
+                "app/src/main/java/com/paifa/univerge/app/FloatingChatBlinkVoiceActivity.kt"
+            ).readText(),
+            projectFile(
+                "app/src/main/java/com/paifa/univerge/app/BlinkVoiceFullscreenOverlayController.kt"
+            ).readText()
+        )
+
+        hostSources.forEach { source ->
+            assertTrue(source.contains("BlinkVoiceContinuousListener"))
+            assertFalse(source.contains("com.blinkvoice.visual.detector"))
+            assertFalse(source.contains("com.blinkvoice.visual.events"))
+            assertFalse(source.contains("com.google.mediapipe"))
+            assertFalse(source.contains("androidx.camera.core.ImageAnalysis"))
+            assertFalse(source.contains("androidx.camera.lifecycle.ProcessCameraProvider"))
+            assertFalse(source.contains("CameraSelector.DEFAULT_FRONT_CAMERA"))
+            assertFalse(source.contains("BitmapImageBuilder"))
+            assertFalse(source.contains("ImageProxy"))
+        }
     }
 
     private fun projectFile(path: String): File {

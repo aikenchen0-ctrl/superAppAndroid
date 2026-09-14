@@ -15,9 +15,21 @@ internal class GestureHintOverlayController(
     private var hintView: TextView? = null
     private var shownLabel: String? = null
 
+    fun prewarm() {
+        if (hintView != null) return
+        createView()?.apply { visibility = android.view.View.GONE }
+    }
+
     fun show(label: String) {
         if (label == shownLabel && hintView != null) return
-        val view = hintView ?: TextView(context).apply {
+        val view = hintView ?: createView() ?: return
+        view.visibility = android.view.View.VISIBLE
+        view.text = "即将执行：$label"
+        shownLabel = label
+    }
+
+    private fun createView(): TextView? {
+        val view = TextView(context).apply {
             setTextColor(Color.WHITE)
             textSize = 14f
             setPadding(dp(16), dp(9), dp(16), dp(9))
@@ -25,20 +37,28 @@ internal class GestureHintOverlayController(
                 setColor(Color.argb(224, 26, 31, 42))
                 cornerRadius = dp(18).toFloat()
             }
-        }.also { created ->
-            runCatching { windowManager.addView(created, layoutParams()) }
-                .onSuccess { hintView = created }
-                .onFailure { return }
         }
-        view.text = "即将执行：$label"
-        shownLabel = label
+        return runCatching {
+            windowManager.addView(view, layoutParams())
+            hintView = view
+            view
+        }.getOrElse { null }
     }
 
     fun hide() {
         val view = hintView ?: return
-        runCatching { windowManager.removeViewImmediate(view) }
+        // Keep the non-touchable window alive and only hide the child. Repeated
+        // add/remove IPC in MOVE/UP was a source of input callback stalls.
+        view.visibility = android.view.View.GONE
+        shownLabel = null
+    }
+
+    /** Permanent teardown used only when the accessibility service is destroyed. */
+    fun dispose() {
+        val view = hintView ?: return
         hintView = null
         shownLabel = null
+        runCatching { windowManager.removeViewImmediate(view) }
     }
 
     private fun layoutParams(): WindowManager.LayoutParams {

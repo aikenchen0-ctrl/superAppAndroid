@@ -41,22 +41,22 @@ class MainActivityDebugChatContractTest {
         assertTrue(mainActivitySource.contains("Text(\"触感测试\")"))
         assertTrue(mainActivitySource.contains("TouchTestActivity::class.java"))
         assertTrue(manifestSource.contains("com.paifa.univerge.app.TouchTestActivity"))
-        assertTrue(activitySource.contains("pointerInteropFilter"))
-        assertTrue(activitySource.contains("handleMotionEvent"))
+        assertTrue(activitySource.contains("HeavyDragHost"))
+        assertTrue(activitySource.contains("heavyDraggable"))
         assertTrue(activitySource.contains("selectedModelInfo"))
         assertTrue(activitySource.contains("Icons.AutoMirrored.Outlined.ArrowBack"))
     }
 
     @Test
-    fun touchTestShowsExplicitChineseGestureClassification() {
+    fun touchTestShowsExplicitHeavyDragClassification() {
         val activitySource = sourceFile("app/src/main/java/com/paifa/univerge/app/TouchTestActivity.kt").readText()
 
         assertTrue(activitySource.contains("点击"))
         assertTrue(activitySource.contains("重触"))
-        assertTrue(activitySource.contains("按压"))
-        assertTrue(activitySource.contains("长按"))
         assertTrue(activitySource.contains("轻触"))
-        assertTrue(!activitySource.contains("拖动"))
+        assertTrue(activitySource.contains("拖动"))
+        assertTrue(activitySource.contains("拖放区域"))
+        assertTrue(activitySource.contains("重叠目标"))
     }
 
     private fun sourceFile(path: String): File {

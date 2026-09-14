@@ -11,6 +11,7 @@ import com.paifa.univerge.accessibility.floatingchat.tools.rightRailWidthDp
 import com.paifa.univerge.core.gesture.BackGestureProgress
 import com.paifa.univerge.core.gesture.SwipeClassifier
 import com.paifa.univerge.core.gesture.hitTestBackGestureOption
+import com.paifa.univerge.core.gesture.runtime.nextGestureSessionId
 import com.paifa.univerge.core.model.EdgeSide
 import com.paifa.univerge.core.model.EdgeZoneConfig
 import com.paifa.univerge.core.model.GestureData
@@ -60,6 +61,7 @@ internal fun Modifier.floatingChatInternalEdgeGesture(
                 rightConfigs = rightEdgeConfigs
             ) ?: return@awaitEachGesture
             val side = zone.side
+            val gestureId = nextGestureSessionId()
 
             val startX = down.position.x
             val startY = down.position.y
@@ -124,7 +126,14 @@ internal fun Modifier.floatingChatInternalEdgeGesture(
 
                 if (!change.pressed) {
                     if (consumingGesture) {
-                        val data = GestureData(startX, startY, latestX, latestY)
+                        val data = GestureData(
+                            startX = startX,
+                            startY = startY,
+                            endX = latestX,
+                            endY = latestY,
+                            gestureId = gestureId,
+                            zoneId = zone.zoneId
+                        )
                         val finalBackProgress = latestBackProgress
                         if (finalBackProgress != null) {
                             onBackGestureEnd(side, finalBackProgress)

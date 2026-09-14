@@ -22,7 +22,10 @@ class UniVergePreferences(context: Context) {
      */
     var globalEnabled: Boolean
         get() = prefs.getBoolean(KEY_GLOBAL_ENABLED, true)
-        set(value) = prefs.edit().putBoolean(KEY_GLOBAL_ENABLED, value).apply()
+        set(value) = prefs.edit()
+            .putBoolean(KEY_GLOBAL_ENABLED, value)
+            .putLong(KEY_GESTURE_CONFIG_VERSION, gestureConfigVersion + 1L)
+            .apply()
 
     var accessibilityKeepAliveEnabled: Boolean
         get() = prefs.getBoolean(KEY_ACCESSIBILITY_KEEP_ALIVE_ENABLED, false)
@@ -59,7 +62,13 @@ class UniVergePreferences(context: Context) {
 
     internal var gestureInputMode: GestureInputMode
         get() = GestureInputMode.fromId(prefs.getString(KEY_GESTURE_INPUT_MODE, GestureInputMode.Auto.id))
-        set(value) = prefs.edit().putString(KEY_GESTURE_INPUT_MODE, value.id).apply()
+        set(value) = prefs.edit()
+            .putString(KEY_GESTURE_INPUT_MODE, value.id)
+            .putLong(KEY_GESTURE_CONFIG_VERSION, gestureConfigVersion + 1L)
+            .apply()
+
+    internal val gestureConfigVersion: Long
+        get() = prefs.getLong(KEY_GESTURE_CONFIG_VERSION, 0L)
 
     var bottomGestureBarWidthDp: Int
         get() = sanitizeBottomGestureBarWidthDp(
@@ -67,6 +76,7 @@ class UniVergePreferences(context: Context) {
         )
         set(value) = prefs.edit()
             .putInt(KEY_BOTTOM_GESTURE_BAR_WIDTH_DP, sanitizeBottomGestureBarWidthDp(value))
+            .putLong(KEY_GESTURE_CONFIG_VERSION, gestureConfigVersion + 1L)
             .apply()
 
     var floatingChatFrostedBackgroundEnabled: Boolean
@@ -130,6 +140,7 @@ class UniVergePreferences(context: Context) {
         set(value) = prefs.edit()
             .putInt(KEY_SHORT_PULL_THRESHOLD_DP, sanitizeShortPullThresholdDp(value))
             .putInt(KEY_SWIPE_THRESHOLD_DP, sanitizeShortPullThresholdDp(value))
+            .putLong(KEY_GESTURE_CONFIG_VERSION, gestureConfigVersion + 1L)
             .apply()
 
     var longPullThresholdDp: Int
@@ -142,6 +153,7 @@ class UniVergePreferences(context: Context) {
                 KEY_LONG_PULL_THRESHOLD_DP,
                 sanitizeLongPullThresholdDp(shortThresholdDp = shortPullThresholdDp, longThresholdDp = value)
             )
+            .putLong(KEY_GESTURE_CONFIG_VERSION, gestureConfigVersion + 1L)
             .apply()
 
     var pausedUntilEpochMs: Long
@@ -195,6 +207,7 @@ class UniVergePreferences(context: Context) {
         prefs.edit()
             .putInt(edgeZoneInsetKey(side, EdgeZoneConfig.DEFAULT_ZONE_ID), sanitized)
             .putInt(edgeInsetKey(side), sanitized)
+            .putLong(KEY_GESTURE_CONFIG_VERSION, gestureConfigVersion + 1L)
             .apply()
     }
 
@@ -212,7 +225,10 @@ class UniVergePreferences(context: Context) {
     }
 
     fun setAction(side: EdgeSide, gestureType: GestureType, action: GestureAction) {
-        prefs.edit().putString(actionKey(side, gestureType), action.id).apply()
+        prefs.edit()
+            .putString(actionKey(side, gestureType), action.id)
+            .putLong(KEY_GESTURE_CONFIG_VERSION, gestureConfigVersion + 1L)
+            .apply()
     }
 
     fun bottomGestureBarActionFor(gestureType: BottomGestureBarGestureType): GestureAction {
@@ -221,7 +237,10 @@ class UniVergePreferences(context: Context) {
     }
 
     fun setBottomGestureBarAction(gestureType: BottomGestureBarGestureType, action: GestureAction) {
-        prefs.edit().putString(bottomGestureBarActionKey(gestureType), action.id).apply()
+        prefs.edit()
+            .putString(bottomGestureBarActionKey(gestureType), action.id)
+            .putLong(KEY_GESTURE_CONFIG_VERSION, gestureConfigVersion + 1L)
+            .apply()
     }
 
     var sideFunctionCustomActionIds: List<String>
@@ -279,6 +298,7 @@ class UniVergePreferences(context: Context) {
         val prefix = edgePrefix(side)
         val editor = prefs.edit()
             .putInt("${prefix}_zone_count", normalized.size)
+            .putLong(KEY_GESTURE_CONFIG_VERSION, gestureConfigVersion + 1L)
         normalized.forEach { config ->
             putEdgeConfig(editor, config)
         }
@@ -514,6 +534,16 @@ internal fun isBottomGestureBarPreferenceKey(key: String?): Boolean {
     return key == KEY_BOTTOM_GESTURE_BAR_WIDTH_DP || key?.startsWith("bottom_gesture_bar_action_") == true
 }
 
+internal fun isBottomGestureBarGeometryPreferenceKey(key: String?): Boolean =
+    key == KEY_BOTTOM_GESTURE_BAR_WIDTH_DP
+
+internal fun isGestureConfigVersionPreferenceKey(key: String?): Boolean =
+    key == "gesture_config_version"
+
+internal fun isEdgeGeometryPreferenceKey(key: String?): Boolean =
+    key?.startsWith("edge_") == true &&
+        !key.contains("overlay_opacity")
+
 internal fun sanitizeShortPullThresholdDp(value: Int): Int {
     return value.coerceIn(MIN_SHORT_PULL_THRESHOLD_DP, MAX_SHORT_PULL_THRESHOLD_DP)
 }
@@ -553,6 +583,7 @@ internal const val KEY_FLOATING_CHAT_BACKGROUND_OPACITY_PERCENT = "floating_chat
 internal const val KEY_FLOATING_CHAT_BLUR_RADIUS_DP = "floating_chat_blur_radius_dp"
 internal const val KEY_FLOATING_CHAT_BACKGROUND_COLOR_RGB = "floating_chat_background_color_rgb"
 internal const val KEY_BOTTOM_GESTURE_BAR_WIDTH_DP = "bottom_gesture_bar_width_dp"
+private const val KEY_GESTURE_CONFIG_VERSION = "gesture_config_version"
 private const val KEY_EDGE_OVERLAY_OPACITY_PERCENT = "edge_overlay_opacity_percent"
 private val FLOATING_CHAT_BACKGROUND_COLOR_PRESET_RGBS = listOf(
     0xEAF3F6,
