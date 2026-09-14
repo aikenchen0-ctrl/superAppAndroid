@@ -63,6 +63,7 @@ class BlinkDetector(
     private val RIGHT_EYE_ELA = EyeLandmarks(33, 133, 158, 153)
 
     private var faceLandmarker: FaceLandmarker? = null
+    @Volatile private var closed = false
     private var blinkCount = 0
     private var wasBlinking = false
     @Volatile private var debugLoggingEnabled = false
@@ -95,6 +96,7 @@ class BlinkDetector(
      * 初始化 FaceLandmarker 模型和实时流推理参数。
      */
     fun setup() {
+        closed = false
         val t0 = SystemClock.elapsedRealtime()
         val baseOptionsBuilder = BaseOptions.builder()
             .setModelAssetPath(MODEL_NAME)
@@ -111,7 +113,7 @@ class BlinkDetector(
                 handleResult(result, mpImage)
             }
             .setErrorListener { error ->
-                listener.onError(error.message ?: "Unknown error")
+                this.listener.onError(error.message ?: "Unknown error")
             }
             .build()
 
@@ -123,6 +125,9 @@ class BlinkDetector(
      * 异步提交一帧相机图像给 MediaPipe，并记录提交时间用于计算推理耗时。
      */
     fun detectAsync(mpImage: MPImage, frameTime: Long, rotationDegrees: Int = 0) {
+        if (closed) {
+            return
+        }
         val detector = faceLandmarker ?: return
         val dispatchTimeMs = SystemClock.elapsedRealtime()
         pendingFrameMetadata.record(mpImage, frameTime, rotationDegrees, dispatchTimeMs)
@@ -138,6 +143,7 @@ class BlinkDetector(
      * 释放 MediaPipe 检测器资源，避免相机页面关闭后继续占用模型。
      */
     fun close() {
+        closed = true
         faceLandmarker?.close()
         faceLandmarker = null
         pendingFrameMetadata.clear()
@@ -163,10 +169,25 @@ class BlinkDetector(
      * 处理 MediaPipe 返回的人脸关键点，计算左右眼 ELA 并给出基础闭眼状态。
      */
     private fun handleResult(result: FaceLandmarkerResult, mpImage: MPImage) {
-        val metadata = pendingFrameMetadata.take(mpImage) ?: run {
-            BlinkDebugLogger.warn(debugLoggingEnabled, "result_without_frame_metadata")
+        if (closed) {
             return
         }
+        val resultFrameTimeMs = result.timestampMs()
+        val metadata = pendingFrameMetadata.takeForFrameTime(resultFrameTimeMs)
+            ?: run {
+                // MediaPipe rebuilds the callback MPImage from its output packet, so object
+                // identity cannot be used here. The result timestamp is the stable join key.
+                BlinkDebugLogger.warn(
+                    debugLoggingEnabled,
+                    "result_without_frame_metadata timestampMs=$resultFrameTimeMs"
+                )
+                FrameMetadataStore.Metadata(
+                    mpImage,
+                    resultFrameTimeMs,
+                    0,
+                    SystemClock.elapsedRealtime()
+                )
+            }
         val inferenceMs = (SystemClock.elapsedRealtime() - metadata.getDispatchTimeMs()).coerceAtLeast(0L)
 
         var leftEla = Float.NaN
@@ -189,6 +210,9 @@ class BlinkDetector(
             } else if (!bothClosed) {
                 wasBlinking = false
             }
+        } else {
+            // 人脸离开后，恢复检测应从新的眼睛周期开始，不能沿用上一张脸的闭眼锁存。
+            wasBlinking = false
         }
 
         logDetectionResult(

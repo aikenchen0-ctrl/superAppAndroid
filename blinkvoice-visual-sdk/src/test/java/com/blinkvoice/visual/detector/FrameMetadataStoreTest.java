@@ -67,6 +67,20 @@ public class FrameMetadataStoreTest {
         assertEquals(400L, store.take(fourth).getFrameTimeMs());
     }
 
+    @Test
+    public void matchesCallbackMetadataByResultTimestampWhenImageInstanceChanges() {
+        FrameMetadataStore store = new FrameMetadataStore(4);
+        Object submittedImage = new Object();
+
+        store.record(submittedImage, 1234L, 90, 77L);
+
+        FrameMetadataStore.Metadata metadata = store.takeForFrameTime(1234L);
+
+        assertEquals(1234L, metadata.getFrameTimeMs());
+        assertEquals(90, metadata.getRotationDegrees());
+        assertEquals(77L, metadata.getDispatchTimeMs());
+    }
+
     private static final class EqualFrame {
         @Override
         public boolean equals(Object other) {
