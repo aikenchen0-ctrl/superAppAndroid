@@ -84,7 +84,7 @@ class GestureContractRegressionTest {
         )
         recognizer.onDown(PointerSample(4f, 100f, 0L, pointerId = 1))
         recognizer.onMove(PointerSample(80f, 100f, 10L, pointerId = 1))
-        assertTrue(recognizer.onMove(PointerSample(50f, 100f, 20L, pointerId = 1)) is GestureSignal.Cancel)
+        assertTrue(recognizer.onMove(PointerSample(12f, 100f, 20L, pointerId = 1)) is GestureSignal.Cancel)
         assertTrue(recognizer.onUp(PointerSample(100f, 100f, 30L, pointerId = 1)) is GestureSignal.Ignored)
 
         val outward = SideGestureRecognizer(

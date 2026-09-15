@@ -78,6 +78,19 @@ class EdgeGestureDetectorTest {
     }
 
     @Test
+    fun slightRetractionAfterPreviewStillCommitsThroughTheOverlayAdapter() {
+        val commits = mutableListOf<GestureType>()
+        val detector = detector(onGesture = { type, _ -> commits += type })
+
+        detector.onTouchEvent(event(MotionEvent.ACTION_DOWN, x = 0f, y = 200f, time = 0L))
+        detector.onTouchEvent(event(MotionEvent.ACTION_MOVE, x = 40f, y = 200f, time = 20L))
+        detector.onTouchEvent(event(MotionEvent.ACTION_MOVE, x = 28f, y = 200f, time = 40L))
+        detector.onTouchEvent(event(MotionEvent.ACTION_UP, x = 28f, y = 200f, time = 60L))
+
+        assertEquals(listOf(GestureType.PULL_INWARD_SHORT), commits)
+    }
+
+    @Test
     fun holdTimerOnlyArmsCandidateUntilUp() {
         val commits = mutableListOf<GestureType>()
         val detector = detector(onGesture = { type, _ -> commits += type })

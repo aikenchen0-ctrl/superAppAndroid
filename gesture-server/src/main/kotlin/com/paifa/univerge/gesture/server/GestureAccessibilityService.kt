@@ -5,28 +5,86 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Parcel
+import android.os.Handler
+import android.os.Looper
 import android.util.Base64
 import android.view.accessibility.AccessibilityEvent
 
 /** Process-isolated host. It deliberately has no dependency on chat/video/Compose controllers. */
 class GestureAccessibilityService : AccessibilityService() {
     private lateinit var runtime: GestureServerRuntime
+    private lateinit var overlayController: GestureServerOverlayController
+    private lateinit var actionExecutor: GestureServerActionExecutor
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var serviceConnected = false
+    private val leaseHeartbeat = object : Runnable {
+        override fun run() {
+            if (serviceConnected && ::overlayController.isInitialized && overlayController.hasInputSurface) {
+                GestureServerProcessLease.heartbeat(this@GestureAccessibilityService)
+            } else {
+                GestureServerProcessLease.release(this@GestureAccessibilityService)
+            }
+            mainHandler.postDelayed(this, LEASE_HEARTBEAT_INTERVAL_MS)
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
         runtime = GestureServerRuntimeHost.runtime(this)
         runtime.start()
+        actionExecutor = GestureServerActionExecutor(this)
+        overlayController = GestureServerOverlayController(
+            service = this,
+            windowManager = getSystemService(WINDOW_SERVICE) as android.view.WindowManager,
+            onAction = actionExecutor::execute,
+            onInputSurfaceChanged = { refreshLease() },
+            onInputSurfaceWillChange = { available ->
+                if (available) {
+                    GestureServerProcessLease.acquire(this)
+                } else {
+                    GestureServerProcessLease.release(this)
+                }
+            }
+        )
     }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        serviceConnected = true
         runtime.start()
+        overlayController.start(runtime)
+        mainHandler.removeCallbacks(leaseHeartbeat)
+        mainHandler.post(leaseHeartbeat)
+        mainHandler.post { refreshLease() }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
 
-    override fun onInterrupt() = Unit
+    override fun onInterrupt() {
+        if (::overlayController.isInitialized) {
+            overlayController.cancelActiveGesture()
+        }
+    }
 
+    override fun onDestroy() {
+        serviceConnected = false
+        mainHandler.removeCallbacks(leaseHeartbeat)
+        if (::overlayController.isInitialized) overlayController.close()
+        GestureServerProcessLease.release(this)
+        super.onDestroy()
+    }
+
+    private fun refreshLease() {
+        if (serviceConnected && ::overlayController.isInitialized && overlayController.hasInputSurface) {
+            GestureServerProcessLease.acquire(this)
+        } else {
+            GestureServerProcessLease.release(this)
+        }
+    }
+
+    private companion object {
+        const val LEASE_HEARTBEAT_INTERVAL_MS = 1_000L
+    }
 }
 
 /** Regular bound service exposes Binder because AccessibilityService.onBind is final. */

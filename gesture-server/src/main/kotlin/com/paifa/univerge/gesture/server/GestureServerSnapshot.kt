@@ -31,6 +31,13 @@ data class GestureServerSnapshot(
     val rightZones: List<GestureServerZone> = emptyList(),
     val bottomWidthDp: Float = 156f,
     val bottomHeightDp: Float = 30f,
+    val shortPullDistanceDp: Float = 32f,
+    val longPullDistanceDp: Float = 96f,
+    val holdDurationMs: Long = 500L,
+    /** Runtime gate from the main service; false means the server must own no input. */
+    val inputEnabled: Boolean = true,
+    /** True while the in-process floating chat surface owns edge/bottom input. */
+    val floatingChatOwnsSurface: Boolean = false,
     val leftActions: Map<String, String> = emptyMap(),
     val rightActions: Map<String, String> = emptyMap(),
     val bottomActions: Map<String, String> = emptyMap()
@@ -41,6 +48,9 @@ data class GestureServerSnapshot(
         if (!screenHeightDp.isFinite() || screenHeightDp < 0f) return false
         if (!bottomWidthDp.isFinite() || bottomWidthDp <= 0f) return false
         if (!bottomHeightDp.isFinite() || bottomHeightDp <= 0f) return false
+        if (!shortPullDistanceDp.isFinite() || shortPullDistanceDp <= 0f) return false
+        if (!longPullDistanceDp.isFinite() || longPullDistanceDp < shortPullDistanceDp) return false
+        if (holdDurationMs <= 0L) return false
         return validZones(leftZones) && validZones(rightZones) &&
             validActions(leftActions) && validActions(rightActions) && validActions(bottomActions)
     }
@@ -63,6 +73,11 @@ data class GestureServerSnapshot(
         putFloat(KEY_SCREEN_HEIGHT_DP, screenHeightDp)
         putFloat(KEY_BOTTOM_WIDTH_DP, bottomWidthDp)
         putFloat(KEY_BOTTOM_HEIGHT_DP, bottomHeightDp)
+        putFloat(KEY_SHORT_PULL_DISTANCE_DP, shortPullDistanceDp)
+        putFloat(KEY_LONG_PULL_DISTANCE_DP, longPullDistanceDp)
+        putLong(KEY_HOLD_DURATION_MS, holdDurationMs)
+        putBoolean(KEY_INPUT_ENABLED, inputEnabled)
+        putBoolean(KEY_FLOATING_CHAT_OWNS_SURFACE, floatingChatOwnsSurface)
         putParcelableArrayList(KEY_LEFT_ZONES, ArrayList(leftZones.map(GestureServerZone::toBundle)))
         putParcelableArrayList(KEY_RIGHT_ZONES, ArrayList(rightZones.map(GestureServerZone::toBundle)))
         putBundle(KEY_LEFT_ACTIONS, leftActions.toBundle())
@@ -77,6 +92,11 @@ data class GestureServerSnapshot(
         private const val KEY_SCREEN_HEIGHT_DP = "screen_height_dp"
         private const val KEY_BOTTOM_WIDTH_DP = "bottom_width_dp"
         private const val KEY_BOTTOM_HEIGHT_DP = "bottom_height_dp"
+        private const val KEY_SHORT_PULL_DISTANCE_DP = "short_pull_distance_dp"
+        private const val KEY_LONG_PULL_DISTANCE_DP = "long_pull_distance_dp"
+        private const val KEY_HOLD_DURATION_MS = "hold_duration_ms"
+        private const val KEY_INPUT_ENABLED = "input_enabled"
+        private const val KEY_FLOATING_CHAT_OWNS_SURFACE = "floating_chat_owns_surface"
         private const val KEY_LEFT_ZONES = "left_zones"
         private const val KEY_RIGHT_ZONES = "right_zones"
         private const val KEY_LEFT_ACTIONS = "left_actions"
@@ -96,6 +116,11 @@ data class GestureServerSnapshot(
                 rightZones = right,
                 bottomWidthDp = bundle.getFloat(KEY_BOTTOM_WIDTH_DP, Float.NaN),
                 bottomHeightDp = bundle.getFloat(KEY_BOTTOM_HEIGHT_DP, Float.NaN),
+                shortPullDistanceDp = bundle.getFloat(KEY_SHORT_PULL_DISTANCE_DP, 32f),
+                longPullDistanceDp = bundle.getFloat(KEY_LONG_PULL_DISTANCE_DP, 96f),
+                holdDurationMs = bundle.getLong(KEY_HOLD_DURATION_MS, 500L),
+                inputEnabled = bundle.getBoolean(KEY_INPUT_ENABLED, true),
+                floatingChatOwnsSurface = bundle.getBoolean(KEY_FLOATING_CHAT_OWNS_SURFACE, false),
                 leftActions = bundle.getBundle(KEY_LEFT_ACTIONS).toActionMap(),
                 rightActions = bundle.getBundle(KEY_RIGHT_ACTIONS).toActionMap(),
                 bottomActions = bundle.getBundle(KEY_BOTTOM_ACTIONS).toActionMap()

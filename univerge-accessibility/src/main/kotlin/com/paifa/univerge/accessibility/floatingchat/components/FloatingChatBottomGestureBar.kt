@@ -11,17 +11,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.paifa.univerge.accessibility.BottomGestureBarGestureType
 import com.paifa.univerge.accessibility.floatingchat.theme.OverlayTokens
 import com.paifa.univerge.accessibility.defaultBottomGestureBarWidthDp
+import com.paifa.univerge.accessibility.bottomGestureBarTouchHeightDp
 import com.paifa.univerge.accessibility.resolveBottomGestureBarGestureType
+import com.paifa.univerge.accessibility.sanitizeBottomGestureBarWidthDp
 import com.paifa.univerge.core.gesture.runtime.nextGestureSessionId
 import com.paifa.univerge.core.model.GestureData
 import kotlin.math.abs
@@ -29,16 +33,19 @@ import kotlin.math.abs
 @Composable
 internal fun FloatingChatExpandedBottomGestureBar(
     onGesture: (BottomGestureBarGestureType, GestureData) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    widthDp: Int = defaultBottomGestureBarWidthDp()
 ) {
     var pressed by remember { mutableStateOf(false) }
+    val currentOnGesture by rememberUpdatedState(onGesture)
+    val configuredWidthDp = sanitizeBottomGestureBarWidthDp(widthDp)
     Box(
         modifier = modifier
-            .width(defaultBottomGestureBarWidthDp().dp)
-            .height(FloatingChatBottomGestureBarHeightDp.dp)
+            .width(configuredWidthDp.dp)
+            .height(bottomGestureBarTouchHeightDp().dp)
             .floatingChatBottomGestureBarInput(
                 onPressedChange = { nextPressed -> pressed = nextPressed },
-                onGesture = onGesture
+                onGesture = { gesture, data -> currentOnGesture(gesture, data) }
             ),
         contentAlignment = Alignment.Center
     ) {
@@ -55,7 +62,7 @@ internal fun FloatingChatExpandedBottomGestureBar(
 private fun Modifier.floatingChatBottomGestureBarInput(
     onPressedChange: (Boolean) -> Unit,
     onGesture: (BottomGestureBarGestureType, GestureData) -> Unit
-): Modifier = pointerInput(onGesture) {
+): Modifier = pointerInput(Unit) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
         val gestureId = nextGestureSessionId()
@@ -66,7 +73,7 @@ private fun Modifier.floatingChatBottomGestureBarInput(
         var lastMotionX = startX
         var lastMotionY = startY
         var lastMovementAtMillis = down.uptimeMillis
-        var gestureDispatched = false
+        var released = false
         onPressedChange(true)
         down.consume()
         while (true) {
@@ -74,31 +81,26 @@ private fun Modifier.floatingChatBottomGestureBarInput(
             val change = event.changes.firstOrNull { it.id == down.id } ?: break
             latestX = change.position.x
             latestY = change.position.y
+            val changedToUp = change.changedToUp()
+            if (event.changes.any { it.id != down.id && it.pressed }) {
+                // Bottom actions are single-pointer transactions. A second
+                // pointer cancels the preview instead of allowing a later UP
+                // from the first pointer to commit a tap or swipe.
+                change.consume()
+                onPressedChange(false)
+                released = true
+                break
+            }
             if (abs(latestX - lastMotionX) >= FloatingChatBottomGestureBarMotionSlopPx || abs(latestY - lastMotionY) >= FloatingChatBottomGestureBarMotionSlopPx) {
                 lastMotionX = latestX
                 lastMotionY = latestY
                 lastMovementAtMillis = change.uptimeMillis
             }
-            if (!gestureDispatched) {
-                val gestureType = resolveBottomGestureBarGestureType(latestX - startX, latestY - startY, change.uptimeMillis - down.uptimeMillis, change.uptimeMillis - lastMovementAtMillis)
-                if (gestureType == BottomGestureBarGestureType.SwipeUpHold) {
-                    gestureDispatched = true
-                    onGesture(
-                        gestureType,
-                        GestureData(
-                            startX = startX,
-                            startY = startY,
-                            endX = latestX,
-                            endY = latestY,
-                            gestureId = gestureId
-                        )
-                    )
-                }
-            }
             change.consume()
             if (!change.pressed) {
+                released = true
                 onPressedChange(false)
-                if (!gestureDispatched) {
+                if (changedToUp) {
                     onGesture(
                         resolveBottomGestureBarGestureType(
                             latestX - startX,
@@ -118,11 +120,10 @@ private fun Modifier.floatingChatBottomGestureBarInput(
                 break
             }
         }
-        onPressedChange(false)
+        if (!released) onPressedChange(false)
     }
 }
 
-private const val FloatingChatBottomGestureBarHeightDp = 30
 private const val FloatingChatBottomGestureBarVisualWidthDp = 92
 private const val FloatingChatBottomGestureBarVisualHeightDp = 5
 private const val FloatingChatBottomGestureBarMotionSlopPx = 6f

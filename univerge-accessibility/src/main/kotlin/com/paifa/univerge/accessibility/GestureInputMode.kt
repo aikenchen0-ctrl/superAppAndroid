@@ -109,6 +109,16 @@ internal fun shouldStartNativeEdgeInput(
     externalActivityVisible: Boolean
 ): Boolean = !floatingChatOwnsGestureSurface(floatingChatExpanded, externalActivityVisible)
 
+/**
+ * The isolated server is the sole edge/bottom input owner while its lease is
+ * fresh. The floating chat's own Compose surface is an explicit exception:
+ * it must be able to receive its internal gestures while the server drains.
+ */
+internal fun shouldYieldToGestureServer(
+    gestureServerLeaseActive: Boolean,
+    floatingChatOwnsSurface: Boolean
+): Boolean = gestureServerLeaseActive && !floatingChatOwnsSurface
+
 internal fun floatingChatOwnsGestureSurface(
     floatingChatExpanded: Boolean,
     externalActivityVisible: Boolean

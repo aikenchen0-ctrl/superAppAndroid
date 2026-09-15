@@ -6,6 +6,7 @@ import com.paifa.univerge.core.model.GestureAction
 import com.paifa.univerge.core.model.GestureData
 import com.paifa.univerge.core.model.GestureType
 import kotlin.math.abs
+import kotlin.math.hypot
 
 data class SideGestureThresholds(
     val minPullDistanceDp: Float = 24f,
@@ -13,7 +14,8 @@ data class SideGestureThresholds(
     val minSwipeDistanceDp: Float = 48f,
     val holdDurationMs: Long = 500L,
     val holdSlopDp: Float = 12f,
-    val retractionToleranceDp: Float = 8f
+    val retractionToleranceDp: Float = 8f,
+    val outwardToleranceDp: Float = 8f
 )
 
 /** Pure transaction recognizer. It never executes an action and never schedules work. */
@@ -55,7 +57,6 @@ class SideGestureRecognizer(
     private var activePointerId = 0
     private var zoneId = -1
     private var gestureId = 0L
-    private var maxInward = 0f
     private var movedBeyondHoldSlop = false
     private var holdArmed = false
     private var candidate: GestureType? = null
@@ -88,7 +89,6 @@ class SideGestureRecognizer(
         latestX = xDp
         latestY = yDp
         latestAt = timeMillis
-        maxInward = 0f
         movedBeyondHoldSlop = false
         holdArmed = false
         candidate = null
@@ -116,10 +116,10 @@ class SideGestureRecognizer(
         latestX = xDp
         latestY = yDp
         latestAt = timeMillis
-        val inward = inwardDistance(xDp)
-        if (inward < 0f) return cancel()
-        if (inward > maxInward) maxInward = inward
-        if (candidate != null && inward < maxInward - thresholds.retractionToleranceDp) return cancel()
+        val rawInward = inwardDistance(xDp)
+        if (rawInward < -thresholds.outwardToleranceDp) return cancel()
+        val inward = rawInward.coerceAtLeast(0f)
+        if (hasReturnedNearEdge(inward)) return cancel()
         if (abs(yDp - downY) > thresholds.holdSlopDp) movedBeyondHoldSlop = true
         if (canArmHold(timeMillis, inward)) holdArmed = true
         val gesture = classify(inward, yDp - downY) ?: return GestureSignal.Ignored
@@ -153,11 +153,14 @@ class SideGestureRecognizer(
         latestX = xDp
         latestY = yDp
         latestAt = timeMillis
-        val inward = inwardDistance(xDp)
-        if (inward < 0f || (candidate != null && (inward < maxInward - thresholds.retractionToleranceDp || inward < thresholds.minPullDistanceDp))) return cancel()
+        val rawInward = inwardDistance(xDp)
+        if (rawInward < -thresholds.outwardToleranceDp) return cancel()
+        val inward = rawInward.coerceAtLeast(0f)
+        if (hasReturnedNearEdge(inward)) return cancel()
         if (abs(yDp - downY) > thresholds.holdSlopDp) movedBeyondHoldSlop = true
         if (canArmHold(timeMillis, inward)) holdArmed = true
         val gesture = classify(inward, yDp - downY) ?: return cancel()
+        if (gesture.requiresMinimumInwardDistance() && inward < thresholds.minPullDistanceDp) return cancel()
         state = State.Committed
         return GestureSignal.Commit(
             gesture = gesture,
@@ -198,17 +201,25 @@ class SideGestureRecognizer(
             } else if (inward >= thresholds.minPullDistanceDp) {
                 GestureType.PULL_INWARD_SHORT
             } else null
-            GestureType.PULL_DIAGONAL_UP -> diagonalVariant(GestureType.PULL_DIAGONAL_UP, inward)
-            GestureType.PULL_DIAGONAL_DOWN -> diagonalVariant(GestureType.PULL_DIAGONAL_DOWN, inward)
+            GestureType.PULL_DIAGONAL_UP -> diagonalVariant(
+                GestureType.PULL_DIAGONAL_UP,
+                inward,
+                hypot(inward, dy)
+            )
+            GestureType.PULL_DIAGONAL_DOWN -> diagonalVariant(
+                GestureType.PULL_DIAGONAL_DOWN,
+                inward,
+                hypot(inward, dy)
+            )
             GestureType.SWIPE_UP -> if (abs(dy) >= thresholds.minSwipeDistanceDp) GestureType.SWIPE_UP else null
             GestureType.SWIPE_DOWN -> if (abs(dy) >= thresholds.minSwipeDistanceDp) GestureType.SWIPE_DOWN else null
             else -> base
         }
     }
 
-    private fun diagonalVariant(base: GestureType, inward: Float): GestureType? {
-        if (inward < thresholds.minPullDistanceDp) return null
-        val long = inward >= thresholds.longPullDistanceDp
+    private fun diagonalVariant(base: GestureType, inward: Float, travelDistance: Float): GestureType? {
+        if (inward < thresholds.minPullDistanceDp || travelDistance < thresholds.minPullDistanceDp) return null
+        val long = travelDistance >= thresholds.longPullDistanceDp
         return when (base) {
             GestureType.PULL_DIAGONAL_UP -> if (long) GestureType.PULL_DIAGONAL_UP_LONG else GestureType.PULL_DIAGONAL_UP_SHORT
             GestureType.PULL_DIAGONAL_DOWN -> if (long) GestureType.PULL_DIAGONAL_DOWN_LONG else GestureType.PULL_DIAGONAL_DOWN_SHORT
@@ -221,6 +232,16 @@ class SideGestureRecognizer(
             inward >= thresholds.minPullDistanceDp &&
             !movedBeyondHoldSlop &&
             abs(latestY - downY) <= thresholds.holdSlopDp
+
+    /** Keep a preview recoverable until the finger returns close to the edge. */
+    private fun hasReturnedNearEdge(inward: Float): Boolean {
+        val currentCandidate = candidate ?: return false
+        if (!currentCandidate.requiresMinimumInwardDistance()) return false
+        val cancellationBoundary = (
+            thresholds.minPullDistanceDp - thresholds.retractionToleranceDp
+        ).coerceAtLeast(0f)
+        return inward < cancellationBoundary
+    }
 
     private fun updatePreview(gesture: GestureType, progress: Float, xDp: Float, yDp: Float): GestureSignal.Preview {
         val existing = preview
@@ -253,6 +274,12 @@ class SideGestureRecognizer(
 
     private fun progress(inward: Float): Float =
         (inward / thresholds.longPullDistanceDp.coerceAtLeast(1f)).coerceIn(0f, 1f)
+
+    private fun GestureType.requiresMinimumInwardDistance(): Boolean = when (this) {
+        GestureType.SWIPE_UP,
+        GestureType.SWIPE_DOWN -> false
+        else -> true
+    }
 
     private fun inwardDistance(xDp: Float): Float = when (side) {
         EdgeSide.LEFT -> xDp - downX

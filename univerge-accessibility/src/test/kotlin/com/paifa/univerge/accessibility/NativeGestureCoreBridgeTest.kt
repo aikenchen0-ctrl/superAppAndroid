@@ -5,6 +5,7 @@ import com.paifa.univerge.core.model.EdgeZoneConfig
 import com.paifa.univerge.core.model.GestureAction
 import com.paifa.univerge.core.model.GestureType
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -50,6 +51,70 @@ class NativeGestureCoreBridgeTest {
         assertEquals(
             com.paifa.univerge.core.model.GestureAction.Back,
             (commit as NativeCoreSignal.Side).signalCommit().action
+        )
+    }
+
+    @Test
+    fun nativeCoreUsesTheSameMinimumCaptureWidthAsTheNativeInputRegion() {
+        val bridge = NativeGestureCoreBridge(
+            nativeCoreConfig(GestureAction.Back, version = 1L).copy(
+                leftConfigs = listOf(
+                    EdgeZoneConfig(
+                        side = EdgeSide.LEFT,
+                        zoneId = 0,
+                        topInsetPercent = 0,
+                        bottomInsetPercent = 0,
+                        thicknessDp = 1,
+                        edgeInsetDp = 0
+                    )
+                )
+            )
+        )
+
+        assertTrue(bridge.onDown(20f, 160f, 0L) is NativeCoreSignal.Side)
+    }
+
+    @Test
+    fun ignoredNativeMoveDelegatesAfterTouchSlopButNotBeforeIt() {
+        assertFalse(
+            shouldDelegateNativeIgnoredMove(
+                activeSide = EdgeSide.LEFT,
+                activeBottomGesture = false,
+                consumingGesture = false,
+                distancePx = 4f,
+                touchSlopPx = 8f,
+                gestureThresholdPx = 24f
+            )
+        )
+        assertFalse(
+            shouldDelegateNativeIgnoredMove(
+                activeSide = EdgeSide.LEFT,
+                activeBottomGesture = false,
+                consumingGesture = false,
+                distancePx = 12f,
+                touchSlopPx = 8f,
+                gestureThresholdPx = 24f
+            )
+        )
+        assertTrue(
+            shouldDelegateNativeIgnoredMove(
+                activeSide = EdgeSide.LEFT,
+                activeBottomGesture = false,
+                consumingGesture = false,
+                distancePx = 32f,
+                touchSlopPx = 8f,
+                gestureThresholdPx = 24f
+            )
+        )
+        assertFalse(
+            shouldDelegateNativeIgnoredMove(
+                activeSide = null,
+                activeBottomGesture = true,
+                consumingGesture = false,
+                distancePx = 12f,
+                touchSlopPx = 8f,
+                gestureThresholdPx = 24f
+            )
         )
     }
 

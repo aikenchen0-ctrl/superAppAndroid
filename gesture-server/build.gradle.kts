@@ -23,10 +23,15 @@ android {
     testOptions {
         unitTests.isIncludeAndroidResources = true
     }
+
+    buildFeatures {
+        aidl = true
+    }
 }
 
 dependencies {
     implementation(project(":univerge-core"))
+    implementation(project(":univerge-overlay"))
     implementation("androidx.core:core-ktx:1.15.0")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.16.1")

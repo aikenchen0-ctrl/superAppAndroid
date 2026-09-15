@@ -28,4 +28,52 @@ class GestureActionOwnerPolicyTest {
         assertTrue(isGestureActionSourceAllowed(GestureActionSource.Overlay, true, true))
         assertFalse(isGestureActionSourceAllowed(GestureActionSource.Compose, true, true))
     }
+
+    @Test
+    fun serverLeaseRejectsLateMainServiceTerminals() {
+        assertFalse(
+            isGestureActionSourceAllowed(
+                source = GestureActionSource.Native,
+                floatingChatExpanded = false,
+                externalActivityVisible = false,
+                gestureServerOwnsInput = true
+            )
+        )
+        assertFalse(
+            isGestureActionSourceAllowed(
+                source = GestureActionSource.Overlay,
+                floatingChatExpanded = false,
+                externalActivityVisible = false,
+                gestureServerOwnsInput = true
+            )
+        )
+        assertTrue(
+            isGestureActionSourceAllowed(
+                source = GestureActionSource.Command,
+                floatingChatExpanded = false,
+                externalActivityVisible = false,
+                gestureServerOwnsInput = true
+            )
+        )
+    }
+
+    @Test
+    fun serverForwardedActionsRequireTheActiveServerLease() {
+        assertTrue(
+            isGestureActionSourceAllowed(
+                source = GestureActionSource.Server,
+                floatingChatExpanded = false,
+                externalActivityVisible = false,
+                gestureServerOwnsInput = true
+            )
+        )
+        assertFalse(
+            isGestureActionSourceAllowed(
+                source = GestureActionSource.Server,
+                floatingChatExpanded = false,
+                externalActivityVisible = false,
+                gestureServerOwnsInput = false
+            )
+        )
+    }
 }

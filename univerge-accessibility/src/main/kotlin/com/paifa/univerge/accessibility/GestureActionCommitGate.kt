@@ -16,11 +16,17 @@ internal class GestureActionCommitGate(
         require(maxEntries > 0) { "maxEntries must be positive" }
     }
 
-    private val ledger = GestureEventLedger(maxEntries)
+    /** Each physical owner has its own id namespace across process boundaries. */
+    private val ledgers = GestureActionSource.entries.associateWith {
+        GestureEventLedger(maxEntries)
+    }
 
-    fun accept(gestureId: Long): Boolean = ledger.acceptGestureId(gestureId)
+    fun accept(gestureId: Long): Boolean = accept(GestureActionSource.Command, gestureId)
 
-    fun clear() = ledger.clear()
+    fun accept(source: GestureActionSource, gestureId: Long): Boolean =
+        ledgers.getValue(source).acceptGestureId(gestureId)
+
+    fun clear() = ledgers.values.forEach(GestureEventLedger::clear)
 
     private companion object {
         const val DEFAULT_MAX_ENTRIES = 128

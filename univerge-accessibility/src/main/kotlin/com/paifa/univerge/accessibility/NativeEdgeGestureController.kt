@@ -5,6 +5,8 @@ import android.accessibilityservice.TouchInteractionController
 import android.graphics.Rect
 import android.graphics.Region
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.Display
 import android.view.MotionEvent
@@ -45,6 +47,7 @@ internal class NativeEdgeGestureController(
     private var callback: TouchInteractionController.Callback? = null
     private var config: NativeEdgeGestureConfig? = null
     private var floatingChatExpanded = false
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val touchSlopPx = ViewConfiguration.get(service).scaledTouchSlop.toFloat()
     private val previewData = GestureData(0f, 0f, 0f, 0f)
     private var coreBridge: NativeGestureCoreBridge? = null
@@ -81,12 +84,21 @@ internal class NativeEdgeGestureController(
                 handleMotionEvent(touchController, event)
             }
 
-            override fun onStateChanged(state: Int) = Unit
+            override fun onStateChanged(state: Int) {
+                if (shouldAbortNativeSessionForState(
+                        state = state,
+                        sessionActive = nativeEventSessionActive || hasActiveGesture
+                    )
+                ) {
+                    abortActiveSession()
+                    nativeEventSessionActive = false
+                }
+            }
         }
 
         return runCatching {
             touchController.registerCallback(
-                Executor { command -> command.run() },
+                Executor { command -> mainHandler.post(command) },
                 newCallback
             )
             controller = touchController
@@ -133,6 +145,13 @@ internal class NativeEdgeGestureController(
         floatingChatExpanded = false
         isRunning = false
         resetGestureFields()
+        nativeEventSessionActive = false
+    }
+
+    /** Cancels only the current transaction while keeping the Native callback registered. */
+    fun cancelActiveSession() {
+        abortActiveSession()
+        nativeEventSessionActive = false
     }
 
     fun setFloatingChatExpanded(expanded: Boolean) {
@@ -172,6 +191,7 @@ internal class NativeEdgeGestureController(
         }.getOrDefault(false)
     }
 
+    @Synchronized
     private fun handleMotionEvent(
         touchController: TouchInteractionController,
         event: MotionEvent
@@ -181,15 +201,31 @@ internal class NativeEdgeGestureController(
             eventTime = event.eventTime,
             controllerState = touchController.state
         )
+        if (shouldIgnoreOutOfOrderNativeEvent(
+                action = event.actionMasked,
+                eventTime = event.eventTime,
+                sessionStartTime = nativeSessionStartTime,
+                lastAcceptedEventTime = nativeLastAcceptedEventTime,
+                sessionActive = nativeEventSessionActive
+            )
+        ) {
+            return
+        }
         if (event.actionMasked == MotionEvent.ACTION_DOWN) {
             // A lost UP/CANCEL must not leak the previous BackWave selection
             // into the next transaction. Abort before accepting the new DOWN.
             abortActiveSession()
+            nativeSessionStartTime = event.eventTime
+            nativeLastAcceptedEventTime = event.eventTime
+            nativeEventSessionActive = true
         } else if (gestureDelegated) {
             if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) {
                 abortActiveSession()
+                nativeEventSessionActive = false
             }
             return
+        } else {
+            nativeLastAcceptedEventTime = maxOf(nativeLastAcceptedEventTime, event.eventTime)
         }
         val currentConfig = config ?: run {
             requestDelegatingOnce(touchController)
@@ -201,10 +237,12 @@ internal class NativeEdgeGestureController(
             MotionEvent.ACTION_UP -> handleUp(touchController, currentConfig, event)
             MotionEvent.ACTION_CANCEL -> {
                 abortActiveSession()
+                nativeEventSessionActive = false
             }
             MotionEvent.ACTION_POINTER_DOWN,
             MotionEvent.ACTION_POINTER_UP -> {
                 abortActiveSession()
+                nativeEventSessionActive = false
             }
             else -> Unit
         }
@@ -267,7 +305,20 @@ internal class NativeEdgeGestureController(
             pointerCount = event.pointerCount
         ) ?: NativeCoreSignal.Ignored
         if (signal === NativeCoreSignal.Ignored) {
-            if (activeSide == null && !activeBottomGesture) {
+            val distance = hypot(event.x - startX, event.y - startY)
+            if (shouldDelegateNativeIgnoredMove(
+                    activeSide = activeSide,
+                    activeBottomGesture = activeBottomGesture,
+                    consumingGesture = consumingGesture,
+                    distancePx = distance,
+                    touchSlopPx = touchSlopPx,
+                    gestureThresholdPx = config.shortThresholdPx
+                )
+            ) {
+                coreBridge?.onCancel()
+                requestDelegatingOnce(touchController)
+                clearGestureTrackingFields()
+            } else if (activeSide == null && !activeBottomGesture) {
                 requestDelegatingOnce(touchController)
             }
             return
@@ -359,11 +410,13 @@ internal class NativeEdgeGestureController(
             }
             onGestureEnd()
             resetGestureFields()
+            nativeEventSessionActive = false
             return
         }
         if (signal !is NativeCoreSignal.Side) {
             requestDelegatingOnce(touchController)
             resetGestureFields()
+            nativeEventSessionActive = false
             return
         }
         val side = signal.side
@@ -392,6 +445,7 @@ internal class NativeEdgeGestureController(
             requestDelegatingOnce(touchController)
         }
         resetGestureFields()
+        nativeEventSessionActive = false
     }
 
     private fun backProgressFor(
@@ -526,6 +580,9 @@ internal class NativeEdgeGestureController(
     private var latestBackProgress: BackGestureProgress? = null
     private var sentBackCancel = false
     private var gestureDelegated = false
+    private var nativeSessionStartTime = Long.MIN_VALUE
+    private var nativeLastAcceptedEventTime = Long.MIN_VALUE
+    private var nativeEventSessionActive = false
 
     private companion object {
         const val TAG = "NativeEdgeGesture"
@@ -542,6 +599,39 @@ internal fun shouldRequestNativeTouchDelegation(
     platformIsDelegating: Boolean
 ): Boolean {
     return !alreadyDelegated && !platformIsDelegating
+}
+
+internal fun shouldDelegateNativeIgnoredMove(
+    activeSide: EdgeSide?,
+    activeBottomGesture: Boolean,
+    consumingGesture: Boolean,
+    distancePx: Float,
+    touchSlopPx: Float,
+    gestureThresholdPx: Float
+): Boolean {
+    return (activeSide == null || distancePx > gestureThresholdPx) &&
+        !activeBottomGesture &&
+        !consumingGesture &&
+        distancePx > touchSlopPx
+}
+
+internal fun shouldIgnoreOutOfOrderNativeEvent(
+    action: Int,
+    eventTime: Long,
+    sessionStartTime: Long,
+    lastAcceptedEventTime: Long,
+    sessionActive: Boolean = true
+): Boolean {
+    if (action == MotionEvent.ACTION_DOWN) return false
+    if (!sessionActive || sessionStartTime == Long.MIN_VALUE) return true
+    return eventTime < sessionStartTime || eventTime < lastAcceptedEventTime
+}
+
+internal fun shouldAbortNativeSessionForState(state: Int, sessionActive: Boolean): Boolean {
+    return sessionActive && (
+        state == TouchInteractionController.STATE_CLEAR ||
+            state == TouchInteractionController.STATE_DELEGATING
+        )
 }
 
 internal fun shouldMarkNativeTouchDelegated(
@@ -741,7 +831,10 @@ internal class NativeGestureCoreBridge(initialConfig: NativeEdgeGestureConfig) {
                 return HotZoneSegment(
                     startDp = screenHeightDp * value.topInsetPercent / 100f,
                     lengthDp = screenHeightDp * (100 - value.topInsetPercent - value.bottomInsetPercent) / 100f,
-                    thicknessDp = value.thicknessDp.toFloat(),
+                    // Keep Core's hit width identical to the platform capture
+                    // width. Otherwise a 1dp config is captured by Native's
+                    // 24dp start target but rejected by Core on most points.
+                    thicknessDp = nativeTouchInteractionEdgeStartTargetDp(value.thicknessDp).toFloat(),
                     enabled = value.enabled,
                     zoneId = value.zoneId,
                     edgeInsetDp = value.edgeInsetDp.toFloat()

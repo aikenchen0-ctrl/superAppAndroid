@@ -654,9 +654,10 @@ internal class FloatingChatOverlayController(
                              )
                          },
                          onPreviewChromeChanged = ::setPreviewChromeVisible,
-                        edgeGestureShortThresholdDp = preferences.shortPullThresholdDp,
-                        edgeGestureLongThresholdDp = preferences.longPullThresholdDp,
-                        leftEdgeConfigs = leftEdgeConfigs,
+                         edgeGestureShortThresholdDp = preferences.shortPullThresholdDp,
+                         edgeGestureLongThresholdDp = preferences.longPullThresholdDp,
+                         bottomGestureBarWidthDp = preferences.bottomGestureBarWidthDp,
+                         leftEdgeConfigs = leftEdgeConfigs,
                         rightEdgeConfigs = rightEdgeConfigs,
                         onEdgeGesture = onEdgeGesture,
                         onBottomGesture = onBottomGesture,
@@ -713,7 +714,12 @@ internal class FloatingChatOverlayController(
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || state != FloatingChatOverlayState.Expanded) return
         val view = composeView ?: return
         view.post {
-            if (!view.isAttachedToWindow || view.width <= 0 || view.height <= 0) return@post
+            if (
+                state != FloatingChatOverlayState.Expanded ||
+                !view.isAttachedToWindow ||
+                view.width <= 0 ||
+                view.height <= 0
+            ) return@post
             val density = context.resources.displayMetrics.density
             val intercepts = edgeGestureInterceptRects(
                 screenWidthPx = view.width,
@@ -722,9 +728,17 @@ internal class FloatingChatOverlayController(
                 configs = EdgeSide.entries.flatMap(preferences::edgeConfigs),
                 fixedTouchTargetDp = floatingChatInternalEdgeGestureTouchTargetDp()
             )
-            view.systemGestureExclusionRects = intercepts.map { rect ->
+            val exclusions = intercepts.map { rect ->
                 Rect(rect.left, rect.top, rect.right, rect.bottom)
-            }
+            }.toMutableList()
+            floatingChatBottomGestureExclusionRect(
+                screenWidthPx = view.width,
+                screenHeightPx = view.height,
+                density = density,
+                widthDp = preferences.bottomGestureBarWidthDp,
+                heightDp = bottomGestureBarTouchHeightDp()
+            )?.let(exclusions::add)
+            view.systemGestureExclusionRects = exclusions
         }
     }
 

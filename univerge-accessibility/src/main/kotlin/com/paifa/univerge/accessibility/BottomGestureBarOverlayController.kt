@@ -7,8 +7,10 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.Rect
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.DisplayMetrics
 import android.util.Log
 import android.view.Gravity
@@ -20,6 +22,7 @@ import com.paifa.univerge.core.model.GestureData
 import com.paifa.univerge.core.model.GestureType
 import com.paifa.univerge.core.gesture.runtime.BottomBarConfig
 import com.paifa.univerge.core.gesture.runtime.BottomGestureRecognizer
+import com.paifa.univerge.core.gesture.runtime.BottomGestureThresholds
 import com.paifa.univerge.core.gesture.runtime.GestureSignal
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -39,7 +42,7 @@ internal fun bottomGestureBarPreviewBounds(
     density: Float,
     widthDp: Int
 ): BottomGestureBarPreviewBounds {
-    val safeDensity = density.coerceAtLeast(0.75f)
+    val safeDensity = density.takeIf { it.isFinite() && it > 0f }?.coerceAtLeast(0.75f) ?: 1f
     val width = (sanitizeBottomGestureBarWidthDp(widthDp) * safeDensity)
         .coerceAtMost(screenWidthPx.toFloat())
     val height = (bottomGestureBarTouchHeightDp() * safeDensity)
@@ -66,6 +69,75 @@ internal fun bottomGestureBarOutlineWindowSize(
 ): Pair<Int, Int> {
     return (realDisplayWidthPx.takeIf { it > 0 } ?: fallbackWidthPx) to
         bottomGestureBarOutlineScreenHeightPx(realDisplayHeightPx, fallbackHeightPx)
+}
+
+/** Converts logical bar geometry once at the platform boundary. */
+internal fun bottomGestureBarLayoutSizePx(
+    widthDp: Int,
+    heightDp: Int,
+    density: Float
+): Pair<Int, Int> {
+    val safeDensity = density.takeIf { it.isFinite() && it > 0f } ?: 1f
+    val widthPx = (sanitizeBottomGestureBarWidthDp(widthDp) * safeDensity)
+        .roundToInt()
+        .coerceAtLeast(1)
+    val heightPx = (heightDp.coerceAtLeast(1) * safeDensity)
+        .roundToInt()
+        .coerceAtLeast(1)
+    return widthPx to heightPx
+}
+
+internal fun bottomGestureBarScreenSizeDp(
+    screenWidthPx: Int,
+    screenHeightPx: Int,
+    density: Float
+): Pair<Float, Float> {
+    val safeDensity = density.takeIf { it.isFinite() && it > 0f } ?: 1f
+    return (screenWidthPx.coerceAtLeast(0) / safeDensity) to
+        (screenHeightPx.coerceAtLeast(0) / safeDensity)
+}
+
+internal fun floatingChatBottomGestureExclusionRect(
+    screenWidthPx: Int,
+    screenHeightPx: Int,
+    density: Float,
+    widthDp: Int,
+    heightDp: Int
+): Rect? {
+    if (
+        screenWidthPx <= 0 ||
+        screenHeightPx <= 0 ||
+        widthDp <= 0 ||
+        heightDp <= 0 ||
+        !density.isFinite() ||
+        density <= 0f
+    ) {
+        return null
+    }
+    val (requestedWidthPx, requestedHeightPx) = bottomGestureBarLayoutSizePx(
+        widthDp = widthDp,
+        heightDp = heightDp,
+        density = density
+    )
+    val widthPx = requestedWidthPx.coerceAtMost(screenWidthPx)
+    val heightPx = requestedHeightPx.coerceAtMost(screenHeightPx)
+    val left = ((screenWidthPx - widthPx) / 2f).roundToInt()
+    return Rect(
+        left,
+        screenHeightPx - heightPx,
+        left + widthPx,
+        screenHeightPx
+    )
+}
+
+/** `View.systemGestureExclusionRects` exists only from API 29 onward. */
+internal fun bottomGestureBarExclusionRects(
+    sdkInt: Int,
+    width: Int,
+    height: Int
+): List<Rect> {
+    if (sdkInt < Build.VERSION_CODES.Q || width <= 0 || height <= 0) return emptyList()
+    return listOf(Rect(0, 0, width, height))
 }
 
 private fun WindowManager.bottomGestureBarOutlineDisplaySize(
@@ -215,19 +287,30 @@ internal class BottomGestureBarOverlayController(
     val hasActiveGesture: Boolean
         get() = gestureBarView?.hasActiveGesture == true
 
+    fun cancelActiveGesture() {
+        gestureBarView?.cancelActiveGesture()
+    }
+
     fun show() {
         if (gestureBarView != null) return
         val density = context.resources.displayMetrics.density.coerceAtLeast(0.01f)
         val metrics = context.resources.displayMetrics
+        val (screenWidthPx, screenHeightPx) = windowManager.bottomGestureBarOutlineDisplaySize(metrics)
+        val (screenWidthDp, screenHeightDp) = bottomGestureBarScreenSizeDp(
+            screenWidthPx = screenWidthPx,
+            screenHeightPx = screenHeightPx,
+            density = density
+        )
         val widthDp = sanitizeBottomGestureBarWidthDp(preferences.bottomGestureBarWidthDp).toFloat()
         val recognizer = BottomGestureRecognizer(
             bar = BottomBarConfig(
-                screenWidthDp = metrics.widthPixels / density,
-                screenHeightDp = metrics.heightPixels / density,
+                screenWidthDp = screenWidthDp,
+                screenHeightDp = screenHeightDp,
                 widthDp = widthDp,
-                heightDp = BottomGestureBarTouchHeightDp.toFloat()
+                heightDp = bottomGestureBarTouchHeightDp().toFloat()
             ),
             actions = bottomGestureCoreActions(),
+            thresholds = bottomGestureBarThresholds(density),
             snapshotVersion = 1L
         )
         val view = BottomGestureBarView(
@@ -313,19 +396,30 @@ internal class BottomGestureBarOverlayController(
     private fun bottomBarConfig(): BottomBarConfig {
         val density = context.resources.displayMetrics.density.coerceAtLeast(0.01f)
         val metrics = context.resources.displayMetrics
+        val (screenWidthPx, screenHeightPx) = windowManager.bottomGestureBarOutlineDisplaySize(metrics)
+        val (screenWidthDp, screenHeightDp) = bottomGestureBarScreenSizeDp(
+            screenWidthPx = screenWidthPx,
+            screenHeightPx = screenHeightPx,
+            density = density
+        )
         return BottomBarConfig(
-            screenWidthDp = metrics.widthPixels / density,
-            screenHeightDp = metrics.heightPixels / density,
+            screenWidthDp = screenWidthDp,
+            screenHeightDp = screenHeightDp,
             widthDp = sanitizeBottomGestureBarWidthDp(preferences.bottomGestureBarWidthDp).toFloat(),
-            heightDp = BottomGestureBarTouchHeightDp.toFloat()
+            heightDp = bottomGestureBarTouchHeightDp().toFloat()
         )
     }
 
     private fun layoutParams(): WindowManager.LayoutParams {
         val density = context.resources.displayMetrics.density
+        val (widthPx, heightPx) = bottomGestureBarLayoutSizePx(
+            widthDp = preferences.bottomGestureBarWidthDp,
+            heightDp = bottomGestureBarTouchHeightDp(),
+            density = density
+        )
         return WindowManager.LayoutParams(
-            (preferences.bottomGestureBarWidthDp * density).toInt(),
-            (BottomGestureBarHeightDp * density).toInt(),
+            widthPx,
+            heightPx,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
@@ -350,7 +444,42 @@ internal class BottomGestureBarOverlayController(
 
     private companion object {
         const val TAG = "UbikiTouch"
-        const val BottomGestureBarHeightDp = 30
+    }
+}
+
+/**
+ * Adapter-side terminal gate. A platform may repeat or replay an UP after a
+ * cancellation; only the first terminal event of a down/up transaction may
+ * dispatch an action.
+ */
+internal class BottomGestureBarDispatchSession<T>(
+    private val onCommit: (T) -> Unit = {}
+) {
+    private var active = false
+    private var terminal = false
+
+    fun onDown() {
+        active = true
+        terminal = false
+    }
+
+    fun onMove() {
+        // MOVE is preview-only; it never reaches the action callback.
+    }
+
+    fun onUp(value: T): Boolean {
+        if (!active || terminal) return false
+        terminal = true
+        active = false
+        onCommit(value)
+        return true
+    }
+
+    fun onCancel() {
+        if (active) {
+            terminal = true
+            active = false
+        }
     }
 }
 
@@ -489,6 +618,19 @@ internal fun bottomGestureBarDispatchesGestureActionAfterTouchEvent(): Boolean =
 
 internal fun bottomGestureBarTouchHeightDp(): Int = BottomGestureBarTouchHeightDp
 
+/**
+ * The legacy View and Native adapters measured movement in physical pixels.
+ * The core recognizer consumes dp, so convert that contract at the boundary.
+ */
+internal fun bottomGestureBarThresholds(density: Float): BottomGestureThresholds {
+    val safeDensity = density.takeIf { it.isFinite() && it > 0f } ?: 1f
+    return BottomGestureThresholds(
+        minSwipeDistanceDp = BottomGestureBarSwipeDistancePx / safeDensity,
+        slopDp = BottomGestureBarMotionSlopPx / safeDensity,
+        upwardHoldDurationMs = BottomGestureBarUpwardPauseMillis
+    )
+}
+
 @SuppressLint("ViewConstructor")
 private class BottomGestureBarView(
     context: Context,
@@ -504,15 +646,43 @@ private class BottomGestureBarView(
         color = Color.argb(255, 25, 35, 45)
     }
     private var pressed = false
+    private var touchActive = false
+    private var finishDelivered = false
+    private var commitPending = false
+    private val dispatchSession = BottomGestureBarDispatchSession<GestureSignal.Commit>()
+    private val holdHandler = Handler(Looper.getMainLooper())
+    private val holdPollRunnable = object : Runnable {
+        override fun run() {
+            if (!touchActive || !recognizer.hasActiveGesture) return
+            recognizer.onHoldTimer(SystemClock.uptimeMillis())
+            holdHandler.postDelayed(this, HOLD_POLL_INTERVAL_MS)
+        }
+    }
 
     val hasActiveGesture: Boolean
         get() = recognizer.hasActiveGesture
+
+    fun cancelActiveGesture() {
+        holdHandler.removeCallbacks(holdPollRunnable)
+        touchActive = false
+        dispatchSession.onCancel()
+        recognizer.onCancel()
+        pressed = false
+        invalidate()
+        if (!commitPending) finishGesture()
+    }
 
     fun updateGeometry(next: BottomBarConfig): Boolean = recognizer.updateGeometry(next)
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
         super.onSizeChanged(width, height, oldWidth, oldHeight)
-        systemGestureExclusionRects = listOf(Rect(0, 0, width, height))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            systemGestureExclusionRects = bottomGestureBarExclusionRects(
+                sdkInt = Build.VERSION.SDK_INT,
+                width = width,
+                height = height
+            )
+        }
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -539,6 +709,8 @@ private class BottomGestureBarView(
         val yDp = event.rawY / density
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                dispatchSession.onDown()
+                if (!commitPending) finishDelivered = false
                 recognizer.onDown(
                     xDp = xDp,
                     yDp = yDp,
@@ -546,21 +718,35 @@ private class BottomGestureBarView(
                     pointerId = event.getPointerId(0),
                     pointerCount = event.pointerCount
                 )
+                touchActive = recognizer.hasActiveGesture
+                holdHandler.removeCallbacks(holdPollRunnable)
+                if (touchActive) holdHandler.postDelayed(holdPollRunnable, HOLD_POLL_INTERVAL_MS)
                 pressed = true
                 invalidate()
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
-                recognizer.onMove(
+                val signal = recognizer.onMove(
                     xDp = xDp,
                     yDp = yDp,
                     timeMillis = event.eventTime,
                     pointerId = event.getPointerId(0),
                     pointerCount = event.pointerCount
                 )
+                if (signal is GestureSignal.Preview) {
+                    dispatchSession.onMove()
+                } else if (signal is GestureSignal.Cancel) {
+                    holdHandler.removeCallbacks(holdPollRunnable)
+                    touchActive = false
+                    dispatchSession.onCancel()
+                    pressed = false
+                    invalidate()
+                    finishGesture()
+                }
                 return true
             }
             MotionEvent.ACTION_UP -> {
+                holdHandler.removeCallbacks(holdPollRunnable)
                 val signal = recognizer.onUp(
                     xDp = xDp,
                     yDp = yDp,
@@ -568,28 +754,51 @@ private class BottomGestureBarView(
                     pointerId = event.getPointerId(0),
                     pointerCount = event.pointerCount
                 )
+                touchActive = false
                 pressed = false
                 invalidate()
-                if (signal is GestureSignal.Commit) {
+                if (signal is GestureSignal.Commit && dispatchSession.onUp(signal)) {
+                    val action = signal.action
+                    val data = signal.data.toScreenData(density)
+                    commitPending = true
                     performClick()
-                    onGesture(signal.action, signal.data.toScreenData(density))
+                    val posted = holdHandler.post {
+                        try {
+                            onGesture(action, data)
+                        } finally {
+                            commitPending = false
+                            finishGesture()
+                        }
+                    }
+                    if (!posted) {
+                        commitPending = false
+                        finishGesture()
+                    }
+                } else {
+                    dispatchSession.onCancel()
+                    if (!commitPending) finishGesture()
                 }
-                onGestureFinished()
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
+                holdHandler.removeCallbacks(holdPollRunnable)
+                touchActive = false
+                dispatchSession.onCancel()
                 recognizer.onCancel()
                 pressed = false
                 invalidate()
-                onGestureFinished()
+                if (!commitPending) finishGesture()
                 return true
             }
             MotionEvent.ACTION_POINTER_DOWN,
             MotionEvent.ACTION_POINTER_UP -> {
+                holdHandler.removeCallbacks(holdPollRunnable)
+                touchActive = false
+                dispatchSession.onCancel()
                 recognizer.onCancel()
                 pressed = false
                 invalidate()
-                onGestureFinished()
+                if (!commitPending) finishGesture()
                 return true
             }
         }
@@ -599,18 +808,30 @@ private class BottomGestureBarView(
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
         super.onWindowFocusChanged(hasWindowFocus)
         if (!hasWindowFocus) {
+            holdHandler.removeCallbacks(holdPollRunnable)
+            touchActive = false
+            dispatchSession.onCancel()
             recognizer.onFocusLost()
             pressed = false
             invalidate()
-            onGestureFinished()
+            if (!commitPending) finishGesture()
         }
     }
 
     override fun onDetachedFromWindow() {
+        holdHandler.removeCallbacks(holdPollRunnable)
+        touchActive = false
+        dispatchSession.onCancel()
         recognizer.onCancel()
         pressed = false
-        onGestureFinished()
+        if (!commitPending) finishGesture()
         super.onDetachedFromWindow()
+    }
+
+    private fun finishGesture() {
+        if (finishDelivered) return
+        finishDelivered = true
+        onGestureFinished()
     }
 
     override fun performClick(): Boolean {
@@ -621,6 +842,7 @@ private class BottomGestureBarView(
     private companion object {
         const val BottomGestureBarVisualWidthDp = 92f
         const val BottomGestureBarVisualHeightDp = 5f
+        const val HOLD_POLL_INTERVAL_MS = 50L
     }
 
     private fun GestureData.toScreenData(density: Float): GestureData = GestureData(

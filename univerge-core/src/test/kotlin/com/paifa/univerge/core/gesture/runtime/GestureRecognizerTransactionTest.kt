@@ -60,7 +60,7 @@ class GestureRecognizerTransactionTest {
         )
         recognizer.onDown(4f, 100f, 0L, pointerId = 1)
         recognizer.onMove(80f, 100f, 10L, pointerId = 1)
-        assertTrue(recognizer.onMove(50f, 100f, 20L, pointerId = 1) is GestureSignal.Cancel)
+        assertTrue(recognizer.onMove(12f, 100f, 20L, pointerId = 1) is GestureSignal.Cancel)
         assertTrue(recognizer.onUp(100f, 100f, 30L, pointerId = 1) is GestureSignal.Ignored)
 
         val outward = SideGestureRecognizer(
@@ -72,6 +72,25 @@ class GestureRecognizerTransactionTest {
         )
         outward.onDown(4f, 100f, 0L, pointerId = 2)
         assertTrue(outward.onMove(-20f, 100f, 10L, pointerId = 2) is GestureSignal.Cancel)
+    }
+
+    @Test
+    fun slightRetractionAfterPreviewKeepsTheSessionAndCommitsTheCurrentGesture() {
+        val recognizer = SideGestureRecognizer(
+            EdgeSide.LEFT,
+            400f,
+            800f,
+            listOf(HotZoneSegment(0f, 800f, thicknessDp = 32f)),
+            mapOf(GestureType.PULL_INWARD_SHORT to GestureAction.Back)
+        )
+
+        recognizer.onDown(4f, 100f, 0L, pointerId = 1)
+        assertTrue(recognizer.onMove(80f, 100f, 10L, pointerId = 1) is GestureSignal.Preview)
+
+        // The finger has moved back by 12dp, but is still well inside the
+        // activation band. This must remain recoverable instead of cancelling.
+        assertTrue(recognizer.onMove(68f, 100f, 20L, pointerId = 1) is GestureSignal.Preview)
+        assertTrue(recognizer.onUp(68f, 100f, 30L, pointerId = 1) is GestureSignal.Commit)
     }
 
     @Test

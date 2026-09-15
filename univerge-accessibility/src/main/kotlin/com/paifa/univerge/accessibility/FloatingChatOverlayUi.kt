@@ -570,6 +570,7 @@ internal fun FloatingChatOverlay(
     onPreviewChromeChanged: (Boolean) -> Unit = {},
     edgeGestureShortThresholdDp: Int = FloatingChatInternalEdgeGestureDefaults.ShortThresholdDp,
     edgeGestureLongThresholdDp: Int = FloatingChatInternalEdgeGestureDefaults.LongThresholdDp,
+    bottomGestureBarWidthDp: Int = defaultBottomGestureBarWidthDp(),
     leftEdgeConfigs: List<EdgeZoneConfig> = emptyList(),
     rightEdgeConfigs: List<EdgeZoneConfig> = emptyList(),
     onEdgeGesture: (EdgeSide, GestureType, GestureData) -> Unit = { _, _, _ -> },
@@ -3158,9 +3159,9 @@ internal fun FloatingChatOverlay(
         )
         FloatingChatExpandedBottomGestureBar(
             onGesture = currentOnBottomGesture,
+            widthDp = bottomGestureBarWidthDp,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
                 .zIndex(48f)
         )
         FavoriteCollectionOverlayHost(

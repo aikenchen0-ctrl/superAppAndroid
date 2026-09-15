@@ -31,4 +31,14 @@ class GestureActionCommitGateTest {
         assertTrue(gate.accept(3L))
         assertTrue(gate.accept(1L))
     }
+
+    @Test
+    fun sameGestureIdFromDifferentOwnersIsNotDeduplicated() {
+        val gate = GestureActionCommitGate(maxEntries = 4)
+
+        assertTrue(gate.accept(GestureActionSource.Native, 41L))
+        assertFalse(gate.accept(GestureActionSource.Native, 41L))
+        assertTrue(gate.accept(GestureActionSource.Server, 41L))
+        assertFalse(gate.accept(GestureActionSource.Server, 41L))
+    }
 }

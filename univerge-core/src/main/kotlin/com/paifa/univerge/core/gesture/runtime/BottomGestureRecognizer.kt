@@ -5,6 +5,8 @@ import com.paifa.univerge.core.model.GestureData
 import com.paifa.univerge.core.model.GestureType
 import kotlin.math.abs
 
+private const val MOVEMENT_CLOCK_RESOLUTION_DP = 0.5f
+
 data class BottomGestureThresholds(
     val minSwipeDistanceDp: Float = 48f,
     val longPressDurationMs: Long = 500L,
@@ -43,6 +45,8 @@ class BottomGestureRecognizer(
     private var peakDx = 0f
     private var peakDy = 0f
     private var lastMovementAt = 0L
+    private var lastMovementX = 0f
+    private var lastMovementY = 0f
     private var upwardHoldArmed = false
 
     val hasActiveGesture: Boolean
@@ -77,6 +81,8 @@ class BottomGestureRecognizer(
         peakDx = 0f
         peakDy = 0f
         lastMovementAt = timeMillis
+        lastMovementX = xDp
+        lastMovementY = yDp
         upwardHoldArmed = false
         state = State.Tracking
         return GestureSignal.Ignored
@@ -93,14 +99,21 @@ class BottomGestureRecognizer(
     fun onMove(xDp: Float, yDp: Float, timeMillis: Long, pointerId: Int = activePointerId, pointerCount: Int = 1): GestureSignal {
         if (state != State.Tracking) return GestureSignal.Ignored
         if (pointerCount != 1 || pointerId != activePointerId) return cancel()
+        // A platform can deliver repeated or slightly jittery MOVE samples
+        // while the finger is held still. Refresh the pause window only after
+        // movement accumulates beyond the clock's noise resolution.
+        val movedSinceLastSample = movementExceededResolution(xDp, yDp)
         latestX = xDp
         latestY = yDp
         val dx = xDp - downX
         val dy = yDp - downY
         if (abs(dx) > abs(peakDx)) peakDx = dx
         if (abs(dy) > abs(peakDy)) peakDy = dy
-        if (abs(dx) > thresholds.slopDp || abs(dy) > thresholds.slopDp) {
-            lastMovementAt = timeMillis
+        if (movedSinceLastSample) {
+            lastMovementX = xDp
+            lastMovementY = yDp
+            lastMovementAt = maxOf(lastMovementAt, timeMillis)
+            upwardHoldArmed = false
         }
         if (candidate != null && rollback(dx, dy)) return cancel()
         if (abs(dx) > thresholds.slopDp || abs(dy) > thresholds.slopDp) movedBeyondSlop = true
@@ -126,8 +139,15 @@ class BottomGestureRecognizer(
     fun onUp(xDp: Float, yDp: Float, timeMillis: Long, pointerId: Int = activePointerId, pointerCount: Int = 1): GestureSignal {
         if (state != State.Tracking) return GestureSignal.Ignored
         if (pointerCount != 1 || pointerId != activePointerId) return cancel()
+        val movedSinceLastSample = movementExceededResolution(xDp, yDp)
         latestX = xDp
         latestY = yDp
+        if (movedSinceLastSample) {
+            lastMovementX = xDp
+            lastMovementY = yDp
+            lastMovementAt = maxOf(lastMovementAt, timeMillis)
+            upwardHoldArmed = false
+        }
         val dx = xDp - downX
         val dy = yDp - downY
         if (candidate != null && rollback(dx, dy)) return cancel()
@@ -186,6 +206,16 @@ class BottomGestureRecognizer(
         peakDy <= -thresholds.minSwipeDistanceDp &&
             abs(peakDy) > abs(peakDx) &&
             timeMillis - lastMovementAt >= thresholds.upwardHoldDurationMs
+
+    private fun movementExceededResolution(xDp: Float, yDp: Float): Boolean {
+        val slop = thresholds.slopDp.coerceAtLeast(0f)
+        val resolution = minOf(slop, MOVEMENT_CLOCK_RESOLUTION_DP)
+        return if (resolution == 0f) {
+            xDp != lastMovementX || yDp != lastMovementY
+        } else {
+            abs(xDp - lastMovementX) > resolution || abs(yDp - lastMovementY) > resolution
+        }
+    }
 
     private fun rollback(dx: Float, dy: Float): Boolean =
         (peakDx > thresholds.minSwipeDistanceDp && dx < peakDx - thresholds.retractionToleranceDp) ||

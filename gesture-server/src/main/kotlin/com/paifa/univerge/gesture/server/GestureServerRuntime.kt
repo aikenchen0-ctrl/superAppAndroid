@@ -1,5 +1,7 @@
 package com.paifa.univerge.gesture.server
 
+import java.util.concurrent.CopyOnWriteArrayList
+
 /** Persistence boundary kept independent from SharedPreferences for deterministic tests. */
 interface GestureServerSnapshotStore {
     fun read(): GestureServerSnapshot?
@@ -19,6 +21,7 @@ class GestureServerRuntime(
 ) {
     private var current: GestureServerSnapshot? = null
     private var started = false
+    private val snapshotListeners = CopyOnWriteArrayList<(GestureServerSnapshot) -> Unit>()
 
     val snapshot: GestureServerSnapshot?
         get() = current
@@ -29,6 +32,13 @@ class GestureServerRuntime(
             current = store.read()?.takeIf(GestureServerSnapshot::isValid)
         }
         return current
+    }
+
+    /** Registers a low-frequency snapshot listener and immediately replays the current value. */
+    fun addSnapshotListener(listener: (GestureServerSnapshot) -> Unit): AutoCloseable {
+        snapshotListeners += listener
+        current?.let { snapshot -> runCatching { listener(snapshot) } }
+        return AutoCloseable { snapshotListeners.remove(listener) }
     }
 
     fun apply(next: GestureServerSnapshot): GestureServerApplyResult {
@@ -49,6 +59,9 @@ class GestureServerRuntime(
         )
         store.write(current!!)
         onSnapshotApplied(current!!)
+        snapshotListeners.forEach { listener ->
+            runCatching { listener(current!!) }
+        }
         return GestureServerApplyResult(true, "accepted", current)
     }
 

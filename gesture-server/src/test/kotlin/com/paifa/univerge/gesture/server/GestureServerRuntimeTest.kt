@@ -61,6 +61,35 @@ class GestureServerRuntimeTest {
         assertEquals(GestureAction.None, restored?.actionFor(EdgeSide.LEFT, GestureType.SWIPE_DOWN))
     }
 
+    @Test
+    fun gestureThresholdsRoundTripWithTheServerSnapshot() {
+        val source = snapshot(6L).copy(
+            shortPullDistanceDp = 31f,
+            longPullDistanceDp = 141f,
+            holdDurationMs = 620L
+        )
+        val restored = GestureServerSnapshot.fromBundle(source.toBundle())
+
+        assertEquals(31f, restored?.shortPullDistanceDp ?: 0f, 0.001f)
+        assertEquals(141f, restored?.longPullDistanceDp ?: 0f, 0.001f)
+        assertEquals(620L, restored?.holdDurationMs)
+    }
+
+    @Test
+    fun snapshotListenersReceiveOnlyAcceptedSnapshotsAndCanBeRemoved() {
+        val runtime = GestureServerRuntime(InMemoryGestureServerSnapshotStore())
+        val versions = mutableListOf<Long>()
+        val registration = runtime.addSnapshotListener { versions += it.version }
+
+        assertTrue(runtime.apply(snapshot(1L)).accepted)
+        assertFalse(runtime.apply(snapshot(1L)).accepted)
+        assertTrue(runtime.apply(snapshot(2L)).accepted)
+        registration.close()
+        assertTrue(runtime.apply(snapshot(3L)).accepted)
+
+        assertEquals(listOf(1L, 2L), versions)
+    }
+
     private fun snapshot(version: Long) = GestureServerSnapshot(
         version = version,
         density = 3f,
