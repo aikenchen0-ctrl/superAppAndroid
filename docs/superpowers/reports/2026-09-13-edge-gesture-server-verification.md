@@ -51,7 +51,7 @@ Merged manifest confirms the isolated services run with `android:process=":gestu
 
 ## Remaining
 
-- The Macrobenchmark source now compiles at [EdgeGestureLatencyBenchmark.kt](C:/codeDev/zhifa/superAppAndroid/benchmark/src/main/kotlin/com/paifa/univerge/benchmark/EdgeGestureLatencyBenchmark.kt); same-device latency/allocation measurements and real-device gesture acceptance remain pending because `adb devices` reports no connected device.
+- The Macrobenchmark source now compiles at [EdgeGestureLatencyBenchmark.kt](C:/codeDev/_superAppAndroid_remote/benchmark/src/main/kotlin/com/paifa/univerge/benchmark/EdgeGestureLatencyBenchmark.kt); same-device latency/allocation measurements and real-device gesture acceptance remain pending because `adb devices` reports no connected device.
 - A pre-existing Core sample-data test still fails because `FloatingChatMessageType.EnterpriseInvite` exists in the enum but is absent from that test's expected set; it is unrelated to the gesture changes.
 - The full accessibility suite currently has 38 existing UI/contract failures (for example `FloatingChatAiVoiceEntryTest`, `FloatingChatMessageUiContractTest`, and workspace presentation contracts); the targeted gesture suites and Debug APK build pass independently.
 - `adb devices` currently reports no connected device, so the reported “first swipe delayed, then two returns” classification still needs a real-device trace. The added debug fields are `owner`, `gestureId`, `action`, and terminal acceptance/rejection.
