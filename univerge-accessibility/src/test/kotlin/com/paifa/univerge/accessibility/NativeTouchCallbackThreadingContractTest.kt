@@ -1,19 +1,37 @@
 package com.paifa.univerge.accessibility
 
 import java.io.File
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class NativeTouchCallbackThreadingContractTest {
     @Test
-    fun nativeTouchCallbacksAreSerializedThroughTheMainHandler() {
+    fun nativeTouchCallbacksDoNotAddAMainLooperHop() {
         val source = sourceFile().readText()
 
-        assertTrue(source.contains("import android.os.Handler"))
-        assertTrue(source.contains("private val mainHandler = Handler(Looper.getMainLooper())"))
-        assertTrue(source.contains("Executor { command -> mainHandler.post(command) }"))
-        assertFalse(source.contains("Executor { command -> command.run() }"))
+        assertTrue(
+            "Touch callbacks must run on the callback executor so MOVE cannot backlog the main looper",
+            source.contains("Executor { command -> command.run() }")
+        )
+        assertFalse(
+            "per-event main-handler hops delay ACTION_UP behind window work",
+            source.contains("Executor { command -> mainHandler.post(command) }")
+        )
+    }
+
+    @Test
+    fun visualProgressUsesACoalescedMainDispatch() {
+        val source = sourceFile().readText()
+
+        assertTrue(
+            "visual MOVE updates must be coalesced before touching WindowManager/Compose",
+            source.contains("postCoalescedVisualProgress")
+        )
+        assertTrue(
+            "terminal visual cleanup must have an explicit main-thread boundary",
+            source.contains("postVisualTerminal")
+        )
     }
 
     private fun sourceFile(): File {

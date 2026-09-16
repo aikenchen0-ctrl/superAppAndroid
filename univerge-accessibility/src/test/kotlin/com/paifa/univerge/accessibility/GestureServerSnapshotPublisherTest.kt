@@ -137,6 +137,32 @@ class GestureServerSnapshotPublisherTest {
     }
 
     @Test
+    fun recognitionBehaviorSchemaChangeInvalidatesAnOlderPublisherRevision() {
+        val context = BindingContext(RuntimeEnvironment.getApplication())
+        val publisher = GestureServerSnapshotPublisher(context)
+        val first = publisher.revisionFor(
+            configVersion = 10L,
+            screenWidthPx = 1080,
+            screenHeightPx = 2400,
+            density = 3f
+        )
+
+        context.getSharedPreferences("gesture_server_publisher", Context.MODE_PRIVATE)
+            .edit()
+            .putInt("behavior_schema_version", 1)
+            .commit()
+
+        val afterBehaviorChange = publisher.revisionFor(
+            configVersion = 10L,
+            screenWidthPx = 1080,
+            screenHeightPx = 2400,
+            density = 3f
+        )
+
+        assertTrue(afterBehaviorChange > first)
+    }
+
+    @Test
     fun floatingChatSurfaceOwnershipChangesAdvanceThePublisherRevision() {
         val context = BindingContext(RuntimeEnvironment.getApplication())
         val publisher = GestureServerSnapshotPublisher(context)

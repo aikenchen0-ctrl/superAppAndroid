@@ -7,6 +7,7 @@ import android.graphics.Region
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.Display
 import android.view.MotionEvent
@@ -23,6 +24,7 @@ import com.paifa.univerge.core.gesture.runtime.PointerSample
 import com.paifa.univerge.core.gesture.runtime.SideGestureRecognizer
 import com.paifa.univerge.core.gesture.runtime.SideGestureThresholds
 import com.paifa.univerge.core.gesture.runtime.BottomGestureThresholds
+import com.paifa.univerge.core.gesture.runtime.configuredSideGestureThresholdsDp
 import com.paifa.univerge.core.model.GestureAction
 import com.paifa.univerge.core.model.EdgeSide
 import com.paifa.univerge.core.model.EdgeZoneConfig
@@ -52,12 +54,31 @@ internal class NativeEdgeGestureController(
     private val previewData = GestureData(0f, 0f, 0f, 0f)
     private var coreBridge: NativeGestureCoreBridge? = null
     private var activeConfig: NativeEdgeGestureConfig? = null
+    private val visualDispatch = NativeVisualDispatch<NativeVisualProgress>(
+        post = { runnable -> mainHandler.post(runnable) },
+        onProgress = ::renderVisualProgress,
+        onTerminal = onGestureEnd
+    )
     private val sessionAbort = NativeGestureSessionAbort(
         cancelCore = { coreBridge?.onCancel() },
         cancelBackProgress = ::cancelBackProgressIfNeeded,
-        endPreview = onGestureEnd,
+        endPreview = ::postVisualTerminal,
         clearFields = ::resetGestureFields
     )
+    private val bottomHoldPollRunnable = object : Runnable {
+        override fun run() {
+            dispatchNativeHoldTimer()
+        }
+    }
+    /**
+     * A directional bottom gesture may commit before Android delivers its
+     * terminal event. Keep the transaction alive briefly so a delayed UP can
+     * finish it, but reclaim it when the platform drops that terminal event.
+     * Each runnable captures its session generation; an old queued runnable
+     * can therefore never abort a newer touch transaction.
+     */
+    @Volatile
+    private var bottomTerminalWatchdog: Runnable? = null
 
     var isRunning: Boolean = false
         private set
@@ -67,6 +88,7 @@ internal class NativeEdgeGestureController(
 
     fun start(config: NativeEdgeGestureConfig): Boolean {
         if (Build.VERSION.SDK_INT < NATIVE_TOUCH_INTERACTION_MIN_SDK) return false
+        visualDispatch.resumeVisuals()
         val touchController = runCatching {
             service.getTouchInteractionController(Display.DEFAULT_DISPLAY)
         }.onFailure {
@@ -98,7 +120,10 @@ internal class NativeEdgeGestureController(
 
         return runCatching {
             touchController.registerCallback(
-                Executor { command -> mainHandler.post(command) },
+                // The platform already serializes callbacks for the supplied
+                // executor. Running the command directly avoids putting every
+                // MOVE ahead of ACTION_UP on the service main looper.
+                Executor { command -> command.run() },
                 newCallback
             )
             controller = touchController
@@ -124,6 +149,7 @@ internal class NativeEdgeGestureController(
 
     fun stop() {
         abortActiveSession()
+        visualDispatch.clearPendingVisuals()
         val touchController = controller
         val registeredCallback = callback
         config?.let { currentConfig ->
@@ -206,7 +232,9 @@ internal class NativeEdgeGestureController(
                 eventTime = event.eventTime,
                 sessionStartTime = nativeSessionStartTime,
                 lastAcceptedEventTime = nativeLastAcceptedEventTime,
-                sessionActive = nativeEventSessionActive
+                sessionActive = nativeEventSessionActive,
+                sessionDownTime = nativeSessionDownTime,
+                eventDownTime = event.downTime
             )
         ) {
             return
@@ -215,8 +243,10 @@ internal class NativeEdgeGestureController(
             // A lost UP/CANCEL must not leak the previous BackWave selection
             // into the next transaction. Abort before accepting the new DOWN.
             abortActiveSession()
+            nativeSessionGeneration += 1L
             nativeSessionStartTime = event.eventTime
             nativeLastAcceptedEventTime = event.eventTime
+            nativeSessionDownTime = event.downTime
             nativeEventSessionActive = true
         } else if (gestureDelegated) {
             if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) {
@@ -288,6 +318,8 @@ internal class NativeEdgeGestureController(
         }
         activeBottomGesture = signal is NativeCoreSignal.Bottom
         consumingGesture = activeBottomGesture
+        bottomCommitGestureId = 0L
+        if (activeBottomGesture) scheduleNativeHoldPoll()
         latestBackProgress = null
         sentBackCancel = false
     }
@@ -326,9 +358,18 @@ internal class NativeEdgeGestureController(
         latestX = event.x
         latestY = event.y
         if (signal is NativeCoreSignal.Bottom) {
-            if (signal.signal is GestureSignal.Preview) consumingGesture = true
-            if (signal.signal is GestureSignal.Cancel) {
-                abortActiveSession()
+            when (signal.signal) {
+                is GestureSignal.Preview -> consumingGesture = true
+                is GestureSignal.Commit -> {
+                    consumingGesture = true
+                    stopNativeHoldPoll()
+                    dispatchBottomCommit(signal, config, fromMove = true)
+                }
+                is GestureSignal.Cancel -> {
+                    stopNativeHoldPoll()
+                    abortActiveSession()
+                }
+                else -> Unit
             }
             return
         }
@@ -343,7 +384,6 @@ internal class NativeEdgeGestureController(
         val active = activeConfig ?: config
         updatePreviewData(startX, startY, latestX, latestY)
         val previewAction = (signal.signal as? GestureSignal.Preview)?.action ?: GestureAction.None
-        onGestureProgress(side, previewAction, previewData)
         val dx = latestX - startX
         val dy = latestY - startY
         val distance = hypot(dx, dy)
@@ -353,19 +393,30 @@ internal class NativeEdgeGestureController(
             touchX = latestX,
             touchY = latestY
         )
+        var backProgressCancelled = false
 
         if (backProgress != null) {
             latestBackProgress = backProgress
             sentBackCancel = false
-            onBackGestureProgress(intercept, backProgress)
             if (distance > touchSlopPx || consumingGesture) {
                 consumingGesture = true
             }
         } else if (latestBackProgress != null && !sentBackCancel) {
             latestBackProgress = null
             sentBackCancel = true
-            onBackGestureCancel()
+            visualBackCancelPending = true
+            backProgressCancelled = true
         }
+        postCoalescedVisualProgress(
+            NativeVisualProgress(
+                side = side,
+                previewAction = previewAction,
+                data = previewData.copy(),
+                intercept = intercept,
+                backProgress = backProgress,
+                backProgressCancelled = backProgressCancelled
+            )
+        )
         when (signal.signal) {
             is GestureSignal.Preview -> {
                 consumingGesture = true
@@ -393,6 +444,12 @@ internal class NativeEdgeGestureController(
         config: NativeEdgeGestureConfig,
         event: MotionEvent
     ) {
+        stopNativeHoldPoll()
+        stopBottomTerminalWatchdog()
+        // onUp() finishes the core transaction, so capture its id before the
+        // recognizer clears the active session. The visual queue uses this id
+        // to coalesce only duplicate terminals from the same gesture.
+        val terminalGestureId = coreBridge?.activeGestureId ?: 0L
         val signal = coreBridge?.onUp(
             xPx = event.x,
             yPx = event.y,
@@ -405,16 +462,16 @@ internal class NativeEdgeGestureController(
         if (signal is NativeCoreSignal.Bottom) {
             val commit = signal.signal as? GestureSignal.Commit
             if (commit != null) {
-                val type = bottomGestureTypeFor(commit.gesture)
-                if (type != null) onBottomGesture(type, commit.action, commit.data.toPx(activeConfig?.density ?: config.density))
+                dispatchBottomCommit(signal, config, fromMove = false)
             }
-            onGestureEnd()
+            postVisualTerminal(gestureKey = terminalGestureId)
             resetGestureFields()
             nativeEventSessionActive = false
             return
         }
         if (signal !is NativeCoreSignal.Side) {
             requestDelegatingOnce(touchController)
+            postVisualTerminal(gestureKey = terminalGestureId)
             resetGestureFields()
             nativeEventSessionActive = false
             return
@@ -423,7 +480,6 @@ internal class NativeEdgeGestureController(
         val intercept = activeIntercept
         val active = activeConfig ?: config
         val commit = signal.signal as? GestureSignal.Commit
-        onGestureEnd()
         val data = commit?.data?.toPx(active.density)
             ?: GestureData(startX, startY, latestX, latestY)
         val finalBackProgress = backProgressFor(
@@ -432,9 +488,13 @@ internal class NativeEdgeGestureController(
             touchX = latestX,
             touchY = latestY
         ) ?: latestBackProgress?.copy(selectedOption = BackGestureOption.None)
+        val visualBackEnd = if (commit != null && finalBackProgress != null && intercept != null) {
+            { onBackGestureEnd(intercept, finalBackProgress) }
+        } else {
+            null
+        }
 
         if (commit != null && finalBackProgress != null && intercept != null) {
-            onBackGestureEnd(intercept, finalBackProgress)
             if (!onBackGestureCommit(intercept, finalBackProgress, commit.action, data)) {
                 onGesture(side, commit.gesture, commit.action, data)
             }
@@ -444,6 +504,12 @@ internal class NativeEdgeGestureController(
             cancelBackProgressIfNeeded()
             requestDelegatingOnce(touchController)
         }
+        // The terminal action has crossed its action boundary before visual
+        // cleanup is posted. WindowManager work cannot delay ACTION_UP.
+        postVisualTerminal(
+            gestureKey = terminalGestureId,
+            afterBackEnd = visualBackEnd
+        )
         resetGestureFields()
         nativeEventSessionActive = false
     }
@@ -501,10 +567,56 @@ internal class NativeEdgeGestureController(
         }
     }
 
+    /** Enqueue only the newest visual state; recognition and terminal dispatch stay synchronous. */
+    private fun postCoalescedVisualProgress(progress: NativeVisualProgress) {
+        visualDispatch.postCoalescedVisualProgress(progress)
+    }
+
+    private fun renderVisualProgress(progress: NativeVisualProgress) {
+        onGestureProgress(progress.side, progress.previewAction, progress.data)
+        if (progress.backProgressCancelled) {
+            onBackGestureCancel()
+            visualBackCancelPending = false
+        }
+        progress.backProgress?.let { backProgress ->
+            onBackGestureProgress(progress.intercept, backProgress)
+        }
+    }
+
+    /**
+     * Clear pending MOVE visuals, then run terminal visual cleanup on the main
+     * handler. The callback is captured before gesture fields are reset.
+     */
+    private fun postVisualTerminal(afterBackEnd: (() -> Unit)? = null) {
+        val activeGestureKey = coreBridge?.activeGestureId ?: 0L
+        postVisualTerminal(
+            gestureKey = activeGestureKey.takeIf { it > 0L } ?: bottomCommitGestureId,
+            afterBackEnd = afterBackEnd
+        )
+    }
+
+    private fun postVisualTerminal(
+        gestureKey: Long,
+        afterBackEnd: (() -> Unit)? = null
+    ) {
+        val cancelBack = shouldCancelBackProgressAtVisualTerminal(
+            hasBackEnd = afterBackEnd != null,
+            cancellationPending = visualBackCancelPending,
+            backProgressActive = latestBackProgress != null && !sentBackCancel
+        )
+        visualBackCancelPending = false
+        if (cancelBack) sentBackCancel = true
+        visualDispatch.postVisualTerminal(gestureKey = gestureKey) {
+            if (cancelBack) onBackGestureCancel()
+            afterBackEnd?.invoke()
+            onGestureEnd()
+        }
+    }
+
     private fun cancelBackProgressIfNeeded() {
         if (latestBackProgress == null || sentBackCancel) return
         sentBackCancel = true
-        onBackGestureCancel()
+        visualBackCancelPending = true
     }
 
     private fun abortActiveSession(): Boolean = sessionAbort.abort(
@@ -544,8 +656,89 @@ internal class NativeEdgeGestureController(
     }
 
     private fun resetGestureFields() {
+        stopNativeHoldPoll()
+        stopBottomTerminalWatchdog()
         clearGestureTrackingFields()
         gestureDelegated = false
+    }
+
+    private fun scheduleNativeHoldPoll() {
+        mainHandler.removeCallbacks(bottomHoldPollRunnable)
+        mainHandler.postDelayed(bottomHoldPollRunnable, NATIVE_HOLD_POLL_INTERVAL_MS)
+    }
+
+    private fun stopNativeHoldPoll() {
+        mainHandler.removeCallbacks(bottomHoldPollRunnable)
+    }
+
+    private fun scheduleBottomTerminalWatchdog() {
+        stopBottomTerminalWatchdog()
+        val generation = nativeSessionGeneration
+        val watchdog = Runnable {
+            dispatchBottomTerminalWatchdog(generation)
+        }
+        bottomTerminalWatchdog = watchdog
+        mainHandler.postDelayed(watchdog, NATIVE_TERMINAL_WATCHDOG_TIMEOUT_MS)
+    }
+
+    private fun stopBottomTerminalWatchdog() {
+        bottomTerminalWatchdog?.let(mainHandler::removeCallbacks)
+        bottomTerminalWatchdog = null
+    }
+
+    @Synchronized
+    private fun dispatchBottomTerminalWatchdog(generation: Long) {
+        if (!shouldRunNativeBottomTerminalWatchdog(
+                watchdogGeneration = generation,
+                currentGeneration = nativeSessionGeneration,
+                sessionActive = nativeEventSessionActive,
+                bottomGestureActive = activeBottomGesture
+            )
+        ) {
+            return
+        }
+        bottomTerminalWatchdog = null
+        // The action already crossed the boundary at MOVE/hold time. This
+        // timeout only performs the missing terminal cleanup; it never emits
+        // the bottom action a second time.
+        abortActiveSession()
+        nativeEventSessionActive = false
+    }
+
+    @Synchronized
+    private fun dispatchNativeHoldTimer() {
+        if (!nativeEventSessionActive || !activeBottomGesture) return
+        val currentConfig = activeConfig ?: config ?: return
+        val signal = coreBridge?.onHoldTimer(SystemClock.uptimeMillis())
+        if (signal is NativeCoreSignal.Bottom) {
+            if (signal.signal is GestureSignal.Commit) {
+                dispatchBottomCommit(signal, currentConfig, fromMove = true)
+                stopNativeHoldPoll()
+                return
+            }
+        }
+        if (nativeEventSessionActive && activeBottomGesture) {
+            scheduleNativeHoldPoll()
+        }
+    }
+
+    private fun dispatchBottomCommit(
+        signal: NativeCoreSignal.Bottom,
+        config: NativeEdgeGestureConfig,
+        fromMove: Boolean
+    ): Boolean {
+        val commit = signal.signal as? GestureSignal.Commit ?: return false
+        if (commit.gestureId <= 0L || commit.gestureId == bottomCommitGestureId) return false
+        val type = bottomGestureTypeFor(commit.gesture) ?: return false
+        if (fromMove && !shouldDispatchBottomGestureDuringMove(type)) return false
+        bottomCommitGestureId = commit.gestureId
+        onBottomGesture(
+            type,
+            commit.action,
+            commit.data.toPx(activeConfig?.density ?: config.density)
+        )
+        if (fromMove) scheduleBottomTerminalWatchdog()
+        return true
     }
 
     private fun clearGestureTrackingFields() {
@@ -558,8 +751,10 @@ internal class NativeEdgeGestureController(
         latestY = 0f
         consumingGesture = false
         activeBottomGesture = false
+        bottomCommitGestureId = 0L
         latestBackProgress = null
         sentBackCancel = false
+        visualBackCancelPending = false
     }
 
     private fun updatePreviewData(startX: Float, startY: Float, endX: Float, endY: Float) {
@@ -577,22 +772,192 @@ internal class NativeEdgeGestureController(
     private var latestY = 0f
     private var consumingGesture = false
     private var activeBottomGesture = false
+    private var bottomCommitGestureId = 0L
     private var latestBackProgress: BackGestureProgress? = null
     private var sentBackCancel = false
+    @Volatile
+    private var visualBackCancelPending = false
     private var gestureDelegated = false
     private var nativeSessionStartTime = Long.MIN_VALUE
     private var nativeLastAcceptedEventTime = Long.MIN_VALUE
+    private var nativeSessionDownTime = Long.MIN_VALUE
+    private var nativeSessionGeneration = 0L
     private var nativeEventSessionActive = false
 
     private companion object {
         const val TAG = "NativeEdgeGesture"
+        const val NATIVE_HOLD_POLL_INTERVAL_MS = 50L
+        const val NATIVE_TERMINAL_WATCHDOG_TIMEOUT_MS = 1_500L
     }
 }
 
-internal fun shouldDispatchBottomGestureDuringMove(gestureType: BottomGestureBarGestureType): Boolean {
-    return gestureType == BottomGestureBarGestureType.SwipeUpHold ||
-        gestureType == BottomGestureBarGestureType.LongPress
+internal fun shouldCancelBackProgressAtVisualTerminal(
+    hasBackEnd: Boolean,
+    cancellationPending: Boolean,
+    backProgressActive: Boolean
+): Boolean {
+    if (hasBackEnd) return false
+    return cancellationPending || backProgressActive
 }
+
+private data class NativeVisualProgress(
+    val side: EdgeSide,
+    val previewAction: GestureAction,
+    val data: GestureData,
+    val intercept: NativeTouchInterceptRect,
+    val backProgress: BackGestureProgress?,
+    val backProgressCancelled: Boolean
+)
+
+/**
+ * Main-thread visual boundary for native input. MOVE frames are latest-value
+ * state, while a terminal event invalidates any frame that has not run yet.
+ */
+internal class NativeVisualDispatch<T>(
+    private val post: ((() -> Unit) -> Unit),
+    private val onProgress: (T) -> Unit,
+    private val onTerminal: () -> Unit = {}
+) {
+    private val lock = Any()
+    private var generation = 0L
+    private var acceptingVisuals = true
+    private var pendingProgress: PendingProgress<T>? = null
+    private var scheduledProgressGeneration: Long? = null
+    private val pendingTerminals = java.util.ArrayDeque<PendingTerminal>()
+
+    fun resumeVisuals() {
+        synchronized(lock) {
+            acceptingVisuals = true
+        }
+    }
+
+    /** Invalidates work already posted to the main thread without removing its Runnable. */
+    fun clearPendingVisuals() {
+        synchronized(lock) {
+            acceptingVisuals = false
+            generation += 1L
+            pendingProgress = null
+            scheduledProgressGeneration = null
+            pendingTerminals.clear()
+        }
+    }
+
+    fun postCoalescedVisualProgress(progress: T) {
+        val generationToSchedule = synchronized(lock) {
+            if (!acceptingVisuals) {
+                null
+            } else {
+                // A new frame belongs to the current generation. Keep a queued
+                // terminal callback intact: Handler FIFO must finish the previous
+                // gesture before this frame is rendered.
+                pendingProgress = PendingProgress(generation, progress)
+                if (scheduledProgressGeneration == generation) {
+                    null
+                } else {
+                    scheduledProgressGeneration = generation
+                    generation
+                }
+            }
+        }
+        generationToSchedule?.let { value -> post { consumeProgress(value) } }
+    }
+
+    fun postVisualTerminal(gestureKey: Long = 0L, after: (() -> Unit)? = null) {
+        var scheduleTerminal = false
+        synchronized(lock) {
+            if (acceptingVisuals) {
+                generation += 1L
+                pendingProgress = null
+                val callback = after ?: onTerminal
+                // Repeated terminal notifications for one gesture are noise, but
+                // terminals from different gestures must remain ordered.
+                if (pendingTerminals.none { it.gestureKey == gestureKey }) {
+                    pendingTerminals.addLast(PendingTerminal(gestureKey, callback))
+                    // Each distinct terminal owns one FIFO main-thread task. This
+                    // keeps a second gesture from waiting on an implicit reschedule
+                    // that a test executor (or a saturated Handler) may not drain.
+                    scheduleTerminal = true
+                }
+            }
+        }
+        if (scheduleTerminal) post { consumeNextTerminal() }
+    }
+
+    private fun consumeProgress(generationValue: Long) {
+        val frame: T?
+        synchronized(lock) {
+            if (scheduledProgressGeneration == generationValue) {
+                scheduledProgressGeneration = null
+            }
+            val pending = pendingProgress
+            frame = if (
+                acceptingVisuals &&
+                generation == generationValue &&
+                pending?.generation == generationValue
+            ) {
+                pendingProgress = null
+                pending.value
+            } else {
+                null
+            }
+        }
+        frame?.let(onProgress)
+
+        // A producer may replace the frame while rendering. Schedule only one
+        // bounded follow-up for the newer state.
+        val followUpGeneration: Long?
+        synchronized(lock) {
+            val pending = pendingProgress
+            followUpGeneration = if (
+                pending != null &&
+                pending.generation == generation &&
+                scheduledProgressGeneration == null
+            ) {
+                scheduledProgressGeneration = generation
+                generation
+            } else {
+                null
+            }
+        }
+        followUpGeneration?.let { value -> post { consumeProgress(value) } }
+    }
+
+    private fun consumeNextTerminal() {
+        val terminal: (() -> Unit)?
+        synchronized(lock) {
+            terminal = if (acceptingVisuals) {
+                pendingTerminals.pollFirst()?.callback
+            } else {
+                null
+            }
+        }
+        if (terminal == null) return
+
+        terminal.invoke()
+    }
+
+    private data class PendingTerminal(
+        val gestureKey: Long,
+        val callback: () -> Unit
+    )
+
+    private data class PendingProgress<T>(
+        val generation: Long,
+        val value: T
+    )
+
+}
+
+internal fun shouldDispatchBottomGestureDuringMove(gestureType: BottomGestureBarGestureType): Boolean {
+    return gestureType != BottomGestureBarGestureType.Tap
+}
+
+internal fun shouldRunNativeBottomTerminalWatchdog(
+    watchdogGeneration: Long,
+    currentGeneration: Long,
+    sessionActive: Boolean,
+    bottomGestureActive: Boolean
+): Boolean = watchdogGeneration == currentGeneration && sessionActive && bottomGestureActive
 
 internal fun shouldRequestNativeTouchDelegation(
     alreadyDelegated: Boolean,
@@ -620,10 +985,17 @@ internal fun shouldIgnoreOutOfOrderNativeEvent(
     eventTime: Long,
     sessionStartTime: Long,
     lastAcceptedEventTime: Long,
-    sessionActive: Boolean = true
+    sessionActive: Boolean = true,
+    sessionDownTime: Long = Long.MIN_VALUE,
+    eventDownTime: Long = Long.MIN_VALUE
 ): Boolean {
     if (action == MotionEvent.ACTION_DOWN) return false
     if (!sessionActive || sessionStartTime == Long.MIN_VALUE) return true
+    if (
+        sessionDownTime != Long.MIN_VALUE &&
+        eventDownTime != Long.MIN_VALUE &&
+        eventDownTime != sessionDownTime
+    ) return true
     return eventTime < sessionStartTime || eventTime < lastAcceptedEventTime
 }
 
@@ -1026,7 +1398,32 @@ internal fun edgeGestureInterceptRects(
 }
 
 internal fun nativeGestureThresholdPx(thresholdDp: Int, density: Float): Float {
-    return thresholdDp.coerceIn(8, 320) * density * NATIVE_GESTURE_THRESHOLD_RESPONSE_RATIO
+    val safeDensity = density.takeIf { it.isFinite() && it > 0f } ?: 1f
+    return configuredSideGestureThresholdsDp(
+        shortPullDistanceDp = thresholdDp.toFloat(),
+        longPullDistanceDp = thresholdDp.toFloat()
+    ).minPullDistanceDp * safeDensity
 }
 
-private const val NATIVE_GESTURE_THRESHOLD_RESPONSE_RATIO = 0.70f
+internal fun nativeGestureLongThresholdPx(
+    shortThresholdDp: Int,
+    longThresholdDp: Int,
+    density: Float
+): Float {
+    val safeDensity = density.takeIf { it.isFinite() && it > 0f } ?: 1f
+    return configuredSideGestureThresholdsDp(
+        shortPullDistanceDp = shortThresholdDp.toFloat(),
+        longPullDistanceDp = longThresholdDp.toFloat()
+    ).longPullDistanceDp * safeDensity
+}
+
+internal fun nativeGestureVerticalThresholdPx(thresholdDp: Int, density: Float): Float {
+    val safeDensity = density.takeIf { it.isFinite() && it > 0f } ?: 1f
+    return configuredSideGestureThresholdsDp(
+        shortPullDistanceDp = thresholdDp.toFloat(),
+        longPullDistanceDp = thresholdDp.toFloat()
+    ).minSwipeDistanceDp * safeDensity
+}
+
+internal fun edgeOverlayVerticalSwipeThresholdPx(shortThresholdDp: Int, density: Float): Float =
+    nativeGestureVerticalThresholdPx(shortThresholdDp, density)

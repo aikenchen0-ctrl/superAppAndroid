@@ -112,7 +112,7 @@ class GestureContractRegressionTest {
             mapOf(GestureType.SWIPE_LEFT to GestureAction.Back)
         )
         second.onDown(PointerSample(200f, 785f, 0L, pointerId = 3))
-        assertTrue(second.onMove(PointerSample(120f, 785f, 20L, pointerId = 3)) is GestureSignal.Preview)
-        assertTrue(second.onUp(PointerSample(120f, 785f, 30L, pointerId = 3)) is GestureSignal.Commit)
+        assertTrue(second.onMove(PointerSample(120f, 785f, 20L, pointerId = 3)) is GestureSignal.Commit)
+        assertTrue(second.onUp(PointerSample(120f, 785f, 30L, pointerId = 3)) is GestureSignal.Ignored)
     }
 }

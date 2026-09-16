@@ -104,6 +104,11 @@ internal fun nativeTouchRecoveryNeeded(
     return !controllerRunning
 }
 
+internal fun shouldResetNativeTouchRuntimeFailureOnWake(
+    wasInteractive: Boolean,
+    actualInteractive: Boolean
+): Boolean = actualInteractive && !wasInteractive
+
 internal fun shouldStartNativeEdgeInput(
     floatingChatExpanded: Boolean,
     externalActivityVisible: Boolean

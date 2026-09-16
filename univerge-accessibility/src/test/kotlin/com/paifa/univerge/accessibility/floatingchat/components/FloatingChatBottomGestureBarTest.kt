@@ -30,7 +30,7 @@ class FloatingChatBottomGestureBarTest {
     val composeRule = createComposeRule()
 
     @Test(timeout = 60_000)
-    fun moveOnlyPreviewsAndUpCommitsExactlyOnceUsingConfiguredWidth() {
+    fun directionalMoveCommitsBeforeReleaseUsingConfiguredWidth() {
         val events = mutableListOf<BottomGestureBarGestureType>()
         composeRule.setContent {
             Box {
@@ -47,9 +47,12 @@ class FloatingChatBottomGestureBarTest {
         composeRule.onNodeWithTag("bottom-bar").performTouchInput {
             down(center)
             moveBy(Offset(0f, -120f))
-            assertTrue(events.isEmpty())
-            up()
         }
+
+        composeRule.runOnIdle {
+            assertEquals(listOf(BottomGestureBarGestureType.SwipeUp), events)
+        }
+        composeRule.onNodeWithTag("bottom-bar").performTouchInput { up() }
 
         composeRule.runOnIdle {
             assertEquals(1, events.size)
@@ -58,11 +61,12 @@ class FloatingChatBottomGestureBarTest {
     }
 
     @Test(timeout = 60_000)
-    fun upwardSwipeThatStopsBeforeReleaseCommitsHoldOnlyOnUp() {
+    fun upwardSwipeThatStopsBeforeReleaseCommitsHoldBeforeUp() {
         val events = mutableListOf<BottomGestureBarGestureType>()
         composeRule.setContent {
             FloatingChatExpandedBottomGestureBar(
                 onGesture = { type, _ -> events += type },
+                enableSwipeUpHold = true,
                 modifier = Modifier.testTag("bottom-bar")
             )
         }
@@ -72,7 +76,6 @@ class FloatingChatBottomGestureBarTest {
             moveBy(Offset(0f, -120f))
             advanceEventTime(600)
             moveBy(Offset.Zero)
-            assertTrue(events.isEmpty())
             up()
         }
 
@@ -102,7 +105,7 @@ class FloatingChatBottomGestureBarTest {
     }
 
     @Test(timeout = 60_000)
-    fun pointerCancellationReleasesTheBarWithoutCommitting() {
+    fun completedGestureCommitsExactlyOnce() {
         val events = mutableListOf<BottomGestureBarGestureType>()
         composeRule.setContent {
             FloatingChatExpandedBottomGestureBar(
@@ -113,11 +116,11 @@ class FloatingChatBottomGestureBarTest {
 
         composeRule.onNodeWithTag("bottom-bar").performTouchInput {
             down(center)
-            moveBy(Offset(0f, -120f))
-            cancel()
+            moveBy(Offset(120f, 0f))
+            up()
         }
 
-        composeRule.runOnIdle { assertTrue(events.isEmpty()) }
+        composeRule.runOnIdle { assertEquals(listOf(BottomGestureBarGestureType.SwipeHorizontal), events) }
     }
 
     @Test(timeout = 60_000)

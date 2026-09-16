@@ -10,6 +10,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.util.Collections
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.thread
+import kotlin.collections.AbstractMap
+import kotlin.collections.AbstractSet
 
 @RunWith(RobolectricTestRunner::class)
 class GestureServerRuntimeTest {
@@ -90,10 +97,128 @@ class GestureServerRuntimeTest {
         assertEquals(listOf(1L, 2L), versions)
     }
 
+    @Test
+    fun concurrentAppliesNeverNotifyAnOlderVersionAfterANewerVersion() {
+        val runtime = GestureServerRuntime(InMemoryGestureServerSnapshotStore())
+        val versions = Collections.synchronizedList(mutableListOf<Long>())
+        runtime.addSnapshotListener { versions += it.version }
+        val ready = CountDownLatch(1)
+        val workers = (0 until 8).map { worker ->
+            thread(start = true, name = "runtime-race-$worker") {
+                assertTrue(ready.await(5, TimeUnit.SECONDS))
+                repeat(2_000) {
+                    runtime.apply(snapshot(if (worker % 2 == 0) 2L else 1L))
+                }
+            }
+        }
+
+        ready.countDown()
+        workers.forEach { it.join(5_000) }
+
+        val decreases = versions.zipWithNext().filter { (previous, current) -> current < previous }
+        assertTrue("accepted snapshot versions must be monotonic, got $decreases", decreases.isEmpty())
+    }
+
+    @Test
+    fun anOlderApplyCannotOverwriteANewerApplyThatPassedTheVersionCheck() {
+        val bothCopiesReady = CountDownLatch(2)
+        val highCopyFinished = CountDownLatch(1)
+        val releaseLowCopy = CountDownLatch(1)
+        val runtime = GestureServerRuntime(InMemoryGestureServerSnapshotStore())
+        val high = snapshot(2L).copy(
+            bottomActions = HookedActionMap {
+                bothCopiesReady.countDown()
+                assertTrue(bothCopiesReady.await(5, TimeUnit.SECONDS))
+                highCopyFinished.countDown()
+            }
+        )
+        val low = snapshot(1L).copy(
+            bottomActions = HookedActionMap {
+                bothCopiesReady.countDown()
+                assertTrue(bothCopiesReady.await(5, TimeUnit.SECONDS))
+                assertTrue(highCopyFinished.await(5, TimeUnit.SECONDS))
+                assertTrue(releaseLowCopy.await(5, TimeUnit.SECONDS))
+            }
+        )
+        val highThread = thread(start = true) { assertTrue(runtime.apply(high).accepted) }
+        val lowThread = thread(start = true) { assertFalse(runtime.apply(low).accepted) }
+
+        waitUntil { runtime.snapshot?.version == 2L }
+        releaseLowCopy.countDown()
+        highThread.join(5_000)
+        lowThread.join(5_000)
+
+        assertEquals("the late low version must be rejected", 2L, runtime.snapshot?.version)
+    }
+
+    @Test
+    fun concurrentStartReadsTheStoreOnlyOnce() {
+        val firstReadStarted = CountDownLatch(1)
+        val allowFirstRead = CountDownLatch(1)
+        val store = object : GestureServerSnapshotStore {
+            var reads = 0
+
+            override fun read(): GestureServerSnapshot? {
+                reads += 1
+                val readNumber = reads
+                if (readNumber == 1) {
+                    firstReadStarted.countDown()
+                    assertTrue(allowFirstRead.await(5, TimeUnit.SECONDS))
+                }
+                return snapshot(readNumber.toLong())
+            }
+
+            override fun write(snapshot: GestureServerSnapshot) = Unit
+        }
+        val runtime = GestureServerRuntime(store)
+        val first = thread(start = true) { runtime.start() }
+        assertTrue(firstReadStarted.await(5, TimeUnit.SECONDS))
+        val secondStarted = CountDownLatch(1)
+        val second = thread(start = true) {
+            secondStarted.countDown()
+            runtime.start()
+        }
+        assertTrue(secondStarted.await(5, TimeUnit.SECONDS))
+        allowFirstRead.countDown()
+        first.join(5_000)
+        second.join(5_000)
+
+        assertEquals("start must perform one initialization read", 1, store.reads)
+        assertEquals(1L, runtime.snapshot?.version)
+    }
+
     private fun snapshot(version: Long) = GestureServerSnapshot(
         version = version,
         density = 3f,
         screenWidthDp = 360f,
         screenHeightDp = 800f
     )
+
+    private fun waitUntil(condition: () -> Boolean) {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+        while (!condition() && System.nanoTime() < deadline) {
+            Thread.yield()
+        }
+        assertTrue("condition was not reached before timeout", condition())
+    }
+
+    private class HookedActionMap(
+        private val onCopy: () -> Unit
+    ) : AbstractMap<String, String>() {
+        private val iterations = AtomicInteger(0)
+        private val entry = java.util.AbstractMap.SimpleImmutableEntry(
+            GestureType.SWIPE_UP.id,
+            GestureAction.Back.id
+        )
+
+        override val entries: Set<Map.Entry<String, String>> = object : AbstractSet<Map.Entry<String, String>>() {
+            override val size: Int = 1
+
+            override fun iterator(): Iterator<Map.Entry<String, String>> {
+                val iteration = iterations.incrementAndGet()
+                if (iteration == 2) onCopy()
+                return listOf(entry).iterator()
+            }
+        }
+    }
 }

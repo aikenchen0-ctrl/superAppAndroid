@@ -34,9 +34,9 @@
 - Modify: `univerge-core/src/main/kotlin/com/paifa/univerge/core/gesture/SwipeClassifier.kt`
 - Modify: `univerge-core/src/main/kotlin/com/paifa/univerge/core/model/GestureType.kt`
 
-- [ ] **Step 1: Write failing tests** covering inward/outward motion, short/long/diagonal short/long, stationary hold, upward/downward swipe, rollback, `CANCEL`, multi-pointer, focus loss, repeated `UP`, and “MOVE never commits”.
+- [ ] **Step 1: Write failing tests** covering inward/outward motion, short/long/diagonal short/long, stationary hold, upward/downward swipe, rollback, `CANCEL`, multi-pointer, focus loss, repeated `UP`, side `MOVE` preview semantics, and bottom threshold-time commit semantics.
 - [ ] **Step 2: Run** `./gradlew :univerge-core:test --no-daemon --max-workers=1` and verify failures identify missing transaction behavior rather than test setup errors.
-- [ ] **Step 3: Implement** one allocation-free session per recognizer using primitive coordinates, `gestureId`, `activePointerId`, and a captured config/action snapshot. Timer callbacks may arm a hold candidate but only `UP` may emit `GestureCommit`.
+- [ ] **Step 3: Implement** one allocation-free session per recognizer using primitive coordinates, `gestureId`, `activePointerId`, and a captured config/action snapshot. Side timer callbacks may arm a hold candidate for `UP`; bottom direction/timed thresholds may emit one irreversible `GestureCommit` before `UP`, with terminal cleanup handled separately.
 - [ ] **Step 4: Update** diagonal classification defaults so the requested diagonal gestures are enabled in the server snapshot while preserving legacy `SwipeClassifier` callers through explicit constructor configuration.
 - [ ] **Step 5: Run** core tests, then refactor only after green to remove duplicate distance calculations and precompute thresholds.
 
@@ -133,7 +133,7 @@
 ## Acceptance Gates
 
 - [ ] Every physical region has exactly one input owner.
-- [ ] MOVE never executes an action; UP executes at most one action.
+- [ ] Side `MOVE` never executes an action; bottom Tap executes on `UP`, while bottom direction/timed gestures execute once at the stable threshold and `UP/CANCEL` never duplicates them.
 - [ ] Rollback, cancel, multi-pointer and focus loss never execute an action.
 - [ ] Central touch remains with the foreground app.
 - [ ] Configuration updates do not alter an active gesture.

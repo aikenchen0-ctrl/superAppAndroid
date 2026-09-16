@@ -19,54 +19,99 @@ class GestureServerRuntime(
     private val store: GestureServerSnapshotStore,
     private val onSnapshotApplied: (GestureServerSnapshot) -> Unit = {}
 ) {
+    private val stateLock = Any()
+    private val persistenceLock = Any()
+    private val dispatchLock = Any()
     private var current: GestureServerSnapshot? = null
     private var started = false
     private val snapshotListeners = CopyOnWriteArrayList<(GestureServerSnapshot) -> Unit>()
 
     val snapshot: GestureServerSnapshot?
-        get() = current
+        get() = synchronized(stateLock) { current }
 
     fun start(): GestureServerSnapshot? {
-        if (!started) {
-            started = true
-            current = store.read()?.takeIf(GestureServerSnapshot::isValid)
+        return synchronized(stateLock) {
+            if (!started) {
+                started = true
+                current = store.read()?.takeIf(GestureServerSnapshot::isValid)
+            }
+            current
         }
-        return current
     }
 
     /** Registers a low-frequency snapshot listener and immediately replays the current value. */
     fun addSnapshotListener(listener: (GestureServerSnapshot) -> Unit): AutoCloseable {
-        snapshotListeners += listener
-        current?.let { snapshot -> runCatching { listener(snapshot) } }
-        return AutoCloseable { snapshotListeners.remove(listener) }
+        val replay = synchronized(stateLock) {
+            snapshotListeners += listener
+            current
+        }
+        replay?.let { snapshot -> runCatching { listener(snapshot) } }
+        return AutoCloseable {
+            synchronized(stateLock) {
+                snapshotListeners.remove(listener)
+            }
+        }
     }
 
     fun apply(next: GestureServerSnapshot): GestureServerApplyResult {
         start()
         if (!next.isValid()) {
-            return GestureServerApplyResult(false, "invalid_snapshot", current)
+            return GestureServerApplyResult(false, "invalid_snapshot", snapshot)
         }
-        val previous = current
-        if (previous != null && next.version <= previous.version) {
-            return GestureServerApplyResult(false, "stale_snapshot", previous)
-        }
-        current = next.copy(
+
+        val normalized = next.copy(
             leftZones = next.leftZones.toList(),
             rightZones = next.rightZones.toList(),
             leftActions = next.leftActions.toMap(),
             rightActions = next.rightActions.toMap(),
             bottomActions = next.bottomActions.toMap()
         )
-        store.write(current!!)
-        onSnapshotApplied(current!!)
-        snapshotListeners.forEach { listener ->
-            runCatching { listener(current!!) }
+        val accepted = synchronized(stateLock) {
+            val previous = current
+            if (previous != null && next.version <= previous.version) {
+                null
+            } else {
+                normalized.also { current = it }
+            }
         }
-        return GestureServerApplyResult(true, "accepted", current)
+
+        if (accepted == null) {
+            return GestureServerApplyResult(false, "stale_snapshot", snapshot)
+        }
+
+        persistIfCurrent(accepted)
+        dispatchIfCurrent(accepted)
+        return GestureServerApplyResult(true, "accepted", accepted)
     }
 
     /** Binder loss is intentionally non-destructive: keep the last valid local snapshot. */
-    fun onBinderDisconnected(): GestureServerSnapshot? = current ?: start()
+    fun onBinderDisconnected(): GestureServerSnapshot? = snapshot ?: start()
+
+    private fun persistIfCurrent(accepted: GestureServerSnapshot) {
+        synchronized(persistenceLock) {
+            val stillCurrent = synchronized(stateLock) {
+                current?.version == accepted.version
+            }
+            if (stillCurrent) {
+                store.write(accepted)
+            }
+        }
+    }
+
+    private fun dispatchIfCurrent(accepted: GestureServerSnapshot) {
+        synchronized(dispatchLock) {
+            val stillCurrent = synchronized(stateLock) {
+                current?.version == accepted.version
+            }
+            if (!stillCurrent) return
+
+            runCatching { onSnapshotApplied(accepted) }
+            val listeners = synchronized(stateLock) { snapshotListeners.toList() }
+            listeners.forEach { listener ->
+                runCatching { listener(accepted) }
+            }
+        }
+    }
 }
 
 class InMemoryGestureServerSnapshotStore(

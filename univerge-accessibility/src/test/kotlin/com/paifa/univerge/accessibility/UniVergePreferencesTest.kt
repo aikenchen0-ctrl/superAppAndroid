@@ -7,6 +7,7 @@ import com.paifa.univerge.core.model.EdgeZoneConfig
 import com.paifa.univerge.core.model.GestureAction
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -68,6 +69,107 @@ class UniVergePreferencesTest {
 
         assertEquals(true, afterGeometry > initial)
         assertEquals(true, afterAction > afterGeometry)
+    }
+
+    @Test(timeout = 60_000L)
+    fun reloadClearsLegacyConflictingUpwardGestureBinding() {
+        context.getSharedPreferences("ubiki_touch_settings", Context.MODE_PRIVATE)
+            .edit()
+            .putString("bottom_gesture_bar_action_swipe_up", GestureAction.Home.id)
+            .putString("bottom_gesture_bar_action_swipe_up_hold", GestureAction.Screenshot.id)
+            .commit()
+
+        val preferences = UniVergePreferences(context)
+
+        assertEquals(GestureAction.Home, preferences.bottomGestureBarActionFor(BottomGestureBarGestureType.SwipeUp))
+        assertEquals(
+            GestureAction.None,
+            preferences.bottomGestureBarActionFor(BottomGestureBarGestureType.SwipeUpHold)
+        )
+    }
+
+    @Test(timeout = 60_000L)
+    fun reloadPreservesLegacyHoldBindingByDisablingDefaultSwipeUp() {
+        context.getSharedPreferences("ubiki_touch_settings", Context.MODE_PRIVATE)
+            .edit()
+            .putString("bottom_gesture_bar_action_swipe_up_hold", GestureAction.Screenshot.id)
+            .commit()
+
+        val preferences = UniVergePreferences(context)
+
+        assertEquals(
+            GestureAction.None,
+            preferences.bottomGestureBarActionFor(BottomGestureBarGestureType.SwipeUp)
+        )
+        assertEquals(
+            GestureAction.Screenshot,
+            preferences.bottomGestureBarActionFor(BottomGestureBarGestureType.SwipeUpHold)
+        )
+    }
+
+    @Test(timeout = 60_000L)
+    fun legacyBottomGestureMigrationPrefersImmediateSwipeWhenBothActionsWereStored() {
+        assertEquals(
+            LegacyBottomGestureBarActionMigration(
+                swipeUp = GestureAction.Home,
+                swipeUpHold = GestureAction.None
+            ),
+            legacyBottomGestureBarActionMigration(
+                storedSwipeUpId = GestureAction.Home.id,
+                storedSwipeUpHoldId = GestureAction.Screenshot.id
+            )
+        )
+    }
+
+    @Test(timeout = 60_000L)
+    fun legacyBottomGestureMigrationDisablesDefaultSwipeWhenOnlyHoldWasStored() {
+        assertEquals(
+            LegacyBottomGestureBarActionMigration(
+                swipeUp = GestureAction.None,
+                swipeUpHold = GestureAction.Screenshot
+            ),
+            legacyBottomGestureBarActionMigration(
+                storedSwipeUpId = null,
+                storedSwipeUpHoldId = GestureAction.Screenshot.id
+            )
+        )
+    }
+
+    @Test(timeout = 60_000L)
+    fun legacyBottomGestureMigrationIsSkippedWhenBindingsAreAlreadyExclusive() {
+        assertNull(
+            legacyBottomGestureBarActionMigration(
+                storedSwipeUpId = GestureAction.None.id,
+                storedSwipeUpHoldId = GestureAction.Screenshot.id
+            )
+        )
+        assertNull(
+            legacyBottomGestureBarActionMigration(
+                storedSwipeUpId = GestureAction.Home.id,
+                storedSwipeUpHoldId = GestureAction.None.id
+            )
+        )
+    }
+
+    @Test(timeout = 60_000L)
+    fun legacyBottomGestureMigrationAdvancesVersionOnlyOnceAcrossReloads() {
+        context.getSharedPreferences("ubiki_touch_settings", Context.MODE_PRIVATE)
+            .edit()
+            .putLong("gesture_config_version", 12L)
+            .putString("bottom_gesture_bar_action_swipe_up", GestureAction.Home.id)
+            .putString("bottom_gesture_bar_action_swipe_up_hold", GestureAction.Screenshot.id)
+            .commit()
+
+        val migrated = UniVergePreferences(context)
+        assertEquals(13L, migrated.gestureConfigVersion)
+        assertEquals(GestureAction.Home, migrated.bottomGestureBarActionFor(BottomGestureBarGestureType.SwipeUp))
+        assertEquals(
+            GestureAction.None,
+            migrated.bottomGestureBarActionFor(BottomGestureBarGestureType.SwipeUpHold)
+        )
+
+        val reloaded = UniVergePreferences(context)
+        assertEquals(13L, reloaded.gestureConfigVersion)
     }
 
     @Test(timeout = 60_000L)

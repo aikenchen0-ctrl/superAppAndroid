@@ -1,6 +1,7 @@
 package com.paifa.univerge.accessibility
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -66,5 +67,30 @@ class BottomGestureBarReliabilityTest {
         session.onCancel()
         session.onUp(BottomGestureBarGestureType.SwipeUpHold)
         assertEquals(listOf(BottomGestureBarGestureType.SwipeUpHold), commits)
+    }
+
+    @Test
+    fun bottomGestureBarActionCanCommitWhenRecognitionThresholdIsCrossedBeforeUp() {
+        val commits = mutableListOf<BottomGestureBarGestureType>()
+        val session = BottomGestureBarDispatchSession<BottomGestureBarGestureType> { commits += it }
+
+        session.onDown()
+
+        assertTrue(session.onCommit(BottomGestureBarGestureType.SwipeUp))
+        assertFalse(session.onUp(BottomGestureBarGestureType.SwipeUp))
+        assertEquals(listOf(BottomGestureBarGestureType.SwipeUp), commits)
+    }
+
+    @Test
+    fun earlyCommitRemainsPendingUntilTheAdapterFinishesTheTouchTransaction() {
+        val session = BottomGestureBarDispatchSession<BottomGestureBarGestureType>()
+
+        session.onDown()
+        assertTrue(session.onCommit(BottomGestureBarGestureType.SwipeUp))
+        assertTrue(session.hasPendingTerminal)
+
+        session.onFinish()
+
+        assertFalse(session.hasPendingTerminal)
     }
 }

@@ -16,6 +16,7 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
+import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
 class GestureServerOverlayControllerTest {
@@ -156,6 +157,40 @@ class GestureServerOverlayControllerTest {
         side.onTouchEvent(event(MotionEvent.ACTION_UP, 46f, 100f, 40L))
 
         assertEquals(listOf(com.paifa.univerge.core.model.GestureAction.Back), actions)
+        controller.close()
+    }
+
+    @Test
+    fun sideThresholdSanitizationKeepsTheConfiguredLongGestureDistinct() {
+        val windows = RecordingWindowManager()
+        val actions = mutableListOf<com.paifa.univerge.core.model.GestureAction>()
+        val runtime = GestureServerRuntime(InMemoryGestureServerSnapshotStore())
+        val controller = GestureServerOverlayController(
+            service = service(),
+            windowManager = windows.proxy,
+            onAction = { action, _ -> actions += action }
+        )
+        runtime.apply(snapshot(45L).copy(
+            shortPullDistanceDp = 120f,
+            longPullDistanceDp = 120f,
+            leftActions = mapOf(
+                com.paifa.univerge.core.model.GestureType.PULL_INWARD_SHORT.id to
+                    com.paifa.univerge.core.model.GestureAction.Home.id,
+                com.paifa.univerge.core.model.GestureType.PULL_INWARD_LONG.id to
+                    com.paifa.univerge.core.model.GestureAction.Back.id
+            )
+        ))
+        controller.start(runtime)
+        idleMain()
+
+        val side = windows.edgeViews().single()
+        side.onTouchEvent(event(MotionEvent.ACTION_DOWN, 0f, 100f, 0L))
+        // 86dp is above the effective short threshold (84dp), but below the
+        // sanitized long threshold (89.6dp).
+        side.onTouchEvent(event(MotionEvent.ACTION_MOVE, 86f, 100f, 20L))
+        side.onTouchEvent(event(MotionEvent.ACTION_UP, 86f, 100f, 40L))
+
+        assertEquals(listOf(com.paifa.univerge.core.model.GestureAction.Home), actions)
         controller.close()
     }
 
@@ -311,11 +346,52 @@ class GestureServerOverlayControllerTest {
         val x = bottom.width / 2f
         bottom.onTouchEvent(event(MotionEvent.ACTION_DOWN, x, bottom.height - 2f, 0L))
         bottom.onTouchEvent(event(MotionEvent.ACTION_MOVE, x, -60f, 20L))
+        assertEquals("directional bottom action commits before release", listOf(com.paifa.univerge.core.model.GestureAction.Home), actions)
         bottom.onTouchEvent(event(MotionEvent.ACTION_UP, x, -60f, 40L))
 
         assertEquals(1, commits.size)
         assertEquals(listOf(com.paifa.univerge.core.model.GestureAction.Home), actions)
         assertEquals(23L, commits.single().snapshotVersion)
+        controller.close()
+    }
+
+    @Test
+    fun lostBottomUpIsRecoveredByTheTerminalWatchdog() {
+        val windows = RecordingWindowManager()
+        val runtime = GestureServerRuntime(InMemoryGestureServerSnapshotStore())
+        val controller = GestureServerOverlayController(
+            service = service(),
+            windowManager = windows.proxy,
+            onAction = { _, _ -> }
+        )
+        runtime.apply(snapshot(60L).copy(
+            bottomActions = mapOf(
+                com.paifa.univerge.core.model.GestureType.SWIPE_UP.id to
+                    com.paifa.univerge.core.model.GestureAction.Home.id
+            )
+        ))
+        controller.start(runtime)
+        idleMain()
+
+        val oldBottom = windows.bottomViews().single()
+        val x = oldBottom.width / 2f
+        oldBottom.onTouchEvent(event(MotionEvent.ACTION_DOWN, x, oldBottom.height - 2f, 0L))
+        oldBottom.onTouchEvent(event(MotionEvent.ACTION_MOVE, x, -60f, 20L))
+
+        runtime.apply(snapshot(61L).copy(
+            bottomActions = mapOf(
+                com.paifa.univerge.core.model.GestureType.SWIPE_UP.id to
+                    com.paifa.univerge.core.model.GestureAction.Home.id
+            )
+        ))
+        idleMain()
+        assertEquals("the committed touch keeps the old surface until it is finished", oldBottom, windows.bottomViews().single())
+
+        // The previous UP is intentionally missing. The watchdog must abandon
+        // the committed transaction so the pending snapshot can be installed.
+        shadowOf(Looper.getMainLooper()).idleFor(2L, TimeUnit.SECONDS)
+
+        assertTrue(windows.bottomViews().single() !== oldBottom)
         controller.close()
     }
 

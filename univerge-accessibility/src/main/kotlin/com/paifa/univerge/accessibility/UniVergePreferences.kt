@@ -17,6 +17,10 @@ import java.util.Calendar
 class UniVergePreferences(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
 
+    init {
+        migrateLegacyBottomGestureBarActionBindings()
+    }
+
     /**
      * 启用边缘触摸条
      */
@@ -237,10 +241,51 @@ class UniVergePreferences(context: Context) {
     }
 
     fun setBottomGestureBarAction(gestureType: BottomGestureBarGestureType, action: GestureAction) {
+        val current = BottomGestureBarGestureType.entries.associateWith(::bottomGestureBarActionFor)
+        val normalized = normalizeBottomGestureBarActionBindings(current, gestureType, action)
         prefs.edit()
-            .putString(bottomGestureBarActionKey(gestureType), action.id)
+            .putString(bottomGestureBarActionKey(gestureType), normalized.getValue(gestureType).id)
+            .also { editor ->
+                if (gestureType == BottomGestureBarGestureType.SwipeUp && action != GestureAction.None) {
+                    editor.putString(
+                        bottomGestureBarActionKey(BottomGestureBarGestureType.SwipeUpHold),
+                        normalized.getValue(BottomGestureBarGestureType.SwipeUpHold).id
+                    )
+                } else if (gestureType == BottomGestureBarGestureType.SwipeUpHold && action != GestureAction.None) {
+                    editor.putString(
+                        bottomGestureBarActionKey(BottomGestureBarGestureType.SwipeUp),
+                        normalized.getValue(BottomGestureBarGestureType.SwipeUp).id
+                    )
+                }
+            }
             .putLong(KEY_GESTURE_CONFIG_VERSION, gestureConfigVersion + 1L)
             .apply()
+    }
+
+    /**
+     * Older versions could persist both upward actions even though they share
+     * the same physical prefix. Migrate the pair in one write so readers never
+     * observe a half-normalized binding or a second version bump on reload.
+     */
+    private fun migrateLegacyBottomGestureBarActionBindings() {
+        val swipeUpKey = bottomGestureBarActionKey(BottomGestureBarGestureType.SwipeUp)
+        val swipeUpHoldKey = bottomGestureBarActionKey(BottomGestureBarGestureType.SwipeUpHold)
+        synchronized(LEGACY_BOTTOM_GESTURE_MIGRATION_LOCK) {
+            val migration = legacyBottomGestureBarActionMigration(
+                storedSwipeUpId = prefs.getString(swipeUpKey, null),
+                storedSwipeUpHoldId = prefs.getString(swipeUpHoldKey, null)
+            ) ?: return
+
+            val editor = prefs.edit()
+                .putString(swipeUpKey, migration.swipeUp.id)
+                .putString(swipeUpHoldKey, migration.swipeUpHold.id)
+                .putLong(KEY_GESTURE_CONFIG_VERSION, gestureConfigVersion + 1L)
+            // This is a one-time schema migration. Finish it before exposing
+            // the preferences instance so a restart cannot repeat the bump.
+            if (!runCatching { editor.commit() }.getOrDefault(false)) {
+                editor.apply()
+            }
+        }
     }
 
     var sideFunctionCustomActionIds: List<String>
@@ -493,6 +538,43 @@ class UniVergePreferences(context: Context) {
         const val KEY_SIDE_FUNCTION_CUSTOM_ACTION_IDS = "side_function_custom_action_ids"
         const val KEY_QUIET_HOURS_SCHEDULES = "quiet_hours_schedules"
         const val DEFAULT_EDGE_OVERLAY_OPACITY_PERCENT = 0
+        private val LEGACY_BOTTOM_GESTURE_MIGRATION_LOCK = Any()
+    }
+}
+
+/** Canonical pair persisted after migrating the legacy upward gesture bindings. */
+internal data class LegacyBottomGestureBarActionMigration(
+    val swipeUp: GestureAction,
+    val swipeUpHold: GestureAction
+)
+
+/**
+ * Returns the one-time migration for old upward bindings, or null when the
+ * persisted values are already exclusive (or no legacy hold binding exists).
+ * A missing ordinary binding represents the old default Home action; an
+ * explicitly stored hold action therefore has to disable that default.
+ */
+internal fun legacyBottomGestureBarActionMigration(
+    storedSwipeUpId: String?,
+    storedSwipeUpHoldId: String?
+): LegacyBottomGestureBarActionMigration? {
+    val storedSwipeUpHold = storedSwipeUpHoldId?.let(GestureAction::fromId)
+    val storedSwipeUp = storedSwipeUpId?.let(GestureAction::fromId)
+    return when {
+        storedSwipeUpId == null && storedSwipeUpHold != null && storedSwipeUpHold != GestureAction.None -> {
+            LegacyBottomGestureBarActionMigration(
+                swipeUp = GestureAction.None,
+                swipeUpHold = storedSwipeUpHold
+            )
+        }
+        storedSwipeUpId != null && storedSwipeUp != null && storedSwipeUp != GestureAction.None &&
+            storedSwipeUpHold != null && storedSwipeUpHold != GestureAction.None -> {
+            LegacyBottomGestureBarActionMigration(
+                swipeUp = storedSwipeUp,
+                swipeUpHold = GestureAction.None
+            )
+        }
+        else -> null
     }
 }
 

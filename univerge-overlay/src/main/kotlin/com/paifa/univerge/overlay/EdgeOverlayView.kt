@@ -16,6 +16,7 @@ import android.view.View
 import com.paifa.univerge.core.gesture.BackGestureProgress
 import com.paifa.univerge.core.gesture.runtime.GestureSignal
 import com.paifa.univerge.core.gesture.runtime.SideGestureRecognizer
+import com.paifa.univerge.core.gesture.runtime.configuredSideGestureThresholdsDp
 import com.paifa.univerge.core.model.EdgeSide
 import com.paifa.univerge.core.model.GestureData
 import com.paifa.univerge.core.model.GestureAction
@@ -49,16 +50,20 @@ class EdgeOverlayView(
     private val onBackGestureCommitWithAction: ((BackGestureProgress, GestureAction, GestureData) -> Boolean)? = null
 ) : View(context) {
     private val previewFrameDispatcher = ViewGesturePreviewFrameDispatcher(this)
+    private val effectiveSideThresholds = configuredSideGestureThresholdsDp(
+        shortPullDistanceDp = swipeThresholdDp.toFloat(),
+        longPullDistanceDp = longSwipeThresholdDp.toFloat()
+    )
     private val touchPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
     }
     private val detector = EdgeGestureDetector(
         side = side,
-        minSwipeDistancePx = swipeThresholdDp.coerceIn(8, 120) * resources.displayMetrics.density * SWIPE_THRESHOLD_RESPONSE_RATIO,
-        longSwipeDistancePx = longSwipeThresholdDp.coerceIn(swipeThresholdDp + 8, LONG_SWIPE_THRESHOLD_MAX_DP) * resources.displayMetrics.density * SWIPE_THRESHOLD_RESPONSE_RATIO,
+        minSwipeDistancePx = effectiveSideThresholds.minPullDistanceDp * resources.displayMetrics.density,
+        longSwipeDistancePx = effectiveSideThresholds.longPullDistanceDp * resources.displayMetrics.density,
         minPreviewDistancePx = 0f,
         minVerticalSwipeDistancePx = minVerticalSwipeDistancePx.takeIf { it > 0f }
-            ?: swipeThresholdDp * resources.displayMetrics.density,
+            ?: effectiveSideThresholds.minSwipeDistanceDp * resources.displayMetrics.density,
         onGesture = onGesture,
         onGestureProgress = onGestureProgress,
         onGestureEnd = onGestureEnd,
@@ -186,8 +191,6 @@ class EdgeOverlayView(
     }
 
     private companion object {
-        const val SWIPE_THRESHOLD_RESPONSE_RATIO = 0.70f
-        const val LONG_SWIPE_THRESHOLD_MAX_DP = 320
         const val HANDLE_MIN_WIDTH_DP = 1
         const val HANDLE_MAX_WIDTH_DP = 96
         const val TOUCH_HANDLE_BOOST_DP = 2

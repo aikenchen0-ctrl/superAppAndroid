@@ -67,4 +67,14 @@ class GestureBindingTest {
         assertFalse(ledger.accept(cancel))
         assertFalse(ledger.accept(commit))
     }
+
+    @Test
+    fun ledgerCanReleaseAnActionWhenItsDispatchWasRejected() {
+        val ledger = GestureEventLedger()
+        assertTrue(ledger.acceptGestureId(42L))
+
+        ledger.releaseGestureId(42L)
+
+        assertTrue(ledger.acceptGestureId(42L))
+    }
 }

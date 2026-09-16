@@ -41,4 +41,14 @@ class GestureActionCommitGateTest {
         assertTrue(gate.accept(GestureActionSource.Server, 41L))
         assertFalse(gate.accept(GestureActionSource.Server, 41L))
     }
+
+    @Test
+    fun releaseAllowsRetryWhenDispatchWasRejected() {
+        val gate = GestureActionCommitGate(maxEntries = 4)
+
+        assertTrue(gate.accept(GestureActionSource.Native, 41L))
+        gate.release(GestureActionSource.Native, 41L)
+
+        assertTrue(gate.accept(GestureActionSource.Native, 41L))
+    }
 }

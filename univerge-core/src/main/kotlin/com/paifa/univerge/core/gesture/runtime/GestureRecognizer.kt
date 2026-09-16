@@ -13,7 +13,11 @@ data class PointerSample(
     val pointerId: Int = 0
 )
 
-/** Domain-only result. MOVE updates the reusable Preview; only UP creates Commit. */
+/**
+ * Domain-only result. MOVE updates the reusable Preview and may create one
+ * terminal Commit when a bottom gesture reaches an irreversible threshold;
+ * UP creates the deferred Commit for tap/release gestures.
+ */
 sealed interface GestureSignal {
     data object Ignored : GestureSignal
 

@@ -12,7 +12,9 @@ data class BottomGestureThresholds(
     val longPressDurationMs: Long = 500L,
     val slopDp: Float = 12f,
     val retractionToleranceDp: Float = 8f,
-    val upwardHoldDurationMs: Long = 500L
+    val upwardHoldDurationMs: Long = 500L,
+    /** Short movement window used to distinguish a continuing swipe from an upward pause. */
+    val upwardSwipeDisambiguationMs: Long = 120L
 )
 
 /** Bottom bar transaction recognizer; its action map is independent from side actions. */
@@ -20,10 +22,26 @@ class BottomGestureRecognizer(
     private var bar: BottomBarConfig,
     actions: Map<GestureType, GestureAction>,
     private val thresholds: BottomGestureThresholds = BottomGestureThresholds(),
-    private val snapshotVersion: Long = 1L
+    private val snapshotVersion: Long = 1L,
+    /**
+     * Gesture kinds that participate in recognition. This is intentionally
+     * separate from [actions]: a caller may recognize a gesture and map it to
+     * [GestureAction.None] without manufacturing a fake action binding.
+     */
+    private val enabledGestures: Set<GestureType> = actions
+        .filterValues { it != GestureAction.None }
+        .keys
+        .toSet()
 ) {
     constructor(snapshot: ConfigSnapshot, thresholds: BottomGestureThresholds = BottomGestureThresholds()) : this(
-        snapshot.bottomBar, snapshot.bottomActions, thresholds, snapshot.revision
+        snapshot.bottomBar,
+        snapshot.bottomActions,
+        thresholds,
+        snapshot.revision,
+        snapshot.bottomActions
+            .filterValues { it != GestureAction.None }
+            .keys
+            .toSet()
     )
 
     private val actions = actions.toMap()
@@ -39,7 +57,7 @@ class BottomGestureRecognizer(
     private var preview: GestureSignal.Preview? = null
 
     val activeGestureId: Long
-        get() = if (state == State.Tracking) gestureId else 0L
+        get() = if (state == State.Tracking || state == State.Committed) gestureId else 0L
     private var holdArmed = false
     private var movedBeyondSlop = false
     private var peakDx = 0f
@@ -48,9 +66,10 @@ class BottomGestureRecognizer(
     private var lastMovementX = 0f
     private var lastMovementY = 0f
     private var upwardHoldArmed = false
+    private var upwardCandidateAt = Long.MIN_VALUE
 
     val hasActiveGesture: Boolean
-        get() = state == State.Tracking
+        get() = state == State.Tracking || state == State.Committed
 
     /** Geometry may change in place only between transactions. */
     fun updateGeometry(next: BottomBarConfig): Boolean {
@@ -84,6 +103,7 @@ class BottomGestureRecognizer(
         lastMovementX = xDp
         lastMovementY = yDp
         upwardHoldArmed = false
+        upwardCandidateAt = Long.MIN_VALUE
         state = State.Tracking
         return GestureSignal.Ignored
     }
@@ -119,14 +139,54 @@ class BottomGestureRecognizer(
         if (abs(dx) > thresholds.slopDp || abs(dy) > thresholds.slopDp) movedBeyondSlop = true
         if (canArmHold(timeMillis)) holdArmed = true
         val gesture = classify(dx, dy, timeMillis) ?: return GestureSignal.Ignored
+        if (gesture == GestureType.SWIPE_UP && upwardCandidateAt == Long.MIN_VALUE) {
+            upwardCandidateAt = timeMillis
+        }
         candidate = gesture
-        return updatePreview(gesture, progress(dx, dy), xDp, yDp)
+        val preview = updatePreview(gesture, progress(dx, dy), xDp, yDp)
+        return commitWhenReady(
+            gesture = gesture,
+            xDp = xDp,
+            yDp = yDp,
+            timeMillis = timeMillis,
+            movedSinceLastSample = movedSinceLastSample,
+            preview = preview
+        )
     }
 
     fun onHoldTimer(timeMillis: Long): GestureSignal {
         if (state != State.Tracking) return GestureSignal.Ignored
-        if (canArmHold(timeMillis)) holdArmed = true
-        upwardHoldArmed = isUpwardHoldCandidate(timeMillis)
+        if (canArmHold(timeMillis)) {
+            holdArmed = true
+            candidate = GestureType.LONG_PRESS
+            val preview = updatePreview(GestureType.LONG_PRESS, 1f, latestX, latestY)
+            return commitWhenReady(
+                gesture = GestureType.LONG_PRESS,
+                xDp = latestX,
+                yDp = latestY,
+                timeMillis = timeMillis,
+                movedSinceLastSample = false,
+                preview = preview
+            )
+        }
+        upwardHoldArmed = hasAction(GestureType.SWIPE_UP_HOLD) && isUpwardHoldCandidate(timeMillis)
+        if (upwardHoldArmed) {
+            candidate = GestureType.SWIPE_UP_HOLD
+            val preview = updatePreview(
+                GestureType.SWIPE_UP_HOLD,
+                progress(latestX - downX, latestY - downY),
+                latestX,
+                latestY
+            )
+            return commitWhenReady(
+                gesture = GestureType.SWIPE_UP_HOLD,
+                xDp = latestX,
+                yDp = latestY,
+                timeMillis = timeMillis,
+                movedSinceLastSample = false,
+                preview = preview
+            )
+        }
         return GestureSignal.Ignored
     }
 
@@ -137,6 +197,10 @@ class BottomGestureRecognizer(
     )
 
     fun onUp(xDp: Float, yDp: Float, timeMillis: Long, pointerId: Int = activePointerId, pointerCount: Int = 1): GestureSignal {
+        if (state == State.Committed) {
+            state = State.Idle
+            return GestureSignal.Ignored
+        }
         if (state != State.Tracking) return GestureSignal.Ignored
         if (pointerCount != 1 || pointerId != activePointerId) return cancel()
         val movedSinceLastSample = movementExceededResolution(xDp, yDp)
@@ -154,8 +218,7 @@ class BottomGestureRecognizer(
         if (abs(dx) > thresholds.slopDp || abs(dy) > thresholds.slopDp) movedBeyondSlop = true
         if (canArmHold(timeMillis)) holdArmed = true
         val gesture = classify(dx, dy, timeMillis) ?: return cancel()
-        state = State.Committed
-        return GestureSignal.Commit(
+        val commit = GestureSignal.Commit(
             gesture = gesture,
             action = actions[gesture] ?: GestureAction.None,
             data = GestureData(
@@ -172,11 +235,23 @@ class BottomGestureRecognizer(
             zoneId = -1,
             snapshotVersion = snapshotVersion
         )
+        // ACTION_UP is the terminal boundary for a release-based gesture.
+        // Keep the commit payload, but make the recognizer idle immediately so
+        // geometry/configuration updates are not blocked after the action ran.
+        state = State.Idle
+        return commit
     }
 
     fun onCancel(): GestureSignal = cancel()
 
-    fun onFocusLost(): GestureSignal = if (state == State.Tracking) cancel() else GestureSignal.Ignored
+    fun onFocusLost(): GestureSignal = when (state) {
+        State.Tracking -> cancel()
+        State.Committed -> {
+            state = State.Idle
+            GestureSignal.Ignored
+        }
+        else -> GestureSignal.Ignored
+    }
 
     private fun classify(dx: Float, dy: Float, timeMillis: Long): GestureType? {
         if (holdArmed && !movedBeyondSlop && abs(dx) <= thresholds.slopDp && abs(dy) <= thresholds.slopDp) {
@@ -186,7 +261,10 @@ class BottomGestureRecognizer(
             return if (dx < 0f) GestureType.SWIPE_LEFT else GestureType.SWIPE_RIGHT
         }
         if (dy <= -thresholds.minSwipeDistanceDp) {
-            return if (upwardHoldArmed || isUpwardHoldCandidate(timeMillis)) {
+            return if (
+                hasAction(GestureType.SWIPE_UP_HOLD) &&
+                    (upwardHoldArmed || isUpwardHoldCandidate(timeMillis))
+            ) {
                 GestureType.SWIPE_UP_HOLD
             } else {
                 GestureType.SWIPE_UP
@@ -255,7 +333,63 @@ class BottomGestureRecognizer(
         ).also { preview = it }
     }
 
+    private fun commitWhenReady(
+        gesture: GestureType,
+        xDp: Float,
+        yDp: Float,
+        timeMillis: Long,
+        movedSinceLastSample: Boolean,
+        preview: GestureSignal.Preview
+    ): GestureSignal {
+        val upwardHoldConfigured = enabledGestures.contains(GestureType.SWIPE_UP_HOLD)
+        val ready = when (gesture) {
+            GestureType.TAP -> false
+            // Both gestures share the same upward prefix. A configured normal
+            // swipe is the latency-sensitive action, so it commits at the
+            // first threshold-crossing MOVE. Hold remains available when the
+            // normal swipe has no bound action.
+            GestureType.SWIPE_UP -> !upwardHoldConfigured || hasBoundAction(GestureType.SWIPE_UP)
+            GestureType.SWIPE_UP_HOLD,
+            GestureType.SWIPE_DOWN,
+            GestureType.SWIPE_LEFT,
+            GestureType.SWIPE_RIGHT,
+            GestureType.LONG_PRESS -> true
+            else -> false
+        }
+        return if (ready) commit(gesture, xDp, yDp) else preview
+    }
+
+    private fun commit(gesture: GestureType, xDp: Float, yDp: Float): GestureSignal.Commit {
+        state = State.Committed
+        return GestureSignal.Commit(
+            gesture = gesture,
+            action = actions[gesture] ?: GestureAction.None,
+            data = GestureData(
+                startX = downX,
+                startY = downY,
+                endX = xDp,
+                endY = yDp,
+                gestureId = gestureId,
+                snapshotVersion = snapshotVersion,
+                zoneId = -1
+            ),
+            gestureId = gestureId,
+            activePointerId = activePointerId,
+            zoneId = -1,
+            snapshotVersion = snapshotVersion
+        )
+    }
+
+    private fun hasAction(gesture: GestureType): Boolean = enabledGestures.contains(gesture)
+
+    private fun hasBoundAction(gesture: GestureType): Boolean =
+        actions[gesture]?.let { it != GestureAction.None } == true
+
     private fun cancel(): GestureSignal {
+        if (state == State.Committed) {
+            state = State.Idle
+            return GestureSignal.Ignored
+        }
         if (state != State.Tracking) return GestureSignal.Ignored
         state = State.Cancelled
         return GestureSignal.Cancel(gestureId, activePointerId, -1, snapshotVersion)

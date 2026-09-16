@@ -25,7 +25,10 @@ internal class VideoDemoOverlayController(
     private val context: Context,
     private val windowManager: WindowManager
 ) {
+    @Volatile
     private var overlayView: VideoDemoOverlayView? = null
+
+    fun hasBackOverride(): Boolean = overlayView != null
 
     fun showOrToggle() {
         when (nextVideoDemoOverlayCommand(isShowing = overlayView != null)) {

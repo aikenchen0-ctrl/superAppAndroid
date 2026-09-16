@@ -18,6 +18,7 @@ import com.paifa.univerge.core.gesture.runtime.BottomGestureThresholds
 import com.paifa.univerge.core.gesture.runtime.HotZoneSegment
 import com.paifa.univerge.core.gesture.runtime.SideGestureRecognizer
 import com.paifa.univerge.core.gesture.runtime.SideGestureThresholds
+import com.paifa.univerge.core.gesture.runtime.configuredSideGestureThresholdsDp
 import com.paifa.univerge.core.model.EdgeSide
 import com.paifa.univerge.core.model.GestureAction
 import com.paifa.univerge.core.model.GestureData
@@ -147,14 +148,18 @@ internal class GestureServerOverlayController(
         rect: GestureServerOverlayRect
     ): Boolean {
         val density = snapshot.density.coerceAtLeast(0.01f)
+        val sideThresholds = configuredSideGestureThresholdsDp(
+            shortPullDistanceDp = snapshot.shortPullDistanceDp,
+            longPullDistanceDp = snapshot.longPullDistanceDp
+        )
         val actionBindings = actionBindings(snapshot, region.side)
         val placement = rect
         val view = ServerEdgeGestureView(
             context = service,
             side = region.side,
             density = density,
-            shortThresholdPx = snapshot.shortPullDistanceDp * density * SERVER_SIDE_THRESHOLD_RESPONSE_RATIO,
-            longThresholdPx = snapshot.longPullDistanceDp * density * SERVER_SIDE_THRESHOLD_RESPONSE_RATIO,
+            shortThresholdPx = sideThresholds.minPullDistanceDp * density,
+            longThresholdPx = sideThresholds.longPullDistanceDp * density,
             actionBindings = actionBindings,
             onGestureFinished = ::onGestureFinished,
             zone = regionZone(snapshot, region),
@@ -412,11 +417,27 @@ private class ServerBottomGestureView(
     )
     private val holdHandler = Handler(Looper.getMainLooper())
     private var touchActive = false
+    private var commitDispatched = false
+    private var finishDelivered = false
     private val holdPoll = object : Runnable {
         override fun run() {
             if (!touchActive || !recognizer.hasActiveGesture) return
-            recognizer.onHoldTimer(SystemClock.uptimeMillis())
+            val signal = recognizer.onHoldTimer(SystemClock.uptimeMillis())
+            if (signal is com.paifa.univerge.core.gesture.runtime.GestureSignal.Commit) {
+                touchActive = false
+                dispatchCommit(signal)
+                return
+            }
             holdHandler.postDelayed(this, HOLD_POLL_INTERVAL_MS)
+        }
+    }
+    private val terminalWatchdog = object : Runnable {
+        override fun run() {
+            if (!commitDispatched || !recognizer.hasActiveGesture) return
+            touchActive = false
+            recognizer.onCancel()
+            commitDispatched = false
+            finishGesture()
         }
     }
 
@@ -443,13 +464,26 @@ private class ServerBottomGestureView(
         val yDp = event.y / density
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                abandonPreviousTransactionIfNeeded()
+                commitDispatched = false
+                finishDelivered = false
                 touchActive = recognizer.onDown(xDp, yDp, event.eventTime, event.getPointerId(0), event.pointerCount) == com.paifa.univerge.core.gesture.runtime.GestureSignal.Ignored && recognizer.hasActiveGesture
                 holdHandler.removeCallbacks(holdPoll)
                 if (touchActive) holdHandler.postDelayed(holdPoll, HOLD_POLL_INTERVAL_MS)
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
-                recognizer.onMove(xDp, yDp, event.eventTime, event.getPointerId(0), event.pointerCount)
+                when (val signal = recognizer.onMove(xDp, yDp, event.eventTime, event.getPointerId(0), event.pointerCount)) {
+                    is com.paifa.univerge.core.gesture.runtime.GestureSignal.Commit -> {
+                        holdHandler.removeCallbacks(holdPoll)
+                        touchActive = false
+                        dispatchCommit(signal)
+                    }
+                    is com.paifa.univerge.core.gesture.runtime.GestureSignal.Cancel -> {
+                        cancelActiveGesture()
+                    }
+                    else -> Unit
+                }
                 return true
             }
             MotionEvent.ACTION_UP -> {
@@ -457,10 +491,10 @@ private class ServerBottomGestureView(
                 val signal = recognizer.onUp(xDp, yDp, event.eventTime, event.getPointerId(0), event.pointerCount)
                 touchActive = false
                 if (signal is com.paifa.univerge.core.gesture.runtime.GestureSignal.Commit) {
-                    performClick()
-                    onAction(signal.action, signal.data)
+                    dispatchCommit(signal)
                 }
-                onGestureFinished()
+                finishGesture()
+                commitDispatched = false
                 return true
             }
             MotionEvent.ACTION_CANCEL,
@@ -476,9 +510,11 @@ private class ServerBottomGestureView(
     fun cancelActiveGesture() {
         val wasActive = hasActiveGesture
         holdHandler.removeCallbacks(holdPoll)
+        holdHandler.removeCallbacks(terminalWatchdog)
         touchActive = false
         recognizer.onCancel()
-        if (wasActive) onGestureFinished()
+        commitDispatched = false
+        if (wasActive) finishGesture()
     }
 
     override fun performClick(): Boolean {
@@ -487,12 +523,42 @@ private class ServerBottomGestureView(
     }
 
     override fun onDetachedFromWindow() {
+        holdHandler.removeCallbacks(terminalWatchdog)
         cancelActiveGesture()
         super.onDetachedFromWindow()
     }
 
+    private fun dispatchCommit(
+        signal: com.paifa.univerge.core.gesture.runtime.GestureSignal.Commit
+    ): Boolean {
+        if (commitDispatched) return false
+        commitDispatched = true
+        holdHandler.removeCallbacks(terminalWatchdog)
+        holdHandler.postDelayed(terminalWatchdog, TERMINAL_WATCHDOG_TIMEOUT_MS)
+        performClick()
+        onAction(signal.action, signal.data)
+        return true
+    }
+
+    private fun finishGesture() {
+        holdHandler.removeCallbacks(terminalWatchdog)
+        if (finishDelivered) return
+        finishDelivered = true
+        onGestureFinished()
+    }
+
+    private fun abandonPreviousTransactionIfNeeded() {
+        if (!recognizer.hasActiveGesture && !touchActive && !commitDispatched) return
+        holdHandler.removeCallbacks(holdPoll)
+        touchActive = false
+        recognizer.onCancel()
+        commitDispatched = false
+        finishGesture()
+    }
+
     private companion object {
         const val HOLD_POLL_INTERVAL_MS = 50L
+        const val TERMINAL_WATCHDOG_TIMEOUT_MS = 1_500L
     }
 }
 
@@ -504,6 +570,5 @@ private fun MotionEvent.isTerminalGestureEvent(): Boolean = when (actionMasked) 
     else -> false
 }
 
-private const val SERVER_SIDE_THRESHOLD_RESPONSE_RATIO = 0.70f
 private const val SERVER_BOTTOM_SWIPE_DISTANCE_PX = 56f
 private const val SERVER_BOTTOM_MOTION_SLOP_PX = 6f

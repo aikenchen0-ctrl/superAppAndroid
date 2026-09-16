@@ -44,13 +44,9 @@ class GestureRecognizerPlatformContractTest {
         assertEquals(GestureType.SWIPE_UP, (moving as GestureSignal.Preview).gesture)
 
         val held = recognizer.onHoldTimer(600L)
-        assertEquals(GestureSignal.Ignored, held)
-        val preview = recognizer.onMove(PointerSample(200f, 700f, 601L))
-        assertEquals(GestureType.SWIPE_UP_HOLD, (preview as GestureSignal.Preview).gesture)
-        assertEquals(
-            GestureType.SWIPE_UP_HOLD,
-            (recognizer.onUp(PointerSample(200f, 700f, 620L)) as GestureSignal.Commit).gesture
-        )
+        assertEquals(GestureType.SWIPE_UP_HOLD, (held as GestureSignal.Commit).gesture)
+        assertEquals(GestureSignal.Ignored, recognizer.onMove(PointerSample(200f, 700f, 601L)))
+        assertEquals(GestureSignal.Ignored, recognizer.onUp(PointerSample(200f, 700f, 620L)))
     }
 
     @Test

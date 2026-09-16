@@ -77,6 +77,14 @@ internal class GestureServerSnapshotPublisher(context: Context) {
         val requestedConfig = configVersion.coerceAtLeast(1L)
         val storedConfig = revisionPreferences.getLong(KEY_CONFIG_VERSION, NO_CONFIG)
         val configChanged = storedConfig == NO_CONFIG || storedConfig != requestedConfig
+        // Bump the transport revision when recognition semantics change even
+        // if the user's persisted preference version did not change. Without
+        // this, a server restored from an older snapshot can reject the new
+        // default bindings as stale and keep the old gesture contract.
+        val behaviorSchemaChanged = revisionPreferences.getInt(
+            KEY_BEHAVIOR_SCHEMA_VERSION,
+            NO_BEHAVIOR_SCHEMA_VERSION
+        ) != BEHAVIOR_SCHEMA_VERSION
         val geometryKnown = revisionPreferences.getBoolean(KEY_GEOMETRY_KNOWN, false)
         val geometryChanged = geometry != null && (
                 !geometryKnown ||
@@ -87,7 +95,7 @@ internal class GestureServerSnapshotPublisher(context: Context) {
                 revisionPreferences.getBoolean(KEY_FLOATING_CHAT_OWNS_SURFACE, false) !=
                 geometry.floatingChatOwnsSurface
             )
-        val shouldAdvance = storedRevision <= 0L || configChanged || geometryChanged
+        val shouldAdvance = storedRevision <= 0L || configChanged || geometryChanged || behaviorSchemaChanged
         val revision = if (shouldAdvance) {
             maxOf(requestedConfig, storedRevision.saturatingIncrement())
         } else {
@@ -96,6 +104,7 @@ internal class GestureServerSnapshotPublisher(context: Context) {
         val editor = revisionPreferences.edit()
             .putLong(KEY_REVISION, revision)
             .putLong(KEY_CONFIG_VERSION, requestedConfig)
+            .putInt(KEY_BEHAVIOR_SCHEMA_VERSION, BEHAVIOR_SCHEMA_VERSION)
         if (geometry != null) {
             editor
                 .putBoolean(KEY_GEOMETRY_KNOWN, true)
@@ -195,6 +204,9 @@ internal class GestureServerSnapshotPublisher(context: Context) {
         const val KEY_DENSITY_BITS = "density_bits"
         const val KEY_INPUT_ENABLED = "input_enabled"
         const val KEY_FLOATING_CHAT_OWNS_SURFACE = "floating_chat_owns_surface"
+        const val KEY_BEHAVIOR_SCHEMA_VERSION = "behavior_schema_version"
+        const val BEHAVIOR_SCHEMA_VERSION = 2
+        const val NO_BEHAVIOR_SCHEMA_VERSION = 0
         const val NO_CONFIG = Long.MIN_VALUE
     }
 }

@@ -235,7 +235,6 @@ class EdgeGestureDetector(
             val committedSignal = signal.withCapturedAction()
             val finalProgress = backProgressFor(committedSignal.data)
             if (finalProgress != null) {
-                onBackGestureEnd(finalProgress)
                 if (finalProgress.committed) {
                     committedGestureConsumed = onBackGestureCommitWithAction?.invoke(
                         finalProgress,
@@ -246,7 +245,9 @@ class EdgeGestureDetector(
             } else {
                 cancelBackProgress()
             }
-            if (previewDelivered) onGestureEnd()
+            // Terminal actions must be handed to the host before any visual or
+            // structural cleanup. WindowManager work in those callbacks can
+            // otherwise delay the action until the next main-loop turn.
             onGestureCommit(committedSignal)
             if (!committedGestureConsumed) {
                 onGestureWithAction?.invoke(
@@ -255,6 +256,8 @@ class EdgeGestureDetector(
                     committedSignal.data
                 ) ?: onGesture(committedSignal.gesture, committedSignal.data)
             }
+            finalProgress?.let(onBackGestureEnd)
+            if (previewDelivered) onGestureEnd()
         } else {
             dispatchSignal(signal)
             if (signal is GestureSignal.Cancel) cancelSessionAfterSignal()

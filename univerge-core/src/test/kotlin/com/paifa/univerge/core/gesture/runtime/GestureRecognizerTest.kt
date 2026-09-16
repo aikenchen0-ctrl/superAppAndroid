@@ -69,16 +69,16 @@ class GestureRecognizerTest {
     }
 
     @Test
-    fun bottomBarRequiresHitAndCommitsLongPressOnUp() {
+    fun bottomBarRequiresHitAndCommitsLongPressWhenTheThresholdIsReached() {
         val recognizer = BottomGestureRecognizer(
             BottomBarConfig(400f, 800f, widthDp = 240f, heightDp = 32f),
             mapOf(GestureType.LONG_PRESS to GestureAction.Screenshot, GestureType.SWIPE_UP to GestureAction.Home)
         )
         assertEquals(GestureSignal.Ignored, recognizer.onDown(PointerSample(10f, 790f, 0L)))
         recognizer.onDown(PointerSample(200f, 785f, 0L))
-        val preview = recognizer.onMove(PointerSample(200f, 785f, 600L))
-        assertEquals(GestureType.LONG_PRESS, (preview as GestureSignal.Preview).gesture)
-        assertEquals(GestureAction.Screenshot, preview.action)
-        assertEquals(GestureAction.Screenshot, (recognizer.onUp(PointerSample(200f, 785f, 700L)) as GestureSignal.Commit).action)
+        val commit = recognizer.onMove(PointerSample(200f, 785f, 600L)) as GestureSignal.Commit
+        assertEquals(GestureType.LONG_PRESS, commit.gesture)
+        assertEquals(GestureAction.Screenshot, commit.action)
+        assertEquals(GestureSignal.Ignored, recognizer.onUp(PointerSample(200f, 785f, 700L)))
     }
 }

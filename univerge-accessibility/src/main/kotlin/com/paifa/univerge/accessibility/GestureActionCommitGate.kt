@@ -26,6 +26,9 @@ internal class GestureActionCommitGate(
     fun accept(source: GestureActionSource, gestureId: Long): Boolean =
         ledgers.getValue(source).acceptGestureId(gestureId)
 
+    fun release(source: GestureActionSource, gestureId: Long) =
+        ledgers.getValue(source).releaseGestureId(gestureId)
+
     fun clear() = ledgers.values.forEach(GestureEventLedger::clear)
 
     private companion object {

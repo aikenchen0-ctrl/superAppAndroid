@@ -8,6 +8,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.unit.dp
 import com.paifa.univerge.core.gesture.BackGestureProgress
+import com.paifa.univerge.core.gesture.runtime.configuredSideGestureThresholdsDp
 import com.paifa.univerge.core.model.EdgeSide
 import com.paifa.univerge.core.model.EdgeZoneConfig
 import com.paifa.univerge.core.model.GestureData
@@ -30,24 +31,15 @@ internal fun Modifier.floatingChatOverlayGestureBinding(
     val edgeGestureTouchTargetPx = with(density) {
         FloatingChatInternalEdgeGestureDefaults.TouchTargetDp.toPx()
     }
-    val edgeGestureShortThresholdPx = with(density) {
-        edgeGestureShortThresholdDp
-            .coerceIn(
-                FloatingChatInternalEdgeGestureDefaults.ShortThresholdMinDp,
-                FloatingChatInternalEdgeGestureDefaults.ShortThresholdMaxDp
-            )
-            .dp
-            .toPx() * FloatingChatInternalEdgeGestureDefaults.ThresholdResponseRatio
-    }
-    val edgeGestureLongThresholdPx = with(density) {
-        edgeGestureLongThresholdDp
-            .coerceIn(
-                edgeGestureShortThresholdDp + FloatingChatInternalEdgeGestureDefaults.LongThresholdMinDeltaDp,
-                FloatingChatInternalEdgeGestureDefaults.LongThresholdMaxDp
-            )
-            .dp
-            .toPx() * FloatingChatInternalEdgeGestureDefaults.ThresholdResponseRatio
-    }
+    val edgeGestureShortThresholdPx = floatingChatEdgeGestureShortThresholdPx(
+        shortThresholdDp = edgeGestureShortThresholdDp,
+        density = density.density
+    )
+    val edgeGestureLongThresholdPx = floatingChatEdgeGestureLongThresholdPx(
+        shortThresholdDp = edgeGestureShortThresholdDp,
+        longThresholdDp = edgeGestureLongThresholdDp,
+        density = density.density
+    )
     val currentOnEdgeGesture by rememberUpdatedState(onEdgeGesture)
     val currentOnBackGestureProgress by rememberUpdatedState(onBackGestureProgress)
     val currentOnBackGestureCommit by rememberUpdatedState(onBackGestureCommit)
@@ -68,4 +60,27 @@ internal fun Modifier.floatingChatOverlayGestureBinding(
         onBackGestureEnd = currentOnBackGestureEnd,
         onBackGestureCancel = currentOnBackGestureCancel
     )
+}
+
+internal fun floatingChatEdgeGestureShortThresholdPx(
+    shortThresholdDp: Int,
+    density: Float
+): Float {
+    val safeDensity = density.takeIf { it.isFinite() && it > 0f } ?: 1f
+    return configuredSideGestureThresholdsDp(
+        shortPullDistanceDp = shortThresholdDp.toFloat(),
+        longPullDistanceDp = shortThresholdDp.toFloat()
+    ).minPullDistanceDp * safeDensity
+}
+
+internal fun floatingChatEdgeGestureLongThresholdPx(
+    shortThresholdDp: Int,
+    longThresholdDp: Int,
+    density: Float
+): Float {
+    val safeDensity = density.takeIf { it.isFinite() && it > 0f } ?: 1f
+    return configuredSideGestureThresholdsDp(
+        shortPullDistanceDp = shortThresholdDp.toFloat(),
+        longPullDistanceDp = longThresholdDp.toFloat()
+    ).longPullDistanceDp * safeDensity
 }

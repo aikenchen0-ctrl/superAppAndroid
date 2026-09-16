@@ -436,6 +436,13 @@ class FloatingChatMessageUiContractTest {
     }
 
     @Test
+    fun interactiveRecoveryAllowsNativeTouchRetryAfterTransientFailure() {
+        assertEquals(true, shouldResetNativeTouchRuntimeFailureOnWake(false, true))
+        assertEquals(false, shouldResetNativeTouchRuntimeFailureOnWake(true, true))
+        assertEquals(false, shouldResetNativeTouchRuntimeFailureOnWake(false, false))
+    }
+
+    @Test
     fun keyboardAlwaysSuspendsNativeTouchExplorationToPreventTypingSpeech() {
         val eligibility = NativeTouchInteractionEligibility(
             sdkInt = 34,
@@ -3962,10 +3969,10 @@ class FloatingChatMessageUiContractTest {
         assertEquals(260, sanitizeBottomGestureBarWidthDp(600))
         assertEquals(GestureAction.Recents, defaultBottomGestureBarAction(BottomGestureBarGestureType.Tap))
         assertEquals(GestureAction.Home, defaultBottomGestureBarAction(BottomGestureBarGestureType.SwipeUp))
-        assertEquals(GestureAction.Screenshot, defaultBottomGestureBarAction(BottomGestureBarGestureType.SwipeUpHold))
+        assertEquals(GestureAction.None, defaultBottomGestureBarAction(BottomGestureBarGestureType.SwipeUpHold))
         assertEquals(GestureAction.Back, defaultBottomGestureBarAction(BottomGestureBarGestureType.SwipeHorizontal))
         assertEquals(GestureAction.Notifications, defaultBottomGestureBarAction(BottomGestureBarGestureType.LongPress))
-        assertEquals(true, bottomGestureBarDispatchesGestureActionAfterTouchEvent())
+        assertEquals(false, bottomGestureBarDispatchesGestureActionAfterTouchEvent())
     }
 
     @Test
@@ -4055,7 +4062,7 @@ class FloatingChatMessageUiContractTest {
             )
         )
         assertEquals(
-            BottomGestureBarAction.Screenshot,
+            BottomGestureBarAction.None,
             resolveBottomGestureBarAction(
                 deltaX = 0f,
                 deltaY = -120f,

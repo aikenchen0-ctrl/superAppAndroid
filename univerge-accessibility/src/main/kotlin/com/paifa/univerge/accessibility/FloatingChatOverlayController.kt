@@ -269,6 +269,8 @@ internal class FloatingChatOverlayController(
         return true
     }
 
+    fun hasBackOverride(): Boolean = runtimeState.canHandleBack()
+
     fun toggle() {
         if (state == FloatingChatOverlayState.Expanded) {
             collapse()

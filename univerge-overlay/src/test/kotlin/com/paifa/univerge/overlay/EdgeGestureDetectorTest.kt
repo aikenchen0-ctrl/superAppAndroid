@@ -78,6 +78,49 @@ class EdgeGestureDetectorTest {
     }
 
     @Test
+    fun terminalActionIsDeliveredBeforePreviewCleanupAtUp() {
+        val events = mutableListOf<String>()
+        val detector = EdgeGestureDetector(
+            side = EdgeSide.LEFT,
+            minSwipeDistancePx = 20f,
+            longSwipeDistancePx = 60f,
+            onGesture = { _, _ -> events += "legacy-action" },
+            onGestureEnd = { events += "preview-end" },
+            actionBindings = mapOf(GestureType.PULL_INWARD_SHORT to GestureAction.Back),
+            onGestureWithAction = { _, _, _ -> events += "action" },
+            viewportHeightPx = { 800f }
+        )
+
+        detector.onTouchEvent(event(MotionEvent.ACTION_DOWN, x = 0f, y = 200f, time = 0L))
+        detector.onTouchEvent(event(MotionEvent.ACTION_MOVE, x = 40f, y = 200f, time = 20L))
+        detector.onTouchEvent(event(MotionEvent.ACTION_UP, x = 40f, y = 200f, time = 40L))
+
+        assertEquals(listOf("action", "preview-end"), events)
+    }
+
+    @Test
+    fun backTerminalActionIsDeliveredBeforeBackAndPreviewCleanupAtUp() {
+        val events = mutableListOf<String>()
+        val detector = EdgeGestureDetector(
+            side = EdgeSide.LEFT,
+            minSwipeDistancePx = 20f,
+            longSwipeDistancePx = 60f,
+            onGesture = { _, _ -> events += "legacy-action" },
+            onGestureEnd = { events += "preview-end" },
+            onBackGestureEnd = { events += "back-end" },
+            onBackGestureCommit = { _, _ -> events += "back-action"; true },
+            actionBindings = mapOf(GestureType.PULL_INWARD_SHORT to GestureAction.Back),
+            viewportHeightPx = { 800f }
+        )
+
+        detector.onTouchEvent(event(MotionEvent.ACTION_DOWN, x = 0f, y = 200f, time = 0L))
+        detector.onTouchEvent(event(MotionEvent.ACTION_MOVE, x = 40f, y = 200f, time = 20L))
+        detector.onTouchEvent(event(MotionEvent.ACTION_UP, x = 40f, y = 200f, time = 40L))
+
+        assertEquals(listOf("back-action", "back-end", "preview-end"), events)
+    }
+
+    @Test
     fun slightRetractionAfterPreviewStillCommitsThroughTheOverlayAdapter() {
         val commits = mutableListOf<GestureType>()
         val detector = detector(onGesture = { type, _ -> commits += type })
@@ -187,6 +230,25 @@ class EdgeGestureDetectorTest {
         view.onTouchEvent(event(MotionEvent.ACTION_UP, x = 40f, y = 200f, time = 40L))
 
         assertEquals(listOf(GestureAction.Back), commits)
+    }
+
+    @Test
+    fun overlayUsesTheEffectiveShortThresholdForVerticalSwipesByDefault() {
+        val commits = mutableListOf<GestureType>()
+        val view = EdgeOverlayView(
+            context = RuntimeEnvironment.getApplication(),
+            side = EdgeSide.LEFT,
+            visibleThicknessDp = 24,
+            swipeThresholdDp = 45,
+            onGesture = { type, _ -> commits += type }
+        )
+        view.layout(0, 0, 48, 800)
+
+        view.onTouchEvent(event(MotionEvent.ACTION_DOWN, x = 0f, y = 400f, time = 0L))
+        view.onTouchEvent(event(MotionEvent.ACTION_MOVE, x = 0f, y = 365f, time = 20L))
+        view.onTouchEvent(event(MotionEvent.ACTION_UP, x = 0f, y = 365f, time = 40L))
+
+        assertEquals(listOf(GestureType.SWIPE_UP), commits)
     }
 
     @Test

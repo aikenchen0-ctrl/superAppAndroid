@@ -59,6 +59,12 @@ class GestureEventLedger(
     @Synchronized
     fun acceptGestureId(gestureId: Long): Boolean = acceptGestureIdLocked(gestureId)
 
+    /** Returns an id to the available set when downstream dispatch rejects it. */
+    @Synchronized
+    fun releaseGestureId(gestureId: Long) {
+        if (gestureId > 0L) terminalGestureIds.remove(gestureId)
+    }
+
     private fun acceptGestureIdLocked(gestureId: Long): Boolean {
         if (gestureId <= 0L) return true
         if (!terminalGestureIds.add(gestureId)) return false

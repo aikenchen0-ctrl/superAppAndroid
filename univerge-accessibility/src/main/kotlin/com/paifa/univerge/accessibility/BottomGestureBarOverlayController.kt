@@ -453,33 +453,50 @@ internal class BottomGestureBarOverlayController(
  * dispatch an action.
  */
 internal class BottomGestureBarDispatchSession<T>(
-    private val onCommit: (T) -> Unit = {}
+    private val commitCallback: (T) -> Unit = {}
 ) {
     private var active = false
-    private var terminal = false
+    private var committed = false
+
+    /** True until the adapter has delivered the terminal cleanup callback. */
+    val hasPendingTerminal: Boolean
+        get() = active
 
     fun onDown() {
         active = true
-        terminal = false
+        committed = false
     }
 
-    fun onMove() {
-        // MOVE is preview-only; it never reaches the action callback.
+    /**
+     * Commits the current transaction at the first stable recognition point.
+     * This is deliberately separate from [onUp]: directional and timed
+     * gestures can cross their threshold while the pointer is still down.
+     */
+    fun onCommit(value: T): Boolean {
+        if (!active || committed) return false
+        committed = true
+        commitCallback(value)
+        return true
     }
+
+    fun onMove() = Unit
 
     fun onUp(value: T): Boolean {
-        if (!active || terminal) return false
-        terminal = true
-        active = false
-        onCommit(value)
-        return true
+        val dispatched = onCommit(value)
+        onFinish()
+        return dispatched
     }
 
     fun onCancel() {
         if (active) {
-            terminal = true
-            active = false
+            onFinish()
         }
+    }
+
+    /** Closes the adapter transaction after the platform terminal event. */
+    fun onFinish() {
+        active = false
+        committed = false
     }
 }
 
@@ -489,6 +506,32 @@ enum class BottomGestureBarGestureType(val id: String) {
     SwipeUpHold("swipe_up_hold"),
     SwipeHorizontal("swipe_horizontal"),
     LongPress("long_press")
+}
+
+/**
+ * Normalizes the two upward gestures that share the same physical prefix.
+ * Keeping both actions enabled makes a normal upward swipe wait for an
+ * additional MOVE in order to disambiguate a pause, which violates the
+ * bottom bar's immediate-action contract. The most recently enabled action
+ * therefore owns the prefix; disabling an action does not modify the other.
+ */
+internal fun normalizeBottomGestureBarActionBindings(
+    actions: Map<BottomGestureBarGestureType, GestureAction>,
+    changedGesture: BottomGestureBarGestureType,
+    changedAction: GestureAction
+): Map<BottomGestureBarGestureType, GestureAction> {
+    val normalized = actions.toMutableMap()
+    normalized[changedGesture] = changedAction
+    if (changedAction != GestureAction.None) {
+        when (changedGesture) {
+            BottomGestureBarGestureType.SwipeUp ->
+                normalized[BottomGestureBarGestureType.SwipeUpHold] = GestureAction.None
+            BottomGestureBarGestureType.SwipeUpHold ->
+                normalized[BottomGestureBarGestureType.SwipeUp] = GestureAction.None
+            else -> Unit
+        }
+    }
+    return normalized
 }
 
 internal fun resolveBottomGestureBarGestureType(
@@ -519,7 +562,10 @@ internal fun defaultBottomGestureBarAction(gestureType: BottomGestureBarGestureT
     return when (gestureType) {
         BottomGestureBarGestureType.Tap -> GestureAction.Recents
         BottomGestureBarGestureType.SwipeUp -> GestureAction.Home
-        BottomGestureBarGestureType.SwipeUpHold -> GestureAction.Screenshot
+        // SwipeUpHold shares the same prefix as SwipeUp. Keeping it disabled
+        // by default lets the common upward swipe commit at the threshold;
+        // users who want the pause gesture can opt into it explicitly.
+        BottomGestureBarGestureType.SwipeUpHold -> GestureAction.None
         BottomGestureBarGestureType.SwipeHorizontal -> GestureAction.Back
         BottomGestureBarGestureType.LongPress -> GestureAction.Notifications
     }
@@ -584,6 +630,7 @@ internal fun nativeBottomGestureHitTest(
 }
 
 internal enum class BottomGestureBarAction {
+    None,
     Back,
     Home,
     Recents,
@@ -608,13 +655,15 @@ internal fun resolveBottomGestureBarAction(
         GestureAction.Home -> BottomGestureBarAction.Home
         GestureAction.Recents -> BottomGestureBarAction.Recents
         GestureAction.Screenshot -> BottomGestureBarAction.Screenshot
+        GestureAction.None -> BottomGestureBarAction.None
         else -> BottomGestureBarAction.Back
     }
 }
 
 internal fun bottomGestureBarBottomInsetDp(): Int = 0
 
-internal fun bottomGestureBarDispatchesGestureActionAfterTouchEvent(): Boolean = true
+/** Directional/timed gestures may dispatch before the platform UP event. */
+internal fun bottomGestureBarDispatchesGestureActionAfterTouchEvent(): Boolean = false
 
 internal fun bottomGestureBarTouchHeightDp(): Int = BottomGestureBarTouchHeightDp
 
@@ -648,14 +697,31 @@ private class BottomGestureBarView(
     private var pressed = false
     private var touchActive = false
     private var finishDelivered = false
-    private var commitPending = false
+    private var commitDispatched = false
     private val dispatchSession = BottomGestureBarDispatchSession<GestureSignal.Commit>()
     private val holdHandler = Handler(Looper.getMainLooper())
     private val holdPollRunnable = object : Runnable {
         override fun run() {
             if (!touchActive || !recognizer.hasActiveGesture) return
-            recognizer.onHoldTimer(SystemClock.uptimeMillis())
+            val signal = recognizer.onHoldTimer(SystemClock.uptimeMillis())
+            if (signal is GestureSignal.Commit) {
+                touchActive = false
+                dispatchCommit(signal)
+                return
+            }
             holdHandler.postDelayed(this, HOLD_POLL_INTERVAL_MS)
+        }
+    }
+    private val terminalWatchdog = object : Runnable {
+        override fun run() {
+            if (!commitDispatched || !recognizer.hasActiveGesture) return
+            touchActive = false
+            dispatchSession.onCancel()
+            recognizer.onCancel()
+            pressed = false
+            invalidate()
+            commitDispatched = false
+            finishGesture()
         }
     }
 
@@ -664,12 +730,14 @@ private class BottomGestureBarView(
 
     fun cancelActiveGesture() {
         holdHandler.removeCallbacks(holdPollRunnable)
+        holdHandler.removeCallbacks(terminalWatchdog)
         touchActive = false
         dispatchSession.onCancel()
         recognizer.onCancel()
         pressed = false
         invalidate()
-        if (!commitPending) finishGesture()
+        commitDispatched = false
+        finishGesture()
     }
 
     fun updateGeometry(next: BottomBarConfig): Boolean = recognizer.updateGeometry(next)
@@ -709,8 +777,10 @@ private class BottomGestureBarView(
         val yDp = event.rawY / density
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                abandonPreviousTransactionIfNeeded()
                 dispatchSession.onDown()
-                if (!commitPending) finishDelivered = false
+                finishDelivered = false
+                commitDispatched = false
                 recognizer.onDown(
                     xDp = xDp,
                     yDp = yDp,
@@ -735,6 +805,10 @@ private class BottomGestureBarView(
                 )
                 if (signal is GestureSignal.Preview) {
                     dispatchSession.onMove()
+                } else if (signal is GestureSignal.Commit) {
+                    holdHandler.removeCallbacks(holdPollRunnable)
+                    touchActive = false
+                    dispatchCommit(signal)
                 } else if (signal is GestureSignal.Cancel) {
                     holdHandler.removeCallbacks(holdPollRunnable)
                     touchActive = false
@@ -757,27 +831,14 @@ private class BottomGestureBarView(
                 touchActive = false
                 pressed = false
                 invalidate()
-                if (signal is GestureSignal.Commit && dispatchSession.onUp(signal)) {
-                    val action = signal.action
-                    val data = signal.data.toScreenData(density)
-                    commitPending = true
-                    performClick()
-                    val posted = holdHandler.post {
-                        try {
-                            onGesture(action, data)
-                        } finally {
-                            commitPending = false
-                            finishGesture()
-                        }
-                    }
-                    if (!posted) {
-                        commitPending = false
-                        finishGesture()
-                    }
-                } else {
-                    dispatchSession.onCancel()
-                    if (!commitPending) finishGesture()
+                if (signal is GestureSignal.Commit) {
+                    dispatchCommit(signal)
                 }
+                if (!commitDispatched) {
+                    dispatchSession.onCancel()
+                }
+                finishGesture()
+                commitDispatched = false
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
@@ -787,7 +848,8 @@ private class BottomGestureBarView(
                 recognizer.onCancel()
                 pressed = false
                 invalidate()
-                if (!commitPending) finishGesture()
+                commitDispatched = false
+                finishGesture()
                 return true
             }
             MotionEvent.ACTION_POINTER_DOWN,
@@ -798,7 +860,8 @@ private class BottomGestureBarView(
                 recognizer.onCancel()
                 pressed = false
                 invalidate()
-                if (!commitPending) finishGesture()
+                commitDispatched = false
+                finishGesture()
                 return true
             }
         }
@@ -809,29 +872,61 @@ private class BottomGestureBarView(
         super.onWindowFocusChanged(hasWindowFocus)
         if (!hasWindowFocus) {
             holdHandler.removeCallbacks(holdPollRunnable)
+            holdHandler.removeCallbacks(terminalWatchdog)
             touchActive = false
             dispatchSession.onCancel()
             recognizer.onFocusLost()
             pressed = false
             invalidate()
-            if (!commitPending) finishGesture()
+            commitDispatched = false
+            finishGesture()
         }
     }
 
     override fun onDetachedFromWindow() {
         holdHandler.removeCallbacks(holdPollRunnable)
+        holdHandler.removeCallbacks(terminalWatchdog)
         touchActive = false
         dispatchSession.onCancel()
         recognizer.onCancel()
         pressed = false
-        if (!commitPending) finishGesture()
+        commitDispatched = false
+        finishGesture()
         super.onDetachedFromWindow()
     }
 
+    private fun dispatchCommit(signal: GestureSignal.Commit): Boolean {
+        if (!dispatchSession.onCommit(signal)) return false
+        commitDispatched = true
+        holdHandler.removeCallbacks(terminalWatchdog)
+        holdHandler.postDelayed(terminalWatchdog, TERMINAL_WATCHDOG_TIMEOUT_MS)
+        performClick()
+        onGesture(signal.action, signal.data.toScreenData(density))
+        return true
+    }
+
     private fun finishGesture() {
+        holdHandler.removeCallbacks(terminalWatchdog)
         if (finishDelivered) return
         finishDelivered = true
+        dispatchSession.onFinish()
         onGestureFinished()
+    }
+
+    private fun abandonPreviousTransactionIfNeeded() {
+        if (!recognizer.hasActiveGesture && !touchActive && !commitDispatched &&
+            !dispatchSession.hasPendingTerminal
+        ) {
+            return
+        }
+        holdHandler.removeCallbacks(holdPollRunnable)
+        touchActive = false
+        dispatchSession.onCancel()
+        recognizer.onCancel()
+        pressed = false
+        invalidate()
+        commitDispatched = false
+        finishGesture()
     }
 
     override fun performClick(): Boolean {
@@ -843,6 +938,7 @@ private class BottomGestureBarView(
         const val BottomGestureBarVisualWidthDp = 92f
         const val BottomGestureBarVisualHeightDp = 5f
         const val HOLD_POLL_INTERVAL_MS = 50L
+        const val TERMINAL_WATCHDOG_TIMEOUT_MS = 1_500L
     }
 
     private fun GestureData.toScreenData(density: Float): GestureData = GestureData(

@@ -7,6 +7,8 @@ import android.content.SharedPreferences
 import android.os.Parcel
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
+import android.util.Log
 import android.util.Base64
 import android.view.accessibility.AccessibilityEvent
 
@@ -58,7 +60,19 @@ class GestureAccessibilityService : AccessibilityService() {
         mainHandler.post { refreshLease() }
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (
+            event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
+            Log.isLoggable(TAG, Log.DEBUG)
+        ) {
+            Log.d(
+                TAG,
+                "[DEBUG-launch-trace] phase=window-event package=${event.packageName ?: ""} " +
+                    "class=${event.className ?: ""} eventTime=${event.eventTime} " +
+                    "uptime=${SystemClock.uptimeMillis()}"
+            )
+        }
+    }
 
     override fun onInterrupt() {
         if (::overlayController.isInitialized) {
@@ -69,6 +83,7 @@ class GestureAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         serviceConnected = false
         mainHandler.removeCallbacks(leaseHeartbeat)
+        if (::actionExecutor.isInitialized) actionExecutor.close()
         if (::overlayController.isInitialized) overlayController.close()
         GestureServerProcessLease.release(this)
         super.onDestroy()
@@ -83,6 +98,7 @@ class GestureAccessibilityService : AccessibilityService() {
     }
 
     private companion object {
+        const val TAG = "GestureServer"
         const val LEASE_HEARTBEAT_INTERVAL_MS = 1_000L
     }
 }
