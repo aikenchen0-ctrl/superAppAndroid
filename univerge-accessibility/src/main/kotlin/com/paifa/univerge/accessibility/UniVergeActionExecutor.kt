@@ -12,12 +12,12 @@ import android.util.Log
 import android.widget.Toast
 import com.paifa.univerge.core.model.GestureAction
 import com.paifa.univerge.core.model.GestureData
+import com.paifa.univerge.core.sdk.EdgeGestureHostActions
 
 internal class UniVergeActionExecutor(
     private val service: AccessibilityService,
     private val isHapticFeedbackEnabled: () -> Boolean,
-    private val floatingChatOverlayController: FloatingChatOverlayController? = null,
-    private val videoDemoOverlayController: VideoDemoOverlayController? = null
+    private val hostActions: EdgeGestureHostActions = object : EdgeGestureHostActions {}
 ) {
     fun execute(action: GestureAction, data: GestureData) {
         if (action == GestureAction.None) return
@@ -26,10 +26,7 @@ internal class UniVergeActionExecutor(
 
         when (action) {
             GestureAction.Back -> {
-                if (videoDemoOverlayController?.dismissIfShowing() == true) {
-                    return
-                }
-                if (floatingChatOverlayController?.dismissPreviewOrSheet() != true) {
+                if (!hostActions.consumeBack(data)) {
                     service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
                 }
             }
@@ -41,9 +38,9 @@ internal class UniVergeActionExecutor(
             GestureAction.LockScreen -> lockScreen()
             GestureAction.VolumeUp -> adjustMusicVolume(AudioManager.ADJUST_RAISE)
             GestureAction.VolumeDown -> adjustMusicVolume(AudioManager.ADJUST_LOWER)
-            GestureAction.ExpandFloatingChat -> floatingChatOverlayController?.expand()
-            GestureAction.CollapseFloatingChat -> floatingChatOverlayController?.collapse()
-            GestureAction.PlayVideo -> videoDemoOverlayController?.showOrToggle()
+            GestureAction.ExpandFloatingChat,
+            GestureAction.CollapseFloatingChat,
+            GestureAction.PlayVideo -> hostActions.execute(action, data)
             is GestureAction.LaunchApp -> launchApp(action.packageName)
             GestureAction.None -> Unit
         }

@@ -28,6 +28,7 @@ import com.paifa.univerge.core.model.FloatingChatPrototype
 import com.paifa.univerge.core.model.FloatingChatThumbnailOrientation
 import com.paifa.univerge.core.model.GestureAction
 import com.paifa.univerge.core.model.GestureData
+import com.paifa.univerge.core.sdk.EdgeGestureHostActions
 import com.paifa.univerge.core.model.GestureType
 import com.paifa.univerge.core.model.gestureMappingOrder
 import com.paifa.univerge.core.sidefunction.SideFunctionConfig
@@ -228,8 +229,7 @@ class UniVergeAccessibilityService : AccessibilityService() {
         actionExecutor = UniVergeActionExecutor(
             this,
             isHapticFeedbackEnabled = { preferences.hapticFeedback },
-            floatingChatOverlayController = floatingChatOverlayController,
-            videoDemoOverlayController = videoDemoOverlayController
+            hostActions = edgeGestureHostActions()
         )
         refreshSideFunctionPreviewItems()
         refreshGesturePreviewLabels()
@@ -977,8 +977,7 @@ class UniVergeAccessibilityService : AccessibilityService() {
             actionExecutor = UniVergeActionExecutor(
                 this,
                 isHapticFeedbackEnabled = { preferences.hapticFeedback },
-                floatingChatOverlayController = floatingChatOverlayController,
-                videoDemoOverlayController = videoDemoOverlayController
+                hostActions = edgeGestureHostActions()
             )
             createOverlays()
             floatingChatOverlayController.refreshEdgeGestureConfig()
@@ -1494,6 +1493,22 @@ class UniVergeAccessibilityService : AccessibilityService() {
             data,
             GestureActionSource.ComposeBottom
         )
+    }
+
+    private fun edgeGestureHostActions(): EdgeGestureHostActions = object : EdgeGestureHostActions {
+        override fun consumeBack(data: GestureData): Boolean =
+            videoDemoOverlayController.dismissIfShowing() ||
+                floatingChatOverlayController.dismissPreviewOrSheet()
+
+        override fun execute(action: GestureAction, data: GestureData): Boolean {
+            when (action) {
+                GestureAction.ExpandFloatingChat -> floatingChatOverlayController.expand()
+                GestureAction.CollapseFloatingChat -> floatingChatOverlayController.collapse()
+                GestureAction.PlayVideo -> videoDemoOverlayController.showOrToggle()
+                else -> return false
+            }
+            return true
+        }
     }
 
     private fun executeConfiguredGestureAction(

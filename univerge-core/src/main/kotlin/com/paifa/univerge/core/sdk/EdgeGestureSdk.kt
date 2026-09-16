@@ -8,6 +8,13 @@ fun interface EdgeGestureActionHandler {
     fun execute(action: GestureAction, data: GestureData): Boolean
 }
 
+/** Optional host behavior. Returning true means the host consumed the action. */
+interface EdgeGestureHostActions {
+    fun consumeBack(data: GestureData): Boolean = false
+
+    fun execute(action: GestureAction, data: GestureData): Boolean = false
+}
+
 /** Immutable lifecycle/configuration contract exposed by the edge gesture SDK. */
 data class EdgeGestureSdkConfig(
     val enabled: Boolean = true,
